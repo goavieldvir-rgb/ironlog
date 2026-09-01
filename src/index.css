@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    background-color: #14161A;
+  }
+  body {
+    @apply bg-ink text-chalk font-body antialiased;
+    font-feature-settings: 'tnum' 1;
+  }
+  ::selection {
+    background-color: #D64545;
+    color: #EDEDE6;
+  }
+  * {
+    @apply border-line;
+  }
+  :focus-visible {
+    outline: 2px solid #C9A24B;
+    outline-offset: 2px;
+  }
+  input, select, textarea {
+    @apply bg-surface2 text-chalk placeholder:text-chalkdim/60 rounded-md px-3 py-2 text-sm border border-line focus:border-brass outline-none transition-colors;
+  }
+  h1, h2, h3, h4 {
+    @apply font-display;
+  }
+}
+
+@layer utilities {
+  .eyebrow {
+    @apply font-mono text-[11px] tracking-widest2 uppercase text-chalkdim;
+  }
+  .num {
+    @apply font-mono tabular-nums;
+  }
+  .card {
+    @apply bg-surface border border-line rounded-xl;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #31353E;
+    border-radius: 4px;
+  }
+}
