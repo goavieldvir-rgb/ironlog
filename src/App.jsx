@@ -11,6 +11,7 @@ import WorkoutSession from './components/WorkoutSession.jsx'
 import History from './components/History.jsx'
 import SessionDetail from './components/SessionDetail.jsx'
 import People from './components/People.jsx'
+import Stats from './components/Stats.jsx'
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="/history" element={<History />} />
         <Route path="/history/:id" element={<SessionDetail />} />
         <Route path="/people" element={<People />} />
+        <Route path="/stats" element={<Stats />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
