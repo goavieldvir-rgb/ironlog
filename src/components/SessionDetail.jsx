@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ChevronLeft, Play } from 'lucide-react'
+import { ChevronLeft, Play, Pencil } from 'lucide-react'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection } from '../lib/db.js'
 import { Card, CategoryTag } from './ui.jsx'
@@ -27,9 +27,17 @@ export default function SessionDetail() {
       </Link>
 
       <div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <h1 className="text-3xl">{session.routine_name}</h1>
-          <CategoryTag category={session.category} />
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-3xl">{session.routine_name}</h1>
+            <CategoryTag category={session.category} />
+          </div>
+          <Link
+            to={`/history/${session.id}/edit`}
+            className="inline-flex items-center gap-1.5 text-sm text-brass hover:underline"
+          >
+            <Pencil size={14} /> Edit
+          </Link>
         </div>
         <p className="text-chalkdim text-sm mt-1">{formatDate(session.date)}</p>
       </div>

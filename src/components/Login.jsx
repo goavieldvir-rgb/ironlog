@@ -1,15 +1,17 @@
 import React, { useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
+import { supabase } from '../supabase.js'
 import { Button, Field } from './ui.jsx'
 
 export default function Login() {
   const { login, signup } = useAuth()
-  const [mode, setMode] = useState('login') // 'login' | 'signup'
+  const [mode, setMode] = useState('login') // 'login' | 'signup' | 'reset'
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -18,14 +20,26 @@ export default function Login() {
     try {
       if (mode === 'login') {
         await login(email, password)
-      } else {
+      } else if (mode === 'signup') {
         await signup(email, password, name)
+      } else if (mode === 'reset') {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin + window.location.pathname,
+        })
+        if (error) throw error
+        setResetSent(true)
       }
     } catch (err) {
       setError(friendlyError(err))
     } finally {
       setBusy(false)
     }
+  }
+
+  function switchMode(next) {
+    setMode(next)
+    setError('')
+    setResetSent(false)
   }
 
   return (
@@ -40,55 +54,108 @@ export default function Login() {
         </div>
 
         <div className="card p-6">
-          <div className="flex mb-6 rounded-md bg-surface2 p-1 text-sm">
-            <button
-              type="button"
-              onClick={() => setMode('login')}
-              className={`flex-1 rounded py-1.5 transition-colors ${mode === 'login' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}
-            >
-              Log in
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('signup')}
-              className={`flex-1 rounded py-1.5 transition-colors ${mode === 'signup' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}
-            >
-              Create account
-            </button>
-          </div>
+          {mode !== 'reset' && (
+            <div className="flex mb-6 rounded-md bg-surface2 p-1 text-sm">
+              <button
+                type="button"
+                onClick={() => switchMode('login')}
+                className={`flex-1 rounded py-1.5 transition-colors ${mode === 'login' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}
+              >
+                Log in
+              </button>
+              <button
+                type="button"
+                onClick={() => switchMode('signup')}
+                className={`flex-1 rounded py-1.5 transition-colors ${mode === 'signup' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}
+              >
+                Create account
+              </button>
+            </div>
+          )}
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            {mode === 'signup' && (
-              <Field label="Name">
-                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Alex" required />
+          {mode === 'reset' && resetSent ? (
+            <div className="flex flex-col gap-4 text-center py-2">
+              <p className="text-chalk">Check your email for a reset link.</p>
+              <p className="text-chalkdim text-sm">Sent to {email}</p>
+              <button
+                type="button"
+                onClick={() => switchMode('login')}
+                className="text-brass text-sm hover:underline w-fit mx-auto"
+              >
+                Back to log in
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              {mode === 'reset' && (
+                <div>
+                  <h2 className="text-xl mb-1">Reset your password</h2>
+                  <p className="text-chalkdim text-sm">We'll email you a link to set a new one.</p>
+                </div>
+              )}
+
+              {mode === 'signup' && (
+                <Field label="Name">
+                  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Alex" required />
+                </Field>
+              )}
+
+              <Field label="Email">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                />
               </Field>
-            )}
-            <Field label="Email">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-              />
-            </Field>
-            <Field label="Password">
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                minLength={6}
-                required
-              />
-            </Field>
 
-            {error && <p className="text-iron text-sm">{error}</p>}
+              {mode !== 'reset' && (
+                <Field label="Password">
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    minLength={6}
+                    required
+                  />
+                </Field>
+              )}
 
-            <Button type="submit" disabled={busy} className="mt-2 w-full">
-              {busy ? 'One moment…' : mode === 'login' ? 'Log in' : 'Create account'}
-            </Button>
-          </form>
+              {mode === 'login' && (
+                <button
+                  type="button"
+                  onClick={() => switchMode('reset')}
+                  className="text-chalkdim text-xs hover:text-brass w-fit -mt-1"
+                >
+                  Forgot password?
+                </button>
+              )}
+
+              {error && <p className="text-iron text-sm">{error}</p>}
+
+              <Button type="submit" disabled={busy} className="mt-2 w-full">
+                {busy
+                  ? 'One moment…'
+                  : mode === 'login'
+                    ? 'Log in'
+                    : mode === 'signup'
+                      ? 'Create account'
+                      : 'Send reset link'}
+              </Button>
+
+              {mode === 'reset' && (
+                <button
+                  type="button"
+                  onClick={() => switchMode('login')}
+                  className="text-chalkdim text-xs hover:text-chalk w-fit mx-auto"
+                >
+                  Back to log in
+                </button>
+              )}
+            </form>
+          )}
         </div>
 
         <p className="text-chalkdim text-xs text-center mt-6">

@@ -129,3 +129,16 @@ export async function deleteSession(uid, id) {
   const { error } = await supabase.from('sessions').delete().eq('id', id).eq('user_id', uid)
   if (error) throw error
 }
+
+// Editing a past session only touches that session's own row — it
+// deliberately does NOT update the "last weight/reps" snapshot on
+// exercises, since that should reflect the most recent session overall,
+// not whichever one happens to be getting corrected right now.
+export async function updateSession(uid, id, patch) {
+  const row = {}
+  if (patch.date !== undefined) row.date = patch.date
+  if (patch.notes !== undefined) row.notes = patch.notes
+  if (patch.entries !== undefined) row.entries = patch.entries
+  const { error } = await supabase.from('sessions').update(row).eq('id', id).eq('user_id', uid)
+  if (error) throw error
+}
