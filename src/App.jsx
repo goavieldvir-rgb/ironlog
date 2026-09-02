@@ -14,6 +14,8 @@ import SessionDetail from './components/SessionDetail.jsx'
 import EditSession from './components/EditSession.jsx'
 import People from './components/People.jsx'
 import Stats from './components/Stats.jsx'
+import BodyWeight from './components/BodyWeight.jsx'
+import WeeklySummary from './components/WeeklySummary.jsx'
 import ResetPassword from './components/ResetPassword.jsx'
 
 export default function App() {
@@ -66,6 +68,8 @@ export default function App() {
         <Route path="/history/:id/edit" element={<EditSession />} />
         <Route path="/people" element={<People />} />
         <Route path="/stats" element={<Stats />} />
+        <Route path="/weight" element={<BodyWeight />} />
+        <Route path="/summary" element={<WeeklySummary />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

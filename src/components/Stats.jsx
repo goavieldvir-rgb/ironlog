@@ -78,34 +78,50 @@ export default function Stats() {
   // Personal records + per-exercise progress history, derived straight from
   // the sets people logged (no need for a separate exercises fetch).
   const { records, exerciseOptions, progressByExercise } = useMemo(() => {
-    const recMap = {} // exerciseId -> { name, unit, weight, reps, date }
-    const progMap = {} // exerciseId -> [{ date, weight }]
+    const recMap = {} // exerciseId -> { name, unit, bodyweight, weight, reps, date }
+    const progMap = {} // exerciseId -> { name, unit, bodyweight, points: [{ date, weight }] }
 
     for (const s of sessions) {
       for (const entry of s.entries || []) {
         if (!entry.exerciseId) continue
-        const completed = (entry.sets || []).filter(
-          (set) => set.weight !== '' && set.weight != null && set.reps !== '' && set.reps != null,
-        )
+        const completed = (entry.sets || []).filter((set) => {
+          const repsOk = set.reps !== '' && set.reps != null
+          const weightOk = entry.bodyweight ? true : set.weight !== '' && set.weight != null
+          return repsOk && weightOk
+        })
         if (completed.length === 0) continue
 
-        const topSet = completed.reduce((best, set) =>
-          Number(set.weight) > Number(best.weight) ? set : best,
-        )
+        // For a normal weighted exercise, the "top set" is the heaviest.
+        // For a bodyweight exercise, added weight is usually 0/optional, so
+        // the meaningful achievement is the most reps instead.
+        const topSet = entry.bodyweight
+          ? completed.reduce((best, set) => (Number(set.reps) > Number(best.reps) ? set : best))
+          : completed.reduce((best, set) => (Number(set.weight) > Number(best.weight) ? set : best))
 
         const existing = recMap[entry.exerciseId]
-        if (!existing || Number(topSet.weight) > existing.weight) {
+        const isNewBest = entry.bodyweight
+          ? !existing || Number(topSet.reps) > existing.reps
+          : !existing || Number(topSet.weight) > existing.weight
+        if (isNewBest) {
           recMap[entry.exerciseId] = {
             name: entry.name,
             unit: entry.unit,
-            weight: Number(topSet.weight),
+            bodyweight: !!entry.bodyweight,
+            weight: Number(topSet.weight) || 0,
             reps: Number(topSet.reps),
             date: s.date,
           }
         }
 
-        if (!progMap[entry.exerciseId]) progMap[entry.exerciseId] = { name: entry.name, unit: entry.unit, points: [] }
-        progMap[entry.exerciseId].points.push({ date: s.date, label: shortDate(s.date), weight: Number(topSet.weight) })
+        if (!progMap[entry.exerciseId]) {
+          progMap[entry.exerciseId] = { name: entry.name, unit: entry.unit, bodyweight: !!entry.bodyweight, points: [] }
+        }
+        progMap[entry.exerciseId].points.push({
+          date: s.date,
+          label: shortDate(s.date),
+          weight: Number(topSet.weight) || 0,
+          reps: Number(topSet.reps),
+        })
       }
     }
 
@@ -206,16 +222,18 @@ export default function Stats() {
                     tickLine={false}
                     axisLine={false}
                     width={36}
-                    domain={['dataMin - 5', 'dataMax + 5']}
+                    domain={selectedProgress.bodyweight ? [0, 'dataMax + 2'] : ['dataMin - 5', 'dataMax + 5']}
                   />
                   <Tooltip
                     contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
                     labelStyle={{ color: COLORS.chalk }}
-                    formatter={(value) => [`${value}${selectedProgress.unit}`, 'Top set']}
+                    formatter={(value) =>
+                      selectedProgress.bodyweight ? [`${value} reps`, 'Top set'] : [`${value}${selectedProgress.unit}`, 'Top set']
+                    }
                   />
                   <Line
                     type="monotone"
-                    dataKey="weight"
+                    dataKey={selectedProgress.bodyweight ? 'reps' : 'weight'}
                     stroke={COLORS.iron}
                     strokeWidth={2.5}
                     dot={{ fill: COLORS.iron, r: 3 }}
@@ -224,6 +242,11 @@ export default function Stats() {
               </ResponsiveContainer>
             ) : (
               <p className="text-chalkdim text-sm">Pick an exercise above to see your progress over time.</p>
+            )}
+            {selectedProgress?.bodyweight && (
+              <p className="text-chalkdim text-xs">
+                Bodyweight exercise — tracking reps per session rather than weight, since added weight is optional.
+              </p>
             )}
           </Card>
 
@@ -238,8 +261,9 @@ export default function Stats() {
                     <p>{r.name}</p>
                     <div className="text-right">
                       <p className="num text-chalk">
-                        {r.weight}
-                        {r.unit} × {r.reps}
+                        {r.bodyweight
+                          ? `${r.weight > 0 ? `+${r.weight}${r.unit} ` : ''}BW × ${r.reps}`
+                          : `${r.weight}${r.unit} × ${r.reps}`}
                       </p>
                       <p className="text-chalkdim text-xs">{shortDate(r.date)}</p>
                     </div>

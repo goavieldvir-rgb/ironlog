@@ -43,6 +43,7 @@ export async function addExercise(uid, exercise) {
     video_url: exercise.videoUrl || '',
     notes: exercise.notes || '',
     unit: exercise.unit || 'kg',
+    bodyweight: !!exercise.bodyweight,
   })
   if (error) throw error
 }
@@ -54,6 +55,7 @@ export async function updateExercise(uid, id, patch) {
   if (patch.videoUrl !== undefined) row.video_url = patch.videoUrl
   if (patch.notes !== undefined) row.notes = patch.notes
   if (patch.unit !== undefined) row.unit = patch.unit
+  if (patch.bodyweight !== undefined) row.bodyweight = patch.bodyweight
   const { error } = await supabase.from('exercises').update(row).eq('id', id).eq('user_id', uid)
   if (error) throw error
 }
@@ -106,18 +108,22 @@ export async function logSession(uid, session) {
   // when building the next session.
   for (const entry of session.entries) {
     if (!entry.exerciseId) continue
-    const completedSets = (entry.sets || []).filter(
-      (s) => s.weight !== '' && s.weight !== null && s.reps !== '' && s.reps !== null,
-    )
+    const completedSets = (entry.sets || []).filter((s) => {
+      const repsOk = s.reps !== '' && s.reps !== null
+      // Bodyweight exercises don't require a weight to count as a completed
+      // set — the added-weight field is optional by design.
+      const weightOk = entry.bodyweight ? true : s.weight !== '' && s.weight !== null
+      return repsOk && weightOk
+    })
     if (completedSets.length === 0) continue
     const last = completedSets[completedSets.length - 1]
     const { error } = await supabase
       .from('exercises')
       .update({
-        last_weight: Number(last.weight),
+        last_weight: Number(last.weight) || 0,
         last_reps: Number(last.reps),
         last_date: session.date,
-        last_sets: completedSets.map((s) => ({ weight: Number(s.weight), reps: Number(s.reps) })),
+        last_sets: completedSets.map((s) => ({ weight: Number(s.weight) || 0, reps: Number(s.reps) })),
       })
       .eq('id', entry.exerciseId)
       .eq('user_id', uid)
@@ -140,5 +146,30 @@ export async function updateSession(uid, id, patch) {
   if (patch.notes !== undefined) row.notes = patch.notes
   if (patch.entries !== undefined) row.entries = patch.entries
   const { error } = await supabase.from('sessions').update(row).eq('id', id).eq('user_id', uid)
+  if (error) throw error
+}
+
+// ---- Body weight tracking ----
+export async function addBodyWeightEntry(uid, entry) {
+  const { error } = await supabase.from('body_weight_logs').insert({
+    user_id: uid,
+    date: entry.date,
+    weight: Number(entry.weight),
+    unit: entry.unit || 'kg',
+  })
+  if (error) throw error
+}
+
+export async function updateBodyWeightEntry(uid, id, patch) {
+  const row = {}
+  if (patch.date !== undefined) row.date = patch.date
+  if (patch.weight !== undefined) row.weight = Number(patch.weight)
+  if (patch.unit !== undefined) row.unit = patch.unit
+  const { error } = await supabase.from('body_weight_logs').update(row).eq('id', id).eq('user_id', uid)
+  if (error) throw error
+}
+
+export async function deleteBodyWeightEntry(uid, id) {
+  const { error } = await supabase.from('body_weight_logs').delete().eq('id', id).eq('user_id', uid)
   if (error) throw error
 }

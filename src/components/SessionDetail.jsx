@@ -3,12 +3,20 @@ import { Link, useParams } from 'react-router-dom'
 import { ChevronLeft, Play, Pencil } from 'lucide-react'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection } from '../lib/db.js'
-import { Card, CategoryTag } from './ui.jsx'
+import { Card, CategoryTag, Badge } from './ui.jsx'
 
 function formatDate(iso) {
   if (!iso) return ''
   const d = new Date(iso + 'T00:00:00')
   return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+}
+
+function formatSet(entry, s) {
+  if (entry.bodyweight) {
+    const added = Number(s.weight) > 0 ? `+${s.weight}${entry.unit} ` : ''
+    return `${added}BW × ${s.reps || 0}`
+  }
+  return `${s.weight || 0}${entry.unit} × ${s.reps || 0}`
 }
 
 export default function SessionDetail() {
@@ -49,7 +57,10 @@ export default function SessionDetail() {
       {(session.entries || []).map((entry, i) => (
         <Card key={i} className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg">{entry.name}</h3>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-lg">{entry.name}</h3>
+              {entry.bodyweight && <Badge tone="brass">Bodyweight</Badge>}
+            </div>
             {entry.videoUrl && (
               <a
                 href={entry.videoUrl}
@@ -65,8 +76,7 @@ export default function SessionDetail() {
             {(entry.sets || []).map((s, j) => (
               <div key={j} className="bg-surface2 rounded-md px-3 py-1.5 text-sm num">
                 <span className="text-chalkdim mr-1">#{j + 1}</span>
-                {s.weight || 0}
-                {entry.unit} × {s.reps || 0}
+                {formatSet(entry, s)}
               </div>
             ))}
           </div>

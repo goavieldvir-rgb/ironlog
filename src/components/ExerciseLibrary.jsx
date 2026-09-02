@@ -2,9 +2,18 @@ import React, { useMemo, useState } from 'react'
 import { Plus, Play, Pencil, Trash2 } from 'lucide-react'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection, addExercise, updateExercise, deleteExercise } from '../lib/db.js'
-import { Button, Card, CategoryTag, EmptyState, Field } from './ui.jsx'
+import { Button, Card, CategoryTag, Badge, EmptyState, Field } from './ui.jsx'
 
-const emptyForm = { name: '', category: 'strength', videoUrl: '', notes: '', unit: 'kg' }
+const emptyForm = { name: '', category: 'strength', videoUrl: '', notes: '', unit: 'kg', bodyweight: false }
+
+function formatLast(ex) {
+  if (ex.last_weight == null) return null
+  if (ex.bodyweight) {
+    const added = Number(ex.last_weight) > 0 ? `+${ex.last_weight}${ex.unit} ` : ''
+    return `Last: ${added}Bodyweight × ${ex.last_reps}`
+  }
+  return `Last: ${ex.last_weight}${ex.unit} × ${ex.last_reps}`
+}
 
 export default function ExerciseLibrary() {
   const { effectiveUid } = useAdmin()
@@ -63,13 +72,9 @@ export default function ExerciseLibrary() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-lg leading-tight">{ex.name}</h3>
                   <CategoryTag category={ex.category} />
+                  {ex.bodyweight && <Badge tone="brass">Bodyweight</Badge>}
                 </div>
-                {ex.last_weight != null && (
-                  <p className="num text-chalkdim text-xs mt-1">
-                    Last: {ex.last_weight}
-                    {ex.unit} × {ex.last_reps}
-                  </p>
-                )}
+                {formatLast(ex) && <p className="num text-chalkdim text-xs mt-1">{formatLast(ex)}</p>}
               </div>
               <div className="flex gap-1 shrink-0">
                 <button
@@ -185,12 +190,29 @@ function ExerciseModal({ initial, onClose, onSave }) {
             </select>
           </Field>
 
-          <Field label="Weight unit">
-            <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
-              <option value="kg">kg</option>
-              <option value="lb">lb</option>
+          <Field label="How is weight tracked?">
+            <select
+              value={form.bodyweight ? 'bodyweight' : form.unit}
+              onChange={(e) => {
+                const v = e.target.value
+                if (v === 'bodyweight') setForm({ ...form, bodyweight: true })
+                else setForm({ ...form, bodyweight: false, unit: v })
+              }}
+            >
+              <option value="kg">Weight in kg</option>
+              <option value="lb">Weight in lb</option>
+              <option value="bodyweight">Bodyweight (e.g. pull-ups, dips)</option>
             </select>
           </Field>
+
+          {form.bodyweight && (
+            <Field label="Added weight unit (optional extra weight)">
+              <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
+                <option value="kg">kg</option>
+                <option value="lb">lb</option>
+              </select>
+            </Field>
+          )}
 
           <Field label="Example video link (optional)">
             <input

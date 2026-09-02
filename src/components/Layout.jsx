@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { Dumbbell, LayoutDashboard, ListChecks, History, Library, LogOut, Menu, X, Users, UserCheck, BarChart3 } from 'lucide-react'
+import { Dumbbell, LayoutDashboard, ListChecks, History, Library, LogOut, Menu, X, Users, UserCheck, BarChart3, Scale, FileText } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 
@@ -10,6 +10,8 @@ const links = [
   { to: '/exercises', label: 'Exercises', icon: Library },
   { to: '/history', label: 'History', icon: History },
   { to: '/stats', label: 'Stats', icon: BarChart3 },
+  { to: '/weight', label: 'Weight', icon: Scale },
+  { to: '/summary', label: 'Summary', icon: FileText },
 ]
 
 export default function Layout() {

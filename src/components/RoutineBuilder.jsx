@@ -35,7 +35,7 @@ export default function RoutineBuilder() {
     if (!ex) return
     setItems([
       ...items,
-      { exerciseId: ex.id, name: ex.name, unit: ex.unit, videoUrl: ex.video_url || '', targetSets: 3, targetReps: 10 },
+      { exerciseId: ex.id, name: ex.name, unit: ex.unit, bodyweight: !!ex.bodyweight, videoUrl: ex.video_url || '', targetSets: 3, targetReps: 10 },
     ])
     setPickId('')
   }

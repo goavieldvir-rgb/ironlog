@@ -1,6 +1,6 @@
 import React from 'react'
 import { Play, Plus, Trash2, Minus, CornerDownLeft, History } from 'lucide-react'
-import { Card } from './ui.jsx'
+import { Card, Badge } from './ui.jsx'
 
 function Stepper({ value, onChange, step, min = 0 }) {
   function bump(delta) {
@@ -57,17 +57,24 @@ export default function SessionEntryCard({
     onUpdateSet(setIdx, { weight: String(entry.lastWeight), reps: String(entry.lastReps) })
   }
 
+  const prevLabel = (() => {
+    if (entry.lastWeight == null) return null
+    if (entry.bodyweight) {
+      const added = Number(entry.lastWeight) > 0 ? `+${entry.lastWeight}${entry.unit} ` : ''
+      return `Previously: ${added}Bodyweight × ${entry.lastReps}`
+    }
+    return `Previously: ${entry.lastWeight}${entry.unit} × ${entry.lastReps}`
+  })()
+
   return (
     <Card className="flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="text-lg">{entry.name}</h3>
-          {entry.lastWeight != null && (
-            <p className="num text-chalkdim text-xs mt-0.5">
-              Previously: {entry.lastWeight}
-              {entry.unit} × {entry.lastReps}
-            </p>
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-lg">{entry.name}</h3>
+            {entry.bodyweight && <Badge tone="brass">Bodyweight</Badge>}
+          </div>
+          {prevLabel && <p className="num text-chalkdim text-xs mt-0.5">{prevLabel}</p>}
         </div>
         <div className="flex items-center gap-2">
           {entry.videoUrl && (
@@ -91,7 +98,7 @@ export default function SessionEntryCard({
       <div className="flex flex-col gap-1.5">
         <div className="grid grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem] gap-1 text-chalkdim eyebrow px-0.5">
           <span>Set</span>
-          <span className="truncate">Wt ({entry.unit})</span>
+          <span className="truncate">{entry.bodyweight ? `+Wt (${entry.unit}) opt.` : `Wt (${entry.unit})`}</span>
           <span>Reps</span>
           <span />
         </div>
