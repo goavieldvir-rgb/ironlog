@@ -3,6 +3,7 @@ import { Plus, Play, Pencil, Trash2 } from 'lucide-react'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection, addExercise, updateExercise, deleteExercise } from '../lib/db.js'
 import { Button, Card, CategoryTag, Badge, EmptyState, Field } from './ui.jsx'
+import ExercisePicker from './ExercisePicker.jsx'
 
 const emptyForm = { name: '', category: 'strength', videoUrl: '', notes: '', unit: 'kg', bodyweight: false }
 
@@ -20,6 +21,7 @@ export default function ExerciseLibrary() {
   const [exercises, loading, refresh] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [tab, setTab] = useState('all')
   const [editing, setEditing] = useState(null) // null = closed, {} = new, {...} = edit
+  const [picking, setPicking] = useState(false)
   const [q, setQ] = useState('')
 
   const filtered = useMemo(() => {
@@ -37,7 +39,7 @@ export default function ExerciseLibrary() {
           <div className="eyebrow mb-1">Library</div>
           <h1 className="text-3xl">Exercises</h1>
         </div>
-        <Button onClick={() => setEditing(emptyForm)}>
+        <Button onClick={() => setPicking(true)}>
           <Plus size={16} /> Add exercise
         </Button>
       </div>
@@ -57,7 +59,7 @@ export default function ExerciseLibrary() {
           title="No exercises yet"
           body="Build your library first — add a name, an optional demo video link, and a category. You'll pick from these when building routines."
           action={
-            <Button variant="brass" onClick={() => setEditing(emptyForm)}>
+            <Button variant="brass" onClick={() => setPicking(true)}>
               <Plus size={16} /> Add your first exercise
             </Button>
           }
@@ -111,6 +113,28 @@ export default function ExerciseLibrary() {
           </Card>
         ))}
       </div>
+
+      {picking && (
+        <ExercisePicker
+          existingNames={exercises.map((e) => e.name)}
+          onAdd={async (g) => {
+            await addExercise(effectiveUid, {
+              name: g.name,
+              category: g.category,
+              unit: g.unit,
+              bodyweight: g.bodyweight,
+              videoUrl: '',
+              notes: '',
+            })
+            refresh()
+          }}
+          onCreateCustom={() => {
+            setPicking(false)
+            setEditing(emptyForm)
+          }}
+          onClose={() => setPicking(false)}
+        />
+      )}
 
       {editing && (
         <ExerciseModal

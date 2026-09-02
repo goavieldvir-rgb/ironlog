@@ -1,6 +1,27 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase.js'
 
+// Reads the shared global_exercises table — no user_id filter, since it's
+// readable by every signed-in account (see supabase-global-library-upgrade.sql).
+export function useGlobalExercises() {
+  const [data, setData] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase
+      .from('global_exercises')
+      .select('*')
+      .order('name', { ascending: true })
+      .then(({ data, error }) => {
+        if (error) console.error(error)
+        setData(data || [])
+        setLoading(false)
+      })
+  }, [])
+
+  return [data, loading]
+}
+
 // Generic live-ish collection hook: fetches rows owned by `uid` from `table`,
 // ordered by `orderField`. Call the returned refresh() after any mutation
 // made from the same screen so the list updates immediately.
