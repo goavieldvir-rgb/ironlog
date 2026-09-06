@@ -1,16 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { Plus, Trash2, ArrowUp, ArrowDown, ChevronLeft } from 'lucide-react'
+import { Plus, Trash2, ArrowUp, ArrowDown, ChevronLeft, Library } from 'lucide-react'
 import { useAdmin } from '../context/AdminContext.jsx'
-import { useCollection, addRoutine, updateRoutine } from '../lib/db.js'
+import { useCollection, addRoutine, updateRoutine, addExercise } from '../lib/db.js'
 import { Button, Card, Field } from './ui.jsx'
+import ExercisePicker from './ExercisePicker.jsx'
 
 export default function RoutineBuilder() {
   const { effectiveUid } = useAdmin()
   const { id } = useParams()
   const navigate = useNavigate()
-  const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
+  const [exercises, , refreshExercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [routines, loading] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
+  const [picking, setPicking] = useState(false)
 
   const existing = useMemo(() => routines.find((r) => r.id === id), [routines, id])
 
@@ -38,6 +40,36 @@ export default function RoutineBuilder() {
       { exerciseId: ex.id, name: ex.name, unit: ex.unit, bodyweight: !!ex.bodyweight, videoUrl: ex.video_url || '', targetSets: 3, targetReps: 10 },
     ])
     setPickId('')
+  }
+
+  // Used by the "Browse library" picker: adds a global exercise to this
+  // person's own library first (if they don't already have it), then drops
+  // it straight into the routine — no need to visit the Exercises tab first.
+  async function addFromLibrary(g) {
+    let ex = exercises.find((e) => e.name.toLowerCase() === g.name.toLowerCase())
+    if (!ex) {
+      ex = await addExercise(effectiveUid, {
+        name: g.name,
+        category: g.category,
+        unit: g.unit,
+        bodyweight: g.bodyweight,
+        videoUrl: '',
+        notes: '',
+      })
+      refreshExercises()
+    }
+    setItems((prev) => [
+      ...prev,
+      {
+        exerciseId: ex.id,
+        name: ex.name,
+        unit: ex.unit,
+        bodyweight: !!ex.bodyweight,
+        videoUrl: ex.video_url || '',
+        targetSets: 3,
+        targetReps: 10,
+      },
+    ])
   }
 
   function updateItem(i, patch) {
@@ -146,10 +178,10 @@ export default function RoutineBuilder() {
           ))}
         </div>
 
-        <div className="flex gap-2 items-end pt-2 border-t border-line">
-          <Field label={`Add ${category === 'mobility' ? 'mobility' : 'strength'} exercise`}>
+        <div className="flex gap-2 items-end pt-2 border-t border-line flex-wrap">
+          <Field label={`Your ${category === 'mobility' ? 'mobility' : 'strength'} exercises`}>
             <select value={pickId} onChange={(e) => setPickId(e.target.value)} className="w-56">
-              <option value="">Choose from library…</option>
+              <option value="">Choose one you've already added…</option>
               {availableExercises.map((e) => (
                 <option key={e.id} value={e.id}>
                   {e.name}
@@ -160,13 +192,28 @@ export default function RoutineBuilder() {
           <Button type="button" variant="ghost" onClick={addItem} disabled={!pickId}>
             <Plus size={16} /> Add
           </Button>
+          <Button type="button" variant="brass" onClick={() => setPicking(true)}>
+            <Library size={16} /> Browse library
+          </Button>
         </div>
         {availableExercises.length === 0 && (
           <p className="text-chalkdim text-xs">
-            No {category} exercises in your library yet — add some on the Exercises page first.
+            Nothing in your own {category} list yet — use "Browse library" to add something.
           </p>
         )}
       </Card>
+
+      {picking && (
+        <ExercisePicker
+          existingNames={exercises.map((e) => e.name)}
+          onAdd={addFromLibrary}
+          onCreateCustom={() => {
+            setPicking(false)
+            navigate('/exercises')
+          }}
+          onClose={() => setPicking(false)}
+        />
+      )}
 
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={() => navigate('/routines')}>

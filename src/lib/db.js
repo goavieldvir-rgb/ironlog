@@ -57,16 +57,21 @@ export function useCollection(uid, table, orderField = 'created_at', direction =
 
 // ---- Exercises ----
 export async function addExercise(uid, exercise) {
-  const { error } = await supabase.from('exercises').insert({
-    user_id: uid,
-    name: exercise.name,
-    category: exercise.category || 'strength', // 'strength' | 'mobility'
-    video_url: exercise.videoUrl || '',
-    notes: exercise.notes || '',
-    unit: exercise.unit || 'kg',
-    bodyweight: !!exercise.bodyweight,
-  })
+  const { data, error } = await supabase
+    .from('exercises')
+    .insert({
+      user_id: uid,
+      name: exercise.name,
+      category: exercise.category || 'strength', // 'strength' | 'mobility'
+      video_url: exercise.videoUrl || '',
+      notes: exercise.notes || '',
+      unit: exercise.unit || 'kg',
+      bodyweight: !!exercise.bodyweight,
+    })
+    .select()
+    .single()
   if (error) throw error
+  return data
 }
 
 export async function updateExercise(uid, id, patch) {
