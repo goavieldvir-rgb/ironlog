@@ -3,9 +3,13 @@
 @tailwind utilities;
 
 @layer base {
-  html {
+ html {
     background-color: #14161A;
+    overscroll-behavior: none;
+    touch-action: manipulation;
   }
+  body {
+    overflow-x: hidden;
   body {
     @apply bg-ink text-chalk font-body antialiased;
     font-feature-settings: 'tnum' 1;
