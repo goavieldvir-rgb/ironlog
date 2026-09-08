@@ -185,6 +185,8 @@ export default function WeeklySummary() {
   const { effectiveUid, effectiveName, actingAs } = useAdmin()
   const [sessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [bodyWeightAll] = useCollection(effectiveUid, 'body_weight_logs', 'date', 'desc')
+  const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
+  const [routines] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
 
   const [mode, setMode] = useState('week')
   const [offset, setOffset] = useState(0)
@@ -238,12 +240,42 @@ export default function WeeklySummary() {
     URL.revokeObjectURL(url)
   }
 
+  function handleFullBackup() {
+    const backup = {
+      exported_at: new Date().toISOString(),
+      person: actingAs ? effectiveName : null,
+      exercises,
+      routines,
+      sessions,
+      body_weight_logs: bodyWeightAll,
+    }
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `ironlog-backup-${toISO(todayStart())}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <div>
         <div className="eyebrow mb-1">Export</div>
         <h1 className="text-3xl">Training summary</h1>
       </div>
+
+      <Card className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-chalk">Full backup</p>
+          <p className="text-chalkdim text-xs mt-0.5">
+            Every exercise, routine, session, and weigh-in — everything, not just this period.
+          </p>
+        </div>
+        <Button variant="ghost" onClick={handleFullBackup}>
+          <Download size={15} /> Download everything (.json)
+        </Button>
+      </Card>
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex rounded-md bg-surface2 p-1 text-sm w-fit">
