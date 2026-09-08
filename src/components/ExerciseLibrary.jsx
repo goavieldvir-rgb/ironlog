@@ -79,7 +79,7 @@ export default function ExerciseLibrary() {
         />
       )}
 
-      <div className="grid sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {filtered.map((ex) => (
           <Card key={ex.id} className="flex flex-col gap-2">
             <div className="flex items-start justify-between gap-2">

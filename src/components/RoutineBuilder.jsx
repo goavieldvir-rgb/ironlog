@@ -126,7 +126,7 @@ export default function RoutineBuilder() {
       <h1 className="text-3xl">{id ? 'Edit routine' : 'Build a routine'}</h1>
 
       <Card className="flex flex-col gap-4">
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Routine name">
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Push day" required />
           </Field>

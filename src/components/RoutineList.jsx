@@ -57,7 +57,7 @@ export default function RoutineList() {
         />
       )}
 
-      <div className="grid sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {filtered.map((r) => (
           <Card key={r.id} className="flex flex-col gap-3">
             <div className="flex items-start justify-between gap-2">

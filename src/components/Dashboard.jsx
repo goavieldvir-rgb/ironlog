@@ -85,7 +85,7 @@ export default function Dashboard() {
                 .
               </Card>
             ) : (
-              <div className="grid sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {routines.slice(0, 4).map((r) => (
                   <Card key={r.id} className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
