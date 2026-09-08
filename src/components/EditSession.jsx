@@ -6,6 +6,10 @@ import { useCollection, updateSession } from '../lib/db.js'
 import { Button, Card, CategoryTag, Field } from './ui.jsx'
 import SessionEntryCard from './SessionEntryCard.jsx'
 
+function emptySet(category) {
+  return category === 'cardio' ? { duration: '', intensity: '', distance: '' } : { weight: '', reps: '' }
+}
+
 export default function EditSession() {
   const { effectiveUid } = useAdmin()
   const { id } = useParams()
@@ -27,7 +31,11 @@ export default function EditSession() {
       setEntries(
         (session.entries || []).map((e) => ({
           ...e,
-          sets: (e.sets || []).map((s) => ({ weight: s.weight ?? '', reps: s.reps ?? '' })),
+          sets: (e.sets || []).map((s) =>
+            e.category === 'cardio'
+              ? { duration: s.duration ?? '', intensity: s.intensity ?? '', distance: s.distance ?? '' }
+              : { weight: s.weight ?? '', reps: s.reps ?? '' },
+          ),
         })),
       )
       setSeeded(true)
@@ -44,7 +52,7 @@ export default function EditSession() {
 
   function addSet(entryIdx) {
     setEntries((prev) =>
-      prev.map((e, i) => (i !== entryIdx ? e : { ...e, sets: [...e.sets, { weight: '', reps: '' }] })),
+      prev.map((e, i) => (i !== entryIdx ? e : { ...e, sets: [...e.sets, emptySet(e.category)] })),
     )
   }
 

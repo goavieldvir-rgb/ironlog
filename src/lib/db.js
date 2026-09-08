@@ -1,27 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase.js'
 
-// Reads the shared global_exercises table — no user_id filter, since it's
-// readable by every signed-in account (see supabase-global-library-upgrade.sql).
-export function useGlobalExercises() {
-  const [data, setData] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    supabase
-      .from('global_exercises')
-      .select('*')
-      .order('name', { ascending: true })
-      .then(({ data, error }) => {
-        if (error) console.error(error)
-        setData(data || [])
-        setLoading(false)
-      })
-  }, [])
-
-  return [data, loading]
-}
-
 // Generic live-ish collection hook: fetches rows owned by `uid` from `table`,
 // ordered by `orderField`. Call the returned refresh() after any mutation
 // made from the same screen so the list updates immediately.
@@ -55,6 +34,27 @@ export function useCollection(uid, table, orderField = 'created_at', direction =
   return [data, loading, () => setReload((r) => r + 1)]
 }
 
+// Reads the shared global_exercises table — no user_id filter, since it's
+// readable by every signed-in account (see supabase-global-library-upgrade.sql).
+export function useGlobalExercises() {
+  const [data, setData] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase
+      .from('global_exercises')
+      .select('*')
+      .order('name', { ascending: true })
+      .then(({ data, error }) => {
+        if (error) console.error(error)
+        setData(data || [])
+        setLoading(false)
+      })
+  }, [])
+
+  return [data, loading]
+}
+
 // ---- Exercises ----
 export async function addExercise(uid, exercise) {
   const { data, error } = await supabase
@@ -62,11 +62,12 @@ export async function addExercise(uid, exercise) {
     .insert({
       user_id: uid,
       name: exercise.name,
-      category: exercise.category || 'strength', // 'strength' | 'mobility'
+      category: exercise.category || 'strength', // 'strength' | 'mobility' | 'cardio'
       video_url: exercise.videoUrl || '',
       notes: exercise.notes || '',
-      unit: exercise.unit || 'kg',
+      unit: exercise.unit || 'kg', // weight unit, or distance unit (km/mi) for cardio
       bodyweight: !!exercise.bodyweight,
+      intensity_type: exercise.intensityType || 'rpe', // 'rpe' | 'hr_zone', cardio only
     })
     .select()
     .single()
@@ -82,6 +83,7 @@ export async function updateExercise(uid, id, patch) {
   if (patch.notes !== undefined) row.notes = patch.notes
   if (patch.unit !== undefined) row.unit = patch.unit
   if (patch.bodyweight !== undefined) row.bodyweight = patch.bodyweight
+  if (patch.intensityType !== undefined) row.intensity_type = patch.intensityType
   const { error } = await supabase.from('exercises').update(row).eq('id', id).eq('user_id', uid)
   if (error) throw error
 }
@@ -97,7 +99,7 @@ export async function addRoutine(uid, routine) {
     user_id: uid,
     name: routine.name,
     category: routine.category || 'strength',
-    exercises: routine.exercises || [], // [{exerciseId, name, targetSets, targetReps, unit, videoUrl}]
+    exercises: routine.exercises || [],
   })
   if (error) throw error
 }
@@ -116,15 +118,26 @@ export async function deleteRoutine(uid, id) {
   if (error) throw error
 }
 
+// A completed set/interval: strength & mobility need reps (weight optional
+// for bodyweight exercises); cardio needs a duration (intensity/distance
+// optional).
+function isCompletedSet(entry, s) {
+  if (entry.category === 'cardio') {
+    return s.duration !== '' && s.duration !== null && s.duration !== undefined
+  }
+  const repsOk = s.reps !== '' && s.reps !== null
+  const weightOk = entry.bodyweight ? true : s.weight !== '' && s.weight !== null
+  return repsOk && weightOk
+}
+
 // ---- Sessions (a completed workout log) ----
-// entries: [{ exerciseId, name, unit, videoUrl, sets: [{weight, reps}] }]
 export async function logSession(uid, session) {
   const { error: sessionError } = await supabase.from('sessions').insert({
     user_id: uid,
     routine_id: session.routineId || null,
     routine_name: session.routineName || 'Freestyle',
     category: session.category || 'strength',
-    date: session.date, // ISO date string
+    date: session.date,
     notes: session.notes || '',
     entries: session.entries,
   })
@@ -134,15 +147,30 @@ export async function logSession(uid, session) {
   // when building the next session.
   for (const entry of session.entries) {
     if (!entry.exerciseId) continue
-    const completedSets = (entry.sets || []).filter((s) => {
-      const repsOk = s.reps !== '' && s.reps !== null
-      // Bodyweight exercises don't require a weight to count as a completed
-      // set — the added-weight field is optional by design.
-      const weightOk = entry.bodyweight ? true : s.weight !== '' && s.weight !== null
-      return repsOk && weightOk
-    })
+    const completedSets = (entry.sets || []).filter((s) => isCompletedSet(entry, s))
     if (completedSets.length === 0) continue
     const last = completedSets[completedSets.length - 1]
+
+    if (entry.category === 'cardio') {
+      const { error } = await supabase
+        .from('exercises')
+        .update({
+          last_weight: Number(last.duration) || 0, // minutes
+          last_reps: Number(last.intensity) || 0,
+          last_distance: last.distance !== '' && last.distance != null ? Number(last.distance) : null,
+          last_date: session.date,
+          last_sets: completedSets.map((s) => ({
+            duration: Number(s.duration) || 0,
+            intensity: Number(s.intensity) || 0,
+            distance: s.distance !== '' && s.distance != null ? Number(s.distance) : null,
+          })),
+        })
+        .eq('id', entry.exerciseId)
+        .eq('user_id', uid)
+      if (error) console.error(error)
+      continue
+    }
+
     const { error } = await supabase
       .from('exercises')
       .update({
@@ -163,7 +191,7 @@ export async function deleteSession(uid, id) {
 }
 
 // Editing a past session only touches that session's own row — it
-// deliberately does NOT update the "last weight/reps" snapshot on
+// deliberately does NOT update the "last performance" snapshot on
 // exercises, since that should reflect the most recent session overall,
 // not whichever one happens to be getting corrected right now.
 export async function updateSession(uid, id, patch) {

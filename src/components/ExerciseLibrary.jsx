@@ -5,10 +5,23 @@ import { useCollection, addExercise, updateExercise, deleteExercise } from '../l
 import { Button, Card, CategoryTag, Badge, EmptyState, Field } from './ui.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
 
-const emptyForm = { name: '', category: 'strength', videoUrl: '', notes: '', unit: 'kg', bodyweight: false }
+const emptyForm = {
+  name: '',
+  category: 'strength',
+  videoUrl: '',
+  notes: '',
+  unit: 'kg',
+  bodyweight: false,
+  intensityType: 'rpe',
+}
 
 function formatLast(ex) {
   if (ex.last_weight == null) return null
+  if (ex.category === 'cardio') {
+    const dist = ex.last_distance != null ? ` · ${ex.last_distance}${ex.unit}` : ''
+    const intensityLabel = ex.intensity_type === 'hr_zone' ? `Zone ${ex.last_reps}` : `RPE ${ex.last_reps}`
+    return `Last: ${ex.last_weight} min · ${intensityLabel}${dist}`
+  }
   if (ex.bodyweight) {
     const added = Number(ex.last_weight) > 0 ? `+${ex.last_weight}${ex.unit} ` : ''
     return `Last: ${added}Bodyweight × ${ex.last_reps}`
@@ -20,7 +33,7 @@ export default function ExerciseLibrary() {
   const { effectiveUid } = useAdmin()
   const [exercises, loading, refresh] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [tab, setTab] = useState('all')
-  const [editing, setEditing] = useState(null) // null = closed, {} = new, {...} = edit
+  const [editing, setEditing] = useState(null)
   const [picking, setPicking] = useState(false)
   const [q, setQ] = useState('')
 
@@ -74,14 +87,14 @@ export default function ExerciseLibrary() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-lg leading-tight">{ex.name}</h3>
                   <CategoryTag category={ex.category} />
-                  {ex.bodyweight && <Badge tone="brass">Bodyweight</Badge>}
+                  {ex.bodyweight && ex.category !== 'cardio' && <Badge tone="brass">Bodyweight</Badge>}
                 </div>
                 {formatLast(ex) && <p className="num text-chalkdim text-xs mt-1">{formatLast(ex)}</p>}
               </div>
               <div className="flex gap-1 shrink-0">
                 <button
                   className="p-1.5 rounded hover:bg-surface2 text-chalkdim hover:text-chalk"
-                  onClick={() => setEditing({ ...ex, videoUrl: ex.video_url })}
+                  onClick={() => setEditing({ ...ex, videoUrl: ex.video_url, intensityType: ex.intensity_type })}
                   title="Edit"
                 >
                   <Pencil size={15} />
@@ -123,6 +136,7 @@ export default function ExerciseLibrary() {
               category: g.category,
               unit: g.unit,
               bodyweight: g.bodyweight,
+              intensityType: g.intensity_type,
               videoUrl: '',
               notes: '',
             })
@@ -159,10 +173,11 @@ export function Tabs({ tab, setTab }) {
   const opts = [
     { id: 'all', label: 'All' },
     { id: 'strength', label: 'Strength' },
-    { id: 'mobility', label: 'Mobility / Physio' },
+    { id: 'mobility', label: 'Mobility' },
+    { id: 'cardio', label: 'Cardio' },
   ]
   return (
-    <div className="flex rounded-md bg-surface2 p-1 text-sm w-fit">
+    <div className="flex rounded-md bg-surface2 p-1 text-sm w-fit flex-wrap">
       {opts.map((o) => (
         <button
           key={o.id}
@@ -192,9 +207,11 @@ function ExerciseModal({ initial, onClose, onSave }) {
     }
   }
 
+  const isCardio = form.category === 'cardio'
+
   return (
     <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="card p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+      <div className="card p-6 w-full max-w-md max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-2xl mb-4">{initial.id ? 'Edit exercise' : 'New exercise'}</h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <Field label="Name">
@@ -208,34 +225,67 @@ function ExerciseModal({ initial, onClose, onSave }) {
           </Field>
 
           <Field label="Category">
-            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-              <option value="strength">Strength</option>
-              <option value="mobility">Mobility / Physio</option>
-            </select>
-          </Field>
-
-          <Field label="How is weight tracked?">
             <select
-              value={form.bodyweight ? 'bodyweight' : form.unit}
+              value={form.category}
               onChange={(e) => {
-                const v = e.target.value
-                if (v === 'bodyweight') setForm({ ...form, bodyweight: true })
-                else setForm({ ...form, bodyweight: false, unit: v })
+                const category = e.target.value
+                setForm({
+                  ...form,
+                  category,
+                  // sensible defaults when switching into/out of cardio
+                  unit: category === 'cardio' ? 'km' : form.unit === 'km' || form.unit === 'mi' ? 'kg' : form.unit,
+                })
               }}
             >
-              <option value="kg">Weight in kg</option>
-              <option value="lb">Weight in lb</option>
-              <option value="bodyweight">Bodyweight (e.g. pull-ups, dips)</option>
+              <option value="strength">Strength</option>
+              <option value="mobility">Mobility / Physio</option>
+              <option value="cardio">Cardio</option>
             </select>
           </Field>
 
-          {form.bodyweight && (
-            <Field label="Added weight unit (optional extra weight)">
-              <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
-                <option value="kg">kg</option>
-                <option value="lb">lb</option>
-              </select>
-            </Field>
+          {!isCardio && (
+            <>
+              <Field label="How is weight tracked?">
+                <select
+                  value={form.bodyweight ? 'bodyweight' : form.unit}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    if (v === 'bodyweight') setForm({ ...form, bodyweight: true })
+                    else setForm({ ...form, bodyweight: false, unit: v })
+                  }}
+                >
+                  <option value="kg">Weight in kg</option>
+                  <option value="lb">Weight in lb</option>
+                  <option value="bodyweight">Bodyweight (e.g. pull-ups, dips)</option>
+                </select>
+              </Field>
+
+              {form.bodyweight && (
+                <Field label="Added weight unit (optional extra weight)">
+                  <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
+                    <option value="kg">kg</option>
+                    <option value="lb">lb</option>
+                  </select>
+                </Field>
+              )}
+            </>
+          )}
+
+          {isCardio && (
+            <>
+              <Field label="How is intensity logged?">
+                <select value={form.intensityType} onChange={(e) => setForm({ ...form, intensityType: e.target.value })}>
+                  <option value="rpe">Effort scale (RPE 1–10)</option>
+                  <option value="hr_zone">Heart rate zone (1–5)</option>
+                </select>
+              </Field>
+              <Field label="Distance unit (optional — leave default if you won't track distance)">
+                <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
+                  <option value="km">km</option>
+                  <option value="mi">miles</option>
+                </select>
+              </Field>
+            </>
           )}
 
           <Field label="Example video link (optional)">

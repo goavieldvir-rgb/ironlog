@@ -43,11 +43,12 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
           </div>
         </div>
 
-        <div className="flex rounded-md bg-surface2 p-1 text-sm w-fit mb-3">
+        <div className="flex rounded-md bg-surface2 p-1 text-sm w-fit mb-3 flex-wrap">
           {[
             { id: 'all', label: 'All' },
             { id: 'strength', label: 'Strength' },
             { id: 'mobility', label: 'Mobility' },
+            { id: 'cardio', label: 'Cardio' },
           ].map((t) => (
             <button
               key={t.id}
@@ -67,9 +68,9 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
             return (
               <div key={g.id} className="flex items-center justify-between gap-2 px-2 py-2 rounded-md hover:bg-surface2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="truncate">{g.name}</span>
+                  <span className="truncate min-w-0">{g.name}</span>
                   <CategoryTag category={g.category} />
-                  {g.bodyweight && <Badge tone="brass">BW</Badge>}
+                  {g.bodyweight && g.category !== 'cardio' && <Badge tone="brass">BW</Badge>}
                 </div>
                 <button
                   onClick={() => !already && handleAdd(g)}

@@ -26,6 +26,7 @@ export function Badge({ children, tone = 'default' }) {
     default: 'bg-surface2 text-chalkdim',
     brass: 'bg-brasssoft text-brass',
     iron: 'bg-ironsoft text-iron',
+    cardio: 'bg-cardiosoft text-cardio',
     good: 'bg-good/10 text-good',
   }
   return (
@@ -36,11 +37,9 @@ export function Badge({ children, tone = 'default' }) {
 }
 
 export function CategoryTag({ category }) {
-  return category === 'mobility' ? (
-    <Badge tone="brass">Mobility</Badge>
-  ) : (
-    <Badge tone="iron">Strength</Badge>
-  )
+  if (category === 'mobility') return <Badge tone="brass">Mobility</Badge>
+  if (category === 'cardio') return <Badge tone="cardio">Cardio</Badge>
+  return <Badge tone="iron">Strength</Badge>
 }
 
 export function EmptyState({ title, body, action }) {

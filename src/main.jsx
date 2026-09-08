@@ -8,7 +8,6 @@ import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    {/* HashRouter avoids needing server-side rewrite rules on GitHub Pages */}
     <HashRouter>
       <AuthProvider>
         <AdminProvider>

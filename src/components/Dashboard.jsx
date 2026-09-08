@@ -8,7 +8,7 @@ import { Button, Card, CategoryTag, EmptyState } from './ui.jsx'
 
 function startOfWeekISO() {
   const d = new Date()
-  const day = d.getDay() === 0 ? 6 : d.getDay() - 1 // Monday-start week
+  const day = d.getDay() === 0 ? 6 : d.getDay() - 1
   d.setDate(d.getDate() - day)
   return d.toISOString().slice(0, 10)
 }
@@ -89,8 +89,8 @@ export default function Dashboard() {
                 {routines.slice(0, 4).map((r) => (
                   <Card key={r.id} className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate">{r.name}</p>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <p className="truncate min-w-0">{r.name}</p>
                         <CategoryTag category={r.category} />
                       </div>
                       <p className="text-chalkdim text-xs mt-0.5">{r.exercises?.length || 0} exercises</p>
@@ -124,7 +124,7 @@ export default function Dashboard() {
                     <Card className="flex items-center justify-between hover:border-brass/50 transition-colors">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="num text-chalkdim text-xs shrink-0">{formatDate(s.date)}</span>
-                        <p className="truncate">{s.routine_name}</p>
+                        <p className="truncate min-w-0">{s.routine_name}</p>
                         <CategoryTag category={s.category} />
                       </div>
                       <ChevronRight size={16} className="text-chalkdim shrink-0" />

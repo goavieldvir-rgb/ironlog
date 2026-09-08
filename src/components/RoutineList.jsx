@@ -11,7 +11,7 @@ export default function RoutineList() {
   const { effectiveUid, isAdmin } = useAdmin()
   const [routines, loading, refresh] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [tab, setTab] = useState('all')
-  const [copyTarget, setCopyTarget] = useState(null) // routine being copied to another person
+  const [copyTarget, setCopyTarget] = useState(null)
 
   const filtered = useMemo(
     () => routines.filter((r) => tab === 'all' || r.category === tab),
@@ -103,10 +103,12 @@ export default function RoutineList() {
 
             <ul className="text-sm text-chalkdim flex flex-col gap-0.5">
               {(r.exercises || []).slice(0, 4).map((e, i) => (
-                <li key={i} className="flex justify-between">
-                  <span className="text-chalk">{e.name}</span>
-                  <span className="num">
-                    {e.targetSets}×{e.targetReps}
+                <li key={i} className="flex justify-between gap-2">
+                  <span className="text-chalk truncate min-w-0">{e.name}</span>
+                  <span className="num shrink-0">
+                    {r.category === 'cardio'
+                      ? `${e.targetSets ?? e.targetDuration ?? ''}${e.targetSets != null ? ' min' : ''}`
+                      : `${e.targetSets}×${e.targetReps}`}
                   </span>
                 </li>
               ))}
@@ -170,10 +172,10 @@ function CopyToPersonModal({ routine, onClose }) {
               key={p.id}
               onClick={() => copyTo(p)}
               disabled={copiedTo === p.id}
-              className="flex items-center justify-between px-2 py-2 rounded-md hover:bg-surface2 text-left disabled:opacity-50"
+              className="flex items-center justify-between gap-2 px-2 py-2 rounded-md hover:bg-surface2 text-left disabled:opacity-50"
             >
-              <span className="truncate">{p.full_name || p.email}</span>
-              <span className="text-xs text-brass">{copiedTo === p.id ? 'Copied' : 'Copy here'}</span>
+              <span className="truncate min-w-0">{p.full_name || p.email}</span>
+              <span className="text-xs text-brass shrink-0">{copiedTo === p.id ? 'Copied' : 'Copy here'}</span>
             </button>
           ))}
         </div>

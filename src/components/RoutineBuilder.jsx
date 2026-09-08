@@ -31,20 +31,39 @@ export default function RoutineBuilder() {
   }, [existing])
 
   const availableExercises = exercises.filter((e) => e.category === category)
+  const isCardio = category === 'cardio'
+
+  function makeItem(ex) {
+    if (isCardio) {
+      return {
+        exerciseId: ex.id,
+        name: ex.name,
+        unit: ex.unit,
+        category: 'cardio',
+        intensityType: ex.intensity_type || ex.intensityType || 'rpe',
+        videoUrl: ex.video_url || ex.videoUrl || '',
+        targetDuration: 20,
+        targetIntensity: ex.intensity_type === 'hr_zone' ? 3 : 5,
+      }
+    }
+    return {
+      exerciseId: ex.id,
+      name: ex.name,
+      unit: ex.unit,
+      bodyweight: !!ex.bodyweight,
+      videoUrl: ex.video_url || ex.videoUrl || '',
+      targetSets: 3,
+      targetReps: 10,
+    }
+  }
 
   function addItem() {
     const ex = exercises.find((e) => e.id === pickId)
     if (!ex) return
-    setItems([
-      ...items,
-      { exerciseId: ex.id, name: ex.name, unit: ex.unit, bodyweight: !!ex.bodyweight, videoUrl: ex.video_url || '', targetSets: 3, targetReps: 10 },
-    ])
+    setItems([...items, makeItem(ex)])
     setPickId('')
   }
 
-  // Used by the "Browse library" picker: adds a global exercise to this
-  // person's own library first (if they don't already have it), then drops
-  // it straight into the routine — no need to visit the Exercises tab first.
   async function addFromLibrary(g) {
     let ex = exercises.find((e) => e.name.toLowerCase() === g.name.toLowerCase())
     if (!ex) {
@@ -53,23 +72,13 @@ export default function RoutineBuilder() {
         category: g.category,
         unit: g.unit,
         bodyweight: g.bodyweight,
+        intensityType: g.intensity_type,
         videoUrl: '',
         notes: '',
       })
       refreshExercises()
     }
-    setItems((prev) => [
-      ...prev,
-      {
-        exerciseId: ex.id,
-        name: ex.name,
-        unit: ex.unit,
-        bodyweight: !!ex.bodyweight,
-        videoUrl: ex.video_url || '',
-        targetSets: 3,
-        targetReps: 10,
-      },
-    ])
+    setItems((prev) => [...prev, makeItem(ex)])
   }
 
   function updateItem(i, patch) {
@@ -125,6 +134,7 @@ export default function RoutineBuilder() {
             <select value={category} onChange={(e) => setCategory(e.target.value)}>
               <option value="strength">Strength</option>
               <option value="mobility">Mobility / Physio</option>
+              <option value="cardio">Cardio</option>
             </select>
           </Field>
         </div>
@@ -139,26 +149,51 @@ export default function RoutineBuilder() {
 
         <div className="flex flex-col gap-2">
           {items.map((it, i) => (
-            <div key={i} className="flex items-center gap-2 bg-surface2 rounded-md p-2.5">
+            <div key={i} className="flex items-center gap-2 bg-surface2 rounded-md p-2.5 flex-wrap">
               <div className="flex-1 min-w-0">
                 <p className="truncate">{it.name}</p>
               </div>
-              <input
-                type="number"
-                min={1}
-                value={it.targetSets}
-                onChange={(e) => updateItem(i, { targetSets: Number(e.target.value) })}
-                className="w-14 text-center num"
-                title="Target sets"
-              />
-              <span className="text-chalkdim text-xs">×</span>
-              <input
-                value={it.targetReps}
-                onChange={(e) => updateItem(i, { targetReps: e.target.value })}
-                className="w-16 text-center num"
-                title="Target reps"
-                placeholder="10"
-              />
+              {isCardio ? (
+                <>
+                  <input
+                    type="number"
+                    min={1}
+                    value={it.targetDuration ?? 20}
+                    onChange={(e) => updateItem(i, { targetDuration: Number(e.target.value) })}
+                    className="w-16 text-center num"
+                    title="Target duration (minutes)"
+                  />
+                  <span className="text-chalkdim text-xs">min ·</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={it.targetIntensity ?? 5}
+                    onChange={(e) => updateItem(i, { targetIntensity: Number(e.target.value) })}
+                    className="w-14 text-center num"
+                    title={it.intensityType === 'hr_zone' ? 'Target HR zone' : 'Target RPE'}
+                  />
+                  <span className="text-chalkdim text-xs">{it.intensityType === 'hr_zone' ? 'zone' : 'RPE'}</span>
+                </>
+              ) : (
+                <>
+                  <input
+                    type="number"
+                    min={1}
+                    value={it.targetSets}
+                    onChange={(e) => updateItem(i, { targetSets: Number(e.target.value) })}
+                    className="w-14 text-center num"
+                    title="Target sets"
+                  />
+                  <span className="text-chalkdim text-xs">×</span>
+                  <input
+                    value={it.targetReps}
+                    onChange={(e) => updateItem(i, { targetReps: e.target.value })}
+                    className="w-16 text-center num"
+                    title="Target reps"
+                    placeholder="10"
+                  />
+                </>
+              )}
               <div className="flex flex-col">
                 <button onClick={() => move(i, -1)} className="text-chalkdim hover:text-chalk disabled:opacity-30" disabled={i === 0}>
                   <ArrowUp size={13} />
@@ -179,7 +214,7 @@ export default function RoutineBuilder() {
         </div>
 
         <div className="flex gap-2 items-end pt-2 border-t border-line flex-wrap">
-          <Field label={`Your ${category === 'mobility' ? 'mobility' : 'strength'} exercises`}>
+          <Field label={`Your ${category} exercises`}>
             <select value={pickId} onChange={(e) => setPickId(e.target.value)} className="w-56">
               <option value="">Choose one you've already added…</option>
               {availableExercises.map((e) => (

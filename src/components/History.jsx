@@ -50,8 +50,8 @@ export default function History() {
             <Link key={s.id} to={`/history/${s.id}`}>
               <Card className="flex items-center justify-between gap-3 hover:border-brass/50 transition-colors">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-lg leading-tight truncate">{s.routine_name}</h3>
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <h3 className="text-lg leading-tight truncate min-w-0">{s.routine_name}</h3>
                     <CategoryTag category={s.category} />
                   </div>
                   <p className="text-chalkdim text-xs mt-1">

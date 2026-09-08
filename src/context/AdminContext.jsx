@@ -8,7 +8,7 @@ export function AdminProvider({ children }) {
   const { user } = useAuth()
   const [profile, setProfile] = useState(null)
   const [loadingProfile, setLoadingProfile] = useState(true)
-  const [actingAs, setActingAsState] = useState(null) // { uid, name, email } | null
+  const [actingAs, setActingAsState] = useState(null)
 
   useEffect(() => {
     if (!user) {
@@ -29,7 +29,6 @@ export function AdminProvider({ children }) {
       })
   }, [user])
 
-  // Drop "acting as" whenever the logged-in user changes (e.g. logout/login).
   useEffect(() => {
     setActingAsState(null)
   }, [user?.uid])
@@ -46,7 +45,6 @@ export function AdminProvider({ children }) {
     loadingProfile,
     actingAs,
     setActingAs,
-    // The uid whose data should actually be read/written right now.
     effectiveUid: actingAs?.uid || user?.uid,
     effectiveName: actingAs?.name || profile?.full_name || user?.email,
   }

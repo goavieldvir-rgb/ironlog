@@ -5,10 +5,13 @@
 @layer base {
   html {
     background-color: #14161A;
+    overscroll-behavior: none;
+    touch-action: manipulation;
   }
   body {
     @apply bg-ink text-chalk font-body antialiased;
     font-feature-settings: 'tnum' 1;
+    overflow-x: hidden;
   }
   ::selection {
     background-color: #D64545;

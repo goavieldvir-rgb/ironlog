@@ -5,7 +5,7 @@ import { Button, Field } from './ui.jsx'
 
 export default function Login() {
   const { login, signup } = useAuth()
-  const [mode, setMode] = useState('login') // 'login' | 'signup' | 'reset'
+  const [mode, setMode] = useState('login')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')

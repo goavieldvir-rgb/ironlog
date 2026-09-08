@@ -2,10 +2,11 @@ import React from 'react'
 import { Play, Plus, Trash2, Minus, CornerDownLeft, History } from 'lucide-react'
 import { Card, Badge } from './ui.jsx'
 
-function Stepper({ value, onChange, step, min = 0 }) {
+function Stepper({ value, onChange, step, min = 0, max }) {
   function bump(delta) {
     const current = Number(value) || 0
-    const next = Math.max(min, Math.round((current + delta) * 100) / 100)
+    let next = Math.max(min, Math.round((current + delta) * 100) / 100)
+    if (max != null) next = Math.min(max, next)
     onChange(String(next))
   }
   return (
@@ -44,21 +45,38 @@ export default function SessionEntryCard({
   onRemoveEntry,
   removable = false,
 }) {
+  const isCardio = entry.category === 'cardio'
   const weightStep = entry.unit === 'lb' ? 5 : 2.5
+  const intensityMax = entry.intensityType === 'hr_zone' ? 5 : 10
+  const intensityLabel = entry.intensityType === 'hr_zone' ? 'Zone' : 'RPE'
+  const distanceUnit = entry.unit === 'mi' ? 'mi' : 'km'
 
   function copyFromPrevious(setIdx) {
     const prev = entry.sets[setIdx - 1]
     if (!prev) return
-    onUpdateSet(setIdx, { weight: prev.weight, reps: prev.reps })
+    if (isCardio) onUpdateSet(setIdx, { duration: prev.duration, intensity: prev.intensity, distance: prev.distance })
+    else onUpdateSet(setIdx, { weight: prev.weight, reps: prev.reps })
   }
 
   function useLastTime(setIdx) {
     if (entry.lastWeight == null) return
-    onUpdateSet(setIdx, { weight: String(entry.lastWeight), reps: String(entry.lastReps) })
+    if (isCardio) {
+      onUpdateSet(setIdx, {
+        duration: String(entry.lastWeight),
+        intensity: String(entry.lastReps),
+        distance: entry.lastDistance != null ? String(entry.lastDistance) : '',
+      })
+    } else {
+      onUpdateSet(setIdx, { weight: String(entry.lastWeight), reps: String(entry.lastReps) })
+    }
   }
 
   const prevLabel = (() => {
     if (entry.lastWeight == null) return null
+    if (isCardio) {
+      const dist = entry.lastDistance != null ? ` · ${entry.lastDistance}${distanceUnit}` : ''
+      return `Previously: ${entry.lastWeight} min · ${intensityLabel} ${entry.lastReps}${dist}`
+    }
     if (entry.bodyweight) {
       const added = Number(entry.lastWeight) > 0 ? `+${entry.lastWeight}${entry.unit} ` : ''
       return `Previously: ${added}Bodyweight × ${entry.lastReps}`
@@ -72,7 +90,8 @@ export default function SessionEntryCard({
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-lg">{entry.name}</h3>
-            {entry.bodyweight && <Badge tone="brass">Bodyweight</Badge>}
+            {isCardio && <Badge tone="cardio">Cardio</Badge>}
+            {!isCardio && entry.bodyweight && <Badge tone="brass">Bodyweight</Badge>}
           </div>
           {prevLabel && <p className="num text-chalkdim text-xs mt-0.5">{prevLabel}</p>}
         </div>
@@ -95,51 +114,85 @@ export default function SessionEntryCard({
         </div>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <div className="grid grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem] gap-1 text-chalkdim eyebrow px-0.5">
-          <span>Set</span>
-          <span className="truncate">{entry.bodyweight ? `+Wt (${entry.unit}) opt.` : `Wt (${entry.unit})`}</span>
-          <span>Reps</span>
-          <span />
-        </div>
-        {entry.sets.map((s, j) => (
-          <div key={j} className="grid grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem] gap-1 items-center">
-            <span className="num text-chalkdim text-sm">{j + 1}</span>
-            <Stepper value={s.weight} step={weightStep} onChange={(v) => onUpdateSet(j, { weight: v })} />
-            <Stepper value={s.reps} step={1} onChange={(v) => onUpdateSet(j, { reps: v })} />
-            <div className="flex items-center gap-0.5 justify-end min-w-0">
-              {j === 0 && entry.lastWeight != null ? (
-                <button
-                  onClick={() => useLastTime(j)}
-                  title="Use last time's numbers"
-                  className="text-chalkdim hover:text-brass p-1"
-                >
-                  <History size={14} />
-                </button>
-              ) : j > 0 ? (
-                <button
-                  onClick={() => copyFromPrevious(j)}
-                  title="Same as set above"
-                  className="text-chalkdim hover:text-brass p-1"
-                >
-                  <CornerDownLeft size={14} />
-                </button>
-              ) : (
-                <span className="w-6" />
-              )}
-              <button onClick={() => onRemoveSet(j)} className="text-chalkdim hover:text-iron p-1">
-                <Trash2 size={14} />
-              </button>
-            </div>
+      {isCardio ? (
+        <div className="flex flex-col gap-1.5">
+          <div className="grid grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_3.25rem] gap-1 text-chalkdim eyebrow px-0.5">
+            <span>#</span>
+            <span className="truncate">Min</span>
+            <span className="truncate">{intensityLabel}</span>
+            <span className="truncate">{distanceUnit} opt.</span>
+            <span />
           </div>
-        ))}
-        <button
-          onClick={onAddSet}
-          className="text-chalkdim hover:text-chalk text-xs inline-flex items-center gap-1 mt-1 w-fit"
-        >
-          <Plus size={13} /> Add set
-        </button>
-      </div>
+          {entry.sets.map((s, j) => (
+            <div key={j} className="grid grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_3.25rem] gap-1 items-center">
+              <span className="num text-chalkdim text-sm">{j + 1}</span>
+              <Stepper value={s.duration} step={1} min={0} onChange={(v) => onUpdateSet(j, { duration: v })} />
+              <Stepper
+                value={s.intensity}
+                step={1}
+                min={1}
+                max={intensityMax}
+                onChange={(v) => onUpdateSet(j, { intensity: v })}
+              />
+              <Stepper value={s.distance} step={0.1} min={0} onChange={(v) => onUpdateSet(j, { distance: v })} />
+              <div className="flex items-center gap-0.5 justify-end min-w-0">
+                {j === 0 && entry.lastWeight != null ? (
+                  <button onClick={() => useLastTime(j)} title="Use last time's numbers" className="text-chalkdim hover:text-brass p-1">
+                    <History size={14} />
+                  </button>
+                ) : j > 0 ? (
+                  <button onClick={() => copyFromPrevious(j)} title="Same as above" className="text-chalkdim hover:text-brass p-1">
+                    <CornerDownLeft size={14} />
+                  </button>
+                ) : (
+                  <span className="w-6" />
+                )}
+                <button onClick={() => onRemoveSet(j)} className="text-chalkdim hover:text-iron p-1">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+          <button onClick={onAddSet} className="text-chalkdim hover:text-chalk text-xs inline-flex items-center gap-1 mt-1 w-fit">
+            <Plus size={13} /> Add interval
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <div className="grid grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem] gap-1 text-chalkdim eyebrow px-0.5">
+            <span>Set</span>
+            <span className="truncate">{entry.bodyweight ? `+Wt (${entry.unit}) opt.` : `Wt (${entry.unit})`}</span>
+            <span>Reps</span>
+            <span />
+          </div>
+          {entry.sets.map((s, j) => (
+            <div key={j} className="grid grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem] gap-1 items-center">
+              <span className="num text-chalkdim text-sm">{j + 1}</span>
+              <Stepper value={s.weight} step={weightStep} onChange={(v) => onUpdateSet(j, { weight: v })} />
+              <Stepper value={s.reps} step={1} onChange={(v) => onUpdateSet(j, { reps: v })} />
+              <div className="flex items-center gap-0.5 justify-end min-w-0">
+                {j === 0 && entry.lastWeight != null ? (
+                  <button onClick={() => useLastTime(j)} title="Use last time's numbers" className="text-chalkdim hover:text-brass p-1">
+                    <History size={14} />
+                  </button>
+                ) : j > 0 ? (
+                  <button onClick={() => copyFromPrevious(j)} title="Same as set above" className="text-chalkdim hover:text-brass p-1">
+                    <CornerDownLeft size={14} />
+                  </button>
+                ) : (
+                  <span className="w-6" />
+                )}
+                <button onClick={() => onRemoveSet(j)} className="text-chalkdim hover:text-iron p-1">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+          <button onClick={onAddSet} className="text-chalkdim hover:text-chalk text-xs inline-flex items-center gap-1 mt-1 w-fit">
+            <Plus size={13} /> Add set
+          </button>
+        </div>
+      )}
     </Card>
   )
 }

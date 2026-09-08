@@ -72,6 +72,11 @@ function formatDay(iso) {
 }
 
 function formatSet(entry, s) {
+  if (entry.category === 'cardio') {
+    const intensityLabel = entry.intensityType === 'hr_zone' ? 'Zone' : 'RPE'
+    const dist = s.distance !== '' && s.distance != null ? ` · ${s.distance}${entry.unit}` : ''
+    return `${s.duration || 0}min·${intensityLabel}${s.intensity || 0}${dist}`
+  }
   if (entry.bodyweight) {
     const added = Number(s.weight) > 0 ? `+${s.weight}${entry.unit} ` : ''
     return `${added}BW×${s.reps || 0}`
@@ -111,7 +116,6 @@ function computeRange(mode, offset, customStart, customEnd) {
     return { start, end }
   }
 
-  // custom
   const start = customStart ? new Date(customStart + 'T00:00:00') : today
   const end = customEnd ? new Date(customEnd + 'T00:00:00') : today
   return { start, end }
@@ -126,22 +130,30 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName }) {
 
   const totalSets = sessions.reduce((n, s) => n + (s.entries || []).reduce((m, e) => m + (e.sets?.length || 0), 0), 0)
   const totalVolume = sessions.reduce((sum, s) => {
-    const v = (s.entries || []).reduce(
-      (eSum, e) =>
+    const v = (s.entries || []).reduce((eSum, e) => {
+      if (e.category === 'cardio') return eSum
+      return (
         eSum +
         (e.sets || []).reduce((sv, set) => {
           const w = Number(set.weight) || 0
           const r = Number(set.reps) || 0
           return sv + w * r
-        }, 0),
-      0,
-    )
+        }, 0)
+      )
+    }, 0)
     return sum + v
   }, 0)
+  const totalCardioMinutes = sessions.reduce((sum, s) => {
+    const m = (s.entries || []).reduce((eSum, e) => {
+      if (e.category !== 'cardio') return eSum
+      return eSum + (e.sets || []).reduce((sv, set) => sv + (Number(set.duration) || 0), 0)
+    }, 0)
+    return sum + m
+  }, 0)
 
-  lines.push(
-    `${sessions.length} session${sessions.length === 1 ? '' : 's'} · ${totalSets} total sets · ~${Math.round(totalVolume).toLocaleString()} total volume`,
-  )
+  const parts = [`${sessions.length} session${sessions.length === 1 ? '' : 's'}`, `${totalSets} total sets`, `~${Math.round(totalVolume).toLocaleString()} total volume`]
+  if (totalCardioMinutes > 0) parts.push(`${Math.round(totalCardioMinutes)} cardio minutes`)
+  lines.push(parts.join(' · '))
   lines.push('')
 
   if (sessions.length === 0) {

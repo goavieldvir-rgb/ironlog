@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { Flame, TrendingUp, Trophy, BarChart3 } from 'lucide-react'
+import { Flame, TrendingUp, Trophy, BarChart3, Heart } from 'lucide-react'
 import {
   ResponsiveContainer,
   BarChart,
@@ -15,7 +15,7 @@ import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection } from '../lib/db.js'
 import { Card, EmptyState, Field } from './ui.jsx'
 
-const COLORS = { iron: '#D64545', brass: '#C9A24B', chalk: '#EDEDE6', chalkdim: '#9CA0AA', grid: '#31353E' }
+const COLORS = { iron: '#D64545', brass: '#C9A24B', cardio: '#4C8CC9', chalk: '#EDEDE6', chalkdim: '#9CA0AA', grid: '#31353E' }
 
 function mondayOf(dateISO) {
   const d = new Date(dateISO + 'T00:00:00')
@@ -41,7 +41,7 @@ function last12Mondays() {
 
 export default function Stats() {
   const { effectiveUid } = useAdmin()
-  const [sessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'asc')
+  const [sessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [exerciseId, setExerciseId] = useState('')
 
   const weeks = useMemo(() => last12Mondays(), [])
@@ -49,18 +49,28 @@ export default function Stats() {
   const weeklyData = useMemo(() => {
     return weeks.map((weekStart) => {
       const inWeek = sessions.filter((s) => mondayOf(s.date) === weekStart)
-      const volume = inWeek.reduce((sum, s) => {
-        const sessionVolume = (s.entries || []).reduce((eSum, e) => {
-          const setVolume = (e.sets || []).reduce((sv, set) => {
-            const w = Number(set.weight)
-            const r = Number(set.reps)
-            return sv + (isFinite(w) && isFinite(r) ? w * r : 0)
-          }, 0)
-          return eSum + setVolume
-        }, 0)
-        return sum + sessionVolume
-      }, 0)
-      return { week: weekStart, label: shortDate(weekStart), sessions: inWeek.length, volume: Math.round(volume) }
+      let volume = 0
+      let cardioMinutes = 0
+      for (const s of inWeek) {
+        for (const e of s.entries || []) {
+          if (e.category === 'cardio') {
+            cardioMinutes += (e.sets || []).reduce((sv, set) => sv + (Number(set.duration) || 0), 0)
+          } else {
+            volume += (e.sets || []).reduce((sv, set) => {
+              const w = Number(set.weight)
+              const r = Number(set.reps)
+              return sv + (isFinite(w) && isFinite(r) ? w * r : 0)
+            }, 0)
+          }
+        }
+      }
+      return {
+        week: weekStart,
+        label: shortDate(weekStart),
+        sessions: inWeek.length,
+        volume: Math.round(volume),
+        cardioMinutes: Math.round(cardioMinutes),
+      }
     })
   }, [sessions, weeks])
 
@@ -74,16 +84,49 @@ export default function Stats() {
   }, [weeklyData])
 
   const totalVolume = useMemo(() => weeklyData.reduce((s, w) => s + w.volume, 0), [weeklyData])
+  const totalCardioMinutes = useMemo(() => weeklyData.reduce((s, w) => s + w.cardioMinutes, 0), [weeklyData])
+  const hasCardio = totalCardioMinutes > 0
 
   // Personal records + per-exercise progress history, derived straight from
   // the sets people logged (no need for a separate exercises fetch).
   const { records, exerciseOptions, progressByExercise } = useMemo(() => {
-    const recMap = {} // exerciseId -> { name, unit, bodyweight, weight, reps, date }
-    const progMap = {} // exerciseId -> { name, unit, bodyweight, points: [{ date, weight }] }
+    const recMap = {}
+    const progMap = {}
 
     for (const s of sessions) {
       for (const entry of s.entries || []) {
         if (!entry.exerciseId) continue
+
+        if (entry.category === 'cardio') {
+          const completed = (entry.sets || []).filter((set) => set.duration !== '' && set.duration != null)
+          if (completed.length === 0) continue
+          const topSet = completed.reduce((best, set) => (Number(set.duration) > Number(best.duration) ? set : best))
+
+          const existing = recMap[entry.exerciseId]
+          if (!existing || Number(topSet.duration) > existing.duration) {
+            recMap[entry.exerciseId] = {
+              name: entry.name,
+              category: 'cardio',
+              unit: entry.unit,
+              intensityType: entry.intensityType,
+              duration: Number(topSet.duration),
+              intensity: Number(topSet.intensity) || 0,
+              distance: topSet.distance !== '' && topSet.distance != null ? Number(topSet.distance) : null,
+              date: s.date,
+            }
+          }
+
+          if (!progMap[entry.exerciseId]) {
+            progMap[entry.exerciseId] = { name: entry.name, category: 'cardio', unit: entry.unit, points: [] }
+          }
+          progMap[entry.exerciseId].points.push({
+            date: s.date,
+            label: shortDate(s.date),
+            duration: Number(topSet.duration),
+          })
+          continue
+        }
+
         const completed = (entry.sets || []).filter((set) => {
           const repsOk = set.reps !== '' && set.reps != null
           const weightOk = entry.bodyweight ? true : set.weight !== '' && set.weight != null
@@ -91,9 +134,6 @@ export default function Stats() {
         })
         if (completed.length === 0) continue
 
-        // For a normal weighted exercise, the "top set" is the heaviest.
-        // For a bodyweight exercise, added weight is usually 0/optional, so
-        // the meaningful achievement is the most reps instead.
         const topSet = entry.bodyweight
           ? completed.reduce((best, set) => (Number(set.reps) > Number(best.reps) ? set : best))
           : completed.reduce((best, set) => (Number(set.weight) > Number(best.weight) ? set : best))
@@ -105,6 +145,7 @@ export default function Stats() {
         if (isNewBest) {
           recMap[entry.exerciseId] = {
             name: entry.name,
+            category: entry.category || 'strength',
             unit: entry.unit,
             bodyweight: !!entry.bodyweight,
             weight: Number(topSet.weight) || 0,
@@ -114,7 +155,7 @@ export default function Stats() {
         }
 
         if (!progMap[entry.exerciseId]) {
-          progMap[entry.exerciseId] = { name: entry.name, unit: entry.unit, bodyweight: !!entry.bodyweight, points: [] }
+          progMap[entry.exerciseId] = { name: entry.name, category: entry.category, unit: entry.unit, bodyweight: !!entry.bodyweight, points: [] }
         }
         progMap[entry.exerciseId].points.push({
           date: s.date,
@@ -155,11 +196,12 @@ export default function Stats() {
 
       {hasData && (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className={`grid grid-cols-2 ${hasCardio ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3`}>
             <Stat icon={Flame} label="Week streak" value={streak} />
             <Stat icon={BarChart3} label="Sessions logged" value={sessions.length} />
             <Stat icon={TrendingUp} label="Total volume" value={totalVolume.toLocaleString()} />
-            <Stat icon={Trophy} label="Exercises with PRs" value={records.length} />
+            {hasCardio && <Stat icon={Heart} label="Cardio minutes" value={totalCardioMinutes.toLocaleString()} />}
+            <Stat icon={Trophy} label="Personal records" value={records.length} />
           </div>
 
           <Card>
@@ -198,6 +240,25 @@ export default function Stats() {
             </p>
           </Card>
 
+          {hasCardio && (
+            <Card>
+              <h2 className="eyebrow mb-4">Cardio minutes per week</h2>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={weeklyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
+                  <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} width={32} />
+                  <Tooltip
+                    contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
+                    labelStyle={{ color: COLORS.chalk }}
+                    formatter={(value) => [`${value} min`, 'Cardio']}
+                  />
+                  <Bar dataKey="cardioMinutes" fill={COLORS.cardio} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+          )}
+
           <Card className="flex flex-col gap-3">
             <h2 className="eyebrow">Progress by exercise</h2>
             <Field label="Exercise">
@@ -222,28 +283,33 @@ export default function Stats() {
                     tickLine={false}
                     axisLine={false}
                     width={36}
-                    domain={selectedProgress.bodyweight ? [0, 'dataMax + 2'] : ['dataMin - 5', 'dataMax + 5']}
+                    domain={selectedProgress.category === 'cardio' || selectedProgress.bodyweight ? [0, 'dataMax + 5'] : ['dataMin - 5', 'dataMax + 5']}
                   />
                   <Tooltip
                     contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
                     labelStyle={{ color: COLORS.chalk }}
-                    formatter={(value) =>
-                      selectedProgress.bodyweight ? [`${value} reps`, 'Top set'] : [`${value}${selectedProgress.unit}`, 'Top set']
-                    }
+                    formatter={(value) => {
+                      if (selectedProgress.category === 'cardio') return [`${value} min`, 'Duration']
+                      if (selectedProgress.bodyweight) return [`${value} reps`, 'Top set']
+                      return [`${value}${selectedProgress.unit}`, 'Top set']
+                    }}
                   />
                   <Line
                     type="monotone"
-                    dataKey={selectedProgress.bodyweight ? 'reps' : 'weight'}
-                    stroke={COLORS.iron}
+                    dataKey={selectedProgress.category === 'cardio' ? 'duration' : selectedProgress.bodyweight ? 'reps' : 'weight'}
+                    stroke={selectedProgress.category === 'cardio' ? COLORS.cardio : COLORS.iron}
                     strokeWidth={2.5}
-                    dot={{ fill: COLORS.iron, r: 3 }}
+                    dot={{ fill: selectedProgress.category === 'cardio' ? COLORS.cardio : COLORS.iron, r: 3 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
               <p className="text-chalkdim text-sm">Pick an exercise above to see your progress over time.</p>
             )}
-            {selectedProgress?.bodyweight && (
+            {selectedProgress?.category === 'cardio' && (
+              <p className="text-chalkdim text-xs">Tracking your longest single interval per session, in minutes.</p>
+            )}
+            {selectedProgress?.bodyweight && selectedProgress?.category !== 'cardio' && (
               <p className="text-chalkdim text-xs">
                 Bodyweight exercise — tracking reps per session rather than weight, since added weight is optional.
               </p>
@@ -257,13 +323,17 @@ export default function Stats() {
             ) : (
               <div className="flex flex-col divide-y divide-line">
                 {records.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between py-2.5">
-                    <p>{r.name}</p>
-                    <div className="text-right">
+                  <div key={r.id} className="flex items-center justify-between gap-2 py-2.5">
+                    <p className="truncate min-w-0">{r.name}</p>
+                    <div className="text-right shrink-0">
                       <p className="num text-chalk">
-                        {r.bodyweight
-                          ? `${r.weight > 0 ? `+${r.weight}${r.unit} ` : ''}BW × ${r.reps}`
-                          : `${r.weight}${r.unit} × ${r.reps}`}
+                        {r.category === 'cardio'
+                          ? `${r.duration} min · ${r.intensityType === 'hr_zone' ? 'Zone' : 'RPE'} ${r.intensity}${
+                              r.distance != null ? ` · ${r.distance}${r.unit}` : ''
+                            }`
+                          : r.bodyweight
+                            ? `${r.weight > 0 ? `+${r.weight}${r.unit} ` : ''}BW × ${r.reps}`
+                            : `${r.weight}${r.unit} × ${r.reps}`}
                       </p>
                       <p className="text-chalkdim text-xs">{shortDate(r.date)}</p>
                     </div>

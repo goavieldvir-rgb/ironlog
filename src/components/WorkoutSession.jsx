@@ -11,6 +11,10 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function emptySet(category) {
+  return category === 'cardio' ? { duration: '', intensity: '', distance: '' } : { weight: '', reps: '' }
+}
+
 export default function WorkoutSession() {
   const { effectiveUid } = useAdmin()
   const { routineId } = useParams()
@@ -28,7 +32,6 @@ export default function WorkoutSession() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  // Seed entries once the routine (or exercise library, for freestyle) is available.
   useEffect(() => {
     if (isFreestyle) {
       setEntries([])
@@ -38,6 +41,27 @@ export default function WorkoutSession() {
       setEntries(
         routine.exercises.map((it) => {
           const full = exercises.find((e) => e.id === it.exerciseId)
+          const category = it.category || full?.category || 'strength'
+          if (category === 'cardio') {
+            return {
+              exerciseId: it.exerciseId,
+              name: it.name,
+              unit: it.unit,
+              category: 'cardio',
+              intensityType: it.intensityType || full?.intensity_type || 'rpe',
+              videoUrl: full?.video_url || it.videoUrl || '',
+              lastWeight: full?.last_weight,
+              lastReps: full?.last_reps,
+              lastDistance: full?.last_distance,
+              sets: [
+                {
+                  duration: String(it.targetDuration ?? full?.last_weight ?? 20),
+                  intensity: String(it.targetIntensity ?? full?.last_reps ?? 5),
+                  distance: '',
+                },
+              ],
+            }
+          }
           return {
             exerciseId: it.exerciseId,
             name: it.name,
@@ -59,19 +83,37 @@ export default function WorkoutSession() {
   function addFreestyleExercise() {
     const ex = exercises.find((e) => e.id === pickId)
     if (!ex) return
-    setEntries([
-      ...entries,
-      {
-        exerciseId: ex.id,
-        name: ex.name,
-        unit: ex.unit,
-        bodyweight: !!ex.bodyweight,
-        videoUrl: ex.video_url || '',
-        lastWeight: ex.last_weight,
-        lastReps: ex.last_reps,
-        sets: [{ weight: '', reps: '' }, { weight: '', reps: '' }, { weight: '', reps: '' }],
-      },
-    ])
+    if (ex.category === 'cardio') {
+      setEntries([
+        ...entries,
+        {
+          exerciseId: ex.id,
+          name: ex.name,
+          unit: ex.unit,
+          category: 'cardio',
+          intensityType: ex.intensity_type || 'rpe',
+          videoUrl: ex.video_url || '',
+          lastWeight: ex.last_weight,
+          lastReps: ex.last_reps,
+          lastDistance: ex.last_distance,
+          sets: [{ duration: String(ex.last_weight ?? 20), intensity: String(ex.last_reps ?? 5), distance: '' }],
+        },
+      ])
+    } else {
+      setEntries([
+        ...entries,
+        {
+          exerciseId: ex.id,
+          name: ex.name,
+          unit: ex.unit,
+          bodyweight: !!ex.bodyweight,
+          videoUrl: ex.video_url || '',
+          lastWeight: ex.last_weight,
+          lastReps: ex.last_reps,
+          sets: [{ weight: '', reps: '' }, { weight: '', reps: '' }, { weight: '', reps: '' }],
+        },
+      ])
+    }
     setPickId('')
   }
 
@@ -87,7 +129,7 @@ export default function WorkoutSession() {
 
   function addSet(entryIdx) {
     setEntries((prev) =>
-      prev.map((e, i) => (i !== entryIdx ? e : { ...e, sets: [...e.sets, { weight: '', reps: '' }] })),
+      prev.map((e, i) => (i !== entryIdx ? e : { ...e, sets: [...e.sets, emptySet(e.category)] })),
     )
   }
 
@@ -114,7 +156,9 @@ export default function WorkoutSession() {
           exerciseId: e.exerciseId,
           name: e.name,
           unit: e.unit,
+          category: e.category || 'strength',
           bodyweight: e.bodyweight,
+          intensityType: e.intensityType,
           videoUrl: e.videoUrl,
           sets: e.sets,
         })),
@@ -141,7 +185,7 @@ export default function WorkoutSession() {
 
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-3xl">{isFreestyle ? 'Freestyle session' : routine?.name}</h1>
               <CategoryTag category={category} />
             </div>
@@ -168,7 +212,7 @@ export default function WorkoutSession() {
                 <option value="">Choose from library…</option>
                 {availableToAdd.map((e) => (
                   <option key={e.id} value={e.id}>
-                    {e.name} {e.category === 'mobility' ? '(mobility)' : ''}
+                    {e.name} {e.category !== 'strength' ? `(${e.category})` : ''}
                   </option>
                 ))}
               </select>

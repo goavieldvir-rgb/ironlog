@@ -12,6 +12,11 @@ function formatDate(iso) {
 }
 
 function formatSet(entry, s) {
+  if (entry.category === 'cardio') {
+    const intensityLabel = entry.intensityType === 'hr_zone' ? 'Zone' : 'RPE'
+    const dist = s.distance !== '' && s.distance != null ? ` · ${s.distance}${entry.unit}` : ''
+    return `${s.duration || 0} min · ${intensityLabel} ${s.intensity || 0}${dist}`
+  }
   if (entry.bodyweight) {
     const added = Number(s.weight) > 0 ? `+${s.weight}${entry.unit} ` : ''
     return `${added}BW × ${s.reps || 0}`
@@ -59,7 +64,8 @@ export default function SessionDetail() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-lg">{entry.name}</h3>
-              {entry.bodyweight && <Badge tone="brass">Bodyweight</Badge>}
+              {entry.category === 'cardio' && <Badge tone="cardio">Cardio</Badge>}
+              {entry.category !== 'cardio' && entry.bodyweight && <Badge tone="brass">Bodyweight</Badge>}
             </div>
             {entry.videoUrl && (
               <a

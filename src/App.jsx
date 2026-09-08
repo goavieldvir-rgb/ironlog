@@ -23,10 +23,6 @@ export default function App() {
   const navigate = useNavigate()
   const [pendingReset, setPendingReset] = useState(false)
 
-  // Password-reset links land here as ?code=... (a query param, which is
-  // unaffected by HashRouter's use of the URL fragment for routing). Once
-  // exchanged for a session, AuthContext's user updates and we hop over to
-  // the reset-password screen.
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get('code')
     if (!code) return
