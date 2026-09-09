@@ -3,32 +3,39 @@ import { Search, Plus, Check } from 'lucide-react'
 import { useGlobalExercises } from '../lib/db.js'
 import { Button, CategoryTag, Badge } from './ui.jsx'
 
-export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, onClose }) {
+export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, onClose, lockCategory }) {
   const [globalExercises, loading] = useGlobalExercises()
   const [q, setQ] = useState('')
-  const [tab, setTab] = useState('all')
+  const [tab, setTab] = useState(lockCategory || 'all')
   const [addedIds, setAddedIds] = useState(new Set())
 
   const existingLower = useMemo(() => new Set(existingNames.map((n) => n.toLowerCase())), [existingNames])
 
   const filtered = useMemo(() => {
     return globalExercises.filter((g) => {
-      if (tab !== 'all' && g.category !== tab) return false
+      const effectiveTab = lockCategory || tab
+      if (effectiveTab !== 'all' && g.category !== effectiveTab) return false
       if (q && !g.name.toLowerCase().includes(q.toLowerCase())) return false
       return true
     })
-  }, [globalExercises, tab, q])
+  }, [globalExercises, tab, q, lockCategory])
 
   async function handleAdd(g) {
     await onAdd(g)
     setAddedIds((prev) => new Set(prev).add(g.id))
   }
 
+  const categoryLabels = { strength: 'Strength', mobility: 'Mobility', cardio: 'Cardio' }
+
   return (
     <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" onClick={onClose}>
       <div className="card p-6 w-full max-w-lg max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-2xl mb-1">Add an exercise</h2>
-        <p className="text-chalkdim text-sm mb-4">Browse the shared library, or create your own if it's not here.</p>
+        <p className="text-chalkdim text-sm mb-4">
+          {lockCategory
+            ? `Browsing ${categoryLabels[lockCategory]} exercises only, to match this routine's category.`
+            : "Browse the shared library, or create your own if it's not here."}
+        </p>
 
         <div className="flex items-center gap-2 mb-3">
           <div className="relative flex-1">
@@ -43,22 +50,24 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
           </div>
         </div>
 
-        <div className="flex rounded-md bg-surface2 p-1 text-sm w-fit mb-3 flex-wrap">
-          {[
-            { id: 'all', label: 'All' },
-            { id: 'strength', label: 'Strength' },
-            { id: 'mobility', label: 'Mobility' },
-            { id: 'cardio', label: 'Cardio' },
-          ].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`px-3 py-1.5 rounded transition-colors ${tab === t.id ? 'bg-ink text-chalk' : 'text-chalkdim'}`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {!lockCategory && (
+          <div className="flex rounded-md bg-surface2 p-1 text-sm w-fit mb-3 flex-wrap">
+            {[
+              { id: 'all', label: 'All' },
+              { id: 'strength', label: 'Strength' },
+              { id: 'mobility', label: 'Mobility' },
+              { id: 'cardio', label: 'Cardio' },
+            ].map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`px-3 py-1.5 rounded transition-colors ${tab === t.id ? 'bg-ink text-chalk' : 'text-chalkdim'}`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto -mx-2 px-2 flex flex-col gap-1 min-h-[200px]">
           {loading && <p className="text-chalkdim text-sm py-4">Loading library…</p>}

@@ -5,6 +5,7 @@ import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection, addRoutine, updateRoutine, addExercise } from '../lib/db.js'
 import { Button, Card, Field } from './ui.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
+import { ExerciseModal, emptyExerciseForm } from './ExerciseLibrary.jsx'
 
 export default function RoutineBuilder() {
   const { effectiveUid } = useAdmin()
@@ -13,6 +14,7 @@ export default function RoutineBuilder() {
   const [exercises, , refreshExercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [routines, loading] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [picking, setPicking] = useState(false)
+  const [creatingCustom, setCreatingCustom] = useState(false)
 
   const existing = useMemo(() => routines.find((r) => r.id === id), [routines, id])
 
@@ -151,7 +153,7 @@ export default function RoutineBuilder() {
           {items.map((it, i) => (
             <div key={i} className="flex items-center gap-2 bg-surface2 rounded-md p-2.5 flex-wrap">
               <div className="flex-1 min-w-0">
-                <p className="truncate">{it.name}</p>
+                <p className="truncate">{exercises.find((e) => e.id === it.exerciseId)?.name || it.name}</p>
               </div>
               {isCardio ? (
                 <>
@@ -242,11 +244,25 @@ export default function RoutineBuilder() {
         <ExercisePicker
           existingNames={exercises.map((e) => e.name)}
           onAdd={addFromLibrary}
+          lockCategory={category}
           onCreateCustom={() => {
             setPicking(false)
-            navigate('/exercises')
+            setCreatingCustom(true)
           }}
           onClose={() => setPicking(false)}
+        />
+      )}
+
+      {creatingCustom && (
+        <ExerciseModal
+          initial={{ ...emptyExerciseForm, category }}
+          onClose={() => setCreatingCustom(false)}
+          onSave={async (data) => {
+            const ex = await addExercise(effectiveUid, data)
+            refreshExercises()
+            setItems((prev) => [...prev, makeItem(ex)])
+            setCreatingCustom(false)
+          }}
         />
       )}
 

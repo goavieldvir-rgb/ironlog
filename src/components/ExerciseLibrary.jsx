@@ -5,7 +5,7 @@ import { useCollection, addExercise, updateExercise, deleteExercise } from '../l
 import { Button, Card, CategoryTag, Badge, EmptyState, Field } from './ui.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
 
-const emptyForm = {
+export const emptyExerciseForm = {
   name: '',
   category: 'strength',
   videoUrl: '',
@@ -88,6 +88,9 @@ export default function ExerciseLibrary() {
                   <h3 className="text-lg leading-tight">{ex.name}</h3>
                   <CategoryTag category={ex.category} />
                   {ex.bodyweight && ex.category !== 'cardio' && <Badge tone="brass">Bodyweight</Badge>}
+                  {ex.category === 'cardio' && (
+                    <Badge tone="cardio">{ex.intensity_type === 'hr_zone' ? 'HR Zone' : 'RPE'}</Badge>
+                  )}
                 </div>
                 {formatLast(ex) && <p className="num text-chalkdim text-xs mt-1">{formatLast(ex)}</p>}
               </div>
@@ -144,7 +147,7 @@ export default function ExerciseLibrary() {
           }}
           onCreateCustom={() => {
             setPicking(false)
-            setEditing(emptyForm)
+            setEditing(emptyExerciseForm)
           }}
           onClose={() => setPicking(false)}
         />
@@ -193,8 +196,8 @@ export function Tabs({ tab, setTab }) {
   )
 }
 
-function ExerciseModal({ initial, onClose, onSave }) {
-  const [form, setForm] = useState({ ...emptyForm, ...initial })
+export function ExerciseModal({ initial, onClose, onSave }) {
+  const [form, setForm] = useState({ ...emptyExerciseForm, ...initial })
   const [saving, setSaving] = useState(false)
 
   async function handleSubmit(e) {

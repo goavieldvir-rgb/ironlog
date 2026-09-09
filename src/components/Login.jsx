@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { supabase } from '../supabase.js'
 import { Button, Field } from './ui.jsx'
@@ -12,6 +12,21 @@ export default function Login() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [resetSent, setResetSent] = useState(false)
+  const [invited, setInvited] = useState(false)
+
+  // A link generated from People → "Invite someone" pre-fills the sign-up
+  // form so whoever opens it just needs to pick a password.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const inviteEmail = params.get('invite_email')
+    const inviteName = params.get('invite_name')
+    if (inviteEmail || inviteName) {
+      setMode('signup')
+      setInvited(true)
+      if (inviteEmail) setEmail(inviteEmail)
+      if (inviteName) setName(inviteName)
+    }
+  }, [])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -92,6 +107,10 @@ export default function Login() {
                   <h2 className="text-xl mb-1">Reset your password</h2>
                   <p className="text-chalkdim text-sm">We'll email you a link to set a new one.</p>
                 </div>
+              )}
+
+              {mode === 'signup' && invited && (
+                <p className="text-brass text-sm -mt-2">You've been invited — just pick a password to finish.</p>
               )}
 
               {mode === 'signup' && (

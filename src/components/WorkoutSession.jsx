@@ -45,7 +45,7 @@ export default function WorkoutSession() {
           if (category === 'cardio') {
             return {
               exerciseId: it.exerciseId,
-              name: it.name,
+              name: full?.name || it.name,
               unit: it.unit,
               category: 'cardio',
               intensityType: it.intensityType || full?.intensity_type || 'rpe',
@@ -64,7 +64,7 @@ export default function WorkoutSession() {
           }
           return {
             exerciseId: it.exerciseId,
-            name: it.name,
+            name: full?.name || it.name,
             unit: it.unit,
             bodyweight: it.bodyweight ?? full?.bodyweight ?? false,
             videoUrl: full?.video_url || it.videoUrl || '',

@@ -85,7 +85,10 @@ export default function Stats() {
 
   const totalVolume = useMemo(() => weeklyData.reduce((s, w) => s + w.volume, 0), [weeklyData])
   const totalCardioMinutes = useMemo(() => weeklyData.reduce((s, w) => s + w.cardioMinutes, 0), [weeklyData])
-  const hasCardio = totalCardioMinutes > 0
+  const hasCardio = useMemo(
+    () => totalCardioMinutes > 0 || sessions.some((s) => (s.entries || []).some((e) => e.category === 'cardio')),
+    [totalCardioMinutes, sessions],
+  )
 
   // Personal records + per-exercise progress history, derived straight from
   // the sets people logged (no need for a separate exercises fetch).

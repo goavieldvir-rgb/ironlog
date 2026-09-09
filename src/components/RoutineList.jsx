@@ -10,8 +10,14 @@ import { Tabs } from './ExerciseLibrary.jsx'
 export default function RoutineList() {
   const { effectiveUid, isAdmin } = useAdmin()
   const [routines, loading, refresh] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
+  const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [tab, setTab] = useState('all')
   const [copyTarget, setCopyTarget] = useState(null)
+
+  const exerciseNameById = useMemo(
+    () => Object.fromEntries(exercises.map((e) => [e.id, e.name])),
+    [exercises],
+  )
 
   const filtered = useMemo(
     () => routines.filter((r) => tab === 'all' || r.category === tab),
@@ -104,7 +110,7 @@ export default function RoutineList() {
             <ul className="text-sm text-chalkdim flex flex-col gap-0.5">
               {(r.exercises || []).slice(0, 4).map((e, i) => (
                 <li key={i} className="flex justify-between gap-2">
-                  <span className="text-chalk truncate min-w-0">{e.name}</span>
+                  <span className="text-chalk truncate min-w-0">{exerciseNameById[e.exerciseId] || e.name}</span>
                   <span className="num shrink-0">
                     {r.category === 'cardio'
                       ? `${e.targetSets ?? e.targetDuration ?? ''}${e.targetSets != null ? ' min' : ''}`
