@@ -6,6 +6,7 @@ import { useCollection, addRoutine, updateRoutine, addExercise } from '../lib/db
 import { Button, Card, Field } from './ui.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
 import { ExerciseModal, emptyExerciseForm } from './ExerciseLibrary.jsx'
+import { InfoTip } from './InfoTip.jsx'
 
 export default function RoutineBuilder() {
   const { effectiveUid } = useAdmin()
@@ -132,7 +133,14 @@ export default function RoutineBuilder() {
           <Field label="Routine name">
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Push day" required />
           </Field>
-          <Field label="Category">
+          <Field
+            label={
+              <>
+                Category{' '}
+                <InfoTip text="A routine can only hold one category of exercise — Strength, Mobility, or Cardio. This keeps the logging screen showing the right fields (sets/reps vs. duration/intensity) for everything in it." />
+              </>
+            }
+          >
             <select value={category} onChange={(e) => setCategory(e.target.value)}>
               <option value="strength">Strength</option>
               <option value="mobility">Mobility / Physio</option>

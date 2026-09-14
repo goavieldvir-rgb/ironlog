@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Play, Pause, RotateCcw, Timer } from 'lucide-react'
 import { Button } from './ui.jsx'
+import { InfoTip } from './InfoTip.jsx'
 
 const PRESETS = [60, 90, 120, 180]
 
@@ -72,11 +73,12 @@ export default function RestTimer() {
         finished ? 'bg-ironsoft border-iron' : 'bg-ink/95 border-line'
       }`}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <Timer size={16} className={finished ? 'text-iron' : 'text-chalkdim'} />
         <span className={`num text-2xl leading-none ${finished ? 'text-iron' : 'text-chalk'}`}>
           {mm}:{ss}
         </span>
+        <InfoTip text="A countdown timer for resting between sets. Tap 60/90/120/180 to start it at that many seconds — it'll beep and vibrate your phone when time's up." />
       </div>
 
       <div className="flex gap-1">

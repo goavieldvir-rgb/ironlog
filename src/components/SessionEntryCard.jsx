@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Play, Plus, Trash2, Minus, CornerDownLeft, History, StickyNote, ChevronDown } from 'lucide-react'
 import { Card, Badge } from './ui.jsx'
+import { InfoTip } from './InfoTip.jsx'
 
 function Stepper({ value, onChange, step, min = 0, max }) {
   function bump(delta) {
@@ -137,7 +138,12 @@ export default function SessionEntryCard({
             {isCardio && <Badge tone="cardio">Cardio</Badge>}
             {!isCardio && entry.bodyweight && <Badge tone="brass">Bodyweight</Badge>}
           </div>
-          {prevLabel && <p className="num text-chalkdim text-xs mt-0.5">{prevLabel}</p>}
+          {prevLabel && (
+            <p className="num text-chalkdim text-xs mt-0.5 inline-flex items-center gap-1 flex-wrap">
+              {prevLabel}
+              <InfoTip text="This is what you logged last time — and the small clock icon on your first set will fill those numbers in for you. If your last two sessions weren't identical, it'll ask whether to use the last set you did or the heaviest/longest one." />
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {onUpdateNote && !showNote && (

@@ -14,6 +14,7 @@ import {
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection } from '../lib/db.js'
 import { Card, EmptyState, Field } from './ui.jsx'
+import { InfoTip } from './InfoTip.jsx'
 
 const COLORS = { iron: '#D64545', brass: '#C9A24B', cardio: '#4C8CC9', chalk: '#EDEDE6', chalkdim: '#9CA0AA', grid: '#31353E' }
 
@@ -263,7 +264,10 @@ export default function Stats() {
           )}
 
           <Card className="flex flex-col gap-3">
-            <h2 className="eyebrow">Progress by exercise</h2>
+            <h2 className="eyebrow flex items-center gap-1.5 flex-wrap">
+              Progress by exercise
+              <InfoTip text="Pick any exercise you've logged more than once to see a chart of how it's changed over time — weight for normal exercises, reps for bodyweight ones, duration for cardio." />
+            </h2>
             <Field label="Exercise">
               <select value={exerciseId} onChange={(e) => setExerciseId(e.target.value)} className="w-56">
                 <option value="">Choose an exercise…</option>
@@ -320,7 +324,10 @@ export default function Stats() {
           </Card>
 
           <Card className="flex flex-col gap-2">
-            <h2 className="eyebrow mb-1">Personal records</h2>
+            <h2 className="eyebrow mb-1 flex items-center gap-1.5 flex-wrap">
+              Personal records
+              <InfoTip text="Your best-ever weight (or reps, for bodyweight exercises) on each exercise, and the date you hit it. Updates automatically whenever you beat it." />
+            </h2>
             {records.length === 0 ? (
               <p className="text-chalkdim text-sm">No completed sets logged yet.</p>
             ) : (

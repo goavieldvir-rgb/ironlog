@@ -1,10 +1,25 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Users, ArrowRight, ShieldCheck, UserPlus, Copy, Check, AlertTriangle } from 'lucide-react'
+import { Users, ArrowRight, ShieldCheck, UserPlus, Copy, Check, AlertTriangle, Flame } from 'lucide-react'
 import { supabase } from '../supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { Card, Badge, EmptyState, Button, Field } from './ui.jsx'
+import { InfoTip } from './InfoTip.jsx'
+
+function startOfWeekISO() {
+  const d = new Date()
+  const day = d.getDay() === 0 ? 6 : d.getDay() - 1
+  d.setDate(d.getDate() - day)
+  return d.toISOString().slice(0, 10)
+}
+
+function daysAgo(iso) {
+  const days = Math.round((Date.now() - new Date(iso + 'T00:00:00').getTime()) / 86400000)
+  if (days === 0) return 'today'
+  if (days === 1) return 'yesterday'
+  return `${days}d ago`
+}
 
 export default function People() {
   const { user } = useAuth()
@@ -13,6 +28,7 @@ export default function People() {
   const [people, setPeople] = useState([])
   const [loading, setLoading] = useState(true)
   const [inviting, setInviting] = useState(false)
+  const [activity, setActivity] = useState([])
 
   useEffect(() => {
     supabase
@@ -24,7 +40,34 @@ export default function People() {
         setPeople(data || [])
         setLoading(false)
       })
+
+    // Lightweight: just user_id + date, last 90 days, across everyone —
+    // RLS lets an admin read every row, this is what makes "who's gone
+    // quiet" possible without opening each person's account individually.
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - 90)
+    supabase
+      .from('sessions')
+      .select('user_id, date')
+      .gte('date', cutoff.toISOString().slice(0, 10))
+      .then(({ data, error }) => {
+        if (error) console.error(error)
+        setActivity(data || [])
+      })
   }, [])
+
+  const activityByUser = useMemo(() => {
+    const weekStart = startOfWeekISO()
+    const map = {}
+    for (const row of activity) {
+      if (!map[row.user_id]) map[row.user_id] = { thisWeek: 0, lastDate: null }
+      if (row.date >= weekStart) map[row.user_id].thisWeek += 1
+      if (!map[row.user_id].lastDate || row.date > map[row.user_id].lastDate) {
+        map[row.user_id].lastDate = row.date
+      }
+    }
+    return map
+  }, [activity])
 
   function manage(person) {
     if (person.id === user.uid) {
@@ -41,8 +84,9 @@ export default function People() {
         <div>
           <div className="eyebrow mb-1">Admin</div>
           <h1 className="text-3xl">People</h1>
-          <p className="text-chalkdim text-sm mt-1">
+          <p className="text-chalkdim text-sm mt-1 flex items-center gap-1.5 flex-wrap">
             Pick someone to build routines for, or view their training history.
+            <InfoTip text="The colored dot next to each person: green means they've logged a session this week, amber means they've trained before but gone quiet recently, gray means they've never logged anything yet." />
           </p>
         </div>
         <div className="flex gap-2">
@@ -62,30 +106,45 @@ export default function People() {
       )}
 
       <div className="flex flex-col gap-2">
-        {people.map((p) => (
-          <Card key={p.id} className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap min-w-0">
-                <p className="truncate min-w-0">{p.full_name || p.email}</p>
-                {p.id === user.uid && <Badge>You</Badge>}
-                {p.is_admin && (
-                  <Badge tone="brass">
-                    <span className="inline-flex items-center gap-1">
-                      <ShieldCheck size={11} /> Admin
-                    </span>
-                  </Badge>
+        {people.map((p) => {
+          const stats = activityByUser[p.id]
+          const dotColor = stats?.thisWeek > 0 ? 'bg-good' : stats?.lastDate ? 'bg-brass' : 'bg-chalkdim'
+          const activityText = stats?.thisWeek > 0
+            ? `${stats.thisWeek} session${stats.thisWeek === 1 ? '' : 's'} this week`
+            : stats?.lastDate
+              ? `Quiet since ${daysAgo(stats.lastDate)}`
+              : 'No sessions yet'
+          return (
+            <Card key={p.id} className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <p className="truncate min-w-0">{p.full_name || p.email}</p>
+                  {p.id === user.uid && <Badge>You</Badge>}
+                  {p.is_admin && (
+                    <Badge tone="brass">
+                      <span className="inline-flex items-center gap-1">
+                        <ShieldCheck size={11} /> Admin
+                      </span>
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-chalkdim text-xs mt-0.5 truncate">{p.email}</p>
+                {p.id !== user.uid && (
+                  <p className="text-xs mt-1 inline-flex items-center gap-1.5">
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
+                    <span className="text-chalkdim">{activityText}</span>
+                  </p>
                 )}
               </div>
-              <p className="text-chalkdim text-xs mt-0.5 truncate">{p.email}</p>
-            </div>
-            <button
-              onClick={() => manage(p)}
-              className="shrink-0 inline-flex items-center gap-1.5 text-sm text-brass hover:underline"
-            >
-              {p.id === user.uid ? 'Back to my account' : 'Manage'} <ArrowRight size={14} />
-            </button>
-          </Card>
-        ))}
+              <button
+                onClick={() => manage(p)}
+                className="shrink-0 inline-flex items-center gap-1.5 text-sm text-brass hover:underline"
+              >
+                {p.id === user.uid ? 'Back to my account' : 'Manage'} <ArrowRight size={14} />
+              </button>
+            </Card>
+          )
+        })}
       </div>
 
       {inviting && <InviteModal onClose={() => setInviting(false)} />}

@@ -4,6 +4,7 @@ import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection, addExercise, updateExercise, deleteExercise } from '../lib/db.js'
 import { Button, Card, CategoryTag, Badge, EmptyState, Field } from './ui.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
+import { InfoTip } from './InfoTip.jsx'
 
 export const emptyExerciseForm = {
   name: '',
@@ -248,7 +249,14 @@ export function ExerciseModal({ initial, onClose, onSave }) {
 
           {!isCardio && (
             <>
-              <Field label="How is weight tracked?">
+              <Field
+                label={
+                  <>
+                    How is weight tracked?{' '}
+                    <InfoTip text="Most exercises are 'weight in kg/lb' — a barbell, dumbbell, or machine number. Pick Bodyweight for things like pull-ups or push-ups where your own body is the weight, not an external plate." />
+                  </>
+                }
+              >
                 <select
                   value={form.bodyweight ? 'bodyweight' : form.unit}
                   onChange={(e) => {
@@ -276,7 +284,14 @@ export function ExerciseModal({ initial, onClose, onSave }) {
 
           {isCardio && (
             <>
-              <Field label="How is intensity logged?">
+              <Field
+                label={
+                  <>
+                    How is intensity logged?{' '}
+                    <InfoTip text="RPE = 'how hard did that feel', on a 1–10 scale — 10 is an all-out sprint, 1 is a gentle stroll. Heart rate zone is a 1–5 number if you actually track your heart rate. Pick whichever one you naturally pay attention to." />
+                  </>
+                }
+              >
                 <select value={form.intensityType} onChange={(e) => setForm({ ...form, intensityType: e.target.value })}>
                   <option value="rpe">Effort scale (RPE 1–10)</option>
                   <option value="hr_zone">Heart rate zone (1–5)</option>
