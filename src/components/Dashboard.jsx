@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Play, Plus, ChevronRight, Flame, Check, Circle } from 'lucide-react'
+import { Play, Plus, ChevronRight, Flame, Check, Circle, Clock } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection } from '../lib/db.js'
+import { loadDraft, clearDraft } from '../lib/draft.js'
 import { Button, Card, CategoryTag } from './ui.jsx'
 
 function startOfWeekISO() {
@@ -16,6 +17,14 @@ function startOfWeekISO() {
 function formatDate(iso) {
   const d = new Date(iso + 'T00:00:00')
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+function timeAgo(ts) {
+  const mins = Math.max(1, Math.round((Date.now() - ts) / 60000))
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.round(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.round(hrs / 24)}d ago`
 }
 
 export default function Dashboard() {
@@ -50,6 +59,16 @@ export default function Dashboard() {
   const allDone = steps.every((s) => s.done)
   const showChecklist = !sessionsLoading && !allDone
 
+  const [draft, setDraft] = useState(null)
+  useEffect(() => {
+    setDraft(loadDraft(effectiveUid))
+  }, [effectiveUid])
+
+  function discardDraft() {
+    clearDraft(effectiveUid)
+    setDraft(null)
+  }
+
   const firstName = (user.displayName || user.email || '').split(/[\s@]/)[0]
 
   return (
@@ -62,6 +81,31 @@ export default function Dashboard() {
           {actingAs ? `${effectiveName}'s training log` : `Welcome back${firstName ? `, ${firstName}` : ''}.`}
         </h1>
       </div>
+
+      {draft && (
+        <Card className="border-brass/60 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-start gap-3">
+            <Clock size={18} className="text-brass shrink-0 mt-0.5" />
+            <div>
+              <div className="eyebrow text-brass mb-0.5">In progress</div>
+              <p className="text-lg leading-tight">{draft.routineName}</p>
+              <p className="text-chalkdim text-xs mt-0.5">
+                {timeAgo(draft.savedAt)} · {draft.entries?.length || 0} exercise{draft.entries?.length === 1 ? '' : 's'} logged so far
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <button onClick={discardDraft} className="text-chalkdim text-xs hover:text-iron">
+              Discard
+            </button>
+            <Link to={`/workout/${draft.routineId || 'freestyle'}`}>
+              <Button variant="brass">
+                <Play size={15} /> Resume
+              </Button>
+            </Link>
+          </div>
+        </Card>
+      )}
 
       {showChecklist && <OnboardingChecklist steps={steps} />}
 

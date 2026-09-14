@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { ChevronLeft, Plus, Check } from 'lucide-react'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection, logSession } from '../lib/db.js'
+import { saveDraft, loadDraft, clearDraft } from '../lib/draft.js'
 import { Button, Card, CategoryTag, Field } from './ui.jsx'
 import SessionEntryCard from './SessionEntryCard.jsx'
 import RestTimer from './RestTimer.jsx'
@@ -31,13 +32,38 @@ export default function WorkoutSession() {
   const [pickId, setPickId] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  // Tracks whether we've done the initial "restore a draft, or build fresh
+  // from the routine" pass — autosave shouldn't run before that, or it'd
+  // immediately overwrite a real draft with an empty one for a split second.
+  const [ready, setReady] = useState(false)
 
+  // On open: if there's a matching in-progress draft for this exact routine
+  // (or this exact freestyle session) sitting in local storage, restore it
+  // instead of starting fresh — this is what makes "Resume workout" work,
+  // and also what saves you if Safari reloads the tab mid-session.
   useEffect(() => {
     if (isFreestyle) {
+      const draft = loadDraft(effectiveUid)
+      if (draft && draft.routineId === null) {
+        setEntries(draft.entries || [])
+        setDate(draft.date || todayISO())
+        setNotes(draft.notes || '')
+        setReady(true)
+        return
+      }
       setEntries([])
+      setReady(true)
       return
     }
     if (routine) {
+      const draft = loadDraft(effectiveUid)
+      if (draft && draft.routineId === routine.id) {
+        setEntries(draft.entries || [])
+        setDate(draft.date || todayISO())
+        setNotes(draft.notes || '')
+        setReady(true)
+        return
+      }
       setEntries(
         routine.exercises.map((it) => {
           const full = exercises.find((e) => e.id === it.exerciseId)
@@ -53,6 +79,7 @@ export default function WorkoutSession() {
               lastWeight: full?.last_weight,
               lastReps: full?.last_reps,
               lastDistance: full?.last_distance,
+              lastSets: full?.last_sets || [],
               notes: '',
               sets: [
                 {
@@ -71,16 +98,33 @@ export default function WorkoutSession() {
             videoUrl: full?.video_url || it.videoUrl || '',
             lastWeight: full?.last_weight,
             lastReps: full?.last_reps,
+            lastSets: full?.last_sets || [],
             notes: '',
             sets: Array.from({ length: it.targetSets || 3 }, () => ({ weight: '', reps: '' })),
           }
         }),
       )
+      setReady(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routine?.id, exercises.length])
+  }, [routine?.id, exercises.length, isFreestyle, effectiveUid])
 
   const category = isFreestyle ? 'strength' : routine?.category || 'strength'
+
+  // Autosave every change to local storage so a backgrounded-tab reload
+  // never wipes out what's already been logged.
+  useEffect(() => {
+    if (!ready || entries.length === 0) return
+    saveDraft(effectiveUid, {
+      routineId: isFreestyle ? null : routine?.id || null,
+      routineName: isFreestyle ? 'Freestyle session' : routine?.name,
+      category,
+      date,
+      notes,
+      entries,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries, date, notes, ready])
 
   function addFreestyleExercise() {
     const ex = exercises.find((e) => e.id === pickId)
@@ -98,6 +142,7 @@ export default function WorkoutSession() {
           lastWeight: ex.last_weight,
           lastReps: ex.last_reps,
           lastDistance: ex.last_distance,
+          lastSets: ex.last_sets || [],
           notes: '',
           sets: [{ duration: String(ex.last_weight ?? 20), intensity: String(ex.last_reps ?? 5), distance: '' }],
         },
@@ -113,6 +158,7 @@ export default function WorkoutSession() {
           videoUrl: ex.video_url || '',
           lastWeight: ex.last_weight,
           lastReps: ex.last_reps,
+          lastSets: ex.last_sets || [],
           notes: '',
           sets: [{ weight: '', reps: '' }, { weight: '', reps: '' }, { weight: '', reps: '' }],
         },
@@ -172,6 +218,7 @@ export default function WorkoutSession() {
           sets: e.sets,
         })),
       })
+      clearDraft(effectiveUid)
       setSaved(true)
       setTimeout(() => navigate('/history'), 900)
     } finally {

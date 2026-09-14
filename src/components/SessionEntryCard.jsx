@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Play, Plus, Trash2, Minus, CornerDownLeft, History, StickyNote } from 'lucide-react'
+import { Play, Plus, Trash2, Minus, CornerDownLeft, History, StickyNote, ChevronDown } from 'lucide-react'
 import { Card, Badge } from './ui.jsx'
 
 function Stepper({ value, onChange, step, min = 0, max }) {
@@ -47,6 +47,7 @@ export default function SessionEntryCard({
   removable = false,
 }) {
   const [showNote, setShowNote] = useState(!!entry.notes)
+  const [showQuickFill, setShowQuickFill] = useState(false)
   const isCardio = entry.category === 'cardio'
   const weightStep = entry.unit === 'lb' ? 5 : 2.5
   const intensityMax = entry.intensityType === 'hr_zone' ? 5 : 10
@@ -60,17 +61,58 @@ export default function SessionEntryCard({
     else onUpdateSet(setIdx, { weight: prev.weight, reps: prev.reps })
   }
 
-  function useLastTime(setIdx) {
-    if (entry.lastWeight == null) return
+  // Last time's sets, if we have the full breakdown (added once someone
+  // logs a session after this feature shipped). "Last set" is whichever
+  // set was done last (reverse-pyramid friendly); "top set" is the
+  // heaviest/longest one, wherever in the session it fell (pyramid
+  // friendly). Falls back to the single last-known value for older data.
+  const lastSets = entry.lastSets || []
+  const lastSetData = lastSets.length > 0 ? lastSets[lastSets.length - 1] : null
+  const topSetData = (() => {
+    if (lastSets.length === 0) return null
+    if (isCardio) return lastSets.reduce((best, s) => (Number(s.duration) > Number(best.duration) ? s : best))
+    if (entry.bodyweight) return lastSets.reduce((best, s) => (Number(s.reps) > Number(best.reps) ? s : best))
+    return lastSets.reduce((best, s) => (Number(s.weight) > Number(best.weight) ? s : best))
+  })()
+  const hasChoice = lastSetData && topSetData && JSON.stringify(lastSetData) !== JSON.stringify(topSetData)
+  const hasAnyLastData = lastSetData != null || entry.lastWeight != null
+
+  function applySet(setIdx, data) {
     if (isCardio) {
       onUpdateSet(setIdx, {
-        duration: String(entry.lastWeight),
-        intensity: String(entry.lastReps),
-        distance: entry.lastDistance != null ? String(entry.lastDistance) : '',
+        duration: String(data.duration),
+        intensity: String(data.intensity),
+        distance: data.distance != null && data.distance !== '' ? String(data.distance) : '',
       })
     } else {
-      onUpdateSet(setIdx, { weight: String(entry.lastWeight), reps: String(entry.lastReps) })
+      onUpdateSet(setIdx, { weight: String(data.weight), reps: String(data.reps) })
     }
+  }
+
+  function useLastTime(setIdx) {
+    if (hasChoice) {
+      setShowQuickFill((v) => !v)
+      return
+    }
+    const data =
+      lastSetData ||
+      (isCardio
+        ? { duration: entry.lastWeight, intensity: entry.lastReps, distance: entry.lastDistance }
+        : { weight: entry.lastWeight, reps: entry.lastReps })
+    applySet(setIdx, data)
+  }
+
+  function pickQuickFill(setIdx, data) {
+    applySet(setIdx, data)
+    setShowQuickFill(false)
+  }
+
+  function formatQuickFillLabel(data) {
+    if (isCardio) {
+      const dist = data.distance != null && data.distance !== '' ? ` · ${data.distance}${distanceUnit}` : ''
+      return `${data.duration} min · ${intensityLabel} ${data.intensity}${dist}`
+    }
+    return `${data.weight}${entry.unit} × ${data.reps}`
   }
 
   const prevLabel = (() => {
@@ -125,6 +167,28 @@ export default function SessionEntryCard({
         </div>
       </div>
 
+      {showQuickFill && hasChoice && (
+        <div className="flex flex-col gap-1.5 bg-surface2 rounded-md p-2.5 -mt-1">
+          <span className="eyebrow">Copy in numbers from last time</span>
+          <div className="flex flex-col sm:flex-row gap-1.5">
+            <button
+              onClick={() => pickQuickFill(0, lastSetData)}
+              className="flex-1 text-left rounded-md bg-ink border border-line hover:border-brass px-3 py-2"
+            >
+              <p className="text-xs text-chalkdim">Last set done</p>
+              <p className="num text-sm">{formatQuickFillLabel(lastSetData)}</p>
+            </button>
+            <button
+              onClick={() => pickQuickFill(0, topSetData)}
+              className="flex-1 text-left rounded-md bg-ink border border-line hover:border-brass px-3 py-2"
+            >
+              <p className="text-xs text-chalkdim">Top set done</p>
+              <p className="num text-sm">{formatQuickFillLabel(topSetData)}</p>
+            </button>
+          </div>
+        </div>
+      )}
+
       {isCardio ? (
         <div className="flex flex-col gap-1.5">
           <div className="grid grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_3.25rem] gap-1 text-chalkdim eyebrow px-0.5">
@@ -147,9 +211,14 @@ export default function SessionEntryCard({
               />
               <Stepper value={s.distance} step={0.1} min={0} onChange={(v) => onUpdateSet(j, { distance: v })} />
               <div className="flex items-center gap-0.5 justify-end min-w-0">
-                {j === 0 && entry.lastWeight != null ? (
-                  <button onClick={() => useLastTime(j)} title="Use last time's numbers" className="text-chalkdim hover:text-brass p-1">
+                {j === 0 && hasAnyLastData ? (
+                  <button
+                    onClick={() => useLastTime(j)}
+                    title={hasChoice ? "Choose last time's numbers" : "Use last time's numbers"}
+                    className="text-chalkdim hover:text-brass p-1 inline-flex items-center"
+                  >
                     <History size={14} />
+                    {hasChoice && <ChevronDown size={10} />}
                   </button>
                 ) : j > 0 ? (
                   <button onClick={() => copyFromPrevious(j)} title="Same as above" className="text-chalkdim hover:text-brass p-1">
@@ -182,9 +251,14 @@ export default function SessionEntryCard({
               <Stepper value={s.weight} step={weightStep} onChange={(v) => onUpdateSet(j, { weight: v })} />
               <Stepper value={s.reps} step={1} onChange={(v) => onUpdateSet(j, { reps: v })} />
               <div className="flex items-center gap-0.5 justify-end min-w-0">
-                {j === 0 && entry.lastWeight != null ? (
-                  <button onClick={() => useLastTime(j)} title="Use last time's numbers" className="text-chalkdim hover:text-brass p-1">
+                {j === 0 && hasAnyLastData ? (
+                  <button
+                    onClick={() => useLastTime(j)}
+                    title={hasChoice ? "Choose last time's numbers" : "Use last time's numbers"}
+                    className="text-chalkdim hover:text-brass p-1 inline-flex items-center"
+                  >
                     <History size={14} />
+                    {hasChoice && <ChevronDown size={10} />}
                   </button>
                 ) : j > 0 ? (
                   <button onClick={() => copyFromPrevious(j)} title="Same as set above" className="text-chalkdim hover:text-brass p-1">
