@@ -53,6 +53,7 @@ export default function WorkoutSession() {
               lastWeight: full?.last_weight,
               lastReps: full?.last_reps,
               lastDistance: full?.last_distance,
+              notes: '',
               sets: [
                 {
                   duration: String(it.targetDuration ?? full?.last_weight ?? 20),
@@ -70,6 +71,7 @@ export default function WorkoutSession() {
             videoUrl: full?.video_url || it.videoUrl || '',
             lastWeight: full?.last_weight,
             lastReps: full?.last_reps,
+            notes: '',
             sets: Array.from({ length: it.targetSets || 3 }, () => ({ weight: '', reps: '' })),
           }
         }),
@@ -96,6 +98,7 @@ export default function WorkoutSession() {
           lastWeight: ex.last_weight,
           lastReps: ex.last_reps,
           lastDistance: ex.last_distance,
+          notes: '',
           sets: [{ duration: String(ex.last_weight ?? 20), intensity: String(ex.last_reps ?? 5), distance: '' }],
         },
       ])
@@ -110,6 +113,7 @@ export default function WorkoutSession() {
           videoUrl: ex.video_url || '',
           lastWeight: ex.last_weight,
           lastReps: ex.last_reps,
+          notes: '',
           sets: [{ weight: '', reps: '' }, { weight: '', reps: '' }, { weight: '', reps: '' }],
         },
       ])
@@ -125,6 +129,10 @@ export default function WorkoutSession() {
           : { ...e, sets: e.sets.map((s, j) => (j === setIdx ? { ...s, ...patch } : s)) },
       ),
     )
+  }
+
+  function updateNote(entryIdx, text) {
+    setEntries((prev) => prev.map((e, i) => (i !== entryIdx ? e : { ...e, notes: text })))
   }
 
   function addSet(entryIdx) {
@@ -160,6 +168,7 @@ export default function WorkoutSession() {
           bodyweight: e.bodyweight,
           intensityType: e.intensityType,
           videoUrl: e.videoUrl,
+          notes: e.notes || '',
           sets: e.sets,
         })),
       })
@@ -202,6 +211,7 @@ export default function WorkoutSession() {
             onAddSet={() => addSet(i)}
             onRemoveSet={(setIdx) => removeSet(i, setIdx)}
             onRemoveEntry={() => removeEntry(i)}
+            onUpdateNote={(text) => updateNote(i, text)}
           />
         ))}
 

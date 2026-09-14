@@ -1,5 +1,5 @@
-import React from 'react'
-import { Play, Plus, Trash2, Minus, CornerDownLeft, History } from 'lucide-react'
+import React, { useState } from 'react'
+import { Play, Plus, Trash2, Minus, CornerDownLeft, History, StickyNote } from 'lucide-react'
 import { Card, Badge } from './ui.jsx'
 
 function Stepper({ value, onChange, step, min = 0, max }) {
@@ -43,8 +43,10 @@ export default function SessionEntryCard({
   onAddSet,
   onRemoveSet,
   onRemoveEntry,
+  onUpdateNote,
   removable = false,
 }) {
+  const [showNote, setShowNote] = useState(!!entry.notes)
   const isCardio = entry.category === 'cardio'
   const weightStep = entry.unit === 'lb' ? 5 : 2.5
   const intensityMax = entry.intensityType === 'hr_zone' ? 5 : 10
@@ -96,6 +98,15 @@ export default function SessionEntryCard({
           {prevLabel && <p className="num text-chalkdim text-xs mt-0.5">{prevLabel}</p>}
         </div>
         <div className="flex items-center gap-2">
+          {onUpdateNote && !showNote && (
+            <button
+              onClick={() => setShowNote(true)}
+              title="Add a note for this exercise"
+              className="text-chalkdim hover:text-brass p-1"
+            >
+              <StickyNote size={15} />
+            </button>
+          )}
           {entry.videoUrl && (
             <a
               href={entry.videoUrl}
@@ -191,6 +202,18 @@ export default function SessionEntryCard({
           <button onClick={onAddSet} className="text-chalkdim hover:text-chalk text-xs inline-flex items-center gap-1 mt-1 w-fit">
             <Plus size={13} /> Add set
           </button>
+        </div>
+      )}
+
+      {onUpdateNote && showNote && (
+        <div className="flex flex-col gap-1 pt-1 border-t border-line">
+          <span className="eyebrow">Note for this exercise (optional)</span>
+          <input
+            value={entry.notes || ''}
+            onChange={(e) => onUpdateNote(e.target.value)}
+            placeholder="e.g. used the seated machine, swapped in dumbbells…"
+            className="text-sm"
+          />
         </div>
       )}
     </Card>

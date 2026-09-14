@@ -165,6 +165,7 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName }) {
     for (const e of s.entries || []) {
       const setsStr = (e.sets || []).map((set) => formatSet(e, set)).join(', ')
       lines.push(`- ${e.name}: ${setsStr || 'no sets logged'}`)
+      if (e.notes) lines.push(`  (${e.notes})`)
     }
     if (s.notes) lines.push(`  Notes: ${s.notes}`)
     lines.push('')

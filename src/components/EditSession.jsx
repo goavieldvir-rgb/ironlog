@@ -62,6 +62,10 @@ export default function EditSession() {
     )
   }
 
+  function updateNote(entryIdx, text) {
+    setEntries((prev) => prev.map((e, i) => (i !== entryIdx ? e : { ...e, notes: text })))
+  }
+
   async function handleSave() {
     setSaving(true)
     try {
@@ -97,6 +101,7 @@ export default function EditSession() {
           onUpdateSet={(setIdx, patch) => updateSet(i, setIdx, patch)}
           onAddSet={() => addSet(i)}
           onRemoveSet={(setIdx) => removeSet(i, setIdx)}
+          onUpdateNote={(text) => updateNote(i, text)}
         />
       ))}
 

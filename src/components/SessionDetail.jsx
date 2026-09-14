@@ -86,6 +86,7 @@ export default function SessionDetail() {
               </div>
             ))}
           </div>
+          {entry.notes && <p className="text-chalkdim text-sm italic">"{entry.notes}"</p>}
         </Card>
       ))}
     </div>
