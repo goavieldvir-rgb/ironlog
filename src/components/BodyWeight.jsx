@@ -21,6 +21,20 @@ import { Button, Card, EmptyState, Field } from './ui.jsx'
 
 const COLORS = { iron: '#D64545', chalk: '#EDEDE6', chalkdim: '#9CA0AA', grid: '#31353E' }
 
+// If someone logs a few entries in kg and later switches to lb (or vice
+// versa) — easy to do by accident since the unit is just a dropdown on
+// each entry — raw subtraction/plotting across mixed units would produce
+// a nonsensical "change" number and a chart line with a fake jump. Convert
+// everything to one consistent unit for those calculations; each entry's
+// own row still displays in whatever unit it was actually logged in.
+const KG_PER_LB = 0.45359237
+function toKg(weight, unit) {
+  return unit === 'lb' ? weight * KG_PER_LB : weight
+}
+function fromKg(kg, unit) {
+  return unit === 'lb' ? kg / KG_PER_LB : kg
+}
+
 function todayISO() {
   return toLocalISODate()
 }
@@ -43,14 +57,22 @@ export default function BodyWeight() {
   const [saving, setSaving] = useState(false)
 
   const sorted = useMemo(() => [...entries].sort((a, b) => (a.date < b.date ? 1 : -1)), [entries])
+  const latest = sorted[0]
+  const first0 = [...entries].sort((a, b) => (a.date > b.date ? 1 : -1))[0]
+  const displayUnit = latest?.unit || 'kg'
   const chartData = useMemo(
-    () => [...entries].sort((a, b) => (a.date > b.date ? 1 : -1)).map((e) => ({ ...e, label: shortDate(e.date) })),
-    [entries],
+    () =>
+      [...entries]
+        .sort((a, b) => (a.date > b.date ? 1 : -1))
+        .map((e) => ({ ...e, label: shortDate(e.date), weightDisplay: Math.round(fromKg(toKg(e.weight, e.unit), displayUnit) * 10) / 10 })),
+    [entries, displayUnit],
   )
 
-  const latest = sorted[0]
   const first = chartData[0]
-  const change = latest && first && latest.id !== first.id ? Math.round((latest.weight - first.weight) * 10) / 10 : null
+  const change =
+    latest && first0 && latest.id !== first0.id
+      ? Math.round(fromKg(toKg(latest.weight, latest.unit) - toKg(first0.weight, first0.unit), displayUnit) * 10) / 10
+      : null
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -91,7 +113,7 @@ export default function BodyWeight() {
         <div className="grid grid-cols-3 gap-3">
           <Stat label="Current" value={latest ? `${latest.weight}${latest.unit}` : '—'} />
           <Stat label="First logged" value={first ? `${first.weight}${first.unit}` : '—'} />
-          <Stat label="Change" value={change != null ? `${change > 0 ? '+' : ''}${change}${latest.unit}` : '—'} />
+          <Stat label="Change" value={change != null ? `${change > 0 ? '+' : ''}${change}${displayUnit}` : '—'} />
         </div>
       )}
 
@@ -113,9 +135,9 @@ export default function BodyWeight() {
               <Tooltip
                 contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
                 labelStyle={{ color: COLORS.chalk }}
-                formatter={(value, _name, item) => [`${value}${item.payload.unit}`, 'Weight']}
+                formatter={(value) => [`${value}${displayUnit}`, 'Weight']}
               />
-              <Line type="monotone" dataKey="weight" stroke={COLORS.iron} strokeWidth={2.5} dot={{ fill: COLORS.iron, r: 3 }} />
+              <Line type="monotone" dataKey="weightDisplay" stroke={COLORS.iron} strokeWidth={2.5} dot={{ fill: COLORS.iron, r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         </Card>

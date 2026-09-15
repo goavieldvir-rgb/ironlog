@@ -14,6 +14,7 @@ import {
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection } from '../lib/db.js'
 import { toLocalISODate } from '../lib/dates.js'
+import { disambiguateLabels, enT } from '../lib/disambiguate.js'
 import { Card, EmptyState, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 
@@ -122,7 +123,7 @@ export default function Stats() {
           }
 
           if (!progMap[entry.exerciseId]) {
-            progMap[entry.exerciseId] = { name: entry.name, category: 'cardio', unit: entry.unit, points: [] }
+            progMap[entry.exerciseId] = { name: entry.name, category: 'cardio', unit: entry.unit, intensityType: entry.intensityType, points: [] }
           }
           progMap[entry.exerciseId].points.push({
             date: s.date,
@@ -175,11 +176,14 @@ export default function Stats() {
       .map(([id, r]) => ({ id, ...r }))
       .sort((a, b) => a.name.localeCompare(b.name))
 
-    const exerciseOptions = Object.entries(progMap).map(([id, p]) => ({ id, name: p.name }))
+    const exerciseOptions = Object.entries(progMap).map(([id, p]) => ({ id, name: p.name, category: p.category, unit: p.unit, bodyweight: p.bodyweight, intensityType: p.intensityType }))
     exerciseOptions.sort((a, b) => a.name.localeCompare(b.name))
 
     return { records, exerciseOptions, progressByExercise: progMap }
   }, [sessions])
+
+  const recordLabels = useMemo(() => disambiguateLabels(records, (r) => r.name, enT), [records])
+  const exerciseOptionLabels = useMemo(() => disambiguateLabels(exerciseOptions, (e) => e.name, enT), [exerciseOptions])
 
   const selectedProgress = exerciseId ? progressByExercise[exerciseId] : null
 
@@ -272,9 +276,9 @@ export default function Stats() {
             <Field label="Exercise">
               <select value={exerciseId} onChange={(e) => setExerciseId(e.target.value)} className="w-56">
                 <option value="">Choose an exercise…</option>
-                {exerciseOptions.map((e) => (
+                {exerciseOptions.map((e, i) => (
                   <option key={e.id} value={e.id}>
-                    {e.name}
+                    {exerciseOptionLabels[i]}
                   </option>
                 ))}
               </select>
@@ -333,9 +337,9 @@ export default function Stats() {
               <p className="text-chalkdim text-sm">No completed sets logged yet.</p>
             ) : (
               <div className="flex flex-col divide-y divide-line">
-                {records.map((r) => (
+                {records.map((r, i) => (
                   <div key={r.id} className="flex items-center justify-between gap-2 py-2.5">
-                    <p className="truncate min-w-0">{r.name}</p>
+                    <p className="truncate min-w-0">{recordLabels[i]}</p>
                     <div className="text-end shrink-0">
                       <p className="num text-chalk">
                         {r.category === 'cardio'

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { Search, Plus, Check } from 'lucide-react'
 import { useGlobalExercises } from '../lib/db.js'
+import { disambiguateLabels, enT } from '../lib/disambiguate.js'
 import { Button, CategoryTag, Badge } from './ui.jsx'
 
 export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, onClose, lockCategory }) {
@@ -19,6 +20,7 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
       return true
     })
   }, [globalExercises, tab, q, lockCategory])
+  const filteredLabels = useMemo(() => disambiguateLabels(filtered, (g) => g.name, enT), [filtered])
 
   async function handleAdd(g) {
     setAddedIds((prev) => new Set(prev).add(g.id))
@@ -83,12 +85,12 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
         <div className="flex-1 overflow-y-auto -mx-2 px-2 flex flex-col gap-1 min-h-[200px]">
           {loading && <p className="text-chalkdim text-sm py-4">Loading library…</p>}
           {!loading && filtered.length === 0 && <p className="text-chalkdim text-sm py-4">No matches — try creating a custom one below.</p>}
-          {filtered.map((g) => {
+          {filtered.map((g, i) => {
             const already = existingLower.has(g.name.toLowerCase()) || addedIds.has(g.id)
             return (
               <div key={g.id} className="flex items-center justify-between gap-2 px-2 py-2 rounded-md hover:bg-surface2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="truncate min-w-0">{g.name}</span>
+                  <span className="truncate min-w-0">{filteredLabels[i]}</span>
                   <CategoryTag category={g.category} />
                   {g.bodyweight && g.category !== 'cardio' && <Badge tone="brass">BW</Badge>}
                 </div>

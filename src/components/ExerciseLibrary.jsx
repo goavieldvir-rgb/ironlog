@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { Plus, Play, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Play, Pencil, Trash2, Lock } from 'lucide-react'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection, addExercise, updateExercise, deleteExercise } from '../lib/db.js'
 import { Button, Card, CategoryTag, Badge, EmptyState, Field } from './ui.jsx'
@@ -33,10 +33,25 @@ function formatLast(ex) {
 export default function ExerciseLibrary() {
   const { effectiveUid } = useAdmin()
   const [exercises, loading, refresh] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
+  const [sessions] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [tab, setTab] = useState('all')
   const [editing, setEditing] = useState(null)
   const [picking, setPicking] = useState(false)
   const [q, setQ] = useState('')
+
+  // An exercise is "locked" (its tracking method can't change) once it's
+  // actually been logged at least once — that's what makes past numbers
+  // meaningful to compare. Brand-new, never-used exercises stay fully
+  // editable.
+  const usedExerciseIds = useMemo(() => {
+    const ids = new Set()
+    for (const s of sessions) {
+      for (const e of s.entries || []) {
+        if (e.exerciseId) ids.add(e.exerciseId)
+      }
+    }
+    return ids
+  }, [sessions])
 
   const filtered = useMemo(() => {
     return exercises.filter((e) => {
@@ -156,7 +171,9 @@ export default function ExerciseLibrary() {
 
       {editing && (
         <ExerciseModal
+          key={editing.id || 'new'}
           initial={editing}
+          hasHistory={editing.id ? usedExerciseIds.has(editing.id) : false}
           onClose={() => setEditing(null)}
           onSave={async (data) => {
             if (editing.id) {
@@ -166,6 +183,18 @@ export default function ExerciseLibrary() {
             }
             refresh()
             setEditing(null)
+          }}
+          onCreateVariant={(currentForm) => {
+            setEditing({
+              ...emptyExerciseForm,
+              name: currentForm.name,
+              videoUrl: currentForm.videoUrl,
+              notes: currentForm.notes,
+              category: currentForm.category,
+              unit: currentForm.unit,
+              bodyweight: currentForm.bodyweight,
+              intensityType: currentForm.intensityType,
+            })
           }}
         />
       )}
@@ -197,7 +226,7 @@ export function Tabs({ tab, setTab }) {
   )
 }
 
-export function ExerciseModal({ initial, onClose, onSave }) {
+export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, onCreateVariant }) {
   const [form, setForm] = useState({ ...emptyExerciseForm, ...initial })
   const [saving, setSaving] = useState(false)
 
@@ -212,6 +241,7 @@ export function ExerciseModal({ initial, onClose, onSave }) {
   }
 
   const isCardio = form.category === 'cardio'
+  const locked = hasHistory && !!initial.id
 
   return (
     <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" onClick={onClose}>
@@ -228,9 +258,24 @@ export function ExerciseModal({ initial, onClose, onSave }) {
             />
           </Field>
 
+          {locked && (
+            <div className="bg-surface2 rounded-md p-3 flex flex-col gap-2">
+              <p className="text-chalkdim text-sm inline-flex items-start gap-1.5">
+                <Lock size={14} className="shrink-0 mt-0.5" />
+                This exercise already has logged history, so how it's tracked (weight unit, bodyweight, or RPE/heart-rate zone) is locked — changing it now would make past numbers hard to compare. If you want it tracked differently, create a new exercise instead.
+              </p>
+              {onCreateVariant && (
+                <Button type="button" variant="ghost" onClick={() => onCreateVariant(form)} className="w-fit">
+                  Create a new exercise instead
+                </Button>
+              )}
+            </div>
+          )}
+
           <Field label="Category">
             <select
               value={form.category}
+              disabled={locked}
               onChange={(e) => {
                 const category = e.target.value
                 setForm({
@@ -258,6 +303,7 @@ export function ExerciseModal({ initial, onClose, onSave }) {
               >
                 <select
                   value={form.bodyweight ? 'bodyweight' : form.unit}
+                  disabled={locked}
                   onChange={(e) => {
                     const v = e.target.value
                     if (v === 'bodyweight') setForm({ ...form, bodyweight: true })
@@ -291,7 +337,7 @@ export function ExerciseModal({ initial, onClose, onSave }) {
                   </>
                 }
               >
-                <select value={form.intensityType} onChange={(e) => setForm({ ...form, intensityType: e.target.value })}>
+                <select value={form.intensityType} disabled={locked} onChange={(e) => setForm({ ...form, intensityType: e.target.value })}>
                   <option value="rpe">Effort scale (RPE 1–10)</option>
                   <option value="hr_zone">Heart rate zone (1–5)</option>
                 </select>

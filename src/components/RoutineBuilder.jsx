@@ -8,6 +8,7 @@ import { Button, Card, Field } from './ui.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
 import { ExerciseModal, emptyExerciseForm } from './ExerciseLibrary.jsx'
 import { InfoTip } from './InfoTip.jsx'
+import { disambiguateLabels, enT } from '../lib/disambiguate.js'
 
 export default function RoutineBuilder() {
   const { effectiveUid } = useAdmin()
@@ -35,6 +36,7 @@ export default function RoutineBuilder() {
   }, [existing])
 
   const availableExercises = exercises.filter((e) => e.category === category)
+  const availableExerciseLabels = disambiguateLabels(availableExercises, (e) => e.name, enT)
   const isCardio = category === 'cardio'
 
   function makeItem(ex) {
@@ -228,9 +230,9 @@ export default function RoutineBuilder() {
           <Field label={`Your ${category} exercises`}>
             <select value={pickId} onChange={(e) => setPickId(e.target.value)} className="w-56">
               <option value="">Choose one you've already added…</option>
-              {availableExercises.map((e) => (
+              {availableExercises.map((e, i) => (
                 <option key={e.id} value={e.id}>
-                  {e.name}
+                  {availableExerciseLabels[i]}
                 </option>
               ))}
             </select>
