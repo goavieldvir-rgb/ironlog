@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Play, Plus, ChevronRight, Flame, Check, Circle, Clock } from 'lucide-react'
+import { Play, Plus, Flame, Check, Circle, Clock } from 'lucide-react'
+import { ForwardChevron } from './DirectionalIcon.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection } from '../lib/db.js'
@@ -119,7 +120,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between">
           <h2 className="eyebrow">Continue training</h2>
           <Link to="/routines" className="text-chalkdim text-xs hover:text-chalk inline-flex items-center gap-0.5">
-            All routines <ChevronRight size={13} />
+            All routines <ForwardChevron size={13} />
           </Link>
         </div>
         {routines.length === 0 ? (
@@ -156,7 +157,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between">
           <h2 className="eyebrow">Recent activity</h2>
           <Link to="/history" className="text-chalkdim text-xs hover:text-chalk inline-flex items-center gap-0.5">
-            Full history <ChevronRight size={13} />
+            Full history <ForwardChevron size={13} />
           </Link>
         </div>
         {recent.length === 0 ? (
@@ -173,7 +174,7 @@ export default function Dashboard() {
                     <p className="truncate min-w-0">{s.routine_name}</p>
                     <CategoryTag category={s.category} />
                   </div>
-                  <ChevronRight size={16} className="text-chalkdim shrink-0" />
+                  <ForwardChevron size={16} className="text-chalkdim shrink-0" />
                 </Card>
               </Link>
             ))}
@@ -206,7 +207,7 @@ function OnboardingChecklist({ steps }) {
               <p className={s.done ? 'line-through' : ''}>{s.label}</p>
               <p className="text-chalkdim text-xs">{s.body}</p>
             </div>
-            {!s.done && <Plus size={16} className="text-brass ml-auto shrink-0" />}
+            {!s.done && <Plus size={16} className="text-brass ms-auto shrink-0" />}
           </Link>
         ))}
       </div>

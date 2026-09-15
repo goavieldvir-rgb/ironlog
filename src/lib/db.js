@@ -190,6 +190,19 @@ export async function deleteSession(uid, id) {
   if (error) throw error
 }
 
+// Trainer feedback on a specific session — kept separate from the
+// trainee's own notes. The UI only exposes this to admins, but it rides on
+// the existing sessions RLS policy (admin can update any row) rather than
+// needing its own.
+export async function updateTrainerComment(uid, sessionId, comment) {
+  const { error } = await supabase
+    .from('sessions')
+    .update({ trainer_comment: comment })
+    .eq('id', sessionId)
+    .eq('user_id', uid)
+  if (error) throw error
+}
+
 // Editing a past session only touches that session's own row — it
 // deliberately does NOT update the "last performance" snapshot on
 // exercises, since that should reflect the most recent session overall,

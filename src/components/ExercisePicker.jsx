@@ -21,8 +21,19 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
   }, [globalExercises, tab, q, lockCategory])
 
   async function handleAdd(g) {
-    await onAdd(g)
     setAddedIds((prev) => new Set(prev).add(g.id))
+    try {
+      await onAdd(g)
+    } catch (err) {
+      // If the add failed, let them try again rather than showing a
+      // permanent false "Added" state.
+      setAddedIds((prev) => {
+        const next = new Set(prev)
+        next.delete(g.id)
+        return next
+      })
+      throw err
+    }
   }
 
   const categoryLabels = { strength: 'Strength', mobility: 'Mobility', cardio: 'Cardio' }
@@ -39,12 +50,12 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
 
         <div className="flex items-center gap-2 mb-3">
           <div className="relative flex-1">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-chalkdim" />
+            <Search size={14} className="absolute start-2.5 top-1/2 -translate-y-1/2 text-chalkdim" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search exercises…"
-              className="w-full pl-8"
+              className="w-full ps-8"
               autoFocus
             />
           </div>
@@ -57,13 +68,13 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
               { id: 'strength', label: 'Strength' },
               { id: 'mobility', label: 'Mobility' },
               { id: 'cardio', label: 'Cardio' },
-            ].map((t) => (
+            ].map((opt) => (
               <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`px-3 py-1.5 rounded transition-colors ${tab === t.id ? 'bg-ink text-chalk' : 'text-chalkdim'}`}
+                key={opt.id}
+                onClick={() => setTab(opt.id)}
+                className={`px-3 py-1.5 rounded transition-colors ${tab === opt.id ? 'bg-ink text-chalk' : 'text-chalkdim'}`}
               >
-                {t.label}
+                {opt.label}
               </button>
             ))}
           </div>

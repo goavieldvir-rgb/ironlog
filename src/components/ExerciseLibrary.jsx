@@ -236,7 +236,6 @@ export function ExerciseModal({ initial, onClose, onSave }) {
                 setForm({
                   ...form,
                   category,
-                  // sensible defaults when switching into/out of cardio
                   unit: category === 'cardio' ? 'km' : form.unit === 'km' || form.unit === 'mi' ? 'kg' : form.unit,
                 })
               }}

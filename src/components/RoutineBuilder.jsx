@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { Plus, Trash2, ArrowUp, ArrowDown, ChevronLeft, Library } from 'lucide-react'
+import { Plus, Trash2, ArrowUp, ArrowDown, Library } from 'lucide-react'
+import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection, addRoutine, updateRoutine, addExercise } from '../lib/db.js'
 import { Button, Card, Field } from './ui.jsx'
@@ -123,7 +124,7 @@ export default function RoutineBuilder() {
   return (
     <div className="flex flex-col gap-5 max-w-2xl">
       <Link to="/routines" className="text-chalkdim text-sm inline-flex items-center gap-1 hover:text-chalk w-fit">
-        <ChevronLeft size={15} /> Routines
+        <BackChevron size={15} /> Routines
       </Link>
 
       <h1 className="text-3xl">{id ? 'Edit routine' : 'Build a routine'}</h1>

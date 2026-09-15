@@ -335,7 +335,7 @@ export default function Stats() {
                 {records.map((r) => (
                   <div key={r.id} className="flex items-center justify-between gap-2 py-2.5">
                     <p className="truncate min-w-0">{r.name}</p>
-                    <div className="text-right shrink-0">
+                    <div className="text-end shrink-0">
                       <p className="num text-chalk">
                         {r.category === 'cardio'
                           ? `${r.duration} min · ${r.intensityType === 'hr_zone' ? 'Zone' : 'RPE'} ${r.intensity}${

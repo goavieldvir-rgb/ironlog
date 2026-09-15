@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Plus, Play, Pencil, Trash2, Dumbbell, Copy, Send } from 'lucide-react'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection, deleteRoutine, addRoutine } from '../lib/db.js'
+import { loadDraft, clearDraft } from '../lib/draft.js'
 import { supabase } from '../supabase.js'
 import { Button, Card, CategoryTag, EmptyState } from './ui.jsx'
 import { Tabs } from './ExerciseLibrary.jsx'
@@ -99,6 +100,8 @@ export default function RoutineList() {
                   onClick={() => {
                     if (confirm(`Delete routine "${r.name}"? Past sessions stay in your history.`)) {
                       deleteRoutine(effectiveUid, r.id).then(refresh)
+                      const draft = loadDraft(effectiveUid)
+                      if (draft?.routineId === r.id) clearDraft(effectiveUid)
                     }
                   }}
                 >
@@ -178,7 +181,7 @@ function CopyToPersonModal({ routine, onClose }) {
               key={p.id}
               onClick={() => copyTo(p)}
               disabled={copiedTo === p.id}
-              className="flex items-center justify-between gap-2 px-2 py-2 rounded-md hover:bg-surface2 text-left disabled:opacity-50"
+              className="flex items-center justify-between gap-2 px-2 py-2 rounded-md hover:bg-surface2 text-start disabled:opacity-50"
             >
               <span className="truncate min-w-0">{p.full_name || p.email}</span>
               <span className="text-xs text-brass shrink-0">{copiedTo === p.id ? 'Copied' : 'Copy here'}</span>

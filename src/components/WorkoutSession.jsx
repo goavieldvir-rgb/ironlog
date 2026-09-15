@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { ChevronLeft, Plus, Check } from 'lucide-react'
+import { Plus, Check } from 'lucide-react'
+import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection, logSession } from '../lib/db.js'
 import { saveDraft, loadDraft, clearDraft } from '../lib/draft.js'
@@ -227,7 +228,9 @@ export default function WorkoutSession() {
   }
 
   if (!isFreestyle && !routinesLoading && !routine) {
-    return <p className="text-chalkdim">Routine not found.</p>
+    const draft = loadDraft(effectiveUid)
+    if (draft?.routineId === routineId) clearDraft(effectiveUid)
+    return <p className="text-chalkdim">This routine no longer exists — it may have been deleted.</p>
   }
 
   const availableToAdd = exercises.filter((e) => !entries.some((en) => en.exerciseId === e.id))
@@ -236,7 +239,7 @@ export default function WorkoutSession() {
     <div className="flex flex-col">
       <div className="flex flex-col gap-5 max-w-2xl pb-4">
         <Link to="/routines" className="text-chalkdim text-sm inline-flex items-center gap-1 hover:text-chalk w-fit">
-          <ChevronLeft size={15} /> Routines
+          <BackChevron size={15} /> Routines
         </Link>
 
         <div className="flex items-center justify-between flex-wrap gap-2">

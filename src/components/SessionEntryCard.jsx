@@ -15,7 +15,7 @@ function Stepper({ value, onChange, step, min = 0, max }) {
       <button
         type="button"
         onClick={() => bump(-step)}
-        className="px-1 shrink-0 rounded-l-md bg-surface2 text-chalkdim hover:text-chalk border border-line border-r-0"
+        className="px-1 shrink-0 rounded-s-md bg-surface2 text-chalkdim hover:text-chalk border border-line border-e-0"
       >
         <Minus size={11} />
       </button>
@@ -30,7 +30,7 @@ function Stepper({ value, onChange, step, min = 0, max }) {
       <button
         type="button"
         onClick={() => bump(step)}
-        className="px-1 shrink-0 rounded-r-md bg-surface2 text-chalkdim hover:text-chalk border border-line border-l-0"
+        className="px-1 shrink-0 rounded-e-md bg-surface2 text-chalkdim hover:text-chalk border border-line border-s-0"
       >
         <Plus size={11} />
       </button>
@@ -179,14 +179,14 @@ export default function SessionEntryCard({
           <div className="flex flex-col sm:flex-row gap-1.5">
             <button
               onClick={() => pickQuickFill(0, lastSetData)}
-              className="flex-1 text-left rounded-md bg-ink border border-line hover:border-brass px-3 py-2"
+              className="flex-1 text-start rounded-md bg-ink border border-line hover:border-brass px-3 py-2"
             >
               <p className="text-xs text-chalkdim">Last set done</p>
               <p className="num text-sm">{formatQuickFillLabel(lastSetData)}</p>
             </button>
             <button
               onClick={() => pickQuickFill(0, topSetData)}
-              className="flex-1 text-left rounded-md bg-ink border border-line hover:border-brass px-3 py-2"
+              className="flex-1 text-start rounded-md bg-ink border border-line hover:border-brass px-3 py-2"
             >
               <p className="text-xs text-chalkdim">Top set done</p>
               <p className="num text-sm">{formatQuickFillLabel(topSetData)}</p>

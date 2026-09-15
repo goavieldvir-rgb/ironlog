@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Copy, Download, Check } from 'lucide-react'
+import { Copy, Download, Check } from 'lucide-react'
+import { BackChevron, ForwardChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection } from '../lib/db.js'
 import { Button, Card, EmptyState, Field } from './ui.jsx'
@@ -186,8 +187,8 @@ export default function WeeklySummary() {
   const { effectiveUid, effectiveName, actingAs } = useAdmin()
   const [sessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [bodyWeightAll] = useCollection(effectiveUid, 'body_weight_logs', 'date', 'desc')
-  const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
-  const [routines] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
+  const [exercises, exercisesLoading] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
+  const [routines, routinesLoading] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
 
   const [mode, setMode] = useState('week')
   const [offset, setOffset] = useState(0)
@@ -273,7 +274,7 @@ export default function WeeklySummary() {
             Every exercise, routine, session, and weigh-in — everything, not just this period.
           </p>
         </div>
-        <Button variant="ghost" onClick={handleFullBackup}>
+        <Button variant="ghost" onClick={handleFullBackup} disabled={loading || exercisesLoading || routinesLoading}>
           <Download size={15} /> Download everything (.json)
         </Button>
       </Card>
@@ -318,7 +319,7 @@ export default function WeeklySummary() {
             onClick={() => setOffset((o) => o - 1)}
             className="p-2 rounded-md hover:bg-surface2 text-chalkdim hover:text-chalk"
           >
-            <ChevronLeft size={16} />
+            <BackChevron size={16} />
           </button>
           <span className="num text-sm w-44 text-center">{formatRange(start, end, mode)}</span>
           <button
@@ -326,10 +327,10 @@ export default function WeeklySummary() {
             disabled={offset === 0}
             className="p-2 rounded-md hover:bg-surface2 text-chalkdim hover:text-chalk disabled:opacity-30"
           >
-            <ChevronRight size={16} />
+            <ForwardChevron size={16} />
           </button>
           {offset !== 0 && (
-            <button onClick={() => setOffset(0)} className="text-chalkdim text-xs hover:text-chalk ml-1">
+            <button onClick={() => setOffset(0)} className="text-chalkdim text-xs hover:text-chalk ms-1">
               Back to current
             </button>
           )}

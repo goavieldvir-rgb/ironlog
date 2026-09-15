@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { ChevronLeft, Check } from 'lucide-react'
+import { Check } from 'lucide-react'
+import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection, updateSession } from '../lib/db.js'
 import { Button, Card, CategoryTag, Field } from './ui.jsx'
@@ -83,7 +84,7 @@ export default function EditSession() {
   return (
     <div className="flex flex-col gap-5 max-w-2xl">
       <Link to={`/history/${id}`} className="text-chalkdim text-sm inline-flex items-center gap-1 hover:text-chalk w-fit">
-        <ChevronLeft size={15} /> Back to session
+        <BackChevron size={15} /> Back to session
       </Link>
 
       <div className="flex items-center justify-between flex-wrap gap-2">

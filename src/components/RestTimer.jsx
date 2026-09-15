@@ -93,7 +93,7 @@ export default function RestTimer() {
         ))}
       </div>
 
-      <div className="flex items-center gap-1 ml-auto">
+      <div className="flex items-center gap-1 ms-auto">
         {running ? (
           <Button variant="subtle" onClick={pause} className="!px-2.5 !py-1.5">
             <Pause size={14} />

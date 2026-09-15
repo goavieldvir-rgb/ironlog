@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronLeft, Trash2, AlertTriangle } from 'lucide-react'
+import { Trash2, AlertTriangle } from 'lucide-react'
+import { BackChevron } from './DirectionalIcon.jsx'
 import { supabase } from '../supabase.js'
 import { Card, EmptyState, Button } from './ui.jsx'
 
@@ -43,7 +44,7 @@ export default function ErrorLogs() {
   return (
     <div className="flex flex-col gap-5">
       <Link to="/people" className="text-chalkdim text-sm inline-flex items-center gap-1 hover:text-chalk w-fit">
-        <ChevronLeft size={15} /> People
+        <BackChevron size={15} /> People
       </Link>
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -68,7 +69,7 @@ export default function ErrorLogs() {
           <Card key={log.id} className="flex flex-col gap-2">
             <button
               onClick={() => setOpenId(openId === log.id ? null : log.id)}
-              className="flex items-start justify-between gap-3 text-left"
+              className="flex items-start justify-between gap-3 text-start"
             >
               <div className="flex items-start gap-2 min-w-0">
                 <AlertTriangle size={16} className="text-iron shrink-0 mt-0.5" />

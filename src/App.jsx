@@ -17,12 +17,14 @@ import ErrorLogs from './components/ErrorLogs.jsx'
 import Stats from './components/Stats.jsx'
 import BodyWeight from './components/BodyWeight.jsx'
 import WeeklySummary from './components/WeeklySummary.jsx'
+import Help from './components/Help.jsx'
 import ResetPassword from './components/ResetPassword.jsx'
 
 export default function App() {
   const { user, loading } = useAuth()
   const navigate = useNavigate()
   const [pendingReset, setPendingReset] = useState(false)
+  const [resetLinkError, setResetLinkError] = useState('')
 
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get('code')
@@ -30,6 +32,7 @@ export default function App() {
     window.history.replaceState({}, '', window.location.pathname + window.location.hash)
     supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
       if (!error) setPendingReset(true)
+      else setResetLinkError("That reset link is invalid or has expired — request a new one below.")
     })
   }, [])
 
@@ -49,7 +52,7 @@ export default function App() {
     )
   }
 
-  if (!user) return <Login />
+  if (!user) return <Login resetLinkError={resetLinkError} />
 
   return (
     <Routes>
@@ -68,6 +71,7 @@ export default function App() {
         <Route path="/stats" element={<Stats />} />
         <Route path="/weight" element={<BodyWeight />} />
         <Route path="/summary" element={<WeeklySummary />} />
+        <Route path="/help" element={<Help />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

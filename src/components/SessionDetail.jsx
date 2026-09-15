@@ -1,9 +1,10 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ChevronLeft, Play, Pencil } from 'lucide-react'
+import { Play, Pencil, MessageSquareText, Check } from 'lucide-react'
+import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
-import { useCollection } from '../lib/db.js'
-import { Card, CategoryTag, Badge } from './ui.jsx'
+import { useCollection, updateTrainerComment } from '../lib/db.js'
+import { Card, CategoryTag, Badge, Button } from './ui.jsx'
 
 function formatDate(iso) {
   if (!iso) return ''
@@ -25,9 +26,9 @@ function formatSet(entry, s) {
 }
 
 export default function SessionDetail() {
-  const { effectiveUid } = useAdmin()
+  const { effectiveUid, isAdmin } = useAdmin()
   const { id } = useParams()
-  const [sessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const [sessions, loading, refresh] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const session = sessions.find((s) => s.id === id)
 
   if (!loading && !session) return <p className="text-chalkdim">Session not found.</p>
@@ -36,7 +37,7 @@ export default function SessionDetail() {
   return (
     <div className="flex flex-col gap-5 max-w-2xl">
       <Link to="/history" className="text-chalkdim text-sm inline-flex items-center gap-1 hover:text-chalk w-fit">
-        <ChevronLeft size={15} /> History
+        <BackChevron size={15} /> History
       </Link>
 
       <div>
@@ -54,6 +55,8 @@ export default function SessionDetail() {
         </div>
         <p className="text-chalkdim text-sm mt-1">{formatDate(session.date)}</p>
       </div>
+
+      <TrainerComment session={session} effectiveUid={effectiveUid} isAdmin={isAdmin} onSaved={refresh} />
 
       {session.notes && (
         <Card className="text-sm text-chalkdim italic">"{session.notes}"</Card>
@@ -81,7 +84,7 @@ export default function SessionDetail() {
           <div className="flex flex-wrap gap-2">
             {(entry.sets || []).map((s, j) => (
               <div key={j} className="bg-surface2 rounded-md px-3 py-1.5 text-sm num">
-                <span className="text-chalkdim mr-1">#{j + 1}</span>
+                <span className="text-chalkdim me-1">#{j + 1}</span>
                 {formatSet(entry, s)}
               </div>
             ))}
@@ -90,5 +93,73 @@ export default function SessionDetail() {
         </Card>
       ))}
     </div>
+  )
+}
+
+function TrainerComment({ session, effectiveUid, isAdmin, onSaved }) {
+  const [editing, setEditing] = useState(false)
+  const [text, setText] = useState(session.trainer_comment || '')
+  const [saving, setSaving] = useState(false)
+
+  // Nothing to show and nobody who can add anything — render nothing at all.
+  if (!session.trainer_comment && !isAdmin) return null
+
+  async function save() {
+    setSaving(true)
+    try {
+      await updateTrainerComment(effectiveUid, session.id, text)
+      onSaved?.()
+      setEditing(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (editing) {
+    return (
+      <Card className="flex flex-col gap-2 border-brass/50">
+        <span className="eyebrow text-brass flex items-center gap-1.5">
+          <MessageSquareText size={13} /> Trainer feedback
+        </span>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Leave feedback on this session — visible to them, not editable by them."
+          rows={3}
+          autoFocus
+        />
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setEditing(false)}>
+            Cancel
+          </Button>
+          <Button variant="brass" onClick={save} disabled={saving}>
+            {saving ? 'Saving…' : (
+              <>
+                <Check size={15} /> Save
+              </>
+            )}
+          </Button>
+        </div>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="flex items-start justify-between gap-3 border-brass/50">
+      <div className="flex items-start gap-2 min-w-0">
+        <MessageSquareText size={15} className="text-brass shrink-0 mt-0.5" />
+        <div className="min-w-0">
+          <span className="eyebrow text-brass">Trainer feedback</span>
+          <p className="text-sm mt-0.5">
+            {session.trainer_comment || <span className="text-chalkdim italic">No feedback yet.</span>}
+          </p>
+        </div>
+      </div>
+      {isAdmin && (
+        <button onClick={() => setEditing(true)} className="text-chalkdim hover:text-brass shrink-0 p-1">
+          <Pencil size={14} />
+        </button>
+      )}
+    </Card>
   )
 }

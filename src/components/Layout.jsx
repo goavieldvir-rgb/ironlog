@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { Dumbbell, LayoutDashboard, ListChecks, History, Library, LogOut, Menu, X, Users, UserCheck, BarChart3, Scale, FileText } from 'lucide-react'
+import { Dumbbell, LayoutDashboard, ListChecks, History, Library, LogOut, Menu, X, Users, UserCheck, BarChart3, Scale, FileText, HelpCircle } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 
@@ -29,7 +29,7 @@ export default function Layout() {
           <span>
             Managing <strong>{actingAs.name}</strong>'s account
           </span>
-          <button onClick={() => setActingAs(null)} className="underline hover:no-underline ml-1">
+          <button onClick={() => setActingAs(null)} className="underline hover:no-underline ms-1">
             Back to my account
           </button>
         </div>
@@ -61,6 +61,13 @@ export default function Layout() {
           </nav>
 
           <div className="hidden md:flex items-center gap-3">
+            <NavLink
+              to="/help"
+              className="text-chalkdim hover:text-brass transition-colors p-2 rounded-md hover:bg-surface2"
+              title="How Ironlog works"
+            >
+              <HelpCircle size={18} />
+            </NavLink>
             <span className="text-chalkdim text-sm">{user?.displayName || user?.email}</span>
             <button
               onClick={logout}
@@ -94,6 +101,17 @@ export default function Layout() {
                 {l.label}
               </NavLink>
             ))}
+            <NavLink
+              to="/help"
+              onClick={() => setOpen(false)}
+              className={({ isActive }) =>
+                `flex items-center gap-2 px-2 py-2.5 rounded-md text-sm ${
+                  isActive ? 'bg-surface2 text-chalk' : 'text-chalkdim'
+                }`
+              }
+            >
+              <HelpCircle size={16} /> Help
+            </NavLink>
             <button onClick={logout} className="flex items-center gap-2 px-2 py-2.5 rounded-md text-sm text-iron">
               <LogOut size={16} /> Log out
             </button>

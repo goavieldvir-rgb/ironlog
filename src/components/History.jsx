@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Trash2, ChevronRight, Search, X } from 'lucide-react'
+import { Trash2, Search, X } from 'lucide-react'
+import { ForwardChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection, deleteSession } from '../lib/db.js'
 import { Card, CategoryTag, EmptyState, Button, Field } from './ui.jsx'
@@ -61,12 +62,12 @@ export default function History() {
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 min-w-[180px]">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-chalkdim" />
+            <Search size={14} className="absolute start-2.5 top-1/2 -translate-y-1/2 text-chalkdim" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search by routine, exercise, or notes…"
-              className="w-full pl-8"
+              className="w-full ps-8"
             />
           </div>
           <Button variant="ghost" onClick={() => setShowDateFilter((v) => !v)}>
@@ -142,7 +143,7 @@ export default function History() {
                   >
                     <Trash2 size={15} />
                   </button>
-                  <ChevronRight size={18} className="text-chalkdim" />
+                  <ForwardChevron size={18} className="text-chalkdim" />
                 </div>
               </Card>
             </Link>

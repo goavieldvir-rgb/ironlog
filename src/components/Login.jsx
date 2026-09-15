@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { supabase } from '../supabase.js'
 import { Button, Field } from './ui.jsx'
 
-export default function Login() {
+export default function Login({ resetLinkError }) {
   const { login, signup } = useAuth()
   const [mode, setMode] = useState('login')
   const [name, setName] = useState('')
@@ -13,6 +13,13 @@ export default function Login() {
   const [busy, setBusy] = useState(false)
   const [resetSent, setResetSent] = useState(false)
   const [invited, setInvited] = useState(false)
+
+  useEffect(() => {
+    if (resetLinkError) {
+      setMode('reset')
+      setError(resetLinkError)
+    }
+  }, [resetLinkError])
 
   // A link generated from People → "Invite someone" pre-fills the sign-up
   // form so whoever opens it just needs to pick a password.
