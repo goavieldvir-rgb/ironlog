@@ -10,6 +10,7 @@ import {
   Tooltip,
 } from 'recharts'
 import { useAdmin } from '../context/AdminContext.jsx'
+import { toLocalISODate } from '../lib/dates.js'
 import {
   useCollection,
   addBodyWeightEntry,
@@ -21,7 +22,7 @@ import { Button, Card, EmptyState, Field } from './ui.jsx'
 const COLORS = { iron: '#D64545', chalk: '#EDEDE6', chalkdim: '#9CA0AA', grid: '#31353E' }
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10)
+  return toLocalISODate()
 }
 
 function shortDate(iso) {

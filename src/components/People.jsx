@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Users, ArrowRight, ShieldCheck, UserPlus, Copy, Check, AlertTriangle, Flame } from 'lucide-react'
 import { supabase } from '../supabase.js'
+import { toLocalISODate } from '../lib/dates.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { Card, Badge, EmptyState, Button, Field } from './ui.jsx'
@@ -11,7 +12,7 @@ function startOfWeekISO() {
   const d = new Date()
   const day = d.getDay() === 0 ? 6 : d.getDay() - 1
   d.setDate(d.getDate() - day)
-  return d.toISOString().slice(0, 10)
+  return toLocalISODate(d)
 }
 
 function daysAgo(iso) {
@@ -49,7 +50,7 @@ export default function People() {
     supabase
       .from('sessions')
       .select('user_id, date')
-      .gte('date', cutoff.toISOString().slice(0, 10))
+      .gte('date', toLocalISODate(cutoff))
       .then(({ data, error }) => {
         if (error) console.error(error)
         setActivity(data || [])

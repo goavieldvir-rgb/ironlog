@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Play, Plus, Flame, Check, Circle, Clock } from 'lucide-react'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
+import { toLocalISODate } from '../lib/dates.js'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection } from '../lib/db.js'
 import { loadDraft, clearDraft } from '../lib/draft.js'
@@ -12,7 +13,7 @@ function startOfWeekISO() {
   const d = new Date()
   const day = d.getDay() === 0 ? 6 : d.getDay() - 1
   d.setDate(d.getDate() - day)
-  return d.toISOString().slice(0, 10)
+  return toLocalISODate(d)
 }
 
 function formatDate(iso) {

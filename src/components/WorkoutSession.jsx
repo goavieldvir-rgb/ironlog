@@ -5,12 +5,13 @@ import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection, logSession } from '../lib/db.js'
 import { saveDraft, loadDraft, clearDraft } from '../lib/draft.js'
+import { toLocalISODate } from '../lib/dates.js'
 import { Button, Card, CategoryTag, Field } from './ui.jsx'
 import SessionEntryCard from './SessionEntryCard.jsx'
 import RestTimer from './RestTimer.jsx'
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10)
+  return toLocalISODate()
 }
 
 function emptySet(category) {

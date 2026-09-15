@@ -3,6 +3,7 @@ import { Copy, Download, Check } from 'lucide-react'
 import { BackChevron, ForwardChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection } from '../lib/db.js'
+import { toLocalISODate } from '../lib/dates.js'
 import { Button, Card, EmptyState, Field } from './ui.jsx'
 
 function mondayOf(d) {
@@ -42,7 +43,7 @@ function endOfYear(d) {
 }
 
 function toISO(d) {
-  return d.toISOString().slice(0, 10)
+  return toLocalISODate(d)
 }
 
 function todayStart() {

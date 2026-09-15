@@ -13,6 +13,7 @@ import {
 } from 'recharts'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useCollection } from '../lib/db.js'
+import { toLocalISODate } from '../lib/dates.js'
 import { Card, EmptyState, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 
@@ -22,7 +23,7 @@ function mondayOf(dateISO) {
   const d = new Date(dateISO + 'T00:00:00')
   const day = d.getDay() === 0 ? 6 : d.getDay() - 1
   d.setDate(d.getDate() - day)
-  return d.toISOString().slice(0, 10)
+  return toLocalISODate(d)
 }
 
 function shortDate(iso) {
@@ -30,12 +31,12 @@ function shortDate(iso) {
 }
 
 function last12Mondays() {
-  const thisMonday = mondayOf(new Date().toISOString().slice(0, 10))
+  const thisMonday = mondayOf(toLocalISODate())
   const weeks = []
   for (let i = 11; i >= 0; i--) {
     const d = new Date(thisMonday + 'T00:00:00')
     d.setDate(d.getDate() - i * 7)
-    weeks.push(d.toISOString().slice(0, 10))
+    weeks.push(toLocalISODate(d))
   }
   return weeks
 }
