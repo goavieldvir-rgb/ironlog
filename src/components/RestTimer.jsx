@@ -28,28 +28,46 @@ export default function RestTimer() {
   const [secondsLeft, setSecondsLeft] = useState(90)
   const [running, setRunning] = useState(false)
   const [finished, setFinished] = useState(false)
-  const intervalRef = useRef(null)
+  // The actual wall-clock moment the timer should hit zero — not a ticking
+  // counter. Mobile browsers throttle or fully pause setInterval while the
+  // tab/app is backgrounded, so a counter-based timer silently freezes and
+  // "loses" whatever time passed while you were away. Deriving remaining
+  // time from a real timestamp means it's always correct the moment you
+  // come back, even if not a single tick fired while you were gone.
+  const endTimeRef = useRef(null)
+
+  function tick() {
+    if (!endTimeRef.current) return
+    const remaining = Math.max(0, Math.ceil((endTimeRef.current - Date.now()) / 1000))
+    setSecondsLeft(remaining)
+    if (remaining <= 0) {
+      setRunning(false)
+      setFinished(true)
+      beep()
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200])
+    }
+  }
 
   useEffect(() => {
     if (!running) return
-    intervalRef.current = setInterval(() => {
-      setSecondsLeft((s) => {
-        if (s <= 1) {
-          clearInterval(intervalRef.current)
-          setRunning(false)
-          setFinished(true)
-          beep()
-          if (navigator.vibrate) navigator.vibrate([200, 100, 200])
-          return 0
-        }
-        return s - 1
-      })
-    }, 1000)
-    return () => clearInterval(intervalRef.current)
+    const interval = setInterval(tick, 1000)
+    // Catch up immediately when the tab/app becomes visible again, rather
+    // than waiting for the next (possibly long-delayed) interval tick.
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible') tick()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running])
 
   function start(preset) {
-    if (preset) setSecondsLeft(preset)
+    const duration = preset ?? secondsLeft
+    endTimeRef.current = Date.now() + duration * 1000
+    setSecondsLeft(duration)
     setFinished(false)
     setRunning(true)
   }
@@ -62,6 +80,7 @@ export default function RestTimer() {
     setRunning(false)
     setFinished(false)
     setSecondsLeft(preset)
+    endTimeRef.current = null
   }
 
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, '0')

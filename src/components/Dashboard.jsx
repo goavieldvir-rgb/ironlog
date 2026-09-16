@@ -111,10 +111,10 @@ export default function Dashboard() {
 
       {showChecklist && <OnboardingChecklist steps={steps} />}
 
-      <div className="grid grid-cols-3 gap-3">
-        <Stat label="This week" value={thisWeek} suffix="sessions" />
-        <Stat label="Total logged" value={sessions.length} suffix="sessions" />
-        <Stat label="Routines" value={routines.length} suffix="active" />
+      <div className="grid grid-cols-3">
+        <Stat label="This week" value={thisWeek} />
+        <Stat label="Total logged" value={sessions.length} border />
+        <Stat label="Routines" value={routines.length} />
       </div>
 
       <section className="flex flex-col gap-3">
@@ -125,17 +125,17 @@ export default function Dashboard() {
           </Link>
         </div>
         {routines.length === 0 ? (
-          <Card className="text-sm text-chalkdim">
+          <p className="text-sm text-chalkdim">
             No routines yet.{' '}
             <Link to="/routines/new" className="text-brass hover:underline">
               Build one
             </Link>
             .
-          </Card>
+          </p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {routines.slice(0, 4).map((r) => (
-              <Card key={r.id} className="flex items-center justify-between gap-2">
+              <Card key={r.id} className="row flex items-center justify-between gap-2 !border-0 px-3.5 py-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 min-w-0">
                     <p className="truncate min-w-0">{r.name}</p>
@@ -162,21 +162,21 @@ export default function Dashboard() {
           </Link>
         </div>
         {recent.length === 0 ? (
-          <Card className="text-sm text-chalkdim inline-flex items-center gap-1.5">
+          <p className="text-sm text-chalkdim inline-flex items-center gap-1.5">
             <Flame size={14} /> No sessions logged yet — start one above.
-          </Card>
+          </p>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
             {recent.map((s) => (
               <Link key={s.id} to={`/history/${s.id}`}>
-                <Card className="flex items-center justify-between hover:border-brass/50 transition-colors">
+                <div className="row flex items-center justify-between px-3.5 py-2.5">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="num text-chalkdim text-xs shrink-0">{formatDate(s.date)}</span>
                     <p className="truncate min-w-0">{s.routine_name}</p>
                     <CategoryTag category={s.category} />
                   </div>
                   <ForwardChevron size={16} className="text-chalkdim shrink-0" />
-                </Card>
+                </div>
               </Link>
             ))}
           </div>
@@ -216,12 +216,11 @@ function OnboardingChecklist({ steps }) {
   )
 }
 
-function Stat({ label, value, suffix }) {
+function Stat({ label, value, border }) {
   return (
-    <Card className="flex flex-col items-center justify-center py-5 gap-1 text-center">
-      <span className="num text-4xl text-chalk leading-none">{value}</span>
-      <span className="eyebrow">{suffix}</span>
+    <div className={`flex flex-col items-center py-4 gap-0.5 text-center ${border ? 'border-s border-e border-line' : ''}`}>
+      <span className="stat-number">{value}</span>
       <span className="text-chalkdim text-xs">{label}</span>
-    </Card>
+    </div>
   )
 }
