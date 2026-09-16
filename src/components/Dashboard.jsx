@@ -112,9 +112,9 @@ export default function Dashboard() {
       {showChecklist && <OnboardingChecklist steps={steps} />}
 
       <div className="grid grid-cols-3 gap-3">
-        <Stat label="This week" value={thisWeek} />
-        <Stat label="Total logged" value={sessions.length} />
-        <Stat label="Routines" value={routines.length} />
+        <Stat label="This week" value={thisWeek} suffix="sessions" />
+        <Stat label="Total logged" value={sessions.length} suffix="sessions" />
+        <Stat label="Routines" value={routines.length} suffix="active" />
       </div>
 
       <section className="flex flex-col gap-3">
@@ -216,10 +216,11 @@ function OnboardingChecklist({ steps }) {
   )
 }
 
-function Stat({ label, value }) {
+function Stat({ label, value, suffix }) {
   return (
     <Card className="flex flex-col items-center justify-center py-5 gap-1 text-center">
       <span className="num text-4xl text-chalk leading-none">{value}</span>
+      <span className="eyebrow">{suffix}</span>
       <span className="text-chalkdim text-xs">{label}</span>
     </Card>
   )
