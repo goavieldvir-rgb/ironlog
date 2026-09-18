@@ -89,12 +89,14 @@ export default function EditSession() {
         <BackChevron size={15} /> {t('editSession.backToSession')}
       </Link>
 
-      <div className="flex items-center justify-between flex-wrap gap-2">
+      <div className="flex items-start justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <h1 className="text-3xl">{t('editSession.title')}</h1>
           <CategoryTag category={session.category} />
         </div>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-fit" />
+        <Field label={t('workout.date')}>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-fit" />
+        </Field>
       </div>
 
       {entries.map((entry, i) => (

@@ -246,14 +246,16 @@ export default function WorkoutSession() {
           <BackChevron size={15} /> {t('routines.title')}
         </Link>
 
-        <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-start justify-between flex-wrap gap-2">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-3xl">{isFreestyle ? t('workout.freestyleSession') : routine?.name}</h1>
               <CategoryTag category={category} />
             </div>
           </div>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-fit" />
+          <Field label={t('workout.date')}>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-fit" />
+          </Field>
         </div>
 
         {entries.map((entry, i) => (

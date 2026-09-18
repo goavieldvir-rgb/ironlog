@@ -34,7 +34,7 @@ function timeAgo(ts) {
 export default function Dashboard() {
   const { user } = useAuth()
   const { actingAs, effectiveUid, effectiveName } = useAdmin()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [routines] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [sessions, sessionsLoading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
@@ -128,7 +128,11 @@ export default function Dashboard() {
       <div className="grid grid-cols-3 gap-3">
         <Stat label={t('dashboard.thisWeek')} value={thisWeek} suffix={t('dashboard.sessions')} />
         <Stat label={t('dashboard.totalLogged')} value={sessions.length} suffix={t('dashboard.sessions')} />
-        <Stat label={t('dashboard.routinesLabel')} value={routines.length} suffix={t('dashboard.active')} />
+        <Stat
+          label={lang === 'he' ? t('dashboard.active') : t('dashboard.routinesLabel')}
+          value={routines.length}
+          suffix={lang === 'he' ? t('dashboard.routinesLabel') : t('dashboard.active')}
+        />
       </div>
 
       <section className="flex flex-col gap-3">

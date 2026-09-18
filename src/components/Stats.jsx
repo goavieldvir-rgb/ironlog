@@ -230,34 +230,38 @@ export default function Stats() {
 
           <Card>
             <h2 className="eyebrow mb-4">{t('stats.sessionsPerWeek')}</h2>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={weeklyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
-                <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke={COLORS.chalkdim} fontSize={12} allowDecimals={false} tickLine={false} axisLine={false} width={28} />
-                <Tooltip
-                  contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
-                  labelStyle={{ color: COLORS.chalk }}
-                />
-                <Bar dataKey="sessions" fill={COLORS.iron} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div dir="ltr">
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={weeklyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
+                  <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke={COLORS.chalkdim} fontSize={12} allowDecimals={false} tickLine={false} axisLine={false} width={28} />
+                  <Tooltip
+                    contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
+                    labelStyle={{ color: COLORS.chalk }}
+                  />
+                  <Bar dataKey="sessions" fill={COLORS.iron} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </Card>
 
           <Card>
             <h2 className="eyebrow mb-4">{t('stats.volumePerWeek')}</h2>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={weeklyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
-                <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} width={40} />
-                <Tooltip
-                  contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
-                  labelStyle={{ color: COLORS.chalk }}
-                />
-                <Bar dataKey="volume" fill={COLORS.brass} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div dir="ltr">
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={weeklyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
+                  <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} width={40} />
+                  <Tooltip
+                    contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
+                    labelStyle={{ color: COLORS.chalk }}
+                  />
+                  <Bar dataKey="volume" fill={COLORS.brass} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
             <p className="text-chalkdim text-xs mt-2">
               {t('stats.volumeNote')}
             </p>
@@ -266,19 +270,21 @@ export default function Stats() {
           {hasCardio && (
             <Card>
               <h2 className="eyebrow mb-4">{t('stats.cardioPerWeek')}</h2>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={weeklyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
-                  <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} width={32} />
-                  <Tooltip
-                    contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
-                    labelStyle={{ color: COLORS.chalk }}
-                    formatter={(value) => [`${value} min`, t('stats.cardioTooltipLabel')]}
-                  />
-                  <Bar dataKey="cardioMinutes" fill={COLORS.cardio} radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <div dir="ltr">
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={weeklyData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
+                    <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} width={32} />
+                    <Tooltip
+                      contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
+                      labelStyle={{ color: COLORS.chalk }}
+                      formatter={(value) => [`${value} min`, t('stats.cardioTooltipLabel')]}
+                    />
+                    <Bar dataKey="cardioMinutes" fill={COLORS.cardio} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </Card>
           )}
 
@@ -299,36 +305,38 @@ export default function Stats() {
             </Field>
 
             {selectedProgress && selectedProgress.points.length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={selectedProgress.points}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
-                  <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis
-                    stroke={COLORS.chalkdim}
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                    width={36}
-                    domain={selectedProgress.category === 'cardio' || selectedProgress.bodyweight ? [0, 'dataMax + 5'] : ['dataMin - 5', 'dataMax + 5']}
-                  />
-                  <Tooltip
-                    contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
-                    labelStyle={{ color: COLORS.chalk }}
-                    formatter={(value) => {
-                      if (selectedProgress.category === 'cardio') return [`${value} min`, t('stats.duration')]
-                      if (selectedProgress.bodyweight) return [`${value} reps`, t('stats.topSet')]
-                      return [`${value}${selectedProgress.unit}`, t('stats.topSet')]
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey={selectedProgress.category === 'cardio' ? 'duration' : selectedProgress.bodyweight ? 'reps' : 'weight'}
-                    stroke={selectedProgress.category === 'cardio' ? COLORS.cardio : COLORS.iron}
-                    strokeWidth={2.5}
-                    dot={{ fill: selectedProgress.category === 'cardio' ? COLORS.cardio : COLORS.iron, r: 3 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <div dir="ltr">
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={selectedProgress.points}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
+                    <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis
+                      stroke={COLORS.chalkdim}
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      width={36}
+                      domain={selectedProgress.category === 'cardio' || selectedProgress.bodyweight ? [0, 'dataMax + 5'] : ['dataMin - 5', 'dataMax + 5']}
+                    />
+                    <Tooltip
+                      contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
+                      labelStyle={{ color: COLORS.chalk }}
+                      formatter={(value) => {
+                        if (selectedProgress.category === 'cardio') return [`${value} min`, t('stats.duration')]
+                        if (selectedProgress.bodyweight) return [`${value} reps`, t('stats.topSet')]
+                        return [`${value}${selectedProgress.unit}`, t('stats.topSet')]
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey={selectedProgress.category === 'cardio' ? 'duration' : selectedProgress.bodyweight ? 'reps' : 'weight'}
+                      stroke={selectedProgress.category === 'cardio' ? COLORS.cardio : COLORS.iron}
+                      strokeWidth={2.5}
+                      dot={{ fill: selectedProgress.category === 'cardio' ? COLORS.cardio : COLORS.iron, r: 3 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             ) : (
               <p className="text-chalkdim text-sm">{t('stats.pickToSee')}</p>
             )}

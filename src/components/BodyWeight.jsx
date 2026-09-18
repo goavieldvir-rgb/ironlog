@@ -126,26 +126,28 @@ export default function BodyWeight() {
       {!loading && entries.length > 1 && (
         <Card>
           <h2 className="eyebrow mb-4">{t('bodyWeight.overTime')}</h2>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
-              <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
-              <YAxis
-                stroke={COLORS.chalkdim}
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                width={40}
-                domain={['dataMin - 2', 'dataMax + 2']}
-              />
-              <Tooltip
-                contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
-                labelStyle={{ color: COLORS.chalk }}
-                formatter={(value) => [`${value}${displayUnit}`, t('bodyWeight.weightTooltipLabel')]}
-              />
-              <Line type="monotone" dataKey="weightDisplay" stroke={COLORS.iron} strokeWidth={2.5} dot={{ fill: COLORS.iron, r: 3 }} />
-            </LineChart>
-          </ResponsiveContainer>
+          <div dir="ltr">
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
+                <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis
+                  stroke={COLORS.chalkdim}
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                  width={40}
+                  domain={['dataMin - 2', 'dataMax + 2']}
+                />
+                <Tooltip
+                  contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
+                  labelStyle={{ color: COLORS.chalk }}
+                  formatter={(value) => [`${value}${displayUnit}`, t('bodyWeight.weightTooltipLabel')]}
+                />
+                <Line type="monotone" dataKey="weightDisplay" stroke={COLORS.iron} strokeWidth={2.5} dot={{ fill: COLORS.iron, r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </Card>
       )}
 

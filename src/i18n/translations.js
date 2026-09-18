@@ -194,6 +194,7 @@ export const translations = {
       saved: 'Saved',
       saving: 'Saving…',
       finishSave: 'Finish & save session',
+      date: 'Date',
       sessionNotesTip: "This is for the whole workout — how it felt overall, energy levels, anything general. If it's about one specific exercise instead, use the note icon on that exercise's card so it stays attached to the right one.",
     },
     sessionCard: {
@@ -717,6 +718,7 @@ whoever set your account up for you.`,
       saving: 'שומר…',
       finishSave: 'סיום ושמירת האימון',
       sessionNotesTip: 'זה לאימון כולו — איך הוא הרגיש בסך הכל, רמת אנרגיה, כל דבר כללי. אם זה על תרגיל ספציפי אחד, השתמשו בסמל ההערה בכרטיס של אותו תרגיל כדי שזה יישאר מחובר לתרגיל הנכון.',
+      date: 'תאריך',
     },
     sessionCard: {
       cardioBadge: 'קרדיו',

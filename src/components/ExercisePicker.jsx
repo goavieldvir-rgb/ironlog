@@ -37,9 +37,12 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
   async function handleAdd(g) {
     setAddedIds((prev) => new Set(prev).add(g.id))
     try {
-      // Save under whatever name is currently displayed, so a Hebrew-mode
-      // user's own exercise list reads in Hebrew too, not a mix.
-      await onAdd({ ...g, name: displayName(g) })
+      // Save BOTH names, always — not just whichever language happens to
+      // be active right now. This is what makes switching languages later
+      // safe: the exercise already has both, so display just picks
+      // whichever one matches the current language, instead of being
+      // stuck with whatever was active at the moment it was added.
+      await onAdd({ ...g, name: g.name, nameHe: g.name_he || null })
     } catch (err) {
       setAddedIds((prev) => {
         const next = new Set(prev)

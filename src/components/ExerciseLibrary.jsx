@@ -154,6 +154,7 @@ export default function ExerciseLibrary() {
           onAdd={async (g) => {
             await addExercise(effectiveUid, {
               name: g.name,
+              nameHe: g.nameHe,
               category: g.category,
               unit: g.unit,
               bodyweight: g.bodyweight,

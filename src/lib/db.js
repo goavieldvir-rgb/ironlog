@@ -62,6 +62,7 @@ export async function addExercise(uid, exercise) {
     .insert({
       user_id: uid,
       name: exercise.name,
+      name_he: exercise.nameHe || null,
       category: exercise.category || 'strength', // 'strength' | 'mobility' | 'cardio'
       video_url: exercise.videoUrl || '',
       notes: exercise.notes || '',

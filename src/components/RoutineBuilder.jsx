@@ -78,6 +78,7 @@ export default function RoutineBuilder() {
     if (!ex) {
       ex = await addExercise(effectiveUid, {
         name: g.name,
+        nameHe: g.nameHe,
         category: g.category,
         unit: g.unit,
         bodyweight: g.bodyweight,
