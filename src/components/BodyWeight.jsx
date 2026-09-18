@@ -11,6 +11,7 @@ import {
 } from 'recharts'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { toLocalISODate } from '../lib/dates.js'
+import { useLanguage } from '../context/LanguageContext.jsx'
 import {
   useCollection,
   addBodyWeightEntry,
@@ -18,6 +19,7 @@ import {
   deleteBodyWeightEntry,
 } from '../lib/db.js'
 import { Button, Card, EmptyState, Field } from './ui.jsx'
+import { InfoTip } from './InfoTip.jsx'
 
 const COLORS = { iron: '#D64545', chalk: '#EDEDE6', chalkdim: '#9CA0AA', grid: '#31353E' }
 
@@ -51,6 +53,7 @@ const emptyForm = { date: todayISO(), weight: '', unit: 'kg' }
 
 export default function BodyWeight() {
   const { effectiveUid } = useAdmin()
+  const { t } = useLanguage()
   const [entries, loading, refresh] = useCollection(effectiveUid, 'body_weight_logs', 'date', 'asc')
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
@@ -105,21 +108,24 @@ export default function BodyWeight() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <div className="eyebrow mb-1">Body</div>
-        <h1 className="text-3xl">Weight tracking</h1>
+        <div className="eyebrow mb-1">{t('bodyWeight.body')}</div>
+        <h1 className="text-3xl flex items-center gap-2 flex-wrap">
+          {t('bodyWeight.title')}
+          <InfoTip text={t('bodyWeight.pageTip')} />
+        </h1>
       </div>
 
       {!loading && entries.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
-          <Stat label="Current" value={latest ? `${latest.weight}${latest.unit}` : '—'} />
-          <Stat label="First logged" value={first ? `${first.weight}${first.unit}` : '—'} />
-          <Stat label="Change" value={change != null ? `${change > 0 ? '+' : ''}${change}${displayUnit}` : '—'} />
+          <Stat label={t('bodyWeight.current')} value={latest ? `${latest.weight}${latest.unit}` : '—'} />
+          <Stat label={t('bodyWeight.firstLogged')} value={first ? `${first.weight}${first.unit}` : '—'} />
+          <Stat label={t('bodyWeight.change')} value={change != null ? `${change > 0 ? '+' : ''}${change}${displayUnit}` : '—'} />
         </div>
       )}
 
       {!loading && entries.length > 1 && (
         <Card>
-          <h2 className="eyebrow mb-4">Over time</h2>
+          <h2 className="eyebrow mb-4">{t('bodyWeight.overTime')}</h2>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
@@ -135,7 +141,7 @@ export default function BodyWeight() {
               <Tooltip
                 contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
                 labelStyle={{ color: COLORS.chalk }}
-                formatter={(value) => [`${value}${displayUnit}`, 'Weight']}
+                formatter={(value) => [`${value}${displayUnit}`, t('bodyWeight.weightTooltipLabel')]}
               />
               <Line type="monotone" dataKey="weightDisplay" stroke={COLORS.iron} strokeWidth={2.5} dot={{ fill: COLORS.iron, r: 3 }} />
             </LineChart>
@@ -144,12 +150,12 @@ export default function BodyWeight() {
       )}
 
       <Card>
-        <h2 className="eyebrow mb-3">{editingId ? 'Edit entry' : 'Log weight'}</h2>
+        <h2 className="eyebrow mb-3">{editingId ? t('bodyWeight.editEntry') : t('bodyWeight.logWeight')}</h2>
         <form onSubmit={handleSubmit} className="flex items-end gap-2 flex-wrap">
-          <Field label="Date">
+          <Field label={t('bodyWeight.date')}>
             <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
           </Field>
-          <Field label="Weight">
+          <Field label={t('bodyWeight.weightLabel')}>
             <input
               type="number"
               inputMode="decimal"
@@ -161,18 +167,18 @@ export default function BodyWeight() {
               required
             />
           </Field>
-          <Field label="Unit">
+          <Field label={t('bodyWeight.unit')}>
             <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
               <option value="kg">kg</option>
               <option value="lb">lb</option>
             </select>
           </Field>
           <Button type="submit" disabled={saving}>
-            <Plus size={16} /> {editingId ? 'Save' : 'Add'}
+            <Plus size={16} /> {editingId ? t('common.save') : t('common.add')}
           </Button>
           {editingId && (
             <Button type="button" variant="ghost" onClick={cancelEdit}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           )}
         </form>
@@ -180,8 +186,8 @@ export default function BodyWeight() {
 
       {!loading && entries.length === 0 && (
         <EmptyState
-          title="No weigh-ins logged yet"
-          body="Log your weight above whenever you check in — daily, weekly, whatever works for you. A chart and simple stats will build up here over time."
+          title={t('bodyWeight.emptyTitle')}
+          body={t('bodyWeight.emptyBody')}
         />
       )}
 
@@ -203,7 +209,7 @@ export default function BodyWeight() {
                 </button>
                 <button
                   onClick={() => {
-                    if (confirm('Delete this entry?')) deleteBodyWeightEntry(effectiveUid, e.id).then(refresh)
+                    if (confirm(t('bodyWeight.deleteConfirm'))) deleteBodyWeightEntry(effectiveUid, e.id).then(refresh)
                   }}
                   className="text-chalkdim hover:text-iron p-1"
                 >

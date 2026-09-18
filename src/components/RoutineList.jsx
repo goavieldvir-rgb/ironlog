@@ -2,14 +2,17 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Play, Pencil, Trash2, Dumbbell, Copy, Send } from 'lucide-react'
 import { useAdmin } from '../context/AdminContext.jsx'
+import { useLanguage } from '../context/LanguageContext.jsx'
 import { useCollection, deleteRoutine, addRoutine } from '../lib/db.js'
 import { loadDraft, clearDraft } from '../lib/draft.js'
 import { supabase } from '../supabase.js'
 import { Button, Card, CategoryTag, EmptyState } from './ui.jsx'
 import { Tabs } from './ExerciseLibrary.jsx'
+import { InfoTip } from './InfoTip.jsx'
 
 export default function RoutineList() {
   const { effectiveUid, isAdmin } = useAdmin()
+  const { t } = useLanguage()
   const [routines, loading, refresh] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [tab, setTab] = useState('all')
@@ -38,12 +41,15 @@ export default function RoutineList() {
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <div className="eyebrow mb-1">Plan</div>
-          <h1 className="text-3xl">Routines</h1>
+          <div className="eyebrow mb-1">{t('routines.plan')}</div>
+          <h1 className="text-3xl flex items-center gap-2 flex-wrap">
+            {t('routines.title')}
+            <InfoTip text={t('routines.cardActionsTip')} />
+          </h1>
         </div>
         <Link to="/routines/new">
           <Button>
-            <Plus size={16} /> Build routine
+            <Plus size={16} /> {t('routines.buildRoutine')}
           </Button>
         </Link>
       </div>
@@ -52,12 +58,12 @@ export default function RoutineList() {
 
       {!loading && filtered.length === 0 && (
         <EmptyState
-          title="No routines yet"
-          body="A routine is a template — a set of exercises with target sets and reps. Build one once, then follow it every time you train."
+          title={t('routines.emptyTitle')}
+          body={t('routines.emptyBody')}
           action={
             <Link to="/routines/new">
               <Button variant="brass">
-                <Plus size={16} /> Build your first routine
+                <Plus size={16} /> {t('routines.buildFirst')}
               </Button>
             </Link>
           }
@@ -73,13 +79,15 @@ export default function RoutineList() {
                   <h3 className="text-lg leading-tight">{r.name}</h3>
                   <CategoryTag category={r.category} />
                 </div>
-                <p className="text-chalkdim text-xs mt-1">{r.exercises?.length || 0} exercises</p>
+                <p className="text-chalkdim text-xs mt-1">
+                  {r.exercises?.length || 0} {t('routines.exercisesCount')}
+                </p>
               </div>
               <div className="flex gap-1 shrink-0">
                 <button
                   className="p-1.5 rounded hover:bg-surface2 text-chalkdim hover:text-chalk"
                   onClick={() => duplicateRoutine(r)}
-                  title="Duplicate"
+                  title={t('routines.duplicate')}
                 >
                   <Copy size={15} />
                 </button>
@@ -87,7 +95,7 @@ export default function RoutineList() {
                   <button
                     className="p-1.5 rounded hover:bg-brasssoft text-chalkdim hover:text-brass"
                     onClick={() => setCopyTarget(r)}
-                    title="Copy to another person"
+                    title={t('routines.copyToPerson')}
                   >
                     <Send size={15} />
                   </button>
@@ -98,7 +106,7 @@ export default function RoutineList() {
                 <button
                   className="p-1.5 rounded hover:bg-ironsoft text-chalkdim hover:text-iron"
                   onClick={() => {
-                    if (confirm(`Delete routine "${r.name}"? Past sessions stay in your history.`)) {
+                    if (confirm(t('routines.deleteConfirm')(r.name))) {
                       deleteRoutine(effectiveUid, r.id).then(refresh)
                       const draft = loadDraft(effectiveUid)
                       if (draft?.routineId === r.id) clearDraft(effectiveUid)
@@ -121,12 +129,12 @@ export default function RoutineList() {
                   </span>
                 </li>
               ))}
-              {(r.exercises?.length || 0) > 4 && <li>+{r.exercises.length - 4} more</li>}
+              {(r.exercises?.length || 0) > 4 && <li>{t('routines.moreCount')(r.exercises.length - 4)}</li>}
             </ul>
 
             <Link to={`/workout/${r.id}`} className="mt-1">
               <Button variant="brass" className="w-full">
-                <Play size={15} /> Start session
+                <Play size={15} /> {t('routines.startSession')}
               </Button>
             </Link>
           </Card>
@@ -134,7 +142,7 @@ export default function RoutineList() {
       </div>
 
       <Link to="/workout/freestyle" className="text-chalkdim text-sm inline-flex items-center gap-1.5 hover:text-chalk w-fit">
-        <Dumbbell size={14} /> Or log a freestyle session without a routine
+        <Dumbbell size={14} /> {t('routines.freestyleLink')}
       </Link>
 
       {copyTarget && <CopyToPersonModal routine={copyTarget} onClose={() => setCopyTarget(null)} />}
@@ -143,6 +151,7 @@ export default function RoutineList() {
 }
 
 function CopyToPersonModal({ routine, onClose }) {
+  const { t } = useLanguage()
   const [people, setPeople] = useState([])
   const [loading, setLoading] = useState(true)
   const [copiedTo, setCopiedTo] = useState(null)
@@ -171,11 +180,11 @@ function CopyToPersonModal({ routine, onClose }) {
   return (
     <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" onClick={onClose}>
       <div className="card p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-xl mb-1">Copy "{routine.name}"</h2>
-        <p className="text-chalkdim text-sm mb-4">Pick who to copy this routine to.</p>
+        <h2 className="text-xl mb-1">{t('routines.copyModalTitle')(routine.name)}</h2>
+        <p className="text-chalkdim text-sm mb-4">{t('routines.copyModalSubtitle')}</p>
 
         <div className="flex flex-col gap-1 max-h-72 overflow-y-auto">
-          {loading && <p className="text-chalkdim text-sm py-2">Loading…</p>}
+          {loading && <p className="text-chalkdim text-sm py-2">{t('common.loading')}</p>}
           {people.map((p) => (
             <button
               key={p.id}
@@ -184,14 +193,14 @@ function CopyToPersonModal({ routine, onClose }) {
               className="flex items-center justify-between gap-2 px-2 py-2 rounded-md hover:bg-surface2 text-start disabled:opacity-50"
             >
               <span className="truncate min-w-0">{p.full_name || p.email}</span>
-              <span className="text-xs text-brass shrink-0">{copiedTo === p.id ? 'Copied' : 'Copy here'}</span>
+              <span className="text-xs text-brass shrink-0">{copiedTo === p.id ? t('routines.copiedLabel') : t('routines.copyHereLabel')}</span>
             </button>
           ))}
         </div>
 
         <div className="flex justify-end mt-4 pt-4 border-t border-line">
           <Button variant="ghost" onClick={onClose}>
-            Done
+            {t('common.done')}
           </Button>
         </div>
       </div>

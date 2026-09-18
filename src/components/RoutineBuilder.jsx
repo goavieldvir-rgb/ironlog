@@ -3,15 +3,17 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { Plus, Trash2, ArrowUp, ArrowDown, Library } from 'lucide-react'
 import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
+import { useLanguage } from '../context/LanguageContext.jsx'
 import { useCollection, addRoutine, updateRoutine, addExercise } from '../lib/db.js'
 import { Button, Card, Field } from './ui.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
 import { ExerciseModal, emptyExerciseForm } from './ExerciseLibrary.jsx'
 import { InfoTip } from './InfoTip.jsx'
-import { disambiguateLabels, enT } from '../lib/disambiguate.js'
+import { disambiguateLabels } from '../lib/disambiguate.js'
 
 export default function RoutineBuilder() {
   const { effectiveUid } = useAdmin()
+  const { t, lang } = useLanguage()
   const { id } = useParams()
   const navigate = useNavigate()
   const [exercises, , refreshExercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
@@ -36,8 +38,9 @@ export default function RoutineBuilder() {
   }, [existing])
 
   const availableExercises = exercises.filter((e) => e.category === category)
-  const availableExerciseLabels = disambiguateLabels(availableExercises, (e) => e.name, enT)
+  const availableExerciseLabels = disambiguateLabels(availableExercises, (e) => (lang === 'he' && e.name_he) || e.name, t)
   const isCardio = category === 'cardio'
+  const categoryLabel = { strength: t('tabs.strength'), mobility: t('tabs.mobility'), cardio: t('tabs.cardio') }[category]
 
   function makeItem(ex) {
     if (isCardio) {
@@ -120,51 +123,55 @@ export default function RoutineBuilder() {
   }
 
   if (id && !loading && !existing) {
-    return <p className="text-chalkdim">Routine not found.</p>
+    return <p className="text-chalkdim">{t('routines.notFound')}</p>
   }
 
   return (
     <div className="flex flex-col gap-5 max-w-2xl">
       <Link to="/routines" className="text-chalkdim text-sm inline-flex items-center gap-1 hover:text-chalk w-fit">
-        <BackChevron size={15} /> Routines
+        <BackChevron size={15} /> {t('routines.title')}
       </Link>
 
-      <h1 className="text-3xl">{id ? 'Edit routine' : 'Build a routine'}</h1>
+      <h1 className="text-3xl">{id ? t('routines.editTitle') : t('routines.buildTitle')}</h1>
 
       <Card className="flex flex-col gap-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Routine name">
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Push day" required />
+          <Field label={t('routines.routineName')}>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('routines.routineNamePlaceholder')} required />
           </Field>
           <Field
             label={
               <>
-                Category{' '}
-                <InfoTip text="A routine can only hold one category of exercise — Strength, Mobility, or Cardio. This keeps the logging screen showing the right fields (sets/reps vs. duration/intensity) for everything in it." />
+                {t('routines.category')} <InfoTip text={t('routines.categoryTip')} />
               </>
             }
           >
             <select value={category} onChange={(e) => setCategory(e.target.value)}>
-              <option value="strength">Strength</option>
-              <option value="mobility">Mobility / Physio</option>
-              <option value="cardio">Cardio</option>
+              <option value="strength">{t('tabs.strength')}</option>
+              <option value="mobility">{t('exercises.catMobility')}</option>
+              <option value="cardio">{t('tabs.cardio')}</option>
             </select>
           </Field>
         </div>
       </Card>
 
       <Card className="flex flex-col gap-3">
-        <h2 className="eyebrow">Exercises in this routine</h2>
+        <h2 className="eyebrow">{t('routines.exercisesInRoutine')}</h2>
 
         {items.length === 0 && (
-          <p className="text-chalkdim text-sm">No exercises added yet — pick one below to get started.</p>
+          <p className="text-chalkdim text-sm">{t('routines.noExercisesAdded')}</p>
         )}
 
         <div className="flex flex-col gap-2">
           {items.map((it, i) => (
             <div key={i} className="flex items-center gap-2 bg-surface2 rounded-md p-2.5 flex-wrap">
               <div className="flex-1 min-w-0">
-                <p className="truncate">{exercises.find((e) => e.id === it.exerciseId)?.name || it.name}</p>
+                <p className="truncate">
+                  {(() => {
+                    const found = exercises.find((e) => e.id === it.exerciseId)
+                    return (lang === 'he' && found?.name_he) || found?.name || it.name
+                  })()}
+                </p>
               </div>
               {isCardio ? (
                 <>
@@ -174,18 +181,18 @@ export default function RoutineBuilder() {
                     value={it.targetDuration ?? 20}
                     onChange={(e) => updateItem(i, { targetDuration: Number(e.target.value) })}
                     className="w-16 text-center num"
-                    title="Target duration (minutes)"
+                    title={t('routines.targetDuration')}
                   />
-                  <span className="text-chalkdim text-xs">min ·</span>
+                  <span className="text-chalkdim text-xs">{t('routines.minLabel')}</span>
                   <input
                     type="number"
                     min={1}
                     value={it.targetIntensity ?? 5}
                     onChange={(e) => updateItem(i, { targetIntensity: Number(e.target.value) })}
                     className="w-14 text-center num"
-                    title={it.intensityType === 'hr_zone' ? 'Target HR zone' : 'Target RPE'}
+                    title={it.intensityType === 'hr_zone' ? t('routines.targetHrZone') : t('routines.targetIntensity')}
                   />
-                  <span className="text-chalkdim text-xs">{it.intensityType === 'hr_zone' ? 'zone' : 'RPE'}</span>
+                  <span className="text-chalkdim text-xs">{it.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe')}</span>
                 </>
               ) : (
                 <>
@@ -195,14 +202,14 @@ export default function RoutineBuilder() {
                     value={it.targetSets}
                     onChange={(e) => updateItem(i, { targetSets: Number(e.target.value) })}
                     className="w-14 text-center num"
-                    title="Target sets"
+                    title={t('routines.targetSets')}
                   />
                   <span className="text-chalkdim text-xs">×</span>
                   <input
                     value={it.targetReps}
                     onChange={(e) => updateItem(i, { targetReps: e.target.value })}
                     className="w-16 text-center num"
-                    title="Target reps"
+                    title={t('routines.targetReps')}
                     placeholder="10"
                   />
                 </>
@@ -227,9 +234,9 @@ export default function RoutineBuilder() {
         </div>
 
         <div className="flex gap-2 items-end pt-2 border-t border-line flex-wrap">
-          <Field label={`Your ${category} exercises`}>
+          <Field label={t('routines.yourExercisesLabel')(categoryLabel)}>
             <select value={pickId} onChange={(e) => setPickId(e.target.value)} className="w-56">
-              <option value="">Choose one you've already added…</option>
+              <option value="">{t('routines.chooseAlreadyAdded')}</option>
               {availableExercises.map((e, i) => (
                 <option key={e.id} value={e.id}>
                   {availableExerciseLabels[i]}
@@ -238,16 +245,14 @@ export default function RoutineBuilder() {
             </select>
           </Field>
           <Button type="button" variant="ghost" onClick={addItem} disabled={!pickId}>
-            <Plus size={16} /> Add
+            <Plus size={16} /> {t('common.add')}
           </Button>
           <Button type="button" variant="brass" onClick={() => setPicking(true)}>
-            <Library size={16} /> Browse library
+            <Library size={16} /> {t('routines.browseLibrary')}
           </Button>
         </div>
         {availableExercises.length === 0 && (
-          <p className="text-chalkdim text-xs">
-            Nothing in your own {category} list yet — use "Browse library" to add something.
-          </p>
+          <p className="text-chalkdim text-xs">{t('routines.nothingInList')(categoryLabel)}</p>
         )}
       </Card>
 
@@ -279,10 +284,10 @@ export default function RoutineBuilder() {
 
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={() => navigate('/routines')}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button onClick={handleSave} disabled={saving || !name.trim() || items.length === 0}>
-          {saving ? 'Saving…' : 'Save routine'}
+          {saving ? t('common.saving') : t('routines.saveRoutine')}
         </Button>
       </div>
     </div>

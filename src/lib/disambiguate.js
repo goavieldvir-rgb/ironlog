@@ -5,13 +5,6 @@
 // and dropdowns don't show two identical-looking entries. Only appends the
 // suffix when a name actually collides; a normal, unique exercise name is
 // left exactly as-is.
-// A minimal English-only substitute for the app's translate function, for
-// contexts that don't have the full i18n system wired in.
-export function enT(key) {
-  const map = { 'exercises.hrZone': 'HR Zone', 'exercises.rpe': 'RPE', 'exercises.bodyweightWord': 'Bodyweight' }
-  return map[key] || key
-}
-
 export function unitSuffix(item, t) {
   const category = item.category
   if (category === 'cardio') {

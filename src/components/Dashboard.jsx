@@ -2,9 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Play, Plus, Flame, Check, Circle, Clock } from 'lucide-react'
 import { ForwardChevron } from './DirectionalIcon.jsx'
+import { InfoTip } from './InfoTip.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { toLocalISODate } from '../lib/dates.js'
 import { useAdmin } from '../context/AdminContext.jsx'
+import { useLanguage } from '../context/LanguageContext.jsx'
 import { useCollection } from '../lib/db.js'
 import { loadDraft, clearDraft } from '../lib/draft.js'
 import { Button, Card, CategoryTag } from './ui.jsx'
@@ -32,6 +34,7 @@ function timeAgo(ts) {
 export default function Dashboard() {
   const { user } = useAuth()
   const { actingAs, effectiveUid, effectiveName } = useAdmin()
+  const { t } = useLanguage()
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [routines] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [sessions, sessionsLoading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
@@ -42,21 +45,27 @@ export default function Dashboard() {
 
   const steps = useMemo(
     () => [
-      { done: exercises.length > 0, label: 'Add an exercise', body: 'Browse the shared library or create your own.', to: '/exercises' },
+      {
+        done: exercises.length > 0,
+        label: t('dashboard.stepAddExercise'),
+        body: t('dashboard.stepAddExerciseBody'),
+        to: '/exercises',
+      },
       {
         done: routines.length > 0,
-        label: 'Build a routine',
-        body: 'Group exercises into a template with target sets and reps.',
+        label: t('dashboard.stepBuildRoutine'),
+        body: t('dashboard.stepBuildRoutineBody'),
         to: routines.length > 0 ? '/routines' : '/routines/new',
       },
       {
         done: sessions.length > 0,
-        label: 'Log a session',
-        body: 'Follow a routine (or go freestyle) and log your first sets.',
+        label: t('dashboard.stepLogSession'),
+        body: t('dashboard.stepLogSessionBody'),
         to: routines.length > 0 ? `/workout/${routines[0].id}` : '/workout/freestyle',
       },
     ],
-    [exercises.length, routines, sessions.length],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [exercises.length, routines, sessions.length, t],
   )
   const allDone = steps.every((s) => s.done)
   const showChecklist = !sessionsLoading && !allDone
@@ -80,7 +89,9 @@ export default function Dashboard() {
           {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
         </div>
         <h1 className="text-3xl">
-          {actingAs ? `${effectiveName}'s training log` : `Welcome back${firstName ? `, ${firstName}` : ''}.`}
+          {actingAs
+            ? `${effectiveName}${t('dashboard.trainingLog')}`
+            : `${t('dashboard.welcomeBack')}${firstName ? `, ${firstName}` : ''}.`}
         </h1>
       </div>
 
@@ -89,46 +100,49 @@ export default function Dashboard() {
           <div className="flex items-start gap-3">
             <Clock size={18} className="text-brass shrink-0 mt-0.5" />
             <div>
-              <div className="eyebrow text-brass mb-0.5">In progress</div>
+              <div className="eyebrow text-brass mb-0.5 flex items-center gap-1.5 flex-wrap">
+                {t('dashboard.inProgress')}
+                <InfoTip text={t('dashboard.inProgressTip')} />
+              </div>
               <p className="text-lg leading-tight">{draft.routineName}</p>
               <p className="text-chalkdim text-xs mt-0.5">
-                {timeAgo(draft.savedAt)} · {draft.entries?.length || 0} exercise{draft.entries?.length === 1 ? '' : 's'} logged so far
+                {timeAgo(draft.savedAt)} · {draft.entries?.length || 0} {t('dashboard.exerciseLoggedSoFar')}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3 shrink-0">
             <button onClick={discardDraft} className="text-chalkdim text-xs hover:text-iron">
-              Discard
+              {t('dashboard.discard')}
             </button>
             <Link to={`/workout/${draft.routineId || 'freestyle'}`}>
               <Button variant="brass">
-                <Play size={15} /> Resume
+                <Play size={15} /> {t('dashboard.resume')}
               </Button>
             </Link>
           </div>
         </Card>
       )}
 
-      {showChecklist && <OnboardingChecklist steps={steps} />}
+      {showChecklist && <OnboardingChecklist steps={steps} t={t} />}
 
       <div className="grid grid-cols-3 gap-3">
-        <Stat label="This week" value={thisWeek} suffix="sessions" />
-        <Stat label="Total logged" value={sessions.length} suffix="sessions" />
-        <Stat label="Routines" value={routines.length} suffix="active" />
+        <Stat label={t('dashboard.thisWeek')} value={thisWeek} suffix={t('dashboard.sessions')} />
+        <Stat label={t('dashboard.totalLogged')} value={sessions.length} suffix={t('dashboard.sessions')} />
+        <Stat label={t('dashboard.routinesLabel')} value={routines.length} suffix={t('dashboard.active')} />
       </div>
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h2 className="eyebrow">Continue training</h2>
+          <h2 className="eyebrow">{t('dashboard.continueTraining')}</h2>
           <Link to="/routines" className="text-chalkdim text-xs hover:text-chalk inline-flex items-center gap-0.5">
-            All routines <ForwardChevron size={13} />
+            {t('dashboard.allRoutines')} <ForwardChevron size={13} />
           </Link>
         </div>
         {routines.length === 0 ? (
           <p className="text-sm text-chalkdim">
-            No routines yet.{' '}
+            {t('dashboard.noRoutinesYet')}{' '}
             <Link to="/routines/new" className="text-brass hover:underline">
-              Build one
+              {t('dashboard.buildOne')}
             </Link>
             .
           </p>
@@ -141,7 +155,9 @@ export default function Dashboard() {
                     <p className="truncate min-w-0">{r.name}</p>
                     <CategoryTag category={r.category} />
                   </div>
-                  <p className="text-chalkdim text-xs mt-0.5">{r.exercises?.length || 0} exercises</p>
+                  <p className="text-chalkdim text-xs mt-0.5">
+                    {r.exercises?.length || 0} {t('dashboard.exercisesCount')}
+                  </p>
                 </div>
                 <Link to={`/workout/${r.id}`}>
                   <Button variant="subtle" className="shrink-0">
@@ -156,14 +172,14 @@ export default function Dashboard() {
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h2 className="eyebrow">Recent activity</h2>
+          <h2 className="eyebrow">{t('dashboard.recentActivity')}</h2>
           <Link to="/history" className="text-chalkdim text-xs hover:text-chalk inline-flex items-center gap-0.5">
-            Full history <ForwardChevron size={13} />
+            {t('dashboard.fullHistory')} <ForwardChevron size={13} />
           </Link>
         </div>
         {recent.length === 0 ? (
           <p className="text-sm text-chalkdim inline-flex items-center gap-1.5">
-            <Flame size={14} /> No sessions logged yet — start one above.
+            <Flame size={14} /> {t('dashboard.noSessionsYet')}
           </p>
         ) : (
           <div className="flex flex-col gap-1">
@@ -186,12 +202,12 @@ export default function Dashboard() {
   )
 }
 
-function OnboardingChecklist({ steps }) {
+function OnboardingChecklist({ steps, t }) {
   const doneCount = steps.filter((s) => s.done).length
   return (
     <Card className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl">Get set up</h2>
+        <h2 className="text-xl">{t('dashboard.getSetUp')}</h2>
         <span className="eyebrow">
           {doneCount}/{steps.length}
         </span>

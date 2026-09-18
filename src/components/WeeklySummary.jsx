@@ -2,9 +2,11 @@ import React, { useMemo, useState } from 'react'
 import { Copy, Download, Check } from 'lucide-react'
 import { BackChevron, ForwardChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
+import { useLanguage } from '../context/LanguageContext.jsx'
 import { useCollection } from '../lib/db.js'
 import { toLocalISODate } from '../lib/dates.js'
 import { Button, Card, EmptyState, Field } from './ui.jsx'
+import { InfoTip } from './InfoTip.jsx'
 
 function mondayOf(d) {
   const date = new Date(d)
@@ -73,25 +75,27 @@ function formatDay(iso) {
   })
 }
 
-function formatSet(entry, s) {
+function formatSet(entry, s, t) {
   if (entry.category === 'cardio') {
-    const intensityLabel = entry.intensityType === 'hr_zone' ? 'Zone' : 'RPE'
+    const intensityLabel = entry.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe')
     const dist = s.distance !== '' && s.distance != null ? ` · ${s.distance}${entry.unit}` : ''
     return `${s.duration || 0}min·${intensityLabel}${s.intensity || 0}${dist}`
   }
   if (entry.bodyweight) {
     const added = Number(s.weight) > 0 ? `+${s.weight}${entry.unit} ` : ''
-    return `${added}BW×${s.reps || 0}`
+    return `${added}${t('sessionCard.bwShort')}×${s.reps || 0}`
   }
   return `${s.weight || 0}${entry.unit}×${s.reps || 0}`
 }
 
-const MODES = [
-  { id: 'week', label: 'Week' },
-  { id: 'month', label: 'Month' },
-  { id: 'year', label: 'Year' },
-  { id: 'custom', label: 'Custom' },
-]
+function getModes(t) {
+  return [
+    { id: 'week', label: t('summary.modeWeek') },
+    { id: 'month', label: t('summary.modeMonth') },
+    { id: 'year', label: t('summary.modeYear') },
+    { id: 'custom', label: t('summary.modeCustom') },
+  ]
+}
 
 function computeRange(mode, offset, customStart, customEnd) {
   const today = todayStart()
@@ -123,10 +127,15 @@ function computeRange(mode, offset, customStart, customEnd) {
   return { start, end }
 }
 
-function buildSummary({ mode, start, end, sessions, bodyWeights, personName }) {
+function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t }) {
   const lines = []
-  const modeLabel = { week: 'Weekly', month: 'Monthly', year: 'Yearly', custom: 'Custom range' }[mode]
-  lines.push(`# ${modeLabel} training summary`)
+  const modeLabel = {
+    week: t('summary.docWeekly'),
+    month: t('summary.docMonthly'),
+    year: t('summary.docYearly'),
+    custom: t('summary.docCustomRange'),
+  }[mode]
+  lines.push(`# ${modeLabel} ${t('summary.docTrainingSummary')}`)
   lines.push(`${formatRange(start, end, mode)}${personName ? ` — ${personName}` : ''}`)
   lines.push('')
 
@@ -153,28 +162,32 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName }) {
     return sum + m
   }, 0)
 
-  const parts = [`${sessions.length} session${sessions.length === 1 ? '' : 's'}`, `${totalSets} total sets`, `~${Math.round(totalVolume).toLocaleString()} total volume`]
-  if (totalCardioMinutes > 0) parts.push(`${Math.round(totalCardioMinutes)} cardio minutes`)
+  const parts = [
+    `${sessions.length} ${sessions.length === 1 ? t('summary.docSession') : t('summary.docSessions')}`,
+    `${totalSets} ${t('summary.docTotalSets')}`,
+    `~${Math.round(totalVolume).toLocaleString()} ${t('summary.docTotalVolume')}`,
+  ]
+  if (totalCardioMinutes > 0) parts.push(`${Math.round(totalCardioMinutes)} ${t('summary.docCardioMinutes')}`)
   lines.push(parts.join(' · '))
   lines.push('')
 
   if (sessions.length === 0) {
-    lines.push('No sessions logged in this period.')
+    lines.push(t('summary.docNoSessions'))
   }
 
   for (const s of [...sessions].sort((a, b) => (a.date < b.date ? -1 : 1))) {
     lines.push(`## ${formatDay(s.date)} — ${s.routine_name} (${s.category})`)
     for (const e of s.entries || []) {
-      const setsStr = (e.sets || []).map((set) => formatSet(e, set)).join(', ')
-      lines.push(`- ${e.name}: ${setsStr || 'no sets logged'}`)
+      const setsStr = (e.sets || []).map((set) => formatSet(e, set, t)).join(', ')
+      lines.push(`- ${e.name}: ${setsStr || t('summary.docNoSetsLogged')}`)
       if (e.notes) lines.push(`  (${e.notes})`)
     }
-    if (s.notes) lines.push(`  Notes: ${s.notes}`)
+    if (s.notes) lines.push(`  ${t('summary.docNotes')} ${s.notes}`)
     lines.push('')
   }
 
   if (bodyWeights.length > 0) {
-    lines.push('## Body weight')
+    lines.push(`## ${t('summary.docBodyWeight')}`)
     for (const bw of [...bodyWeights].sort((a, b) => (a.date < b.date ? -1 : 1))) {
       lines.push(`- ${formatDay(bw.date)}: ${bw.weight}${bw.unit}`)
     }
@@ -186,6 +199,8 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName }) {
 
 export default function WeeklySummary() {
   const { effectiveUid, effectiveName, actingAs } = useAdmin()
+  const { t } = useLanguage()
+  const MODES = getModes(t)
   const [sessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [bodyWeightAll] = useCollection(effectiveUid, 'body_weight_logs', 'date', 'desc')
   const [exercises, exercisesLoading] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
@@ -223,8 +238,9 @@ export default function WeeklySummary() {
         sessions: periodSessions,
         bodyWeights: periodBodyWeights,
         personName: actingAs ? effectiveName : null,
+        t,
       }),
-    [mode, start, end, periodSessions, periodBodyWeights, actingAs, effectiveName],
+    [mode, start, end, periodSessions, periodBodyWeights, actingAs, effectiveName, t],
   )
 
   async function handleCopy() {
@@ -264,53 +280,54 @@ export default function WeeklySummary() {
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <div className="eyebrow mb-1">Export</div>
-        <h1 className="text-3xl">Training summary</h1>
+        <div className="eyebrow mb-1">{t('summary.export')}</div>
+        <h1 className="text-3xl">{t('summary.title')}</h1>
       </div>
 
       <Card className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <p className="text-chalk">Full backup</p>
-          <p className="text-chalkdim text-xs mt-0.5">
-            Every exercise, routine, session, and weigh-in — everything, not just this period.
-          </p>
+          <p className="text-chalk">{t('summary.fullBackup')}</p>
+          <p className="text-chalkdim text-xs mt-0.5">{t('summary.fullBackupBody')}</p>
         </div>
         <Button variant="ghost" onClick={handleFullBackup} disabled={loading || exercisesLoading || routinesLoading}>
-          <Download size={15} /> Download everything (.json)
+          <Download size={15} /> {t('summary.downloadEverything')}
         </Button>
       </Card>
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex rounded-md bg-surface2 p-1 text-sm w-fit">
-          {MODES.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => switchMode(m.id)}
-              className={`px-3 py-1.5 rounded transition-colors ${
-                mode === m.id ? 'bg-ink text-chalk' : 'text-chalkdim'
-              }`}
-            >
-              {m.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex rounded-md bg-surface2 p-1 text-sm w-fit">
+            {MODES.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => switchMode(m.id)}
+                className={`px-3 py-1.5 rounded transition-colors ${
+                  mode === m.id ? 'bg-ink text-chalk' : 'text-chalkdim'
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <InfoTip text={t('summary.periodTip')} />
         </div>
 
         <div className="flex gap-2">
           <Button variant="ghost" onClick={handleCopy} disabled={loading}>
-            {copied ? <Check size={15} /> : <Copy size={15} />} {copied ? 'Copied' : 'Copy'}
+            {copied ? <Check size={15} /> : <Copy size={15} />} {copied ? t('summary.copied') : t('summary.copy')}
           </Button>
           <Button variant="brass" onClick={handleDownload} disabled={loading}>
-            <Download size={15} /> Download
+            <Download size={15} /> {t('summary.download')}
           </Button>
         </div>
       </div>
 
       {mode === 'custom' ? (
         <div className="flex items-end gap-2 flex-wrap">
-          <Field label="From">
+          <Field label={t('summary.from')}>
             <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} />
           </Field>
-          <Field label="To">
+          <Field label={t('summary.to')}>
             <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} />
           </Field>
         </div>
@@ -332,7 +349,7 @@ export default function WeeklySummary() {
           </button>
           {offset !== 0 && (
             <button onClick={() => setOffset(0)} className="text-chalkdim text-xs hover:text-chalk ms-1">
-              Back to current
+              {t('summary.backToCurrent')}
             </button>
           )}
         </div>
@@ -340,8 +357,8 @@ export default function WeeklySummary() {
 
       {!loading && periodSessions.length === 0 ? (
         <EmptyState
-          title="Nothing logged in this period"
-          body="Once you log a session in this date range, it'll show up here as a shareable summary."
+          title={t('summary.emptyTitle')}
+          body={t('summary.emptyBody')}
         />
       ) : (
         <Card>

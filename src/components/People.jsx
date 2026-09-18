@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Users, ArrowRight, ShieldCheck, UserPlus, Copy, Check, AlertTriangle, Flame } from 'lucide-react'
+import { Users, ShieldCheck, UserPlus, Copy, Check, AlertTriangle } from 'lucide-react'
+import { ForwardArrow } from './DirectionalIcon.jsx'
 import { supabase } from '../supabase.js'
 import { toLocalISODate } from '../lib/dates.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
+import { useLanguage } from '../context/LanguageContext.jsx'
 import { Card, Badge, EmptyState, Button, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 
@@ -15,21 +17,22 @@ function startOfWeekISO() {
   return toLocalISODate(d)
 }
 
-function daysAgo(iso) {
-  const days = Math.round((Date.now() - new Date(iso + 'T00:00:00').getTime()) / 86400000)
-  if (days === 0) return 'today'
-  if (days === 1) return 'yesterday'
-  return `${days}d ago`
-}
-
 export default function People() {
   const { user } = useAuth()
   const { setActingAs } = useAdmin()
+  const { t } = useLanguage()
   const navigate = useNavigate()
   const [people, setPeople] = useState([])
   const [loading, setLoading] = useState(true)
   const [inviting, setInviting] = useState(false)
   const [activity, setActivity] = useState([])
+
+  function daysAgo(iso) {
+    const days = Math.round((Date.now() - new Date(iso + 'T00:00:00').getTime()) / 86400000)
+    if (days === 0) return t('people.today')
+    if (days === 1) return t('people.yesterday')
+    return t('people.daysAgo')(days)
+  }
 
   useEffect(() => {
     supabase
@@ -83,27 +86,27 @@ export default function People() {
     <div className="flex flex-col gap-5">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <div className="eyebrow mb-1">Admin</div>
-          <h1 className="text-3xl">People</h1>
+          <div className="eyebrow mb-1">{t('people.admin')}</div>
+          <h1 className="text-3xl">{t('people.title')}</h1>
           <p className="text-chalkdim text-sm mt-1 flex items-center gap-1.5 flex-wrap">
-            Pick someone to build routines for, or view their training history.
-            <InfoTip text="The colored dot next to each person: green means they've logged a session this week, amber means they've trained before but gone quiet recently, gray means they've never logged anything yet." />
+            {t('people.subtitle')}
+            <InfoTip text={t('people.dotTip')} />
           </p>
         </div>
         <div className="flex gap-2">
           <Link to="/errors">
             <Button variant="ghost">
-              <AlertTriangle size={16} /> Error logs
+              <AlertTriangle size={16} /> {t('people.errorLogs')}
             </Button>
           </Link>
           <Button variant="brass" onClick={() => setInviting(true)}>
-            <UserPlus size={16} /> Invite someone
+            <UserPlus size={16} /> {t('people.inviteSomeone')}
           </Button>
         </div>
       </div>
 
       {!loading && people.length === 0 && (
-        <EmptyState title="No accounts yet" body="Once people sign up, they'll show up here." />
+        <EmptyState title={t('people.emptyTitle')} body={t('people.emptyBody')} />
       )}
 
       <div className="flex flex-col gap-2">
@@ -111,20 +114,20 @@ export default function People() {
           const stats = activityByUser[p.id]
           const dotColor = stats?.thisWeek > 0 ? 'bg-good' : stats?.lastDate ? 'bg-brass' : 'bg-chalkdim'
           const activityText = stats?.thisWeek > 0
-            ? `${stats.thisWeek} session${stats.thisWeek === 1 ? '' : 's'} this week`
+            ? t('people.sessionThisWeek')(stats.thisWeek)
             : stats?.lastDate
-              ? `Quiet since ${daysAgo(stats.lastDate)}`
-              : 'No sessions yet'
+              ? t('people.quietSince')(daysAgo(stats.lastDate))
+              : t('people.noSessionsYet')
           return (
             <Card key={p.id} className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap min-w-0">
                   <p className="truncate min-w-0">{p.full_name || p.email}</p>
-                  {p.id === user.uid && <Badge>You</Badge>}
+                  {p.id === user.uid && <Badge>{t('people.you')}</Badge>}
                   {p.is_admin && (
                     <Badge tone="brass">
                       <span className="inline-flex items-center gap-1">
-                        <ShieldCheck size={11} /> Admin
+                        <ShieldCheck size={11} /> {t('people.adminBadge')}
                       </span>
                     </Badge>
                   )}
@@ -141,19 +144,19 @@ export default function People() {
                 onClick={() => manage(p)}
                 className="shrink-0 inline-flex items-center gap-1.5 text-sm text-brass hover:underline"
               >
-                {p.id === user.uid ? 'Back to my account' : 'Manage'} <ArrowRight size={14} />
+                {p.id === user.uid ? t('people.backToMyAccount') : t('people.manage')} <ForwardArrow size={14} />
               </button>
             </Card>
           )
         })}
       </div>
 
-      {inviting && <InviteModal onClose={() => setInviting(false)} />}
+      {inviting && <InviteModal onClose={() => setInviting(false)} t={t} />}
     </div>
   )
 }
 
-function InviteModal({ onClose }) {
+function InviteModal({ onClose, t }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [copiedLink, setCopiedLink] = useState(false)
@@ -168,7 +171,7 @@ function InviteModal({ onClose }) {
     return `${base}${query ? `?${query}` : ''}#/`
   })()
 
-  const message = `Hey${name ? ` ${name}` : ''}! I set you up on Ironlog, the training log I use — tap this link and just pick a password to get going: ${link}`
+  const message = t('people.inviteMessage')(name, link)
 
   async function copy(text, setCopied) {
     await navigator.clipboard.writeText(text)
@@ -181,18 +184,17 @@ function InviteModal({ onClose }) {
   return (
     <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" onClick={onClose}>
       <div className="card p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-2xl mb-1">Invite someone</h2>
-        <p className="text-chalkdim text-sm mb-4">
-          They'll land on a sign-up form with their name and email already filled in — they just set their own password.
-        </p>
+        <h2 className="text-2xl mb-1">{t('people.inviteModalTitle')}</h2>
+        <p className="text-chalkdim text-sm mb-4">{t('people.inviteModalSubtitle')}</p>
 
         <div className="flex flex-col gap-4">
-          <Field label="Their name">
+          <Field label={t('people.theirName')}>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ido" autoFocus />
           </Field>
-          <Field label="Their email">
+          <Field label={t('people.theirEmail')}>
             <input
               type="email"
+              dir="ltr"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="ido@example.com"
@@ -202,11 +204,11 @@ function InviteModal({ onClose }) {
           {ready && (
             <div className="flex flex-col gap-2 pt-2 border-t border-line">
               <Button variant="ghost" onClick={() => copy(link, setCopiedLink)}>
-                {copiedLink ? <Check size={15} /> : <Copy size={15} />} {copiedLink ? 'Link copied' : 'Copy invite link'}
+                {copiedLink ? <Check size={15} /> : <Copy size={15} />} {copiedLink ? t('people.linkCopied') : t('people.copyInviteLink')}
               </Button>
               <Button variant="brass" onClick={() => copy(message, setCopiedMessage)}>
                 {copiedMessage ? <Check size={15} /> : <Copy size={15} />}
-                {copiedMessage ? 'Message copied' : 'Copy ready-to-send message'}
+                {copiedMessage ? t('people.messageCopied') : t('people.copyReadyMessage')}
               </Button>
             </div>
           )}
@@ -214,7 +216,7 @@ function InviteModal({ onClose }) {
 
         <div className="flex justify-end mt-4 pt-4 border-t border-line">
           <Button variant="ghost" onClick={onClose}>
-            Done
+            {t('common.done')}
           </Button>
         </div>
       </div>

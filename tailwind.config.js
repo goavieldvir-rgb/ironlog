@@ -13,13 +13,15 @@ export default {
         ironsoft: '#3A2224',
         brass: '#C9A24B',
         brasssoft: '#33301F',
+        cardio: '#4C8CC9',
+        cardiosoft: '#1F2A38',
         line: '#31353E',
         good: '#4CAF7D',
       },
       fontFamily: {
-        display: ['"Barlow Condensed"', 'sans-serif'],
-        body: ['Inter', 'sans-serif'],
-        mono: ['"IBM Plex Mono"', 'monospace'],
+        display: ['"Barlow Condensed"', '"Rubik"', 'sans-serif'],
+        body: ['Inter', '"Rubik"', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', '"Rubik"', 'monospace'],
       },
       letterSpacing: {
         widest2: '.18em',

@@ -3,23 +3,29 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { Dumbbell, LayoutDashboard, ListChecks, History, Library, LogOut, Menu, X, Users, UserCheck, BarChart3, Scale, FileText, HelpCircle } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
+import { useLanguage } from '../context/LanguageContext.jsx'
 
 const links = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/routines', label: 'Routines', icon: ListChecks },
-  { to: '/exercises', label: 'Exercises', icon: Library },
-  { to: '/history', label: 'History', icon: History },
-  { to: '/stats', label: 'Stats', icon: BarChart3 },
-  { to: '/weight', label: 'Weight', icon: Scale },
-  { to: '/summary', label: 'Summary', icon: FileText },
+  { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard, end: true },
+  { to: '/routines', labelKey: 'nav.routines', icon: ListChecks },
+  { to: '/exercises', labelKey: 'nav.exercises', icon: Library },
+  { to: '/history', labelKey: 'nav.history', icon: History },
+  { to: '/stats', labelKey: 'nav.stats', icon: BarChart3 },
+  { to: '/weight', labelKey: 'nav.weight', icon: Scale },
+  { to: '/summary', labelKey: 'nav.summary', icon: FileText },
 ]
 
 export default function Layout() {
   const { user, logout } = useAuth()
   const { isAdmin, actingAs, setActingAs } = useAdmin()
+  const { t, lang, setLang } = useLanguage()
   const [open, setOpen] = useState(false)
 
-  const navLinks = isAdmin ? [...links, { to: '/people', label: 'People', icon: Users }] : links
+  const navLinks = isAdmin ? [...links, { to: '/people', labelKey: 'nav.people', icon: Users }] : links
+
+  function toggleLang() {
+    setLang(lang === 'en' ? 'he' : 'en')
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -27,10 +33,11 @@ export default function Layout() {
         <div className="bg-brasssoft text-brass text-sm px-4 py-2 flex items-center justify-center gap-2 flex-wrap">
           <UserCheck size={15} />
           <span>
-            Managing <strong>{actingAs.name}</strong>'s account
+            {t('layout.managingAccount')} <strong>{actingAs.name}</strong>
+            {t('layout.accountSuffix')}
           </span>
           <button onClick={() => setActingAs(null)} className="underline hover:no-underline ms-1">
-            Back to my account
+            {t('layout.backToMyAccount')}
           </button>
         </div>
       )}
@@ -49,22 +56,30 @@ export default function Layout() {
                 to={l.to}
                 end={l.end}
                 className={({ isActive }) =>
-                  `flex items-center gap-1.5 px-3 py-2 rounded-md text-sm transition-colors ${
+                  `flex items-center gap-1.5 px-3 py-2 rounded-md text-sm transition-colors whitespace-nowrap ${
                     isActive ? 'bg-surface2 text-chalk' : 'text-chalkdim hover:text-chalk'
                   }`
                 }
               >
                 <l.icon size={16} />
-                {l.label}
+                {t(l.labelKey)}
               </NavLink>
             ))}
           </nav>
 
           <div className="hidden md:flex items-center gap-3">
+            <button
+              onClick={toggleLang}
+              className="flex rounded-md bg-surface2 p-0.5 text-xs num"
+              title={t('layout.language')}
+            >
+              <span className={`px-2 py-1 rounded ${lang === 'en' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>EN</span>
+              <span className={`px-2 py-1 rounded ${lang === 'he' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>עב</span>
+            </button>
             <NavLink
               to="/help"
               className="text-chalkdim hover:text-brass transition-colors p-2 rounded-md hover:bg-surface2"
-              title="How Ironlog works"
+              title={t('layout.howItWorks')}
             >
               <HelpCircle size={18} />
             </NavLink>
@@ -72,7 +87,7 @@ export default function Layout() {
             <button
               onClick={logout}
               className="text-chalkdim hover:text-iron transition-colors p-2 rounded-md hover:bg-surface2"
-              title="Log out"
+              title={t('nav.logout')}
             >
               <LogOut size={18} />
             </button>
@@ -92,28 +107,38 @@ export default function Layout() {
                 end={l.end}
                 onClick={() => setOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center gap-2 px-2 py-2.5 rounded-md text-sm ${
+                  `flex items-center gap-2 px-2 py-2.5 rounded-md text-sm whitespace-nowrap ${
                     isActive ? 'bg-surface2 text-chalk' : 'text-chalkdim'
                   }`
                 }
               >
                 <l.icon size={16} />
-                {l.label}
+                {t(l.labelKey)}
               </NavLink>
             ))}
             <NavLink
               to="/help"
               onClick={() => setOpen(false)}
               className={({ isActive }) =>
-                `flex items-center gap-2 px-2 py-2.5 rounded-md text-sm ${
+                `flex items-center gap-2 px-2 py-2.5 rounded-md text-sm whitespace-nowrap ${
                   isActive ? 'bg-surface2 text-chalk' : 'text-chalkdim'
                 }`
               }
             >
-              <HelpCircle size={16} /> Help
+              <HelpCircle size={16} /> {t('nav.help')}
             </NavLink>
-            <button onClick={logout} className="flex items-center gap-2 px-2 py-2.5 rounded-md text-sm text-iron">
-              <LogOut size={16} /> Log out
+            <button
+              onClick={toggleLang}
+              className="flex items-center justify-between gap-2 px-2 py-2.5 rounded-md text-sm text-chalkdim whitespace-nowrap"
+            >
+              <span>{t('layout.language')}</span>
+              <span className="flex rounded-md bg-surface2 p-0.5 text-xs num">
+                <span className={`px-2 py-1 rounded ${lang === 'en' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>EN</span>
+                <span className={`px-2 py-1 rounded ${lang === 'he' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>עב</span>
+              </span>
+            </button>
+            <button onClick={logout} className="flex items-center gap-2 px-2 py-2.5 rounded-md text-sm text-iron whitespace-nowrap">
+              <LogOut size={16} /> {t('nav.logout')}
             </button>
           </nav>
         )}

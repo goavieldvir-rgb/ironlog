@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { Check } from 'lucide-react'
 import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
+import { useLanguage } from '../context/LanguageContext.jsx'
 import { useCollection, updateSession } from '../lib/db.js'
 import { Button, Card, CategoryTag, Field } from './ui.jsx'
 import SessionEntryCard from './SessionEntryCard.jsx'
@@ -13,6 +14,7 @@ function emptySet(category) {
 
 export default function EditSession() {
   const { effectiveUid } = useAdmin()
+  const { t } = useLanguage()
   const { id } = useParams()
   const navigate = useNavigate()
   const [sessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
@@ -78,18 +80,18 @@ export default function EditSession() {
     }
   }
 
-  if (!loading && !session) return <p className="text-chalkdim">Session not found.</p>
+  if (!loading && !session) return <p className="text-chalkdim">{t('sessionDetail.notFound')}</p>
   if (!session) return null
 
   return (
     <div className="flex flex-col gap-5 max-w-2xl">
       <Link to={`/history/${id}`} className="text-chalkdim text-sm inline-flex items-center gap-1 hover:text-chalk w-fit">
-        <BackChevron size={15} /> Back to session
+        <BackChevron size={15} /> {t('editSession.backToSession')}
       </Link>
 
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <h1 className="text-3xl">Edit session</h1>
+          <h1 className="text-3xl">{t('editSession.title')}</h1>
           <CategoryTag category={session.category} />
         </div>
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-fit" />
@@ -107,7 +109,7 @@ export default function EditSession() {
       ))}
 
       <Card>
-        <Field label="Session notes (optional)">
+        <Field label={t('workout.sessionNotes')}>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
         </Field>
       </Card>
@@ -116,12 +118,12 @@ export default function EditSession() {
         <Button onClick={handleSave} disabled={saving || saved} variant={saved ? 'subtle' : 'primary'}>
           {saved ? (
             <>
-              <Check size={16} /> Saved
+              <Check size={16} /> {t('workout.saved')}
             </>
           ) : saving ? (
-            'Saving…'
+            t('workout.saving')
           ) : (
-            'Save changes'
+            t('editSession.saveChanges')
           )}
         </Button>
       </div>

@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { Plus, Check } from 'lucide-react'
 import { BackChevron } from './DirectionalIcon.jsx'
+import { InfoTip } from './InfoTip.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
+import { useLanguage } from '../context/LanguageContext.jsx'
 import { useCollection, logSession } from '../lib/db.js'
 import { saveDraft, loadDraft, clearDraft } from '../lib/draft.js'
 import { toLocalISODate } from '../lib/dates.js'
@@ -20,6 +22,7 @@ function emptySet(category) {
 
 export default function WorkoutSession() {
   const { effectiveUid } = useAdmin()
+  const { t, lang } = useLanguage()
   const { routineId } = useParams()
   const navigate = useNavigate()
   const isFreestyle = routineId === 'freestyle'
@@ -73,7 +76,7 @@ export default function WorkoutSession() {
           if (category === 'cardio') {
             return {
               exerciseId: it.exerciseId,
-              name: full?.name || it.name,
+              name: (lang === 'he' && full?.name_he) || full?.name || it.name,
               unit: it.unit,
               category: 'cardio',
               intensityType: it.intensityType || full?.intensity_type || 'rpe',
@@ -94,7 +97,7 @@ export default function WorkoutSession() {
           }
           return {
             exerciseId: it.exerciseId,
-            name: full?.name || it.name,
+            name: (lang === 'he' && full?.name_he) || full?.name || it.name,
             unit: it.unit,
             bodyweight: it.bodyweight ?? full?.bodyweight ?? false,
             videoUrl: full?.video_url || it.videoUrl || '',
@@ -119,7 +122,7 @@ export default function WorkoutSession() {
     if (!ready || entries.length === 0) return
     saveDraft(effectiveUid, {
       routineId: isFreestyle ? null : routine?.id || null,
-      routineName: isFreestyle ? 'Freestyle session' : routine?.name,
+      routineName: isFreestyle ? t('workout.freestyleSession') : routine?.name,
       category,
       date,
       notes,
@@ -136,7 +139,7 @@ export default function WorkoutSession() {
         ...entries,
         {
           exerciseId: ex.id,
-          name: ex.name,
+          name: (lang === 'he' && ex.name_he) || ex.name,
           unit: ex.unit,
           category: 'cardio',
           intensityType: ex.intensity_type || 'rpe',
@@ -154,7 +157,7 @@ export default function WorkoutSession() {
         ...entries,
         {
           exerciseId: ex.id,
-          name: ex.name,
+          name: (lang === 'he' && ex.name_he) || ex.name,
           unit: ex.unit,
           bodyweight: !!ex.bodyweight,
           videoUrl: ex.video_url || '',
@@ -204,7 +207,7 @@ export default function WorkoutSession() {
     try {
       await logSession(effectiveUid, {
         routineId: isFreestyle ? null : routine?.id,
-        routineName: isFreestyle ? 'Freestyle session' : routine?.name,
+        routineName: isFreestyle ? t('workout.freestyleSession') : routine?.name,
         category,
         date,
         notes,
@@ -231,7 +234,7 @@ export default function WorkoutSession() {
   if (!isFreestyle && !routinesLoading && !routine) {
     const draft = loadDraft(effectiveUid)
     if (draft?.routineId === routineId) clearDraft(effectiveUid)
-    return <p className="text-chalkdim">This routine no longer exists — it may have been deleted.</p>
+    return <p className="text-chalkdim">{t('workout.routineNotFound')}</p>
   }
 
   const availableToAdd = exercises.filter((e) => !entries.some((en) => en.exerciseId === e.id))
@@ -240,13 +243,13 @@ export default function WorkoutSession() {
     <div className="flex flex-col">
       <div className="flex flex-col gap-5 max-w-2xl pb-4">
         <Link to="/routines" className="text-chalkdim text-sm inline-flex items-center gap-1 hover:text-chalk w-fit">
-          <BackChevron size={15} /> Routines
+          <BackChevron size={15} /> {t('routines.title')}
         </Link>
 
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-3xl">{isFreestyle ? 'Freestyle session' : routine?.name}</h1>
+              <h1 className="text-3xl">{isFreestyle ? t('workout.freestyleSession') : routine?.name}</h1>
               <CategoryTag category={category} />
             </div>
           </div>
@@ -268,28 +271,34 @@ export default function WorkoutSession() {
 
         {isFreestyle && (
           <Card className="flex items-end gap-2">
-            <Field label="Add exercise">
+            <Field label={t('workout.addExercise')}>
               <select value={pickId} onChange={(e) => setPickId(e.target.value)} className="w-56">
-                <option value="">Choose from library…</option>
+                <option value="">{t('workout.chooseFromLibrary')}</option>
                 {availableToAdd.map((e) => (
                   <option key={e.id} value={e.id}>
-                    {e.name} {e.category !== 'strength' ? `(${e.category})` : ''}
+                    {(lang === 'he' && e.name_he) || e.name} {e.category !== 'strength' ? `(${e.category})` : ''}
                   </option>
                 ))}
               </select>
             </Field>
             <Button type="button" variant="ghost" onClick={addFreestyleExercise} disabled={!pickId}>
-              <Plus size={16} /> Add
+              <Plus size={16} /> {t('common.add')}
             </Button>
           </Card>
         )}
 
         <Card>
-          <Field label="Session notes (optional)">
+          <Field
+            label={
+              <>
+                {t('workout.sessionNotes')} <InfoTip text={t('workout.sessionNotesTip')} />
+              </>
+            }
+          >
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="How it felt, energy, anything to remember next time…"
+              placeholder={t('workout.sessionNotesPlaceholder')}
               rows={2}
             />
           </Field>
@@ -299,12 +308,12 @@ export default function WorkoutSession() {
           <Button onClick={handleFinish} disabled={saving || saved || entries.length === 0} variant={saved ? 'subtle' : 'primary'}>
             {saved ? (
               <>
-                <Check size={16} /> Saved
+                <Check size={16} /> {t('workout.saved')}
               </>
             ) : saving ? (
-              'Saving…'
+              t('workout.saving')
             ) : (
-              'Finish & save session'
+              t('workout.finishSave')
             )}
           </Button>
         </div>

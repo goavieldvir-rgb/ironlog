@@ -1,10 +1,19 @@
 import React from 'react'
 import { supabase } from '../supabase.js'
+import { useLanguage } from '../context/LanguageContext.jsx'
 
 // Catches any uncaught error anywhere in the app so a single broken page
 // shows a friendly recovery screen instead of a blank white page — and logs
 // it to Supabase so an admin can actually find out it happened.
-export default class ErrorBoundary extends React.Component {
+//
+// This is a class component (React error boundaries require the
+// getDerivedStateFromError/componentDidCatch lifecycle, which only exists
+// on classes) but its fallback screen still needs translated text. Since
+// classes can't call hooks directly, ErrorBoundaryInner takes `t` as a
+// prop, and the default-exported functional wrapper below supplies it —
+// this only works because LanguageProvider sits above ErrorBoundary in
+// main.jsx, so useLanguage() here is always safe to call.
+class ErrorBoundaryInner extends React.Component {
   constructor(props) {
     super(props)
     this.state = { hasError: false }
@@ -40,20 +49,18 @@ export default class ErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
+      const { t } = this.props
       return (
         <div className="min-h-screen flex items-center justify-center px-4">
           <div className="max-w-sm text-center flex flex-col gap-4">
             <div className="eyebrow">Ironlog</div>
-            <h1 className="text-3xl">Something went wrong</h1>
-            <p className="text-chalkdim text-sm">
-              This screen hit an unexpected error. Your training data is safe — this is just a display hiccup.
-              Reloading usually fixes it.
-            </p>
+            <h1 className="text-3xl">{t('errorBoundary.title')}</h1>
+            <p className="text-chalkdim text-sm">{t('errorBoundary.body')}</p>
             <button
               onClick={() => window.location.reload()}
               className="bg-iron text-chalk rounded-md px-4 py-2 text-sm font-medium hover:bg-iron/90 mx-auto"
             >
-              Reload
+              {t('errorBoundary.reload')}
             </button>
           </div>
         </div>
@@ -61,4 +68,9 @@ export default class ErrorBoundary extends React.Component {
     }
     return this.props.children
   }
+}
+
+export default function ErrorBoundary({ children }) {
+  const { t } = useLanguage()
+  return <ErrorBoundaryInner t={t}>{children}</ErrorBoundaryInner>
 }

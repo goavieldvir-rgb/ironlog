@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { Plus, Play, Pencil, Trash2, Lock } from 'lucide-react'
 import { useAdmin } from '../context/AdminContext.jsx'
+import { useLanguage } from '../context/LanguageContext.jsx'
 import { useCollection, addExercise, updateExercise, deleteExercise } from '../lib/db.js'
 import { Button, Card, CategoryTag, Badge, EmptyState, Field } from './ui.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
@@ -16,22 +17,23 @@ export const emptyExerciseForm = {
   intensityType: 'rpe',
 }
 
-function formatLast(ex) {
+function formatLast(ex, t) {
   if (ex.last_weight == null) return null
   if (ex.category === 'cardio') {
     const dist = ex.last_distance != null ? ` · ${ex.last_distance}${ex.unit}` : ''
-    const intensityLabel = ex.intensity_type === 'hr_zone' ? `Zone ${ex.last_reps}` : `RPE ${ex.last_reps}`
-    return `Last: ${ex.last_weight} min · ${intensityLabel}${dist}`
+    const intensityLabel = ex.intensity_type === 'hr_zone' ? `${t('exercises.hrZone')} ${ex.last_reps}` : `${t('exercises.rpe')} ${ex.last_reps}`
+    return `${t('exercises.lastPrefix')} ${ex.last_weight} min · ${intensityLabel}${dist}`
   }
   if (ex.bodyweight) {
     const added = Number(ex.last_weight) > 0 ? `+${ex.last_weight}${ex.unit} ` : ''
-    return `Last: ${added}Bodyweight × ${ex.last_reps}`
+    return `${t('exercises.lastPrefix')} ${added}${t('exercises.bodyweightWord')} × ${ex.last_reps}`
   }
-  return `Last: ${ex.last_weight}${ex.unit} × ${ex.last_reps}`
+  return `${t('exercises.lastPrefix')} ${ex.last_weight}${ex.unit} × ${ex.last_reps}`
 }
 
 export default function ExerciseLibrary() {
   const { effectiveUid } = useAdmin()
+  const { t, lang } = useLanguage()
   const [exercises, loading, refresh] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [sessions] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [tab, setTab] = useState('all')
@@ -65,18 +67,18 @@ export default function ExerciseLibrary() {
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <div className="eyebrow mb-1">Library</div>
-          <h1 className="text-3xl">Exercises</h1>
+          <div className="eyebrow mb-1">{t('exercises.library')}</div>
+          <h1 className="text-3xl">{t('exercises.title')}</h1>
         </div>
         <Button onClick={() => setPicking(true)}>
-          <Plus size={16} /> Add exercise
+          <Plus size={16} /> {t('exercises.addExercise')}
         </Button>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 justify-between">
         <Tabs tab={tab} setTab={setTab} />
         <input
-          placeholder="Search exercises…"
+          placeholder={t('exercises.searchPlaceholder')}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           className="w-full sm:w-56"
@@ -85,11 +87,11 @@ export default function ExerciseLibrary() {
 
       {!loading && filtered.length === 0 && (
         <EmptyState
-          title="No exercises yet"
-          body="Build your library first — add a name, an optional demo video link, and a category. You'll pick from these when building routines."
+          title={t('exercises.emptyTitle')}
+          body={t('exercises.emptyBody')}
           action={
             <Button variant="brass" onClick={() => setPicking(true)}>
-              <Plus size={16} /> Add your first exercise
+              <Plus size={16} /> {t('exercises.addFirst')}
             </Button>
           }
         />
@@ -101,31 +103,31 @@ export default function ExerciseLibrary() {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-lg leading-tight">{ex.name}</h3>
+                  <h3 className="text-lg leading-tight">{(lang === 'he' && ex.name_he) || ex.name}</h3>
                   <CategoryTag category={ex.category} />
-                  {ex.bodyweight && ex.category !== 'cardio' && <Badge tone="brass">Bodyweight</Badge>}
+                  {ex.bodyweight && ex.category !== 'cardio' && <Badge tone="brass">{t('exercises.bodyweightBadge')}</Badge>}
                   {ex.category === 'cardio' && (
-                    <Badge tone="cardio">{ex.intensity_type === 'hr_zone' ? 'HR Zone' : 'RPE'}</Badge>
+                    <Badge tone="cardio">{ex.intensity_type === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe')}</Badge>
                   )}
                 </div>
-                {formatLast(ex) && <p className="num text-chalkdim text-xs mt-1">{formatLast(ex)}</p>}
+                {formatLast(ex, t) && <p className="num text-chalkdim text-xs mt-1">{formatLast(ex, t)}</p>}
               </div>
               <div className="flex gap-1 shrink-0">
                 <button
                   className="p-1.5 rounded hover:bg-surface2 text-chalkdim hover:text-chalk"
                   onClick={() => setEditing({ ...ex, videoUrl: ex.video_url, intensityType: ex.intensity_type })}
-                  title="Edit"
+                  title={t('common.edit')}
                 >
                   <Pencil size={15} />
                 </button>
                 <button
                   className="p-1.5 rounded hover:bg-ironsoft text-chalkdim hover:text-iron"
                   onClick={() => {
-                    if (confirm(`Delete "${ex.name}"? This won't remove it from past history.`)) {
+                    if (confirm(t('exercises.deleteConfirm')(ex.name))) {
                       deleteExercise(effectiveUid, ex.id).then(refresh)
                     }
                   }}
-                  title="Delete"
+                  title={t('common.delete')}
                 >
                   <Trash2 size={15} />
                 </button>
@@ -139,7 +141,7 @@ export default function ExerciseLibrary() {
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 text-sm text-brass hover:underline w-fit"
               >
-                <Play size={14} /> Watch example
+                <Play size={14} /> {t('exercises.watchExample')}
               </a>
             )}
           </Card>
@@ -185,6 +187,12 @@ export default function ExerciseLibrary() {
             setEditing(null)
           }}
           onCreateVariant={(currentForm) => {
+            // Keep the name/video/notes as a starting point, but drop the
+            // id (so this becomes a genuinely new exercise) and leave
+            // category/tracking fields exactly as they are — unlocked,
+            // since this "new" exercise has no history yet — so the person
+            // can immediately change whichever one they actually came here
+            // to change.
             setEditing({
               ...emptyExerciseForm,
               name: currentForm.name,
@@ -203,11 +211,12 @@ export default function ExerciseLibrary() {
 }
 
 export function Tabs({ tab, setTab }) {
+  const { t } = useLanguage()
   const opts = [
-    { id: 'all', label: 'All' },
-    { id: 'strength', label: 'Strength' },
-    { id: 'mobility', label: 'Mobility' },
-    { id: 'cardio', label: 'Cardio' },
+    { id: 'all', label: t('tabs.all') },
+    { id: 'strength', label: t('tabs.strength') },
+    { id: 'mobility', label: t('tabs.mobility') },
+    { id: 'cardio', label: t('tabs.cardio') },
   ]
   return (
     <div className="flex rounded-md bg-surface2 p-1 text-sm w-fit flex-wrap">
@@ -227,6 +236,7 @@ export function Tabs({ tab, setTab }) {
 }
 
 export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, onCreateVariant }) {
+  const { t } = useLanguage()
   const [form, setForm] = useState({ ...emptyExerciseForm, ...initial })
   const [saving, setSaving] = useState(false)
 
@@ -246,13 +256,13 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
   return (
     <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" onClick={onClose}>
       <div className="card p-6 w-full max-w-md max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-2xl mb-4">{initial.id ? 'Edit exercise' : 'New exercise'}</h2>
+        <h2 className="text-2xl mb-4">{initial.id ? t('exercises.editExercise') : t('exercises.newExercise')}</h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <Field label="Name">
+          <Field label={t('exercises.name')}>
             <input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Barbell back squat"
+              placeholder={t('exercises.namePlaceholder')}
               required
               autoFocus
             />
@@ -262,17 +272,17 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
             <div className="bg-surface2 rounded-md p-3 flex flex-col gap-2">
               <p className="text-chalkdim text-sm inline-flex items-start gap-1.5">
                 <Lock size={14} className="shrink-0 mt-0.5" />
-                This exercise already has logged history, so how it's tracked (weight unit, bodyweight, or RPE/heart-rate zone) is locked — changing it now would make past numbers hard to compare. If you want it tracked differently, create a new exercise instead.
+                {t('exercises.lockedExplanation')}
               </p>
               {onCreateVariant && (
                 <Button type="button" variant="ghost" onClick={() => onCreateVariant(form)} className="w-fit">
-                  Create a new exercise instead
+                  {t('exercises.createVariant')}
                 </Button>
               )}
             </div>
           )}
 
-          <Field label="Category">
+          <Field label={t('exercises.category')}>
             <select
               value={form.category}
               disabled={locked}
@@ -285,9 +295,9 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
                 })
               }}
             >
-              <option value="strength">Strength</option>
-              <option value="mobility">Mobility / Physio</option>
-              <option value="cardio">Cardio</option>
+              <option value="strength">{t('exercises.catStrength')}</option>
+              <option value="mobility">{t('exercises.catMobility')}</option>
+              <option value="cardio">{t('exercises.catCardio')}</option>
             </select>
           </Field>
 
@@ -296,8 +306,7 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
               <Field
                 label={
                   <>
-                    How is weight tracked?{' '}
-                    <InfoTip text="Most exercises are 'weight in kg/lb' — a barbell, dumbbell, or machine number. Pick Bodyweight for things like pull-ups or push-ups where your own body is the weight, not an external plate." />
+                    {t('exercises.weightTrackedLabel')} <InfoTip text={t('exercises.weightTrackedTip')} />
                   </>
                 }
               >
@@ -310,17 +319,17 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
                     else setForm({ ...form, bodyweight: false, unit: v })
                   }}
                 >
-                  <option value="kg">Weight in kg</option>
-                  <option value="lb">Weight in lb</option>
-                  <option value="bodyweight">Bodyweight (e.g. pull-ups, dips)</option>
+                  <option value="kg">{t('exercises.optKg')}</option>
+                  <option value="lb">{t('exercises.optLb')}</option>
+                  <option value="bodyweight">{t('exercises.optBodyweight')}</option>
                 </select>
               </Field>
 
               {form.bodyweight && (
-                <Field label="Added weight unit (optional extra weight)">
-                  <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
+                <Field label={t('exercises.addedWeightUnit')}>
+                  <select value={form.unit} disabled={locked} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
                     <option value="kg">kg</option>
-                    <option value="lb">lb</option>
+                    <option value="lb">{t('exercises.optLbShort')}</option>
                   </select>
                 </Field>
               )}
@@ -332,49 +341,49 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
               <Field
                 label={
                   <>
-                    How is intensity logged?{' '}
-                    <InfoTip text="RPE = 'how hard did that feel', on a 1–10 scale — 10 is an all-out sprint, 1 is a gentle stroll. Heart rate zone is a 1–5 number if you actually track your heart rate. Pick whichever one you naturally pay attention to." />
+                    {t('exercises.intensityLabel')} <InfoTip text={t('exercises.intensityTip')} />
                   </>
                 }
               >
                 <select value={form.intensityType} disabled={locked} onChange={(e) => setForm({ ...form, intensityType: e.target.value })}>
-                  <option value="rpe">Effort scale (RPE 1–10)</option>
-                  <option value="hr_zone">Heart rate zone (1–5)</option>
+                  <option value="rpe">{t('exercises.optRpe')}</option>
+                  <option value="hr_zone">{t('exercises.optHrZone')}</option>
                 </select>
               </Field>
-              <Field label="Distance unit (optional — leave default if you won't track distance)">
+              <Field label={t('exercises.distanceUnit')}>
                 <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
-                  <option value="km">km</option>
-                  <option value="mi">miles</option>
+                  <option value="km">{t('exercises.optKm')}</option>
+                  <option value="mi">{t('exercises.optMi')}</option>
                 </select>
               </Field>
             </>
           )}
 
-          <Field label="Example video link (optional)">
+          <Field label={t('exercises.videoLink')}>
             <input
               type="url"
+              dir="ltr"
               value={form.videoUrl}
               onChange={(e) => setForm({ ...form, videoUrl: e.target.value })}
-              placeholder="https://youtube.com/…"
+              placeholder={t('exercises.videoPlaceholder')}
             />
           </Field>
 
-          <Field label="Notes (optional)">
+          <Field label={t('exercises.notes')}>
             <textarea
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              placeholder="Cues, target muscle, equipment…"
+              placeholder={t('exercises.notesPlaceholder')}
               rows={2}
             />
           </Field>
 
           <div className="flex gap-2 justify-end mt-2">
             <Button type="button" variant="ghost" onClick={onClose}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
+              {saving ? t('common.saving') : t('common.save')}
             </Button>
           </div>
         </form>

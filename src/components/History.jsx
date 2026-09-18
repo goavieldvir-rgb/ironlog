@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom'
 import { Trash2, Search, X } from 'lucide-react'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
+import { useLanguage } from '../context/LanguageContext.jsx'
 import { useCollection, deleteSession } from '../lib/db.js'
 import { Card, CategoryTag, EmptyState, Button, Field } from './ui.jsx'
 import { Tabs } from './ExerciseLibrary.jsx'
+import { InfoTip } from './InfoTip.jsx'
 
 function formatDate(iso) {
   if (!iso) return ''
@@ -26,6 +28,7 @@ function matchesQuery(session, q) {
 
 export default function History() {
   const { effectiveUid } = useAdmin()
+  const { t } = useLanguage()
   const [sessions, loading, refresh] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [tab, setTab] = useState('all')
   const [q, setQ] = useState('')
@@ -55,8 +58,8 @@ export default function History() {
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <div className="eyebrow mb-1">Log</div>
-        <h1 className="text-3xl">History</h1>
+        <div className="eyebrow mb-1">{t('history.log')}</div>
+        <h1 className="text-3xl">{t('history.title')}</h1>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -66,26 +69,27 @@ export default function History() {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search by routine, exercise, or notes…"
+              placeholder={t('history.searchPlaceholder')}
               className="w-full ps-8"
             />
           </div>
+          <InfoTip text={t('history.searchTip')} />
           <Button variant="ghost" onClick={() => setShowDateFilter((v) => !v)}>
-            Date range
+            {t('history.dateRange')}
           </Button>
           {hasActiveFilters && (
             <button onClick={clearFilters} className="text-chalkdim text-xs hover:text-chalk inline-flex items-center gap-1">
-              <X size={13} /> Clear filters
+              <X size={13} /> {t('history.clearFilters')}
             </button>
           )}
         </div>
 
         {showDateFilter && (
           <div className="flex items-end gap-2 flex-wrap">
-            <Field label="From">
+            <Field label={t('history.from')}>
               <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
             </Field>
-            <Field label="To">
+            <Field label={t('history.to')}>
               <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
             </Field>
           </div>
@@ -96,11 +100,11 @@ export default function History() {
 
       {!loading && filtered.length === 0 && sessions.length > 0 && (
         <EmptyState
-          title="No matches"
-          body="Nothing in your history matches these filters — try a different search term or widen the date range."
+          title={t('history.noMatchesTitle')}
+          body={t('history.noMatchesBody')}
           action={
             <Button variant="ghost" onClick={clearFilters}>
-              Clear filters
+              {t('history.clearFilters')}
             </Button>
           }
         />
@@ -108,11 +112,11 @@ export default function History() {
 
       {!loading && sessions.length === 0 && (
         <EmptyState
-          title="No sessions logged yet"
-          body="Once you finish a workout it'll show up here — full detail, every set, so you can track how you're progressing over time."
+          title={t('history.emptyTitle')}
+          body={t('history.emptyBody')}
           action={
             <Link to="/routines">
-              <Button variant="brass">Start a session</Button>
+              <Button variant="brass">{t('history.startSession')}</Button>
             </Link>
           }
         />
@@ -130,14 +134,14 @@ export default function History() {
                     <CategoryTag category={s.category} />
                   </div>
                   <p className="text-chalkdim text-xs mt-1">
-                    {formatDate(s.date)} · {s.entries?.length || 0} exercises · {totalSets} sets
+                    {formatDate(s.date)} · {s.entries?.length || 0} {t('history.exercisesLabel')} · {totalSets} {t('history.setsLabel')}
                   </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <button
                     onClick={(e) => {
                       e.preventDefault()
-                      if (confirm('Delete this session from your history?')) deleteSession(effectiveUid, s.id).then(refresh)
+                      if (confirm(t('history.deleteConfirm'))) deleteSession(effectiveUid, s.id).then(refresh)
                     }}
                     className="p-1.5 rounded hover:bg-ironsoft text-chalkdim hover:text-iron"
                   >

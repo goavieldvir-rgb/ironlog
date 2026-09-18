@@ -12,9 +12,10 @@ import {
   Tooltip,
 } from 'recharts'
 import { useAdmin } from '../context/AdminContext.jsx'
+import { useLanguage } from '../context/LanguageContext.jsx'
 import { useCollection } from '../lib/db.js'
 import { toLocalISODate } from '../lib/dates.js'
-import { disambiguateLabels, enT } from '../lib/disambiguate.js'
+import { disambiguateLabels } from '../lib/disambiguate.js'
 import { Card, EmptyState, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 
@@ -44,6 +45,7 @@ function last12Mondays() {
 
 export default function Stats() {
   const { effectiveUid } = useAdmin()
+  const { t } = useLanguage()
   const [sessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [exerciseId, setExerciseId] = useState('')
 
@@ -179,11 +181,24 @@ export default function Stats() {
     const exerciseOptions = Object.entries(progMap).map(([id, p]) => ({ id, name: p.name, category: p.category, unit: p.unit, bodyweight: p.bodyweight, intensityType: p.intensityType }))
     exerciseOptions.sort((a, b) => a.name.localeCompare(b.name))
 
+    // Sessions come back newest-first (needed elsewhere), but a progress
+    // line chart only makes sense read oldest-to-newest, left to right.
+    // Without this, the most recent point would plot on the left and the
+    // oldest on the right — backwards.
+    for (const key of Object.keys(progMap)) {
+      progMap[key].points.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+    }
+
     return { records, exerciseOptions, progressByExercise: progMap }
   }, [sessions])
 
-  const recordLabels = useMemo(() => disambiguateLabels(records, (r) => r.name, enT), [records])
-  const exerciseOptionLabels = useMemo(() => disambiguateLabels(exerciseOptions, (e) => e.name, enT), [exerciseOptions])
+  // If two exercises share a name (possible now that tracking method can
+  // differ between "variants" of the same movement), append a short
+  // disambiguating suffix — "(kg)" vs "(lb)", "(Bodyweight)", "(RPE)" vs
+  // "(HR Zone)" — so the dropdown and PR list never show two identical
+  // entries with no way to tell them apart.
+  const recordLabels = useMemo(() => disambiguateLabels(records, (r) => r.name, t), [records, t])
+  const exerciseOptionLabels = useMemo(() => disambiguateLabels(exerciseOptions, (e) => e.name, t), [exerciseOptions, t])
 
   const selectedProgress = exerciseId ? progressByExercise[exerciseId] : null
 
@@ -192,29 +207,29 @@ export default function Stats() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <div className="eyebrow mb-1">Insights</div>
-        <h1 className="text-3xl">Statistics</h1>
+        <div className="eyebrow mb-1">{t('stats.insights')}</div>
+        <h1 className="text-3xl">{t('stats.title')}</h1>
       </div>
 
       {!loading && sessions.length === 0 && (
         <EmptyState
-          title="Nothing to show yet"
-          body="Log a few sessions and this page will fill in with streaks, volume, personal records, and progress charts."
+          title={t('stats.emptyTitle')}
+          body={t('stats.emptyBody')}
         />
       )}
 
       {hasData && (
         <>
           <div className={`grid grid-cols-2 ${hasCardio ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3`}>
-            <Stat icon={Flame} label="Week streak" value={streak} />
-            <Stat icon={BarChart3} label="Sessions logged" value={sessions.length} />
-            <Stat icon={TrendingUp} label="Total volume" value={totalVolume.toLocaleString()} />
-            {hasCardio && <Stat icon={Heart} label="Cardio minutes" value={totalCardioMinutes.toLocaleString()} />}
-            <Stat icon={Trophy} label="Personal records" value={records.length} />
+            <Stat icon={Flame} label={t('stats.weekStreak')} value={streak} />
+            <Stat icon={BarChart3} label={t('stats.sessionsLogged')} value={sessions.length} />
+            <Stat icon={TrendingUp} label={t('stats.totalVolume')} value={totalVolume.toLocaleString()} />
+            {hasCardio && <Stat icon={Heart} label={t('stats.cardioMinutes')} value={totalCardioMinutes.toLocaleString()} />}
+            <Stat icon={Trophy} label={t('stats.personalRecords')} value={records.length} />
           </div>
 
           <Card>
-            <h2 className="eyebrow mb-4">Sessions per week (last 12 weeks)</h2>
+            <h2 className="eyebrow mb-4">{t('stats.sessionsPerWeek')}</h2>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={weeklyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
@@ -230,7 +245,7 @@ export default function Stats() {
           </Card>
 
           <Card>
-            <h2 className="eyebrow mb-4">Total volume per week</h2>
+            <h2 className="eyebrow mb-4">{t('stats.volumePerWeek')}</h2>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={weeklyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
@@ -244,14 +259,13 @@ export default function Stats() {
               </BarChart>
             </ResponsiveContainer>
             <p className="text-chalkdim text-xs mt-2">
-              Volume = weight × reps summed across all sets. Treat this as a rough trend line rather than an
-              exact number if you log in mixed units.
+              {t('stats.volumeNote')}
             </p>
           </Card>
 
           {hasCardio && (
             <Card>
-              <h2 className="eyebrow mb-4">Cardio minutes per week</h2>
+              <h2 className="eyebrow mb-4">{t('stats.cardioPerWeek')}</h2>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={weeklyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
@@ -260,7 +274,7 @@ export default function Stats() {
                   <Tooltip
                     contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
                     labelStyle={{ color: COLORS.chalk }}
-                    formatter={(value) => [`${value} min`, 'Cardio']}
+                    formatter={(value) => [`${value} min`, t('stats.cardioTooltipLabel')]}
                   />
                   <Bar dataKey="cardioMinutes" fill={COLORS.cardio} radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -270,12 +284,12 @@ export default function Stats() {
 
           <Card className="flex flex-col gap-3">
             <h2 className="eyebrow flex items-center gap-1.5 flex-wrap">
-              Progress by exercise
-              <InfoTip text="Pick any exercise you've logged more than once to see a chart of how it's changed over time — weight for normal exercises, reps for bodyweight ones, duration for cardio." />
+              {t('stats.progressByExercise')}
+              <InfoTip text={t('stats.progressTip')} />
             </h2>
-            <Field label="Exercise">
+            <Field label={t('stats.exercise')}>
               <select value={exerciseId} onChange={(e) => setExerciseId(e.target.value)} className="w-56">
-                <option value="">Choose an exercise…</option>
+                <option value="">{t('stats.chooseExercise')}</option>
                 {exerciseOptions.map((e, i) => (
                   <option key={e.id} value={e.id}>
                     {exerciseOptionLabels[i]}
@@ -301,9 +315,9 @@ export default function Stats() {
                     contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
                     labelStyle={{ color: COLORS.chalk }}
                     formatter={(value) => {
-                      if (selectedProgress.category === 'cardio') return [`${value} min`, 'Duration']
-                      if (selectedProgress.bodyweight) return [`${value} reps`, 'Top set']
-                      return [`${value}${selectedProgress.unit}`, 'Top set']
+                      if (selectedProgress.category === 'cardio') return [`${value} min`, t('stats.duration')]
+                      if (selectedProgress.bodyweight) return [`${value} reps`, t('stats.topSet')]
+                      return [`${value}${selectedProgress.unit}`, t('stats.topSet')]
                     }}
                   />
                   <Line
@@ -316,25 +330,25 @@ export default function Stats() {
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-chalkdim text-sm">Pick an exercise above to see your progress over time.</p>
+              <p className="text-chalkdim text-sm">{t('stats.pickToSee')}</p>
             )}
             {selectedProgress?.category === 'cardio' && (
-              <p className="text-chalkdim text-xs">Tracking your longest single interval per session, in minutes.</p>
+              <p className="text-chalkdim text-xs">{t('stats.cardioTrackingNote')}</p>
             )}
             {selectedProgress?.bodyweight && selectedProgress?.category !== 'cardio' && (
               <p className="text-chalkdim text-xs">
-                Bodyweight exercise — tracking reps per session rather than weight, since added weight is optional.
+                {t('stats.bodyweightTrackingNote')}
               </p>
             )}
           </Card>
 
           <Card className="flex flex-col gap-2">
             <h2 className="eyebrow mb-1 flex items-center gap-1.5 flex-wrap">
-              Personal records
-              <InfoTip text="Your best-ever weight (or reps, for bodyweight exercises) on each exercise, and the date you hit it. Updates automatically whenever you beat it." />
+              {t('stats.personalRecords')}
+              <InfoTip text={t('stats.recordsTip')} />
             </h2>
             {records.length === 0 ? (
-              <p className="text-chalkdim text-sm">No completed sets logged yet.</p>
+              <p className="text-chalkdim text-sm">{t('stats.noCompletedSets')}</p>
             ) : (
               <div className="flex flex-col divide-y divide-line">
                 {records.map((r, i) => (
@@ -343,11 +357,11 @@ export default function Stats() {
                     <div className="text-end shrink-0">
                       <p className="num text-chalk">
                         {r.category === 'cardio'
-                          ? `${r.duration} min · ${r.intensityType === 'hr_zone' ? 'Zone' : 'RPE'} ${r.intensity}${
+                          ? `${r.duration} ${t('sessionCard.minUnit')} · ${r.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe')} ${r.intensity}${
                               r.distance != null ? ` · ${r.distance}${r.unit}` : ''
                             }`
                           : r.bodyweight
-                            ? `${r.weight > 0 ? `+${r.weight}${r.unit} ` : ''}BW × ${r.reps}`
+                            ? `${r.weight > 0 ? `+${r.weight}${r.unit} ` : ''}${t('sessionCard.bwShort')} × ${r.reps}`
                             : `${r.weight}${r.unit} × ${r.reps}`}
                       </p>
                       <p className="text-chalkdim text-xs">{shortDate(r.date)}</p>

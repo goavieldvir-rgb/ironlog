@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { HelpCircle } from 'lucide-react'
+import { useLanguage } from '../context/LanguageContext.jsx'
 
 // A small "?" that expands a short plain-language explanation right below
 // itself, in normal document flow — deliberately NOT a floating/absolute
@@ -7,6 +8,7 @@ import { HelpCircle } from 'lucide-react'
 // overflow bugs earlier in this app. Use inside a flex-wrap row so the
 // expanded note drops to its own line cleanly.
 export function InfoTip({ text }) {
+  const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   return (
     <>
@@ -14,7 +16,7 @@ export function InfoTip({ text }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="text-chalkdim hover:text-brass inline-flex align-middle shrink-0"
-        aria-label="What does this mean?"
+        aria-label={t('common.whatDoesThisMean')}
       >
         <HelpCircle size={13} />
       </button>

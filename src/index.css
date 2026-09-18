@@ -43,11 +43,43 @@
   .eyebrow {
     @apply font-mono text-[11px] tracking-widest2 uppercase text-chalkdim;
   }
+  /* Wide letter-spacing is a trick that makes Latin all-caps text read as
+     sleek and designed — Hebrew doesn't have the same case distinction or
+     the same benefit from extra tracking, and it just makes short words
+     (category badges, section labels) look stretched apart and harder to
+     read. Only apply the wide tracking in LTR contexts. */
+  [dir='rtl'] .eyebrow {
+    letter-spacing: normal;
+  }
   .num {
     @apply font-mono tabular-nums;
   }
+  /* Same reasoning as the eyebrow override above: italics are a Latin
+     typographic convention (a genuinely different, cursive-derived letter
+     shape). Hebrew has no equivalent tradition — a browser-faked slant on
+     Hebrew glyphs just looks tilted and slightly broken, not stylish.
+     Applies everywhere italic is used (session notes, placeholders, etc.)
+     without needing to touch each usage individually. */
+  [dir='rtl'] .italic {
+    font-style: normal;
+  }
   .card {
     @apply bg-surface border border-line rounded-xl;
+  }
+  /* A lighter treatment for repeated list rows (a routine, a session, a
+     person) — no heavy border, just enough separation to scan a list
+     quickly. The bordered .card is reserved for genuinely discrete
+     objects: a form, a single emphasized block. */
+  .row {
+    @apply bg-surface/60 hover:bg-surface rounded-lg transition-colors;
+  }
+  /* The one bold move in the whole app: the number being lifted, the
+     streak, the PR. Everything else stays quiet so this reads as the
+     thing that matters. */
+  .stat-number {
+    @apply font-display num tabular-nums text-chalk leading-none;
+    font-size: clamp(2.25rem, 8vw, 3.25rem);
+    font-weight: 500;
   }
   .scrollbar-thin::-webkit-scrollbar {
     height: 6px;

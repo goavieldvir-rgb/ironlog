@@ -10,8 +10,8 @@ import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <ErrorBoundary>
-      <LanguageProvider>
+    <LanguageProvider>
+      <ErrorBoundary>
         <HashRouter>
           <AuthProvider>
             <AdminProvider>
@@ -19,7 +19,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             </AdminProvider>
           </AuthProvider>
         </HashRouter>
-      </LanguageProvider>
-    </ErrorBoundary>
+      </ErrorBoundary>
+    </LanguageProvider>
   </React.StrictMode>,
 )

@@ -1,4 +1,5 @@
 import React from 'react'
+import { useLanguage } from '../context/LanguageContext.jsx'
 
 export function Button({ children, variant = 'primary', className = '', ...props }) {
   const base =
@@ -37,9 +38,10 @@ export function Badge({ children, tone = 'default' }) {
 }
 
 export function CategoryTag({ category }) {
-  if (category === 'mobility') return <Badge tone="brass">Mobility</Badge>
-  if (category === 'cardio') return <Badge tone="cardio">Cardio</Badge>
-  return <Badge tone="iron">Strength</Badge>
+  const { t } = useLanguage()
+  if (category === 'mobility') return <Badge tone="brass">{t('tabs.mobility')}</Badge>
+  if (category === 'cardio') return <Badge tone="cardio">{t('tabs.cardio')}</Badge>
+  return <Badge tone="iron">{t('tabs.strength')}</Badge>
 }
 
 export function EmptyState({ title, body, action }) {

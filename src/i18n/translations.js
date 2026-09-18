@@ -71,6 +71,7 @@ export const translations = {
       resume: 'Resume',
       discard: 'Discard',
       exerciseLoggedSoFar: 'exercises logged so far',
+      inProgressTip: "Everything you log gets saved to your phone instantly, even before you finish the workout. If the app reloads or you switch away mid-session, it's exactly how you left it — nothing is lost.",
     },
     common: {
       save: 'Save',
@@ -82,6 +83,7 @@ export const translations = {
       loading: 'Loading…',
       add: 'Add',
       optional: 'optional',
+      whatDoesThisMean: 'What does this mean?',
     },
     tabs: {
       all: 'All',
@@ -136,6 +138,387 @@ export const translations = {
       noMatches: 'No matches — try creating a custom one below.',
       added: 'Added',
       cantFind: "Can't find it? Create a custom exercise",
+      lockedExplanation: "This exercise already has logged history, so how it's tracked (weight unit, bodyweight, or RPE/heart-rate zone) is locked — changing it now would make past numbers hard to compare. If you want it tracked differently, create a new exercise instead.",
+      createVariant: 'Create a new exercise instead',
+    },
+    routines: {
+      plan: 'Plan',
+      title: 'Routines',
+      buildRoutine: 'Build routine',
+      emptyTitle: 'No routines yet',
+      emptyBody: 'A routine is a template — a set of exercises with target sets and reps. Build one once, then follow it every time you train.',
+      buildFirst: 'Build your first routine',
+      exercisesCount: 'exercises',
+      duplicate: 'Duplicate',
+      copyToPerson: 'Copy to another person',
+      deleteConfirm: (name) => `Delete routine "${name}"? Past sessions stay in your history.`,
+      moreCount: (n) => `+${n} more`,
+      startSession: 'Start session',
+      freestyleLink: 'Or log a freestyle session without a routine',
+      copyModalTitle: (name) => `Copy "${name}"`,
+      copyModalSubtitle: 'Pick who to copy this routine to.',
+      copiedLabel: 'Copied',
+      copyHereLabel: 'Copy here',
+      buildTitle: 'Build a routine',
+      editTitle: 'Edit routine',
+      routineName: 'Routine name',
+      routineNamePlaceholder: 'Push day',
+      category: 'Category',
+      categoryTip: "A routine can only hold one category of exercise — Strength, Mobility, or Cardio. This keeps the logging screen showing the right fields (sets/reps vs. duration/intensity) for everything in it.",
+      exercisesInRoutine: 'Exercises in this routine',
+      noExercisesAdded: 'No exercises added yet — pick one below to get started.',
+      yourExercisesLabel: (catLabel) => `Your ${catLabel} exercises`,
+      chooseAlreadyAdded: "Choose one you've already added…",
+      browseLibrary: 'Browse library',
+      nothingInList: (cat) => `Nothing in your own ${cat} list yet — use "Browse library" to add something.`,
+      targetSets: 'Target sets',
+      targetReps: 'Target reps',
+      targetDuration: 'Target duration (minutes)',
+      targetIntensity: 'Target RPE',
+      targetHrZone: 'Target HR zone',
+      minLabel: 'min ·',
+      saveRoutine: 'Save routine',
+      notFound: 'Routine not found.',
+      duplicateTip: 'Makes an exact copy of this routine under your own account — handy as a starting point for a variation, like a lighter version of the same day.',
+      copyToPersonTip: "Sends a copy of this exact routine straight into someone else's account, so you don't have to rebuild it from scratch for each trainee.",
+      targetFieldsTip: "These are goals to aim for, not a strict rule — you can always log something different on the actual day. They just pre-fill the logging screen so you know what you're working toward.",
+      cardActionsTip: 'The icons on each card: the copy icon duplicates the routine for yourself (handy for a variation), the send icon copies it straight into someone else\'s account, the pencil edits it, and the trash deletes it.',
+    },
+    workout: {
+      freestyleSession: 'Freestyle session',
+      routineNotFound: 'This routine no longer exists — it may have been deleted.',
+      addExercise: 'Add exercise',
+      chooseFromLibrary: 'Choose from library…',
+      sessionNotes: 'Session notes (optional)',
+      sessionNotesPlaceholder: 'How it felt, energy, anything to remember next time…',
+      saved: 'Saved',
+      saving: 'Saving…',
+      finishSave: 'Finish & save session',
+      sessionNotesTip: "This is for the whole workout — how it felt overall, energy levels, anything general. If it's about one specific exercise instead, use the note icon on that exercise's card so it stays attached to the right one.",
+    },
+    sessionCard: {
+      cardioBadge: 'Cardio',
+      bodyweightBadge: 'Bodyweight',
+      previously: 'Previously:',
+      previousTip: "This is what you logged last time — and the small clock icon on your first set will fill those numbers in for you. If your last two sessions weren't identical, it'll ask whether to use the last set you did or the heaviest/longest one.",
+      addNote: 'Add a note for this exercise',
+      example: 'Example',
+      copyInNumbers: 'Copy in numbers from last time',
+      lastSetDone: 'Last set done',
+      topSetDone: 'Top set done',
+      min: 'Min',
+      opt: 'opt.',
+      addInterval: 'Add interval',
+      set: 'Set',
+      wt: 'Wt',
+      reps: 'Reps',
+      addSet: 'Add set',
+      sameAsAbove: 'Same as above',
+      sameAsSetAbove: 'Same as set above',
+      chooseLastTime: "Choose last time's numbers",
+      useLastTime: "Use last time's numbers",
+      noteLabel: 'Note for this exercise (optional)',
+      notePlaceholder: 'e.g. used the seated machine, swapped in dumbbells…',
+      bwShort: 'BW',
+      minUnit: 'min',
+      copyAboveTip: "Fills this set with the exact same numbers as the one right above it — useful when you're doing straight sets (same weight and reps every time) so you don't have to re-enter them.",
+    },
+    restTimer: {
+      tip: "A countdown timer for resting between sets. Tap 60/90/120/180 to start it at that many seconds — it'll beep and vibrate your phone when time's up.",
+    },
+    history: {
+      log: 'Log',
+      title: 'History',
+      searchPlaceholder: 'Search by routine, exercise, or notes…',
+      dateRange: 'Date range',
+      clearFilters: 'Clear filters',
+      from: 'From',
+      to: 'To',
+      noMatchesTitle: 'No matches',
+      noMatchesBody: 'Nothing in your history matches these filters — try a different search term or widen the date range.',
+      emptyTitle: 'No sessions logged yet',
+      emptyBody: "Once you finish a workout it'll show up here — full detail, every set, so you can track how you're progressing over time.",
+      startSession: 'Start a session',
+      exercisesLabel: 'exercises',
+      setsLabel: 'sets',
+      deleteConfirm: 'Delete this session from your history?',
+      searchTip: 'Matches against the routine name, any exercise inside that session, and anything you wrote in notes — so searching for an exercise finds every session where you did it, not just ones named after it.',
+    },
+    sessionDetail: {
+      notFound: 'Session not found.',
+      back: 'History',
+      edit: 'Edit',
+      trainerFeedback: 'Trainer feedback',
+      feedbackPlaceholder: 'Leave feedback on this session — visible to them, not editable by them.',
+      noFeedbackYet: 'No feedback yet.',
+      feedbackVisibilityTip: "This is visible to you whenever you view this session, but only your trainer/admin can add or change it — it's their note to you, not the other way around.",
+    },
+    editSession: {
+      backToSession: 'Back to session',
+      title: 'Edit session',
+      saveChanges: 'Save changes',
+    },
+    stats: {
+      insights: 'Insights',
+      title: 'Statistics',
+      emptyTitle: 'Nothing to show yet',
+      emptyBody: 'Log a few sessions and this page will fill in with streaks, volume, personal records, and progress charts.',
+      weekStreak: 'Week streak',
+      sessionsLogged: 'Sessions logged',
+      totalVolume: 'Total volume',
+      cardioMinutes: 'Cardio minutes',
+      personalRecords: 'Personal records',
+      recordsTip: 'Your best-ever weight (or reps, for bodyweight exercises) on each exercise, and the date you hit it. Updates automatically whenever you beat it.',
+      sessionsPerWeek: 'Sessions per week (last 12 weeks)',
+      volumePerWeek: 'Total volume per week',
+      volumeNote: 'Volume = weight × reps summed across all sets. Treat this as a rough trend line rather than an exact number if you log in mixed units.',
+      cardioPerWeek: 'Cardio minutes per week',
+      progressByExercise: 'Progress by exercise',
+      progressTip: "Pick any exercise you've logged more than once to see a chart of how it's changed over time — weight for normal exercises, reps for bodyweight ones, duration for cardio.",
+      exercise: 'Exercise',
+      chooseExercise: 'Choose an exercise…',
+      pickToSee: 'Pick an exercise above to see your progress over time.',
+      cardioTrackingNote: 'Tracking your longest single interval per session, in minutes.',
+      bodyweightTrackingNote: 'Bodyweight exercise — tracking reps per session rather than weight, since added weight is optional.',
+      noCompletedSets: 'No completed sets logged yet.',
+      duration: 'Duration',
+      topSet: 'Top set',
+      cardioTooltipLabel: 'Cardio',
+    },
+    bodyWeight: {
+      body: 'Body',
+      title: 'Weight tracking',
+      current: 'Current',
+      firstLogged: 'First logged',
+      change: 'Change',
+      overTime: 'Over time',
+      weightTooltipLabel: 'Weight',
+      editEntry: 'Edit entry',
+      logWeight: 'Log weight',
+      date: 'Date',
+      weightLabel: 'Weight',
+      unit: 'Unit',
+      emptyTitle: 'No weigh-ins logged yet',
+      emptyBody: 'Log your weight above whenever you check in — daily, weekly, whatever works for you. A chart and simple stats will build up here over time.',
+      deleteConfirm: 'Delete this entry?',
+      pageTip: "Completely separate from your exercises and routines — this is just for your own body weight over time, if you want to track it. Nothing here affects your workout logging.",
+    },
+    summary: {
+      export: 'Export',
+      title: 'Training summary',
+      fullBackup: 'Full backup',
+      fullBackupBody: 'Every exercise, routine, session, and weigh-in — everything, not just this period.',
+      downloadEverything: 'Download everything (.json)',
+      modeWeek: 'Week',
+      modeMonth: 'Month',
+      modeYear: 'Year',
+      modeCustom: 'Custom',
+      copied: 'Copied',
+      copy: 'Copy',
+      download: 'Download',
+      from: 'From',
+      to: 'To',
+      backToCurrent: 'Back to current',
+      emptyTitle: 'Nothing logged in this period',
+      emptyBody: "Once you log a session in this date range, it'll show up here as a shareable summary.",
+      periodTip: "Switches which sessions are included below and in what you copy or download — this doesn't change your actual training data, just what this report covers.",
+      // Document text — these compose the actual exported/copied file, so
+      // they're translated too rather than only the surrounding UI.
+      docWeekly: 'Weekly',
+      docMonthly: 'Monthly',
+      docYearly: 'Yearly',
+      docCustomRange: 'Custom range',
+      docTrainingSummary: 'training summary',
+      docSession: 'session',
+      docSessions: 'sessions',
+      docTotalSets: 'total sets',
+      docTotalVolume: 'total volume',
+      docCardioMinutes: 'cardio minutes',
+      docNoSessions: 'No sessions logged in this period.',
+      docNoSetsLogged: 'no sets logged',
+      docNotes: 'Notes:',
+      docBodyWeight: 'Body weight',
+    },
+    help: {
+      eyebrow: 'Guide',
+      title: 'How Ironlog works',
+      subtitle: 'Tap any question below to open it. Written in plain language — no fitness-app experience assumed.',
+      s1title: 'What is Ironlog?',
+      s1body: `A place to write down what you did at the gym — which exercises, how
+much weight, how many reps — so you can look back and see whether you're
+actually getting stronger over time, instead of trying to remember it all
+in your head.`,
+      s2title: 'The Dashboard (your home screen)',
+      s2body: `This is what you see when you open the app. The three numbers at
+the top show: how many workouts you've logged this week, how many total,
+and how many routines you have set up.
+
+Below that, "Continue training" shows your workout plans — tap the ▶ play
+button on one to start logging that workout right now.
+
+"Recent activity" shows your last few logged workouts. Tap any of them to
+see the full details.
+
+If you ever leave a workout half-finished (for example your phone locks
+or you switch apps), you'll see an "In progress" card at the very top when
+you come back — tap "Resume" and you'll pick up exactly where you left
+off, nothing is lost.`,
+      s3title: 'Exercises — your personal list of movements',
+      s3body: `Before you can log a workout, the exercises you do need to exist
+in your library. Tap "Add exercise" and you can search a big shared list
+(squats, bench press, running, stretches — hundreds of common ones) and
+add whichever ones you actually do with one tap. Can't find something?
+There's a "create a custom exercise" option at the bottom for anything
+specific to you.
+
+When adding or editing an exercise, you'll see a "How is weight tracked?"
+choice:
+— Weight in kg or lb — normal exercises with a barbell, dumbbell, machine, etc.
+— Bodyweight — things like pull-ups or push-ups, where your own body is
+  the weight. You can still note "added weight" if you strap on extra
+  weight for these.
+
+If the exercise is Cardio (running, cycling, rowing, etc.), you'll instead
+pick how you measure effort:
+— RPE — short for "Rate of Perceived Exertion." It just means: on a scale
+  of 1 to 10, how hard did that feel? 10 is an all-out sprint, 1 is a
+  gentle stroll.
+— Heart rate zone — if you track your heart rate, a number from 1 (very
+  easy) to 5 (maximum effort).
+Neither is "more correct" — pick whichever one you actually pay attention
+to while training.`,
+      s4title: 'Routines — your workout plans',
+      s4body: `A routine is just a saved plan — a specific list of exercises you
+do together, like "Push Day" or "Leg Day." You build it once, then reuse
+it every time you do that workout instead of picking exercises from
+scratch each session.
+
+To build one: give it a name, pick a category (Strength, Mobility, or
+Cardio), then add exercises to it — either from your own list, or tap
+"Browse library" to pull more in from the shared list without leaving the
+page. For each exercise you can set a target — like "3 sets of 10 reps" —
+that's just a goal to aim for, not a strict rule; you can always log
+something different on the day.
+
+Didn't find the exercise you wanted? "Can't find it? Create a custom
+exercise" lets you add a brand new one without losing the routine you're
+in the middle of building.`,
+      s5title: 'Logging a workout — the actual training screen',
+      s5body: `Tap "Start session" on a routine (or "log a freestyle session" to
+train without a plan). For each exercise you'll see rows for each set.
+
+The − and + buttons next to each number let you nudge the weight or reps
+up or down without having to type — tap the number itself if you'd rather
+type it directly.
+
+If you see "Previously: 60kg × 8" under an exercise name, that's exactly
+what you did last time you trained it — handy for knowing what to aim to
+beat.
+
+The small clock icon on the first set fills in your last numbers for you
+automatically. If your last two sessions weren't identical (say you go
+heavy then light, or light then heavy), tapping it gives you a choice
+between "last set done" and "top set done" — pick whichever matches how
+you train.
+
+The little sticky-note icon lets you jot something down about that
+specific exercise that day — "used the other machine," "felt off today,"
+whatever's useful to remember later.
+
+At the bottom of the screen there's a rest timer — tap 60/90/120/180 to
+start a countdown between sets, it'll beep and buzz your phone when time's
+up.
+
+When you're done, hit "Finish & save session" at the bottom. That's the
+only step that actually saves it permanently — everything before that is
+just a working draft.`,
+      s6title: "History — everything you've logged",
+      s6body: `Every finished workout lives here, most recent first. Tap one to
+see the full breakdown, set by set. Made a mistake typing a number? Open
+that session and tap "Edit" to fix it — no need to delete and redo the
+whole thing.
+
+You can search by exercise name, routine name, or anything you wrote in
+your notes, and filter by date range or category (Strength / Mobility /
+Cardio) using the tabs.`,
+      s7title: "Stats — how you're progressing",
+      s7body: `This turns your history into a picture of your progress:
+personal records (your best-ever weight or reps on each exercise),
+progress charts you can pick per exercise, how many weeks in a row you've
+trained, and if you do cardio, your total minutes.`,
+      s8title: 'Weight — tracking your body weight',
+      s8body: `Separate from exercises — this is just for logging your own
+body weight over time if you want to, with a simple chart. Totally
+optional.`,
+      s9title: 'Summary — exporting your training',
+      s9body: `If you (or your trainer) want a written report of a week, month,
+year, or custom date range, this page builds one you can copy or download.
+There's also a "Download everything" button that backs up literally
+everything you've ever logged into one file, if you ever want a full
+copy for yourself.`,
+      s10title: 'If something looks wrong or the app gets stuck',
+      s10body: `Try reloading the page first — most odd glitches clear up with a
+simple refresh, and thanks to the autosave, you won't lose an in-progress
+workout by doing this. If something still seems broken, reach out to
+whoever set your account up for you.`,
+    },
+    people: {
+      admin: 'Admin',
+      title: 'People',
+      subtitle: 'Pick someone to build routines for, or view their training history.',
+      dotTip: "The colored dot next to each person: green means they've logged a session this week, amber means they've trained before but gone quiet recently, gray means they've never logged anything yet.",
+      errorLogs: 'Error logs',
+      inviteSomeone: 'Invite someone',
+      emptyTitle: 'No accounts yet',
+      emptyBody: "Once people sign up, they'll show up here.",
+      you: 'You',
+      adminBadge: 'Admin',
+      sessionThisWeek: (n) => `${n} session${n === 1 ? '' : 's'} this week`,
+      quietSince: (d) => `Quiet since ${d}`,
+      noSessionsYet: 'No sessions yet',
+      today: 'today',
+      yesterday: 'yesterday',
+      daysAgo: (n) => `${n}d ago`,
+      backToMyAccount: 'Back to my account',
+      manage: 'Manage',
+      inviteModalTitle: 'Invite someone',
+      inviteModalSubtitle: "They'll land on a sign-up form with their name and email already filled in — they just set their own password.",
+      theirName: 'Their name',
+      theirEmail: 'Their email',
+      linkCopied: 'Link copied',
+      copyInviteLink: 'Copy invite link',
+      messageCopied: 'Message copied',
+      copyReadyMessage: 'Copy ready-to-send message',
+      inviteMessage: (name, link) => `Hey${name ? ` ${name}` : ''}! I set you up on Ironlog, the training log I use — tap this link and just pick a password to get going: ${link}`,
+    },
+    errorLogs: {
+      backToPeople: 'People',
+      admin: 'Admin',
+      title: 'Error logs',
+      subtitle: 'Unexpected errors anyone hits in the app show up here.',
+      clearAll: 'Clear all',
+      clearAllConfirm: (n) => `Delete all ${n} error logs?`,
+      emptyTitle: 'No errors logged',
+      emptyBody: "Good news — nobody's hit an unexpected error since this was set up.",
+      noStackTrace: 'No stack trace available.',
+    },
+    resetPassword: {
+      account: 'Account',
+      title: 'Set a new password',
+      newPassword: 'New password',
+      confirmPassword: 'Confirm new password',
+      minChars: 'Use at least 6 characters.',
+      noMatch: "Passwords don't match.",
+      genericError: 'Something went wrong — try the reset link again.',
+      passwordUpdated: 'Password updated.',
+      continueToApp: 'Continue to Ironlog',
+      saving: 'Saving…',
+      updatePassword: 'Update password',
+    },
+    errorBoundary: {
+      title: 'Something went wrong',
+      body: 'This screen hit an unexpected error. Your training data is safe — this is just a display hiccup. Reloading usually fixes it.',
+      reload: 'Reload',
     },
   },
   he: {
@@ -160,7 +543,7 @@ export const translations = {
     },
     login: {
       tagline: 'להתאמן. לתעד. להתקדם.',
-      subtitle: 'יומן האימונים הפרטי שלך — סטים, חזרות, משקל ותרגילי מוביליות במקום אחד.',
+      subtitle: 'יומן האימונים הפרטי שלך — סטים, חזרות, משקל ותרגילי מוביליטי במקום אחד.',
       logIn: 'התחברות',
       createAccount: 'יצירת חשבון',
       invitedNote: 'הוזמנת! רק צריך לבחור סיסמה כדי לסיים.',
@@ -210,6 +593,7 @@ export const translations = {
       resume: 'המשך',
       discard: 'מחיקה',
       exerciseLoggedSoFar: 'תרגילים תועדו עד כה',
+      inProgressTip: 'כל מה שאתם מתעדים נשמר בטלפון שלכם באופן מיידי, עוד לפני שסיימתם את האימון. אם האפליקציה נטענת מחדש או שאתם עוברים לאפליקציה אחרת באמצע האימון, הכל יישאר בדיוק כפי שהשארתם אותו — שום דבר לא הולך לאיבוד.',
     },
     common: {
       save: 'שמירה',
@@ -221,11 +605,12 @@ export const translations = {
       loading: 'טוען…',
       add: 'הוספה',
       optional: 'אופציונלי',
+      whatDoesThisMean: 'מה זה אומר?',
     },
     tabs: {
       all: 'הכל',
       strength: 'כוח',
-      mobility: 'מוביליות',
+      mobility: 'מוביליטי',
       cardio: 'קרדיו',
     },
     exercises: {
@@ -249,7 +634,7 @@ export const translations = {
       namePlaceholder: 'סקוואט עם מוט',
       category: 'קטגוריה',
       catStrength: 'כוח',
-      catMobility: 'מוביליות / פיזיותרפיה',
+      catMobility: 'מוביליטי / פיזיותרפיה',
       catCardio: 'קרדיו',
       weightTrackedLabel: 'איך עוקבים אחרי המשקל?',
       weightTrackedTip: 'ברוב התרגילים המשקל הוא מספר על המוט, הדמבל או המכונה. בחרו "משקל גוף" לתרגילים כמו מתח או שכיבות סמיכה, שבהם הגוף שלכם הוא המשקל ולא צלחת חיצונית.',
@@ -275,6 +660,320 @@ export const translations = {
       noMatches: 'לא נמצאו תוצאות — נסו ליצור תרגיל מותאם אישית למטה.',
       added: 'נוסף',
       cantFind: 'לא מוצאים? יצירת תרגיל מותאם אישית',
+      lockedExplanation: 'לתרגיל הזה כבר יש היסטוריה מתועדת, לכן איך שהוא נמדד (יחידת משקל, משקל גוף, או RPE/אזור דופק) נעול — שינוי שלו עכשיו יקשה להשוות בין מספרים מהעבר. אם אתם רוצים לעקוב אחריו אחרת, צרו תרגיל חדש במקום זאת.',
+      createVariant: 'יצירת תרגיל חדש במקום',
+    },
+    routines: {
+      plan: 'תכנון',
+      title: 'תוכניות אימון',
+      buildRoutine: 'בניית תוכנית',
+      emptyTitle: 'עדיין אין תוכניות',
+      emptyBody: 'תוכנית היא תבנית — קבוצת תרגילים עם יעד סטים וחזרות. בנו אותה פעם אחת, ועקבו אחריה בכל אימון.',
+      buildFirst: 'בניית התוכנית הראשונה',
+      exercisesCount: 'תרגילים',
+      duplicate: 'שכפול',
+      copyToPerson: 'העתקה לאדם אחר',
+      deleteConfirm: (name) => `למחוק את התוכנית "${name}"? האימונים שכבר בוצעו יישארו בהיסטוריה.`,
+      moreCount: (n) => `+${n} נוספים`,
+      startSession: 'התחלת אימון',
+      freestyleLink: 'או תיעוד אימון חופשי בלי תוכנית',
+      copyModalTitle: (name) => `העתקת "${name}"`,
+      copyModalSubtitle: 'בחרו למי להעתיק את התוכנית הזו.',
+      copiedLabel: 'הועתק',
+      copyHereLabel: 'העתקה לכאן',
+      buildTitle: 'בניית תוכנית',
+      editTitle: 'עריכת תוכנית',
+      routineName: 'שם התוכנית',
+      routineNamePlaceholder: 'יום דחיפה',
+      category: 'קטגוריה',
+      categoryTip: 'תוכנית יכולה להכיל תרגילים מקטגוריה אחת בלבד — כוח, מוביליטי או קרדיו. כך מסך התיעוד מציג את השדות הנכונים (סטים/חזרות מול משך/עצימות) לכל התרגילים בה.',
+      exercisesInRoutine: 'תרגילים בתוכנית זו',
+      noExercisesAdded: 'עדיין לא נוספו תרגילים — בחרו אחד למטה כדי להתחיל.',
+      yourExercisesLabel: (catLabel) => `התרגילים שלך (${catLabel})`,
+      chooseAlreadyAdded: 'בחרו תרגיל שכבר הוספתם…',
+      browseLibrary: 'עיון בספרייה',
+      nothingInList: (cat) => `עדיין אין תרגילי ${cat} משלכם — השתמשו ב"עיון בספרייה" כדי להוסיף.`,
+      targetSets: 'יעד סטים',
+      targetReps: 'יעד חזרות',
+      targetDuration: 'יעד משך (דקות)',
+      targetIntensity: 'יעד RPE',
+      targetHrZone: 'יעד אזור דופק',
+      minLabel: 'דקות ·',
+      saveRoutine: 'שמירת תוכנית',
+      notFound: 'התוכנית לא נמצאה.',
+      duplicateTip: 'יוצר עותק מדויק של התוכנית הזו תחת החשבון שלכם — שימושי כנקודת התחלה לגרסה שונה, כמו יום קליל יותר של אותו אימון.',
+      copyToPersonTip: 'שולח עותק של התוכנית המדויקת הזו ישירות לחשבון של מישהו אחר, כך שלא צריך לבנות אותה מחדש לכל מתאמן.',
+      targetFieldsTip: 'אלה יעדים לשאוף אליהם, לא כלל נוקשה — תמיד אפשר לתעד משהו אחר ביום עצמו. הם רק ממלאים מראש את מסך התיעוד כדי שתדעו למה אתם שואפים.',
+      cardActionsTip: 'הסמלים בכל כרטיס: סמל ההעתקה משכפל את התוכנית עבורכם (שימושי לגרסה שונה), סמל השליחה מעתיק אותה ישירות לחשבון של מישהו אחר, העיפרון עורך אותה, והפח מוחק אותה.',
+    },
+    workout: {
+      freestyleSession: 'אימון חופשי',
+      routineNotFound: 'התוכנית הזו כבר לא קיימת — ייתכן שנמחקה.',
+      addExercise: 'הוספת תרגיל',
+      chooseFromLibrary: 'בחירה מהספרייה…',
+      sessionNotes: 'הערות לאימון (אופציונלי)',
+      sessionNotesPlaceholder: 'איך זה הרגיש, רמת אנרגיה, כל דבר שכדאי לזכור בפעם הבאה…',
+      saved: 'נשמר',
+      saving: 'שומר…',
+      finishSave: 'סיום ושמירת האימון',
+      sessionNotesTip: 'זה לאימון כולו — איך הוא הרגיש בסך הכל, רמת אנרגיה, כל דבר כללי. אם זה על תרגיל ספציפי אחד, השתמשו בסמל ההערה בכרטיס של אותו תרגיל כדי שזה יישאר מחובר לתרגיל הנכון.',
+    },
+    sessionCard: {
+      cardioBadge: 'קרדיו',
+      bodyweightBadge: 'משקל גוף',
+      previously: 'בפעם הקודמת:',
+      previousTip: 'זה מה שתועד בפעם הקודמת — סמל השעון בסט הראשון ימלא עבורכם את המספרים האלה. אם שני האימונים האחרונים לא היו זהים, תופיע אפשרות לבחור אם להשתמש בסט האחרון שבוצע או בסט הכבד/הארוך ביותר.',
+      addNote: 'הוספת הערה לתרגיל הזה',
+      example: 'הדגמה',
+      copyInNumbers: 'העתקת מספרים מהפעם הקודמת',
+      lastSetDone: 'הסט האחרון שבוצע',
+      topSetDone: 'הסט הכבד ביותר',
+      min: 'דק׳',
+      opt: 'אופציונלי',
+      addInterval: 'הוספת אינטרוול',
+      set: 'סט',
+      wt: 'משקל',
+      reps: 'חזרות',
+      addSet: 'הוספת סט',
+      sameAsAbove: 'כמו למעלה',
+      sameAsSetAbove: 'כמו בסט הקודם',
+      chooseLastTime: 'בחירת מספרים מהפעם הקודמת',
+      useLastTime: 'שימוש במספרים מהפעם הקודמת',
+      noteLabel: 'הערה לתרגיל הזה (אופציונלי)',
+      notePlaceholder: 'למשל: השתמשתי במכונה הישובה, החלפתי לדמבלים…',
+      bwShort: 'מ.ג.',
+      minUnit: 'דק׳',
+      copyAboveTip: 'ממלא את הסט הזה באותם מספרים בדיוק כמו הסט שממש מעליו — שימושי כשעושים סטים ישרים (אותו משקל וחזרות בכל פעם) כדי לא להזין אותם מחדש.',
+    },
+    restTimer: {
+      tip: 'טיימר מנוחה בין סטים. הקישו על 60/90/120/180 כדי להתחיל ספירה לאחור באותו מספר שניות — הוא יצפצף ויְרַעֵד את הטלפון כשהזמן נגמר.',
+    },
+    history: {
+      log: 'יומן',
+      title: 'היסטוריה',
+      searchPlaceholder: 'חיפוש לפי תוכנית, תרגיל או הערות…',
+      dateRange: 'טווח תאריכים',
+      clearFilters: 'ניקוי מסננים',
+      from: 'מתאריך',
+      to: 'עד תאריך',
+      noMatchesTitle: 'אין תוצאות',
+      noMatchesBody: 'שום דבר בהיסטוריה לא תואם למסננים האלה — נסו מונח חיפוש אחר או הרחיבו את טווח התאריכים.',
+      emptyTitle: 'עדיין לא תועד אימון',
+      emptyBody: 'ברגע שתסיימו אימון הוא יופיע כאן — פירוט מלא, כל סט, כדי לעקוב אחרי ההתקדמות שלכם לאורך זמן.',
+      startSession: 'התחלת אימון',
+      exercisesLabel: 'תרגילים',
+      setsLabel: 'סטים',
+      deleteConfirm: 'למחוק את האימון הזה מההיסטוריה שלך?',
+      searchTip: 'מתאים לשם התוכנית, כל תרגיל בתוך האימון ההוא, וכל מה שכתבתם בהערות — כך שחיפוש תרגיל ימצא כל אימון שבו ביצעתם אותו, לא רק אימונים שקרויים על שמו.',
+    },
+    sessionDetail: {
+      notFound: 'האימון לא נמצא.',
+      back: 'היסטוריה',
+      edit: 'עריכה',
+      trainerFeedback: 'משוב מהמאמן',
+      feedbackPlaceholder: 'השאירו משוב על האימון הזה — גלוי להם, לא ניתן לעריכה על ידם.',
+      noFeedbackYet: 'עדיין אין משוב.',
+      feedbackVisibilityTip: 'זה גלוי לכם בכל פעם שאתם צופים באימון הזה, אבל רק המאמן/מנהל שלכם יכול להוסיף או לשנות אותו — זו ההערה שלו אליכם, לא ההפך.',
+    },
+    editSession: {
+      backToSession: 'חזרה לאימון',
+      title: 'עריכת אימון',
+      saveChanges: 'שמירת שינויים',
+    },
+    stats: {
+      insights: 'תובנות',
+      title: 'סטטיסטיקה',
+      emptyTitle: 'עדיין אין מה להציג',
+      emptyBody: 'תעדו כמה אימונים והדף הזה יתמלא ברצפים, נפח אימון, שיאים אישיים וגרפי התקדמות.',
+      weekStreak: 'רצף שבועות',
+      sessionsLogged: 'אימונים שתועדו',
+      totalVolume: 'נפח כולל',
+      cardioMinutes: 'דקות קרדיו',
+      personalRecords: 'שיאים אישיים',
+      recordsTip: 'המשקל הכבד ביותר (או מספר החזרות הגבוה ביותר, לתרגילי משקל גוף) שביצעתם בכל תרגיל, והתאריך שבו זה קרה. מתעדכן אוטומטית בכל פעם שאתם שוברים שיא.',
+      sessionsPerWeek: 'אימונים לשבוע (12 השבועות האחרונים)',
+      volumePerWeek: 'נפח כולל לשבוע',
+      volumeNote: 'נפח = משקל × חזרות, מסוכם על פני כל הסטים. התייחסו לזה כאל מגמה כללית ולא כמספר מדויק אם אתם מתעדים ביחידות מעורבות.',
+      cardioPerWeek: 'דקות קרדיו לשבוע',
+      progressByExercise: 'התקדמות לפי תרגיל',
+      progressTip: 'בחרו תרגיל שתועד יותר מפעם אחת כדי לראות גרף של איך הוא השתנה לאורך זמן — משקל לתרגילים רגילים, חזרות לתרגילי משקל גוף, משך לתרגילי קרדיו.',
+      exercise: 'תרגיל',
+      chooseExercise: 'בחרו תרגיל…',
+      pickToSee: 'בחרו תרגיל למעלה כדי לראות את ההתקדמות שלכם לאורך זמן.',
+      cardioTrackingNote: 'עוקב אחרי האינטרוול הארוך ביותר בכל אימון, בדקות.',
+      bodyweightTrackingNote: 'תרגיל משקל גוף — עוקב אחרי חזרות לכל אימון במקום משקל, מכיוון שמשקל נוסף הוא אופציונלי.',
+      noCompletedSets: 'עדיין לא תועדו סטים שהושלמו.',
+      duration: 'משך',
+      topSet: 'הסט הכבד ביותר',
+      cardioTooltipLabel: 'קרדיו',
+    },
+    bodyWeight: {
+      body: 'גוף',
+      title: 'מעקב משקל',
+      current: 'נוכחי',
+      firstLogged: 'תיעוד ראשון',
+      change: 'שינוי',
+      overTime: 'לאורך זמן',
+      weightTooltipLabel: 'משקל',
+      editEntry: 'עריכת רשומה',
+      logWeight: 'תיעוד משקל',
+      date: 'תאריך',
+      weightLabel: 'משקל',
+      unit: 'יחידה',
+      emptyTitle: 'עדיין לא תועדו שקילות',
+      emptyBody: 'תעדו את המשקל שלכם למעלה בכל פעם שאתם רוצים — יומי, שבועי, מה שמתאים לכם. גרף וסטטיסטיקה פשוטה ייבנו כאן עם הזמן.',
+      deleteConfirm: 'למחוק את הרשומה הזו?',
+      pageTip: 'לגמרי נפרד מהתרגילים והתוכניות שלכם — זה רק למשקל הגוף שלכם לאורך זמן, אם תרצו לעקוב אחריו. שום דבר כאן לא משפיע על תיעוד האימונים שלכם.',
+    },
+    summary: {
+      export: 'ייצוא',
+      title: 'סיכום אימונים',
+      fullBackup: 'גיבוי מלא',
+      fullBackupBody: 'כל תרגיל, תוכנית, אימון ושקילה — הכל, לא רק התקופה הזו.',
+      downloadEverything: 'הורדת הכל (.json)',
+      modeWeek: 'שבוע',
+      modeMonth: 'חודש',
+      modeYear: 'שנה',
+      modeCustom: 'מותאם אישית',
+      copied: 'הועתק',
+      copy: 'העתקה',
+      download: 'הורדה',
+      from: 'מתאריך',
+      to: 'עד תאריך',
+      backToCurrent: 'חזרה להווה',
+      emptyTitle: 'שום דבר לא תועד בתקופה הזו',
+      emptyBody: 'ברגע שתתעדו אימון בטווח התאריכים הזה, הוא יופיע כאן כסיכום שאפשר לשתף.',
+      periodTip: 'קובע אילו אימונים נכללים למטה ובמה שתעתיקו או תורידו — זה לא משנה את נתוני האימון האמיתיים שלכם, רק את מה שהדוח הזה מכסה.',
+      docWeekly: 'שבועי',
+      docMonthly: 'חודשי',
+      docYearly: 'שנתי',
+      docCustomRange: 'טווח מותאם אישית',
+      docTrainingSummary: 'סיכום אימונים',
+      docSession: 'אימון',
+      docSessions: 'אימונים',
+      docTotalSets: 'סה"כ סטים',
+      docTotalVolume: 'סה"כ נפח',
+      docCardioMinutes: 'דקות קרדיו',
+      docNoSessions: 'לא תועדו אימונים בתקופה הזו.',
+      docNoSetsLogged: 'לא תועדו סטים',
+      docNotes: 'הערות:',
+      docBodyWeight: 'משקל גוף',
+    },
+    help: {
+      eyebrow: 'מדריך',
+      title: 'איך Ironlog עובד',
+      subtitle: 'הקישו על כל שאלה למטה כדי לפתוח אותה. כתוב בשפה פשוטה — לא נדרש ניסיון קודם עם אפליקציות כושר.',
+      s1title: 'מה זה Ironlog?',
+      s1body: `מקום לתעד בו מה עשיתם בחדר הכושר — אילו תרגילים, כמה משקל, כמה חזרות — כדי שתוכלו להסתכל אחורה ולראות אם אתם באמת מתחזקים עם הזמן, במקום לנסות לזכור הכל בראש.`,
+      s2title: 'לוח הבקרה (מסך הבית שלכם)',
+      s2body: `זה מה שאתם רואים כשפותחים את האפליקציה. שלושת המספרים למעלה מציגים: כמה אימונים תועדו השבוע, כמה בסך הכל, וכמה תוכניות אימון יש לכם.
+
+מתחת לזה, "המשך אימון" מציג את תוכניות האימון שלכם — הקישו על כפתור ה-▶ כדי להתחיל לתעד את האימון הזה מיד.
+
+"פעילות אחרונה" מציגה את האימונים האחרונים שתועדו. הקישו על אחד מהם כדי לראות את כל הפרטים.
+
+אם אי פעם תעזבו אימון באמצע (למשל הטלפון ננעל או עברתם לאפליקציה אחרת), תראו כרטיס "אימון בעיצומו" ממש למעלה כשתחזרו — הקישו "המשך" ותמשיכו בדיוק מהמקום שעצרתם, שום דבר לא הולך לאיבוד.`,
+      s3title: 'תרגילים — הרשימה האישית שלכם',
+      s3body: `לפני שאפשר לתעד אימון, התרגילים שאתם מבצעים צריכים להיות בספרייה שלכם. הקישו "הוספת תרגיל" ותוכלו לחפש ברשימה משותפת גדולה (סקוואטים, לחיצת חזה, ריצה, מתיחות — מאות תרגילים נפוצים) ולהוסיף בלחיצה אחת את אלה שאתם באמת מבצעים. לא מוצאים משהו? יש אפשרות "יצירת תרגיל מותאם אישית" למטה, לכל דבר ספציפי אצלכם.
+
+כשמוסיפים או עורכים תרגיל, תראו בחירה של "איך עוקבים אחרי המשקל?":
+— משקל בק"ג או פאונד — תרגילים רגילים עם מוט, דמבל, מכונה וכו'.
+— משקל גוף — דברים כמו מתח או שכיבות סמיכה, שבהם הגוף שלכם הוא המשקל. עדיין אפשר לציין "משקל נוסף" אם אתם מוסיפים משקל חיצוני לתרגילים האלה.
+
+אם התרגיל הוא קרדיו (ריצה, אופניים, חתירה וכו'), במקום זאת תבחרו איך למדוד את העצימות:
+— RPE — קיצור של "דירוג מאמץ נתפס". פשוט אומר: בסולם של 1 עד 10, כמה זה הרגיש קשה? 10 זה ספרינט במאמץ מקסימלי, 1 זו הליכה קלה.
+— אזור דופק — אם אתם עוקבים אחרי הדופק שלכם, מספר בין 1 (קל מאוד) ל-5 (מאמץ מקסימלי).
+אף אחת מהאפשרויות היא לא "נכונה יותר" — בחרו את זו שאתם באמת שמים לב אליה בזמן האימון.`,
+      s4title: 'תוכניות אימון — התוכניות שלכם',
+      s4body: `תוכנית היא פשוט תבנית שמורה — רשימה מסוימת של תרגילים שאתם עושים ביחד, כמו "יום דחיפה" או "יום רגליים". בונים אותה פעם אחת, ואז משתמשים בה שוב בכל פעם שעושים את האימון הזה, במקום לבחור תרגילים מאפס בכל אימון.
+
+כדי לבנות אחת: תנו לה שם, בחרו קטגוריה (כוח, מוביליטי או קרדיו), ואז הוסיפו לה תרגילים — או מהרשימה שלכם, או הקישו "עיון בספרייה" כדי למשוך עוד תרגילים מהרשימה המשותפת בלי לעזוב את הדף. לכל תרגיל אפשר להגדיר יעד — כמו "3 סטים של 10 חזרות" — זו רק מטרה לשאוף אליה, לא כלל נוקשה; תמיד אפשר לתעד משהו אחר ביום עצמו.
+
+לא מצאתם את התרגיל שרציתם? "לא מוצאים? יצירת תרגיל מותאם אישית" מאפשר להוסיף תרגיל חדש לגמרי בלי לאבד את התוכנית שאתם באמצע בנייתה.`,
+      s5title: 'תיעוד אימון — מסך האימון עצמו',
+      s5body: `הקישו "התחלת אימון" על תוכנית (או "תיעוד אימון חופשי" כדי להתאמן בלי תוכנית). לכל תרגיל תראו שורות עבור כל סט.
+
+כפתורי ה־ וה+ ליד כל מספר מאפשרים לזוז במשקל או בחזרות בלי להקליד — הקישו על המספר עצמו אם אתם מעדיפים להקליד ישירות.
+
+אם אתם רואים "בפעם הקודמת: 60 ק"ג × 8" מתחת לשם תרגיל, זה בדיוק מה שביצעתם בפעם האחרונה שתרגלתם אותו — שימושי כדי לדעת למה לשאוף לשבור.
+
+סמל השעון הקטן בסט הראשון ממלא עבורכם את המספרים האחרונים אוטומטית. אם שני האימונים האחרונים שלכם לא היו זהים (למשל התחלתם כבד ואז קל, או קל ואז כבד), הקשה עליו תיתן לכם בחירה בין "הסט האחרון שבוצע" ל"הסט הכבד ביותר" — בחרו את מה שמתאים לסגנון האימון שלכם.
+
+סמל הפתקית הקטן מאפשר לרשום משהו על התרגיל הספציפי הזה באותו יום — "השתמשתי במכונה האחרת", "הרגשתי לא במיטבי היום", כל דבר שכדאי לזכור אחר כך.
+
+בתחתית המסך יש טיימר מנוחה — הקישו על 60/90/120/180 כדי להתחיל ספירה לאחור בין סטים, הוא יצפצף ויְרַעֵד את הטלפון כשהזמן נגמר.
+
+כשסיימתם, הקישו "סיום ושמירת האימון" בתחתית. זהו הצעד היחיד ששומר את האימון לצמיתות — כל מה שלפני כן הוא רק טיוטת עבודה.`,
+      s6title: 'היסטוריה — כל מה שתועד',
+      s6body: `כל אימון שהושלם נמצא כאן, מהאחרון לראשון. הקישו על אחד כדי לראות את הפירוט המלא, סט אחר סט. טעיתם בהקלדת מספר? פתחו את האימון והקישו "עריכה" כדי לתקן — אין צורך למחוק ולתעד הכל מחדש.
+
+אפשר לחפש לפי שם תרגיל, שם תוכנית, או כל דבר שכתבתם בהערות, ולסנן לפי טווח תאריכים או קטגוריה (כוח / מוביליטי / קרדיו) באמצעות הלשוניות.`,
+      s7title: 'סטטיסטיקה — איך אתם מתקדמים',
+      s7body: `הדף הזה הופך את ההיסטוריה שלכם לתמונת התקדמות: שיאים אישיים (המשקל או החזרות הכי גבוהים שביצעתם בכל תרגיל), גרפי התקדמות שאפשר לבחור לפי תרגיל, כמה שבועות ברצף התאמנתם, ואם אתם עושים קרדיו — סך הדקות שלכם.`,
+      s8title: 'משקל — מעקב משקל הגוף שלכם',
+      s8body: `נפרד מהתרגילים — זה רק לתיעוד המשקל שלכם לאורך זמן אם תרצו, עם גרף פשוט. לגמרי אופציונלי.`,
+      s9title: 'סיכום — ייצוא האימונים שלכם',
+      s9body: `אם אתם (או המאמן שלכם) רוצים דוח כתוב של שבוע, חודש, שנה, או טווח תאריכים מותאם אישית, הדף הזה בונה אחד שאפשר להעתיק או להוריד. יש גם כפתור "הורדת הכל" שמגבה ממש הכל שאי פעם תועד, לקובץ אחד, אם תרצו עותק מלא לעצמכם.`,
+      s10title: 'אם משהו נראה לא תקין או האפליקציה נתקעת',
+      s10body: `נסו קודם לרענן את הדף — רוב התקלות המוזרות נפתרות ברענון פשוט, ובזכות השמירה האוטומטית לא תאבדו אימון באמצע ביצוע פעולה זו. אם עדיין נראה שמשהו שבור, פנו למי שהגדיר לכם את החשבון.`,
+    },
+    people: {
+      admin: 'ניהול',
+      title: 'אנשים',
+      subtitle: 'בחרו מישהו כדי לבנות עבורו תוכניות, או לצפות בהיסטוריית האימונים שלו.',
+      dotTip: 'הנקודה הצבעונית ליד כל אדם: ירוק אומר שהוא תיעד אימון השבוע, כתום אומר שהוא התאמן בעבר אבל שקט לאחרונה, אפור אומר שהוא עדיין לא תיעד כלום.',
+      errorLogs: 'יומני שגיאות',
+      inviteSomeone: 'הזמן מתאמן חדש',
+      emptyTitle: 'עדיין אין חשבונות',
+      emptyBody: 'ברגע שאנשים יירשמו, הם יופיעו כאן.',
+      you: 'אתם',
+      adminBadge: 'מנהל',
+      sessionThisWeek: (n) => (n === 1 ? 'אימון אחד השבוע' : `${n} אימונים השבוע`),
+      quietSince: (d) => `שקט מאז ${d}`,
+      noSessionsYet: 'עדיין אין אימונים',
+      today: 'היום',
+      yesterday: 'אתמול',
+      daysAgo: (n) => `לפני ${n} ימים`,
+      backToMyAccount: 'חזרה לחשבון שלי',
+      manage: 'ניהול',
+      inviteModalTitle: 'הזמנת מתאמן חדש',
+      inviteModalSubtitle: 'הם יגיעו לטופס הרשמה עם השם והאימייל כבר ממולאים — הם רק צריכים להגדיר סיסמה משלהם.',
+      theirName: 'השם',
+      theirEmail: 'האימייל',
+      linkCopied: 'הקישור הועתק',
+      copyInviteLink: 'העתקת קישור הזמנה',
+      messageCopied: 'ההודעה הועתקה',
+      copyReadyMessage: 'העתקת הודעה מוכנה לשליחה',
+      inviteMessage: (name, link) => `היי${name ? ` ${name}` : ''}! חיברתי אותך ל-Ironlog, יומן האימונים שאני משתמש בו — לחצו על הקישור ופשוט בחרו סיסמה כדי להתחיל: ${link}`,
+    },
+    errorLogs: {
+      backToPeople: 'אנשים',
+      admin: 'ניהול',
+      title: 'יומני שגיאות',
+      subtitle: 'שגיאות בלתי צפויות שמישהו נתקל בהן באפליקציה יופיעו כאן.',
+      clearAll: 'ניקוי הכל',
+      clearAllConfirm: (n) => `למחוק את כל ${n} יומני השגיאות?`,
+      emptyTitle: 'לא תועדו שגיאות',
+      emptyBody: 'חדשות טובות — אף אחד לא נתקל בשגיאה בלתי צפויה מאז ההקמה.',
+      noStackTrace: 'אין מעקב שגיאה זמין.',
+    },
+    resetPassword: {
+      account: 'חשבון',
+      title: 'הגדרת סיסמה חדשה',
+      newPassword: 'סיסמה חדשה',
+      confirmPassword: 'אימות סיסמה חדשה',
+      minChars: 'השתמשו בלפחות 6 תווים.',
+      noMatch: 'הסיסמאות לא תואמות.',
+      genericError: 'משהו השתבש — נסו את קישור האיפוס שוב.',
+      passwordUpdated: 'הסיסמה עודכנה.',
+      continueToApp: 'המשך ל-Ironlog',
+      saving: 'שומר…',
+      updatePassword: 'עדכון סיסמה',
+    },
+    errorBoundary: {
+      title: 'משהו השתבש',
+      body: 'המסך הזה נתקל בשגיאה בלתי צפויה. נתוני האימונים שלכם בטוחים — זו רק תקלת תצוגה. רענון בדרך כלל פותר את זה.',
+      reload: 'רענון',
     },
   },
 }

@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useLanguage } from '../context/LanguageContext.jsx'
 import { supabase } from '../supabase.js'
 import { Button, Field } from './ui.jsx'
 
 export default function Login({ resetLinkError }) {
   const { login, signup } = useAuth()
+  const { t, lang, setLang } = useLanguage()
   const [mode, setMode] = useState('login')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -52,7 +54,7 @@ export default function Login({ resetLinkError }) {
         setResetSent(true)
       }
     } catch (err) {
-      setError(friendlyError(err))
+      setError(friendlyError(err, t))
     } finally {
       setBusy(false)
     }
@@ -65,14 +67,21 @@ export default function Login({ resetLinkError }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
+    <div className="min-h-screen flex items-center justify-center px-4 relative">
+      <button
+        onClick={() => setLang(lang === 'en' ? 'he' : 'en')}
+        className="absolute top-4 end-4 flex rounded-md bg-surface2 p-0.5 text-xs num"
+        title={t('layout.language')}
+      >
+        <span className={`px-2 py-1 rounded ${lang === 'en' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>EN</span>
+        <span className={`px-2 py-1 rounded ${lang === 'he' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>עב</span>
+      </button>
+
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <div className="eyebrow mb-2">Ironlog</div>
-          <h1 className="text-4xl tracking-wide">Train. Log. Progress.</h1>
-          <p className="text-chalkdim text-sm mt-2">
-            Your own private training log — sets, reps, weight and mobility work in one place.
-          </p>
+          <h1 className="text-4xl tracking-wide">{t('login.tagline')}</h1>
+          <p className="text-chalkdim text-sm mt-2">{t('login.subtitle')}</p>
         </div>
 
         <div className="card p-6">
@@ -83,52 +92,60 @@ export default function Login({ resetLinkError }) {
                 onClick={() => switchMode('login')}
                 className={`flex-1 rounded py-1.5 transition-colors ${mode === 'login' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}
               >
-                Log in
+                {t('login.logIn')}
               </button>
               <button
                 type="button"
                 onClick={() => switchMode('signup')}
                 className={`flex-1 rounded py-1.5 transition-colors ${mode === 'signup' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}
               >
-                Create account
+                {t('login.createAccount')}
               </button>
             </div>
           )}
 
           {mode === 'reset' && resetSent ? (
             <div className="flex flex-col gap-4 text-center py-2">
-              <p className="text-chalk">Check your email for a reset link.</p>
-              <p className="text-chalkdim text-sm">Sent to {email}</p>
+              <p className="text-chalk">{t('login.resetSentTitle')}</p>
+              <p className="text-chalkdim text-sm">
+                {t('login.resetSentTo')} {email}
+              </p>
               <button
                 type="button"
                 onClick={() => switchMode('login')}
                 className="text-brass text-sm hover:underline w-fit mx-auto"
               >
-                Back to log in
+                {t('login.backToLogin')}
               </button>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               {mode === 'reset' && (
                 <div>
-                  <h2 className="text-xl mb-1">Reset your password</h2>
-                  <p className="text-chalkdim text-sm">We'll email you a link to set a new one.</p>
+                  <h2 className="text-xl mb-1">{t('login.resetTitle')}</h2>
+                  <p className="text-chalkdim text-sm">{t('login.resetSubtitle')}</p>
                 </div>
               )}
 
               {mode === 'signup' && invited && (
-                <p className="text-brass text-sm -mt-2">You've been invited — just pick a password to finish.</p>
+                <p className="text-brass text-sm -mt-2">{t('login.invitedNote')}</p>
               )}
 
               {mode === 'signup' && (
-                <Field label="Name">
-                  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Alex" required />
+                <Field label={t('login.name')}>
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder={t('login.namePlaceholder')}
+                    required
+                  />
                 </Field>
               )}
 
-              <Field label="Email">
+              <Field label={t('login.email')}>
                 <input
                   type="email"
+                  dir="ltr"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
@@ -137,7 +154,7 @@ export default function Login({ resetLinkError }) {
               </Field>
 
               {mode !== 'reset' && (
-                <Field label="Password">
+                <Field label={t('login.password')}>
                   <input
                     type="password"
                     value={password}
@@ -155,7 +172,7 @@ export default function Login({ resetLinkError }) {
                   onClick={() => switchMode('reset')}
                   className="text-chalkdim text-xs hover:text-brass w-fit -mt-1"
                 >
-                  Forgot password?
+                  {t('login.forgotPassword')}
                 </button>
               )}
 
@@ -163,12 +180,12 @@ export default function Login({ resetLinkError }) {
 
               <Button type="submit" disabled={busy} className="mt-2 w-full">
                 {busy
-                  ? 'One moment…'
+                  ? t('login.oneMoment')
                   : mode === 'login'
-                    ? 'Log in'
+                    ? t('login.logIn')
                     : mode === 'signup'
-                      ? 'Create account'
-                      : 'Send reset link'}
+                      ? t('login.createAccount')
+                      : t('login.sendResetLink')}
               </Button>
 
               {mode === 'reset' && (
@@ -177,30 +194,24 @@ export default function Login({ resetLinkError }) {
                   onClick={() => switchMode('login')}
                   className="text-chalkdim text-xs hover:text-chalk w-fit mx-auto"
                 >
-                  Back to log in
+                  {t('login.backToLogin')}
                 </button>
               )}
             </form>
           )}
         </div>
 
-        <p className="text-chalkdim text-xs text-center mt-6">
-          Each account only ever sees its own training history.
-        </p>
+        <p className="text-chalkdim text-xs text-center mt-6">{t('login.footerNote')}</p>
       </div>
     </div>
   )
 }
 
-function friendlyError(err) {
+function friendlyError(err, t) {
   const msg = err?.message || ''
-  if (msg.includes('Invalid login credentials')) {
-    return "That email/password combination doesn't match an account."
-  }
-  if (msg.includes('User already registered')) {
-    return 'An account with that email already exists — log in instead.'
-  }
-  if (msg.includes('Password should be')) return 'Use at least 6 characters for your password.'
-  if (msg.includes('Unable to validate email')) return 'That email address looks off.'
-  return msg || 'Something went wrong. Please try again.'
+  if (msg.includes('Invalid login credentials')) return t('login.errorBadCredentials')
+  if (msg.includes('User already registered')) return t('login.errorAlreadyRegistered')
+  if (msg.includes('Password should be')) return t('login.errorWeakPassword')
+  if (msg.includes('Unable to validate email')) return t('login.errorBadEmail')
+  return msg || t('login.errorGeneric')
 }
