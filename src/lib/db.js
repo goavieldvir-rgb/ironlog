@@ -69,6 +69,7 @@ export async function addExercise(uid, exercise) {
       unit: exercise.unit || 'kg', // weight unit, or distance unit (km/mi) for cardio
       bodyweight: !!exercise.bodyweight,
       intensity_type: exercise.intensityType || 'rpe', // 'rpe' | 'hr_zone', cardio only
+      track_rir: !!exercise.trackRir, // strength/bodyweight only — reps in reserve per set
     })
     .select()
     .single()
@@ -85,6 +86,7 @@ export async function updateExercise(uid, id, patch) {
   if (patch.unit !== undefined) row.unit = patch.unit
   if (patch.bodyweight !== undefined) row.bodyweight = patch.bodyweight
   if (patch.intensityType !== undefined) row.intensity_type = patch.intensityType
+  if (patch.trackRir !== undefined) row.track_rir = patch.trackRir
   const { error } = await supabase.from('exercises').update(row).eq('id', id).eq('user_id', uid)
   if (error) throw error
 }
@@ -178,7 +180,11 @@ export async function logSession(uid, session) {
         last_weight: Number(last.weight) || 0,
         last_reps: Number(last.reps),
         last_date: session.date,
-        last_sets: completedSets.map((s) => ({ weight: Number(s.weight) || 0, reps: Number(s.reps) })),
+        last_sets: completedSets.map((s) => ({
+          weight: Number(s.weight) || 0,
+          reps: Number(s.reps),
+          ...(s.rir !== '' && s.rir != null ? { rir: Number(s.rir) } : {}),
+        })),
       })
       .eq('id', entry.exerciseId)
       .eq('user_id', uid)

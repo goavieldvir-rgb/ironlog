@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Play, Plus, Trash2, Minus, CornerDownLeft, History, StickyNote, ChevronDown } from 'lucide-react'
+import { Play, Plus, Trash2, Minus, CornerDownLeft, History, StickyNote, ChevronDown, Repeat } from 'lucide-react'
 import { Card, Badge } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -41,11 +41,20 @@ function Stepper({ value, onChange, step, min = 0, max }) {
 
 export default function SessionEntryCard({
   entry,
+  // The current, live exercise record — when provided, this is ALWAYS
+  // preferred over whatever last-known data is cached on `entry` itself.
+  // This is what makes the "previously logged" hint immune to staleness
+  // no matter how the entry was created (starting a routine, adding a
+  // freestyle exercise, resuming a saved-for-later draft, or swapping an
+  // exercise mid-workout) — one live source of truth instead of needing
+  // every one of those code paths to remember to refresh it correctly.
+  liveExercise,
   onUpdateSet,
   onAddSet,
   onRemoveSet,
   onRemoveEntry,
   onUpdateNote,
+  onSwapExercise,
   removable = false,
 }) {
   const { t } = useLanguage()
@@ -56,6 +65,13 @@ export default function SessionEntryCard({
   const intensityMax = entry.intensityType === 'hr_zone' ? 5 : 10
   const intensityLabel = entry.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe')
   const distanceUnit = entry.unit === 'mi' ? 'mi' : 'km'
+
+  // Prefer the live exercise record's data; fall back to whatever's on
+  // the entry itself only if no live record was passed in at all.
+  const lastWeight = liveExercise ? liveExercise.last_weight : entry.lastWeight
+  const lastReps = liveExercise ? liveExercise.last_reps : entry.lastReps
+  const lastDistance = liveExercise ? liveExercise.last_distance : entry.lastDistance
+  const showRir = !isCardio && (liveExercise ? !!liveExercise.track_rir : !!entry.trackRir)
 
   function copyFromPrevious(setIdx) {
     const prev = entry.sets[setIdx - 1]
@@ -69,7 +85,7 @@ export default function SessionEntryCard({
   // set was done last (reverse-pyramid friendly); "top set" is the
   // heaviest/longest one, wherever in the session it fell (pyramid
   // friendly). Falls back to the single last-known value for older data.
-  const lastSets = entry.lastSets || []
+  const lastSets = (liveExercise ? liveExercise.last_sets : entry.lastSets) || []
   const lastSetData = lastSets.length > 0 ? lastSets[lastSets.length - 1] : null
   const topSetData = (() => {
     if (lastSets.length === 0) return null
@@ -78,7 +94,7 @@ export default function SessionEntryCard({
     return lastSets.reduce((best, s) => (Number(s.weight) > Number(best.weight) ? s : best))
   })()
   const hasChoice = lastSetData && topSetData && JSON.stringify(lastSetData) !== JSON.stringify(topSetData)
-  const hasAnyLastData = lastSetData != null || entry.lastWeight != null
+  const hasAnyLastData = lastSetData != null || lastWeight != null
 
   function applySet(setIdx, data) {
     if (isCardio) {
@@ -88,7 +104,9 @@ export default function SessionEntryCard({
         distance: data.distance != null && data.distance !== '' ? String(data.distance) : '',
       })
     } else {
-      onUpdateSet(setIdx, { weight: String(data.weight), reps: String(data.reps) })
+      const patch = { weight: String(data.weight), reps: String(data.reps) }
+      if (showRir) patch.rir = data.rir != null && data.rir !== '' ? String(data.rir) : ''
+      onUpdateSet(setIdx, patch)
     }
   }
 
@@ -100,8 +118,8 @@ export default function SessionEntryCard({
     const data =
       lastSetData ||
       (isCardio
-        ? { duration: entry.lastWeight, intensity: entry.lastReps, distance: entry.lastDistance }
-        : { weight: entry.lastWeight, reps: entry.lastReps })
+        ? { duration: lastWeight, intensity: lastReps, distance: lastDistance }
+        : { weight: lastWeight, reps: lastReps })
     applySet(setIdx, data)
   }
 
@@ -115,20 +133,21 @@ export default function SessionEntryCard({
       const dist = data.distance != null && data.distance !== '' ? ` · ${data.distance}${distanceUnit}` : ''
       return `${data.duration} ${t('sessionCard.minUnit')} · ${intensityLabel} ${data.intensity}${dist}`
     }
-    return `${data.weight}${entry.unit} × ${data.reps}`
+    const rirPart = showRir && data.rir != null && data.rir !== '' ? ` · RIR ${data.rir}` : ''
+    return `${data.weight}${entry.unit} × ${data.reps}${rirPart}`
   }
 
   const prevLabel = (() => {
-    if (entry.lastWeight == null) return null
+    if (lastWeight == null) return null
     if (isCardio) {
-      const dist = entry.lastDistance != null ? ` · ${entry.lastDistance}${distanceUnit}` : ''
-      return `${t('sessionCard.previously')} ${entry.lastWeight} ${t('sessionCard.minUnit')} · ${intensityLabel} ${entry.lastReps}${dist}`
+      const dist = lastDistance != null ? ` · ${lastDistance}${distanceUnit}` : ''
+      return `${t('sessionCard.previously')} ${lastWeight} ${t('sessionCard.minUnit')} · ${intensityLabel} ${lastReps}${dist}`
     }
     if (entry.bodyweight) {
-      const added = Number(entry.lastWeight) > 0 ? `+${entry.lastWeight}${entry.unit} ` : ''
-      return `${t('sessionCard.previously')} ${added}${t('sessionCard.bodyweightBadge')} × ${entry.lastReps}`
+      const added = Number(lastWeight) > 0 ? `+${lastWeight}${entry.unit} ` : ''
+      return `${t('sessionCard.previously')} ${added}${t('sessionCard.bodyweightBadge')} × ${lastReps}`
     }
-    return `${t('sessionCard.previously')} ${entry.lastWeight}${entry.unit} × ${entry.lastReps}`
+    return `${t('sessionCard.previously')} ${lastWeight}${entry.unit} × ${lastReps}`
   })()
 
   return (
@@ -148,6 +167,15 @@ export default function SessionEntryCard({
           )}
         </div>
         <div className="flex items-center gap-2">
+          {onSwapExercise && (
+            <button
+              onClick={onSwapExercise}
+              title={t('sessionCard.swapExercise')}
+              className="text-chalkdim hover:text-brass p-1"
+            >
+              <Repeat size={15} />
+            </button>
+          )}
           {onUpdateNote && !showNote && (
             <button
               onClick={() => setShowNote(true)}
@@ -247,19 +275,34 @@ export default function SessionEntryCard({
         </div>
       ) : (
         <div className="flex flex-col gap-1.5">
-          <div className="grid grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem] gap-1 text-chalkdim eyebrow px-0.5">
+          <div
+            className={`grid gap-1 text-chalkdim eyebrow px-0.5 ${
+              showRir ? 'grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem_3.25rem]' : 'grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem]'
+            }`}
+          >
             <span>{t('sessionCard.set')}</span>
             <span className="truncate">
               {entry.bodyweight ? `+${t('sessionCard.wt')} (${entry.unit}) ${t('sessionCard.opt')}` : `${t('sessionCard.wt')} (${entry.unit})`}
             </span>
             <span>{t('sessionCard.reps')}</span>
+            {showRir && (
+              <span className="inline-flex items-center gap-0.5">
+                {t('sessionCard.rir')} <InfoTip text={t('sessionCard.rirTip')} />
+              </span>
+            )}
             <InfoTip text={t('sessionCard.copyAboveTip')} />
           </div>
           {entry.sets.map((s, j) => (
-            <div key={j} className="grid grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem] gap-1 items-center">
+            <div
+              key={j}
+              className={`grid gap-1 items-center ${
+                showRir ? 'grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem_3.25rem]' : 'grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem]'
+              }`}
+            >
               <span className="num text-chalkdim text-sm">{j + 1}</span>
               <Stepper value={s.weight} step={weightStep} onChange={(v) => onUpdateSet(j, { weight: v })} />
               <Stepper value={s.reps} step={1} onChange={(v) => onUpdateSet(j, { reps: v })} />
+              {showRir && <Stepper value={s.rir} step={1} min={0} max={10} onChange={(v) => onUpdateSet(j, { rir: v })} />}
               <div className="flex items-center gap-0.5 justify-end min-w-0">
                 {j === 0 && hasAnyLastData ? (
                   <button

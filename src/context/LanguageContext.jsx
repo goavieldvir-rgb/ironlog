@@ -35,16 +35,23 @@ export function LanguageProvider({ children }) {
 
   // t('nav.dashboard') walks the nested translations object for the
   // current language. Falls back to English, then to the raw key itself,
-  // so a not-yet-translated string never renders as a blank.
-  function t(key) {
+  // so a not-yet-translated string never renders as a blank. An optional
+  // second argument fills in {placeholder} tokens in the string — e.g.
+  // t('workout.swapSubtitle', { name: 'Bench Press' }) — existing calls
+  // with no second argument are completely unaffected.
+  function t(key, params) {
     const parts = key.split('.')
     let node = translations[lang]
     for (const p of parts) node = node?.[p]
-    if (node != null) return node
-
-    let fallback = translations.en
-    for (const p of parts) fallback = fallback?.[p]
-    return fallback ?? key
+    if (node == null) {
+      let fallback = translations.en
+      for (const p of parts) fallback = fallback?.[p]
+      node = fallback ?? key
+    }
+    if (typeof node === 'string' && params) {
+      return node.replace(/\{(\w+)\}/g, (_, k) => (params[k] != null ? params[k] : `{${k}}`))
+    }
+    return node
   }
 
   const value = { lang, setLang, dir: lang === 'he' ? 'rtl' : 'ltr', t }

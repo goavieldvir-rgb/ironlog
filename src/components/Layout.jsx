@@ -42,7 +42,10 @@ export default function Layout() {
         </div>
       )}
 
-      <header className="border-b border-line sticky top-0 z-20 bg-ink/95 backdrop-blur">
+      <header
+        className="border-b border-line sticky top-0 z-20 bg-ink/95 backdrop-blur"
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      >
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Dumbbell className="text-iron" size={22} strokeWidth={2.5} />

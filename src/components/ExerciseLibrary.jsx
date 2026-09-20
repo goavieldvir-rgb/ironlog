@@ -15,6 +15,7 @@ export const emptyExerciseForm = {
   unit: 'kg',
   bodyweight: false,
   intensityType: 'rpe',
+  trackRir: false,
 }
 
 function formatLast(ex, t) {
@@ -115,7 +116,7 @@ export default function ExerciseLibrary() {
               <div className="flex gap-1 shrink-0">
                 <button
                   className="p-1.5 rounded hover:bg-surface2 text-chalkdim hover:text-chalk"
-                  onClick={() => setEditing({ ...ex, videoUrl: ex.video_url, intensityType: ex.intensity_type })}
+                  onClick={() => setEditing({ ...ex, videoUrl: ex.video_url, intensityType: ex.intensity_type, trackRir: ex.track_rir })}
                   title={t('common.edit')}
                 >
                   <Pencil size={15} />
@@ -203,6 +204,7 @@ export default function ExerciseLibrary() {
               unit: currentForm.unit,
               bodyweight: currentForm.bodyweight,
               intensityType: currentForm.intensityType,
+              trackRir: currentForm.trackRir,
             })
           }}
         />
@@ -334,6 +336,22 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
                   </select>
                 </Field>
               )}
+
+              <Field
+                label={
+                  <>
+                    {t('exercises.trackRirLabel')} <InfoTip text={t('exercises.trackRirTip')} />
+                  </>
+                }
+              >
+                <select
+                  value={form.trackRir ? 'on' : 'off'}
+                  onChange={(e) => setForm({ ...form, trackRir: e.target.value === 'on' })}
+                >
+                  <option value="off">{t('exercises.trackRirOff')}</option>
+                  <option value="on">{t('exercises.trackRirOn')}</option>
+                </select>
+              </Field>
             </>
           )}
 

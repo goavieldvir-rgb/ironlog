@@ -28,6 +28,7 @@ function beep() {
 export default function RestTimer() {
   const { t } = useLanguage()
   const [secondsLeft, setSecondsLeft] = useState(90)
+  const [lastDuration, setLastDuration] = useState(90)
   const [running, setRunning] = useState(false)
   const [finished, setFinished] = useState(false)
   // The actual wall-clock moment the timer should hit zero — not a ticking
@@ -68,6 +69,7 @@ export default function RestTimer() {
 
   function start(preset) {
     const duration = preset ?? secondsLeft
+    if (preset != null) setLastDuration(preset)
     endTimeRef.current = Date.now() + duration * 1000
     setSecondsLeft(duration)
     setFinished(false)
@@ -78,11 +80,11 @@ export default function RestTimer() {
     setRunning(false)
   }
 
-  function reset(preset = 90) {
-    setRunning(false)
-    setFinished(false)
-    setSecondsLeft(preset)
-    endTimeRef.current = null
+  // Restart: go back to whichever duration was actually last used — not a
+  // hardcoded default — and start counting down again immediately. This is
+  // what the button next to Play is for: minimizing taps between sets.
+  function restart() {
+    start(lastDuration)
   }
 
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, '0')
@@ -93,6 +95,7 @@ export default function RestTimer() {
       className={`sticky bottom-0 z-10 border-t backdrop-blur px-4 py-2.5 flex items-center gap-3 flex-wrap transition-colors ${
         finished ? 'bg-ironsoft border-iron' : 'bg-ink/95 border-line'
       }`}
+      style={{ paddingBottom: 'calc(0.625rem + env(safe-area-inset-bottom, 0px))' }}
     >
       <div className="flex items-center gap-1.5">
         <Timer size={16} className={finished ? 'text-iron' : 'text-chalkdim'} />
@@ -124,7 +127,7 @@ export default function RestTimer() {
             <Play size={14} />
           </Button>
         )}
-        <Button variant="ghost" onClick={() => reset()} className="!px-2.5 !py-1.5">
+        <Button variant="ghost" onClick={restart} className="!px-2.5 !py-1.5">
           <RotateCcw size={14} />
         </Button>
       </div>

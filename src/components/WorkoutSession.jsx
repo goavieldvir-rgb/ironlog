@@ -17,7 +17,7 @@ function todayISO() {
 }
 
 function emptySet(category) {
-  return category === 'cardio' ? { duration: '', intensity: '', distance: '' } : { weight: '', reps: '' }
+  return category === 'cardio' ? { duration: '', intensity: '', distance: '' } : { weight: '', reps: '', rir: '' }
 }
 
 export default function WorkoutSession() {
@@ -35,12 +35,41 @@ export default function WorkoutSession() {
   const [notes, setNotes] = useState('')
   const [entries, setEntries] = useState([])
   const [pickId, setPickId] = useState('')
+  // A one-time, this-session-only substitution — e.g. a machine is broken
+  // at the gym today. Only the local `entries` state changes; the routine
+  // document itself is never touched, so next time this routine is
+  // started, the original exercise is back.
+  const [swapIndex, setSwapIndex] = useState(null)
+  const [swapPickId, setSwapPickId] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   // Tracks whether we've done the initial "restore a draft, or build fresh
   // from the routine" pass — autosave shouldn't run before that, or it'd
   // immediately overwrite a real draft with an empty one for a split second.
   const [ready, setReady] = useState(false)
+
+  // A resumed draft's "previously logged" hints (lastWeight/lastReps/
+  // lastSets) were frozen the moment the draft was first created — if you
+  // started this workout days ago, abandoned it, and logged this same
+  // exercise again in the meantime through a different routine, the
+  // resumed draft would still show the OLD stale numbers, or none at all
+  // if there was no history yet back when the draft was created. This
+  // re-checks against your current exercise data on resume, so the hint
+  // is always accurate — everything else about the draft (the actual
+  // sets you'd already typed in, notes) is left completely untouched.
+  function refreshLastKnownData(draftEntries, liveExercises) {
+    return draftEntries.map((entry) => {
+      const full = liveExercises.find((e) => e.id === entry.exerciseId)
+      if (!full) return entry
+      return {
+        ...entry,
+        lastWeight: full.last_weight,
+        lastReps: full.last_reps,
+        lastDistance: full.last_distance,
+        lastSets: full.last_sets || [],
+      }
+    })
+  }
 
   // On open: if there's a matching in-progress draft for this exact routine
   // (or this exact freestyle session) sitting in local storage, restore it
@@ -50,7 +79,7 @@ export default function WorkoutSession() {
     if (isFreestyle) {
       const draft = loadDraft(effectiveUid)
       if (draft && draft.routineId === null) {
-        setEntries(draft.entries || [])
+        setEntries(refreshLastKnownData(draft.entries || [], exercises))
         setDate(draft.date || todayISO())
         setNotes(draft.notes || '')
         setReady(true)
@@ -63,7 +92,7 @@ export default function WorkoutSession() {
     if (routine) {
       const draft = loadDraft(effectiveUid)
       if (draft && draft.routineId === routine.id) {
-        setEntries(draft.entries || [])
+        setEntries(refreshLastKnownData(draft.entries || [], exercises))
         setDate(draft.date || todayISO())
         setNotes(draft.notes || '')
         setReady(true)
@@ -105,7 +134,7 @@ export default function WorkoutSession() {
             lastReps: full?.last_reps,
             lastSets: full?.last_sets || [],
             notes: '',
-            sets: Array.from({ length: it.targetSets || 3 }, () => ({ weight: '', reps: '' })),
+            sets: Array.from({ length: it.targetSets || 3 }, () => ({ weight: '', reps: '', rir: '' })),
           }
         }),
       )
@@ -131,45 +160,57 @@ export default function WorkoutSession() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries, date, notes, ready])
 
+  // Builds a fresh entry for a given exercise — shared by freestyle-add
+  // and swap, so there's exactly one place that knows how to construct
+  // an entry from scratch, not two slowly-diverging copies of the same
+  // logic.
+  function buildEntryFromExercise(ex, targetSets = 3) {
+    if (ex.category === 'cardio') {
+      return {
+        exerciseId: ex.id,
+        name: (lang === 'he' && ex.name_he) || ex.name,
+        unit: ex.unit,
+        category: 'cardio',
+        intensityType: ex.intensity_type || 'rpe',
+        videoUrl: ex.video_url || '',
+        lastWeight: ex.last_weight,
+        lastReps: ex.last_reps,
+        lastDistance: ex.last_distance,
+        lastSets: ex.last_sets || [],
+        notes: '',
+        sets: [{ duration: String(ex.last_weight ?? 20), intensity: String(ex.last_reps ?? 5), distance: '' }],
+      }
+    }
+    return {
+      exerciseId: ex.id,
+      name: (lang === 'he' && ex.name_he) || ex.name,
+      unit: ex.unit,
+      bodyweight: !!ex.bodyweight,
+      videoUrl: ex.video_url || '',
+      lastWeight: ex.last_weight,
+      lastReps: ex.last_reps,
+      lastSets: ex.last_sets || [],
+      notes: '',
+      sets: Array.from({ length: targetSets }, () => ({ weight: '', reps: '', rir: '' })),
+    }
+  }
+
   function addFreestyleExercise() {
     const ex = exercises.find((e) => e.id === pickId)
     if (!ex) return
-    if (ex.category === 'cardio') {
-      setEntries([
-        ...entries,
-        {
-          exerciseId: ex.id,
-          name: (lang === 'he' && ex.name_he) || ex.name,
-          unit: ex.unit,
-          category: 'cardio',
-          intensityType: ex.intensity_type || 'rpe',
-          videoUrl: ex.video_url || '',
-          lastWeight: ex.last_weight,
-          lastReps: ex.last_reps,
-          lastDistance: ex.last_distance,
-          lastSets: ex.last_sets || [],
-          notes: '',
-          sets: [{ duration: String(ex.last_weight ?? 20), intensity: String(ex.last_reps ?? 5), distance: '' }],
-        },
-      ])
-    } else {
-      setEntries([
-        ...entries,
-        {
-          exerciseId: ex.id,
-          name: (lang === 'he' && ex.name_he) || ex.name,
-          unit: ex.unit,
-          bodyweight: !!ex.bodyweight,
-          videoUrl: ex.video_url || '',
-          lastWeight: ex.last_weight,
-          lastReps: ex.last_reps,
-          lastSets: ex.last_sets || [],
-          notes: '',
-          sets: [{ weight: '', reps: '' }, { weight: '', reps: '' }, { weight: '', reps: '' }],
-        },
-      ])
-    }
+    setEntries([...entries, buildEntryFromExercise(ex)])
     setPickId('')
+  }
+
+  function performSwap() {
+    const ex = exercises.find((e) => e.id === swapPickId)
+    if (!ex || swapIndex == null) return
+    // Keep whatever number of sets the original exercise had planned —
+    // swapping shouldn't also reset how many sets you meant to do.
+    const targetSets = entries[swapIndex]?.sets?.length || 3
+    setEntries((prev) => prev.map((e, i) => (i === swapIndex ? buildEntryFromExercise(ex, targetSets) : e)))
+    setSwapIndex(null)
+    setSwapPickId('')
   }
 
   function updateSet(entryIdx, setIdx, patch) {
@@ -262,12 +303,17 @@ export default function WorkoutSession() {
           <SessionEntryCard
             key={entry.exerciseId + i}
             entry={entry}
+            liveExercise={exercises.find((e) => e.id === entry.exerciseId)}
             removable={isFreestyle}
             onUpdateSet={(setIdx, patch) => updateSet(i, setIdx, patch)}
             onAddSet={() => addSet(i)}
             onRemoveSet={(setIdx) => removeSet(i, setIdx)}
             onRemoveEntry={() => removeEntry(i)}
             onUpdateNote={(text) => updateNote(i, text)}
+            onSwapExercise={() => {
+              setSwapIndex(i)
+              setSwapPickId('')
+            }}
           />
         ))}
 
@@ -320,6 +366,39 @@ export default function WorkoutSession() {
           </Button>
         </div>
       </div>
+
+      {swapIndex != null && (
+        <div
+          className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4"
+          onClick={() => setSwapIndex(null)}
+        >
+          <div className="card p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-2xl mb-2">{t('workout.swapTitle')}</h2>
+            <p className="text-chalkdim text-sm mb-4">
+              {t('workout.swapSubtitle', { name: entries[swapIndex]?.name })}
+            </p>
+            <Field label={t('workout.swapPickLabel')}>
+              <select value={swapPickId} onChange={(e) => setSwapPickId(e.target.value)} className="w-full">
+                <option value="">{t('workout.chooseFromLibrary')}</option>
+                {availableToAdd.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {(lang === 'he' && e.name_he) || e.name} {e.category !== 'strength' ? `(${e.category})` : ''}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <p className="text-chalkdim text-xs mt-2">{t('workout.swapNote')}</p>
+            <div className="flex justify-end gap-2 mt-5">
+              <Button type="button" variant="ghost" onClick={() => setSwapIndex(null)}>
+                {t('common.cancel')}
+              </Button>
+              <Button type="button" onClick={performSwap} disabled={!swapPickId}>
+                {t('workout.swapConfirm')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <RestTimer />
     </div>
