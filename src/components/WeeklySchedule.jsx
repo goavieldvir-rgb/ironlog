@@ -10,6 +10,7 @@ import { InfoTip } from './InfoTip.jsx'
 // weekly_schedule table's day_of_week column directly.
 const DAYS = [0, 1, 2, 3, 4, 5, 6]
 const SLOTS = [0, 1, 2]
+const SLOT_LABEL_KEYS = ['slotMobility', 'slotStrength', 'slotCardio']
 
 export default function WeeklySchedule({ effectiveUid, routines }) {
   const { t } = useLanguage()
@@ -140,7 +141,7 @@ export default function WeeklySchedule({ effectiveUid, routines }) {
             <p className="text-chalkdim text-xs mb-4">{t('dashboard.upToThree')}</p>
             <div className="flex flex-col gap-3">
               {SLOTS.map((slot) => (
-                <Field key={slot} label={t('dashboard.slotLabel', { n: slot + 1 })}>
+                <Field key={slot} label={t(`dashboard.${SLOT_LABEL_KEYS[slot]}`)}>
                   <select
                     value={pickIds[slot]}
                     onChange={(e) => setPickIds((prev) => prev.map((v, i) => (i === slot ? e.target.value : v)))}
