@@ -4,7 +4,7 @@ import { Plus, Trash2, ArrowUp, ArrowDown, Library } from 'lucide-react'
 import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { useCollection, addRoutine, updateRoutine, addExercise } from '../lib/db.js'
+import { useCollection, addRoutine, updateRoutine, addExercise, updateExercise } from '../lib/db.js'
 import { Button, Card, Field } from './ui.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
 import { ExerciseModal, emptyExerciseForm } from './ExerciseLibrary.jsx'
@@ -91,6 +91,21 @@ export default function RoutineBuilder() {
     setItems((prev) => [...prev, makeItem(ex)])
   }
 
+  // Bulk-toggles RIR tracking for every strength/bodyweight exercise
+  // currently in this routine (cardio already has its own effort metric,
+  // so it's excluded) — updates each exercise's own setting, same as
+  // toggling it individually in Exercises, just all at once.
+  const rirEligibleIds = [...new Set(items.filter((it) => it.category !== 'cardio').map((it) => it.exerciseId))]
+  const rirEligibleExercises = rirEligibleIds.map((id) => exercises.find((e) => e.id === id)).filter(Boolean)
+  const allRirOn = rirEligibleExercises.length > 0 && rirEligibleExercises.every((e) => e.track_rir)
+
+  async function setRirForRoutine(enable) {
+    for (const id of rirEligibleIds) {
+      await updateExercise(effectiveUid, id, { trackRir: enable })
+    }
+    refreshExercises()
+  }
+
   function updateItem(i, patch) {
     setItems(items.map((it, idx) => (idx === i ? { ...it, ...patch } : it)))
   }
@@ -158,6 +173,17 @@ export default function RoutineBuilder() {
 
       <Card className="flex flex-col gap-3">
         <h2 className="eyebrow">{t('routines.exercisesInRoutine')}</h2>
+
+        {rirEligibleIds.length > 0 && (
+          <div className="flex items-center justify-between gap-2 flex-wrap bg-surface2 rounded-md p-2.5">
+            <span className="text-sm text-chalkdim inline-flex items-center gap-1">
+              {t('routines.rirForAll')} <InfoTip text={t('routines.rirForAllTip')} />
+            </span>
+            <Button type="button" variant="ghost" onClick={() => setRirForRoutine(!allRirOn)}>
+              {allRirOn ? t('routines.rirTurnOff') : t('routines.rirTurnOn')}
+            </Button>
+          </div>
+        )}
 
         {items.length === 0 && (
           <p className="text-chalkdim text-sm">{t('routines.noExercisesAdded')}</p>

@@ -55,6 +55,56 @@ export function useGlobalExercises() {
   return [data, loading]
 }
 
+// Fetches a single profile row (for the effective/acted-as user, which
+// AdminContext's own `profile` doesn't cover — that one is always the
+// logged-in admin's own row). Used for per-person settings that a
+// trainee sets for themselves, like which Dashboard style they prefer.
+export function useProfile(uid) {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [reload, setReload] = useState(0)
+
+  useEffect(() => {
+    if (!uid) return
+    let cancelled = false
+    setLoading(true)
+    supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', uid)
+      .single()
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) console.error(error)
+        setData(data || null)
+        setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [uid, reload])
+
+  return [data, loading, () => setReload((r) => r + 1)]
+}
+
+export async function updateDashboardStyle(uid, style) {
+  const { error } = await supabase.from('profiles').update({ dashboard_style: style }).eq('id', uid)
+  if (error) throw error
+}
+
+// ---- Weekly schedule (recurring — "Sunday is always Pull Day") ----
+// day_of_week: 0 = Sunday ... 6 = Saturday. A day with no row, or a row
+// with routine_id null, both mean "rest day".
+export async function setScheduleDay(uid, dayOfWeek, routineId) {
+  const { error } = await supabase
+    .from('weekly_schedule')
+    .upsert(
+      { user_id: uid, day_of_week: dayOfWeek, routine_id: routineId, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id,day_of_week' },
+    )
+  if (error) throw error
+}
+
 // ---- Exercises ----
 export async function addExercise(uid, exercise) {
   const { data, error } = await supabase

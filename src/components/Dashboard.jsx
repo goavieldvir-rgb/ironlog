@@ -7,9 +7,10 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { toLocalISODate } from '../lib/dates.js'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { useCollection } from '../lib/db.js'
+import { useCollection, useProfile, updateDashboardStyle } from '../lib/db.js'
 import { loadDraft, clearDraft } from '../lib/draft.js'
 import { Button, Card, CategoryTag } from './ui.jsx'
+import WeeklySchedule from './WeeklySchedule.jsx'
 
 function startOfWeekISO() {
   const d = new Date()
@@ -38,6 +39,13 @@ export default function Dashboard() {
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [routines] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [sessions, sessionsLoading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const [effectiveProfile, , refreshEffectiveProfile] = useProfile(effectiveUid)
+  const dashboardStyle = effectiveProfile?.dashboard_style || 'cards'
+
+  async function toggleDashboardStyle() {
+    await updateDashboardStyle(effectiveUid, dashboardStyle === 'cards' ? 'schedule' : 'cards')
+    refreshEffectiveProfile()
+  }
 
   const weekStart = startOfWeekISO()
   const thisWeek = sessions.filter((s) => s.date >= weekStart).length
@@ -125,15 +133,25 @@ export default function Dashboard() {
 
       {showChecklist && <OnboardingChecklist steps={steps} t={t} />}
 
-      <div className="grid grid-cols-3 gap-3">
-        <Stat label={t('dashboard.thisWeek')} value={thisWeek} suffix={t('dashboard.sessions')} />
-        <Stat label={t('dashboard.totalLogged')} value={sessions.length} suffix={t('dashboard.sessions')} />
-        <Stat
-          label={lang === 'he' ? t('dashboard.active') : t('dashboard.routinesLabel')}
-          value={routines.length}
-          suffix={lang === 'he' ? t('dashboard.routinesLabel') : t('dashboard.active')}
-        />
+      <div className="flex justify-end -mb-1">
+        <button onClick={toggleDashboardStyle} className="text-chalkdim text-xs hover:text-brass">
+          {dashboardStyle === 'cards' ? t('dashboard.switchToSchedule') : t('dashboard.switchToCards')}
+        </button>
       </div>
+
+      {dashboardStyle === 'schedule' ? (
+        <WeeklySchedule effectiveUid={effectiveUid} routines={routines} />
+      ) : (
+        <div className="grid grid-cols-3 gap-3">
+          <Stat label={t('dashboard.thisWeek')} value={thisWeek} suffix={t('dashboard.sessions')} />
+          <Stat label={t('dashboard.totalLogged')} value={sessions.length} suffix={t('dashboard.sessions')} />
+          <Stat
+            label={lang === 'he' ? t('dashboard.active') : t('dashboard.routinesLabel')}
+            value={routines.length}
+            suffix={lang === 'he' ? t('dashboard.routinesLabel') : t('dashboard.active')}
+          />
+        </div>
+      )}
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
