@@ -93,14 +93,17 @@ export async function updateDashboardStyle(uid, style) {
 }
 
 // ---- Weekly schedule (recurring — "Sunday is always Pull Day") ----
-// day_of_week: 0 = Sunday ... 6 = Saturday. A day with no row, or a row
-// with routine_id null, both mean "rest day".
-export async function setScheduleDay(uid, dayOfWeek, routineId) {
+// day_of_week: 0 = Sunday ... 6 = Saturday. slot: 0-2, up to three
+// independent routines per day (e.g. cardio + strength on the same day).
+// A day with no row for a slot, or a row with routine_id null, both mean
+// that slot is empty — a day only counts as a full rest day when every
+// slot is empty.
+export async function setScheduleDay(uid, dayOfWeek, slot, routineId) {
   const { error } = await supabase
     .from('weekly_schedule')
     .upsert(
-      { user_id: uid, day_of_week: dayOfWeek, routine_id: routineId, updated_at: new Date().toISOString() },
-      { onConflict: 'user_id,day_of_week' },
+      { user_id: uid, day_of_week: dayOfWeek, slot, routine_id: routineId, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id,day_of_week,slot' },
     )
   if (error) throw error
 }
