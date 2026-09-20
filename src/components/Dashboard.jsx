@@ -1,28 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Play, Plus, Flame, Check, Circle, Clock } from 'lucide-react'
-import { ForwardChevron } from './DirectionalIcon.jsx'
+import { Play, Plus, Check, Circle, Clock, Dumbbell, History as HistoryIcon } from 'lucide-react'
 import { InfoTip } from './InfoTip.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
-import { toLocalISODate } from '../lib/dates.js'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { useCollection, useProfile, updateDashboardStyle } from '../lib/db.js'
+import { useCollection } from '../lib/db.js'
 import { loadDraft, clearDraft } from '../lib/draft.js'
-import { Button, Card, CategoryTag } from './ui.jsx'
+import { Button, Card } from './ui.jsx'
 import WeeklySchedule from './WeeklySchedule.jsx'
-
-function startOfWeekISO() {
-  const d = new Date()
-  const day = d.getDay() === 0 ? 6 : d.getDay() - 1
-  d.setDate(d.getDate() - day)
-  return toLocalISODate(d)
-}
-
-function formatDate(iso) {
-  const d = new Date(iso + 'T00:00:00')
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
 
 function timeAgo(ts) {
   const mins = Math.max(1, Math.round((Date.now() - ts) / 60000))
@@ -35,21 +21,10 @@ function timeAgo(ts) {
 export default function Dashboard() {
   const { user } = useAuth()
   const { actingAs, effectiveUid, effectiveName } = useAdmin()
-  const { t, lang } = useLanguage()
+  const { t } = useLanguage()
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [routines] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [sessions, sessionsLoading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
-  const [effectiveProfile, , refreshEffectiveProfile] = useProfile(effectiveUid)
-  const dashboardStyle = effectiveProfile?.dashboard_style || 'cards'
-
-  async function toggleDashboardStyle() {
-    await updateDashboardStyle(effectiveUid, dashboardStyle === 'cards' ? 'schedule' : 'cards')
-    refreshEffectiveProfile()
-  }
-
-  const weekStart = startOfWeekISO()
-  const thisWeek = sessions.filter((s) => s.date >= weekStart).length
-  const recent = sessions.slice(0, 5)
 
   const steps = useMemo(
     () => [
@@ -133,93 +108,28 @@ export default function Dashboard() {
 
       {showChecklist && <OnboardingChecklist steps={steps} t={t} />}
 
-      <div className="flex justify-end -mb-1">
-        <button onClick={toggleDashboardStyle} className="text-chalkdim text-xs hover:text-brass">
-          {dashboardStyle === 'cards' ? t('dashboard.switchToSchedule') : t('dashboard.switchToCards')}
-        </button>
+      <WeeklySchedule effectiveUid={effectiveUid} routines={routines} />
+
+      <div className="grid grid-cols-2 gap-3">
+        <Link to="/routines">
+          <Card className="flex flex-col items-center justify-center py-6 gap-2 text-center hover:bg-surface2 transition-colors">
+            <Dumbbell size={22} className="text-iron" />
+            <span className="text-sm">{t('dashboard.navRoutines')}</span>
+            <span className="text-chalkdim text-xs">
+              {routines.length} {t('dashboard.exercisesCount')}
+            </span>
+          </Card>
+        </Link>
+        <Link to="/history">
+          <Card className="flex flex-col items-center justify-center py-6 gap-2 text-center hover:bg-surface2 transition-colors">
+            <HistoryIcon size={22} className="text-iron" />
+            <span className="text-sm">{t('dashboard.navHistory')}</span>
+            <span className="text-chalkdim text-xs">
+              {sessions.length} {t('dashboard.sessions')}
+            </span>
+          </Card>
+        </Link>
       </div>
-
-      {dashboardStyle === 'schedule' ? (
-        <WeeklySchedule effectiveUid={effectiveUid} routines={routines} />
-      ) : (
-        <div className="grid grid-cols-3 gap-3">
-          <Stat label={t('dashboard.thisWeek')} value={thisWeek} suffix={t('dashboard.sessions')} />
-          <Stat label={t('dashboard.totalLogged')} value={sessions.length} suffix={t('dashboard.sessions')} />
-          <Stat
-            label={lang === 'he' ? t('dashboard.active') : t('dashboard.routinesLabel')}
-            value={routines.length}
-            suffix={lang === 'he' ? t('dashboard.routinesLabel') : t('dashboard.active')}
-          />
-        </div>
-      )}
-
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <h2 className="eyebrow">{t('dashboard.continueTraining')}</h2>
-          <Link to="/routines" className="text-chalkdim text-xs hover:text-chalk inline-flex items-center gap-0.5">
-            {t('dashboard.allRoutines')} <ForwardChevron size={13} />
-          </Link>
-        </div>
-        {routines.length === 0 ? (
-          <p className="text-sm text-chalkdim">
-            {t('dashboard.noRoutinesYet')}{' '}
-            <Link to="/routines/new" className="text-brass hover:underline">
-              {t('dashboard.buildOne')}
-            </Link>
-            .
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {routines.slice(0, 4).map((r) => (
-              <Card key={r.id} className="row flex items-center justify-between gap-2 !border-0 px-3.5 py-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <p className="truncate min-w-0">{r.name}</p>
-                    <CategoryTag category={r.category} />
-                  </div>
-                  <p className="text-chalkdim text-xs mt-0.5">
-                    {r.exercises?.length || 0} {t('dashboard.exercisesCount')}
-                  </p>
-                </div>
-                <Link to={`/workout/${r.id}`}>
-                  <Button variant="subtle" className="shrink-0">
-                    <Play size={14} />
-                  </Button>
-                </Link>
-              </Card>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <h2 className="eyebrow">{t('dashboard.recentActivity')}</h2>
-          <Link to="/history" className="text-chalkdim text-xs hover:text-chalk inline-flex items-center gap-0.5">
-            {t('dashboard.fullHistory')} <ForwardChevron size={13} />
-          </Link>
-        </div>
-        {recent.length === 0 ? (
-          <p className="text-sm text-chalkdim inline-flex items-center gap-1.5">
-            <Flame size={14} /> {t('dashboard.noSessionsYet')}
-          </p>
-        ) : (
-          <div className="flex flex-col gap-1">
-            {recent.map((s) => (
-              <Link key={s.id} to={`/history/${s.id}`}>
-                <div className="row flex items-center justify-between px-3.5 py-2.5">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="num text-chalkdim text-xs shrink-0">{formatDate(s.date)}</span>
-                    <p className="truncate min-w-0">{s.routine_name}</p>
-                    <CategoryTag category={s.category} />
-                  </div>
-                  <ForwardChevron size={16} className="text-chalkdim shrink-0" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
     </div>
   )
 }
@@ -250,16 +160,6 @@ function OnboardingChecklist({ steps, t }) {
           </Link>
         ))}
       </div>
-    </Card>
-  )
-}
-
-function Stat({ label, value, suffix }) {
-  return (
-    <Card className="flex flex-col items-center justify-center py-5 gap-1 text-center">
-      <span className="num text-4xl text-chalk leading-none">{value}</span>
-      <span className="eyebrow">{suffix}</span>
-      <span className="text-chalkdim text-xs">{label}</span>
     </Card>
   )
 }
