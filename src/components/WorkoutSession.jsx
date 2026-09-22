@@ -1,15 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { Plus, Check } from 'lucide-react'
+import { Plus, Check, Library, Clock } from 'lucide-react'
 import { BackChevron } from './DirectionalIcon.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { useCollection, logSession } from '../lib/db.js'
+import { useFeedback } from '../context/FeedbackContext.jsx'
+import { useCollection, logSession, addExercise } from '../lib/db.js'
 import { saveDraft, loadDraft, clearDraft } from '../lib/draft.js'
 import { toLocalISODate } from '../lib/dates.js'
 import { Button, Card, CategoryTag, Field } from './ui.jsx'
 import SessionEntryCard from './SessionEntryCard.jsx'
+import ExercisePicker from './ExercisePicker.jsx'
+import { ExerciseModal, emptyExerciseForm } from './ExerciseLibrary.jsx'
 import RestTimer from './RestTimer.jsx'
 
 function todayISO() {
@@ -23,12 +26,13 @@ function emptySet(category) {
 export default function WorkoutSession() {
   const { effectiveUid } = useAdmin()
   const { t, lang } = useLanguage()
+  const { confirm, toast } = useFeedback()
   const { routineId } = useParams()
   const navigate = useNavigate()
   const isFreestyle = routineId === 'freestyle'
 
   const [routines, routinesLoading] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
-  const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
+  const [exercises, , refreshExercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const routine = useMemo(() => routines.find((r) => r.id === routineId), [routines, routineId])
 
   const [date, setDate] = useState(todayISO())
@@ -41,8 +45,18 @@ export default function WorkoutSession() {
   // started, the original exercise is back.
   const [swapIndex, setSwapIndex] = useState(null)
   const [swapPickId, setSwapPickId] = useState('')
+  // Shared between freestyle-add and swap: whichever one is active is
+  // tracked by swapIndex (null = adding, a number = swapping that entry),
+  // so both flows can share this one picker and create-custom modal
+  // instead of duplicating them.
+  const [showLibraryPicker, setShowLibraryPicker] = useState(false)
+  const [creatingCustom, setCreatingCustom] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  // When this workout was started — carried inside the draft, so resuming
+  // after a phone lock or app switch keeps the original start time.
+  const [startedAt, setStartedAt] = useState(null)
+  const [now, setNow] = useState(Date.now())
   // Tracks whether we've done the initial "restore a draft, or build fresh
   // from the routine" pass — autosave shouldn't run before that, or it'd
   // immediately overwrite a real draft with an empty one for a split second.
@@ -82,10 +96,12 @@ export default function WorkoutSession() {
         setEntries(refreshLastKnownData(draft.entries || [], exercises))
         setDate(draft.date || todayISO())
         setNotes(draft.notes || '')
+        setStartedAt(draft.startedAt || null)
         setReady(true)
         return
       }
       setEntries([])
+      setStartedAt(Date.now())
       setReady(true)
       return
     }
@@ -95,6 +111,7 @@ export default function WorkoutSession() {
         setEntries(refreshLastKnownData(draft.entries || [], exercises))
         setDate(draft.date || todayISO())
         setNotes(draft.notes || '')
+        setStartedAt(draft.startedAt || null)
         setReady(true)
         return
       }
@@ -138,6 +155,7 @@ export default function WorkoutSession() {
           }
         }),
       )
+      setStartedAt(Date.now())
       setReady(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -156,9 +174,27 @@ export default function WorkoutSession() {
       date,
       notes,
       entries,
+      startedAt,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries, date, notes, ready])
+  }, [entries, date, notes, ready, startedAt])
+
+  // Ticks the elapsed-time display. Once a minute is plenty for a workout.
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30000)
+    return () => clearInterval(id)
+  }, [])
+
+  // Duration only means something for a workout logged live today — not
+  // one being backfilled for a past date, and not a draft abandoned
+  // overnight and finished the next morning (hence the 5-hour cap).
+  const isLive = startedAt && date === todayISO()
+  const elapsedMin = isLive ? Math.max(0, Math.round((now - startedAt) / 60000)) : null
+  function finalDuration() {
+    if (!isLive) return null
+    const m = Math.round((Date.now() - startedAt) / 60000)
+    return m >= 1 && m <= 300 ? m : null
+  }
 
   // Builds a fresh entry for a given exercise — shared by freestyle-add
   // and swap, so there's exactly one place that knows how to construct
@@ -213,6 +249,22 @@ export default function WorkoutSession() {
     setSwapPickId('')
   }
 
+  // Used by both the "browse library" and "create custom exercise" paths,
+  // for both freestyle-add and swap — one place that knows how to place
+  // a newly-picked-or-created exercise wherever it's needed, instead of
+  // duplicating this per entry point.
+  function applyPickedExercise(ex) {
+    if (swapIndex != null) {
+      const targetSets = entries[swapIndex]?.sets?.length || 3
+      setEntries((prev) => prev.map((e, i) => (i === swapIndex ? buildEntryFromExercise(ex, targetSets) : e)))
+      setSwapIndex(null)
+    } else {
+      setEntries((prev) => [...prev, buildEntryFromExercise(ex)])
+    }
+    setPickId('')
+    setSwapPickId('')
+  }
+
   function updateSet(entryIdx, setIdx, patch) {
     setEntries((prev) =>
       prev.map((e, i) =>
@@ -252,6 +304,8 @@ export default function WorkoutSession() {
         category,
         date,
         notes,
+        startedAt: isLive ? new Date(startedAt).toISOString() : null,
+        durationMinutes: finalDuration(),
         entries: entries.map((e) => ({
           exerciseId: e.exerciseId,
           name: e.name,
@@ -267,9 +321,28 @@ export default function WorkoutSession() {
       clearDraft(effectiveUid)
       setSaved(true)
       setTimeout(() => navigate('/history'), 900)
+    } catch (err) {
+      console.error(err)
+      // The draft is only cleared on success, so a failed save (usually
+      // patchy gym signal) never loses anything — say so, so nobody
+      // panics and starts re-typing their whole workout.
+      if (err?.message === 'EMPTY_SESSION') toast(t('workout.nothingLogged'), 'error')
+      else toast(t('workout.saveFailedKept'), 'error')
     } finally {
       setSaving(false)
     }
+  }
+
+  async function handleDiscard() {
+    const ok = await confirm({
+      title: t('workout.discardTitle'),
+      body: t('workout.discardBody'),
+      confirmLabel: t('workout.discardConfirm'),
+      danger: true,
+    })
+    if (!ok) return
+    clearDraft(effectiveUid)
+    navigate('/')
   }
 
   if (!isFreestyle && !routinesLoading && !routine) {
@@ -293,6 +366,11 @@ export default function WorkoutSession() {
               <h1 className="text-3xl">{isFreestyle ? t('workout.freestyleSession') : routine?.name}</h1>
               <CategoryTag category={category} />
             </div>
+            {elapsedMin != null && elapsedMin <= 300 && (
+              <p className="text-chalkdim text-xs mt-1 inline-flex items-center gap-1 num">
+                <Clock size={12} /> {t('workout.elapsed', { min: elapsedMin })}
+              </p>
+            )}
           </div>
           <Field label={t('workout.date')}>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-fit" />
@@ -318,7 +396,7 @@ export default function WorkoutSession() {
         ))}
 
         {isFreestyle && (
-          <Card className="flex items-end gap-2">
+          <Card className="flex items-end gap-2 flex-wrap">
             <Field label={t('workout.addExercise')}>
               <select value={pickId} onChange={(e) => setPickId(e.target.value)} className="w-56">
                 <option value="">{t('workout.chooseFromLibrary')}</option>
@@ -331,6 +409,9 @@ export default function WorkoutSession() {
             </Field>
             <Button type="button" variant="ghost" onClick={addFreestyleExercise} disabled={!pickId}>
               <Plus size={16} /> {t('common.add')}
+            </Button>
+            <Button type="button" variant="brass" onClick={() => setShowLibraryPicker(true)}>
+              <Library size={16} /> {t('routines.browseLibrary')}
             </Button>
           </Card>
         )}
@@ -352,7 +433,10 @@ export default function WorkoutSession() {
           </Field>
         </Card>
 
-        <div className="flex justify-end">
+        <div className="flex justify-between items-center gap-2">
+          <Button type="button" variant="danger" onClick={handleDiscard} disabled={saving || saved}>
+            {t('workout.discard')}
+          </Button>
           <Button onClick={handleFinish} disabled={saving || saved || entries.length === 0} variant={saved ? 'subtle' : 'primary'}>
             {saved ? (
               <>
@@ -367,7 +451,7 @@ export default function WorkoutSession() {
         </div>
       </div>
 
-      {swapIndex != null && (
+      {swapIndex != null && !showLibraryPicker && !creatingCustom && (
         <div
           className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4"
           onClick={() => setSwapIndex(null)}
@@ -387,6 +471,13 @@ export default function WorkoutSession() {
                 ))}
               </select>
             </Field>
+            <button
+              type="button"
+              onClick={() => setShowLibraryPicker(true)}
+              className="text-brass text-sm hover:underline mt-2 inline-flex items-center gap-1"
+            >
+              <Library size={14} /> {t('routines.browseLibrary')}
+            </button>
             <p className="text-chalkdim text-xs mt-2">{t('workout.swapNote')}</p>
             <div className="flex justify-end gap-2 mt-5">
               <Button type="button" variant="ghost" onClick={() => setSwapIndex(null)}>
@@ -398,6 +489,51 @@ export default function WorkoutSession() {
             </div>
           </div>
         </div>
+      )}
+
+      {showLibraryPicker && (
+        <ExercisePicker
+          existingNames={exercises.map((e) => e.name)}
+          onAdd={async (g) => {
+            const wasSwapping = swapIndex != null
+            const ex = await addExercise(effectiveUid, {
+              name: g.name,
+              nameHe: g.nameHe,
+              category: g.category,
+              unit: g.unit,
+              bodyweight: g.bodyweight,
+              intensityType: g.intensity_type,
+              videoUrl: '',
+              notes: '',
+            })
+            refreshExercises()
+            applyPickedExercise(ex)
+            // A swap is a single "replace this one" action, so close
+            // right after — but adding freely (freestyle) stays open,
+            // matching how the library picker behaves everywhere else in
+            // the app, so several exercises can be added in one go.
+            if (wasSwapping) setShowLibraryPicker(false)
+          }}
+          onCreateCustom={() => {
+            setShowLibraryPicker(false)
+            setCreatingCustom(true)
+          }}
+          onClose={() => setShowLibraryPicker(false)}
+        />
+      )}
+
+      {creatingCustom && (
+        <ExerciseModal
+          initial={{ ...emptyExerciseForm, category: swapIndex != null ? entries[swapIndex]?.category || 'strength' : category }}
+          existingExercises={exercises}
+          onClose={() => setCreatingCustom(false)}
+          onSave={async (data) => {
+            const ex = await addExercise(effectiveUid, data)
+            refreshExercises()
+            applyPickedExercise(ex)
+            setCreatingCustom(false)
+          }}
+        />
       )}
 
       <RestTimer />

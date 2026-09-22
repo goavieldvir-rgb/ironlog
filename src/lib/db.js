@@ -150,6 +150,51 @@ export async function deleteExercise(uid, id) {
 }
 
 // ---- Routines ----
+
+// Copies a routine into ANOTHER person's account (admin → trainee). The
+// routine's items point at exercise IDs, and those IDs belong to the
+// source account — a trainee can't read or update someone else's
+// exercises, so copying the IDs as-is left the trainee with a routine
+// whose "previously logged" hints never worked and whose exercises never
+// appeared in their own library. This maps every item onto the target
+// person's own library instead: reuse their exercise if they already
+// have one with the same name and category, otherwise create it.
+export async function copyRoutineToUser(targetUid, routine) {
+  const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase()
+  const sourceIds = [...new Set((routine.exercises || []).map((it) => it.exerciseId).filter(Boolean))]
+
+  const [{ data: targetExercises, error: e1 }, { data: sourceExercises, error: e2 }] = await Promise.all([
+    supabase.from('exercises').select('*').eq('user_id', targetUid),
+    sourceIds.length ? supabase.from('exercises').select('*').in('id', sourceIds) : Promise.resolve({ data: [] }),
+  ])
+  if (e1) throw e1
+  if (e2) throw e2
+
+  const pool = [...(targetExercises || [])]
+  const mapped = []
+  for (const it of routine.exercises || []) {
+    const src = (sourceExercises || []).find((e) => e.id === it.exerciseId)
+    const name = src?.name || it.name
+    const category = src?.category || it.category || routine.category || 'strength'
+    let match = pool.find((e) => norm(e.name) === norm(name) && e.category === category)
+    if (!match) {
+      match = await addExercise(targetUid, {
+        name,
+        nameHe: src?.name_he || null,
+        category,
+        unit: src?.unit || it.unit,
+        bodyweight: src?.bodyweight ?? it.bodyweight,
+        intensityType: src?.intensity_type || it.intensityType,
+        trackRir: src?.track_rir,
+        videoUrl: src?.video_url || it.videoUrl || '',
+        notes: src?.notes || '',
+      })
+      pool.push(match)
+    }
+    mapped.push({ ...it, exerciseId: match.id, name: match.name })
+  }
+  await addRoutine(targetUid, { name: routine.name, category: routine.category, exercises: mapped })
+}
 export async function addRoutine(uid, routine) {
   const { error } = await supabase.from('routines').insert({
     user_id: uid,
@@ -186,8 +231,22 @@ function isCompletedSet(entry, s) {
   return repsOk && weightOk
 }
 
+// Strips sets that were planned but never filled in (e.g. a routine that
+// targets 3 sets when only 2 were done), and exercises left with no
+// completed sets at all. Without this, blank sets were stored permanently —
+// inflating set counts in History, showing empty rows on the session page,
+// and tripping up anything that reads history later (the admin PR alert
+// crashed on exactly this once).
+export function cleanEntries(entries) {
+  return (entries || [])
+    .map((e) => ({ ...e, sets: (e.sets || []).filter((s) => isCompletedSet(e, s)) }))
+    .filter((e) => e.sets.length > 0)
+}
+
 // ---- Sessions (a completed workout log) ----
 export async function logSession(uid, session) {
+  session = { ...session, entries: cleanEntries(session.entries) }
+  if (session.entries.length === 0) throw new Error('EMPTY_SESSION')
   const { error: sessionError } = await supabase.from('sessions').insert({
     user_id: uid,
     routine_id: session.routineId || null,
@@ -196,8 +255,15 @@ export async function logSession(uid, session) {
     date: session.date,
     notes: session.notes || '',
     entries: session.entries,
+    ...(session.startedAt ? { started_at: session.startedAt } : {}),
+    ...(session.durationMinutes != null ? { duration_minutes: session.durationMinutes } : {}),
   })
   if (sessionError) throw sessionError
+
+  // Only overwrite an exercise's remembered note when a new one was
+  // actually written — a session with no note shouldn't erase "seat on 4".
+  const noteFields = (entry) =>
+    entry.notes && entry.notes.trim() ? { last_note: entry.notes.trim(), last_note_date: session.date } : {}
 
   // Denormalize "last performance" onto each exercise for quick lookup
   // when building the next session.
@@ -215,6 +281,7 @@ export async function logSession(uid, session) {
           last_reps: Number(last.intensity) || 0,
           last_distance: last.distance !== '' && last.distance != null ? Number(last.distance) : null,
           last_date: session.date,
+          ...noteFields(entry),
           last_sets: completedSets.map((s) => ({
             duration: Number(s.duration) || 0,
             intensity: Number(s.intensity) || 0,
@@ -233,6 +300,7 @@ export async function logSession(uid, session) {
         last_weight: Number(last.weight) || 0,
         last_reps: Number(last.reps),
         last_date: session.date,
+        ...noteFields(entry),
         last_sets: completedSets.map((s) => ({
           weight: Number(s.weight) || 0,
           reps: Number(s.reps),
@@ -271,7 +339,7 @@ export async function updateSession(uid, id, patch) {
   const row = {}
   if (patch.date !== undefined) row.date = patch.date
   if (patch.notes !== undefined) row.notes = patch.notes
-  if (patch.entries !== undefined) row.entries = patch.entries
+  if (patch.entries !== undefined) row.entries = cleanEntries(patch.entries)
   const { error } = await supabase.from('sessions').update(row).eq('id', id).eq('user_id', uid)
   if (error) throw error
 }

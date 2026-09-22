@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { Dumbbell, LayoutDashboard, ListChecks, History, Library, LogOut, Menu, X, Users, UserCheck, BarChart3, Scale, FileText, HelpCircle } from 'lucide-react'
+import { Dumbbell, LayoutDashboard, ListChecks, History, Library, LogOut, Menu, X, Users, UserCheck, BarChart3, Scale, FileText, HelpCircle, CircleUser } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -29,19 +29,6 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {actingAs && (
-        <div className="bg-brasssoft text-brass text-sm px-4 py-2 flex items-center justify-center gap-2 flex-wrap">
-          <UserCheck size={15} />
-          <span>
-            {t('layout.managingAccount')} <strong>{actingAs.name}</strong>
-            {t('layout.accountSuffix')}
-          </span>
-          <button onClick={() => setActingAs(null)} className="underline hover:no-underline ms-1">
-            {t('layout.backToMyAccount')}
-          </button>
-        </div>
-      )}
-
       <header
         className="border-b border-line sticky top-0 z-20 bg-ink/95 backdrop-blur"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
@@ -86,7 +73,9 @@ export default function Layout() {
             >
               <HelpCircle size={18} />
             </NavLink>
-            <span className="text-chalkdim text-sm">{user?.displayName || user?.email}</span>
+            <NavLink to="/account" className="text-chalkdim text-sm hover:text-brass transition-colors" title={t('nav.account')}>
+              {user?.displayName || user?.email}
+            </NavLink>
             <button
               onClick={logout}
               className="text-chalkdim hover:text-iron transition-colors p-2 rounded-md hover:bg-surface2"
@@ -100,6 +89,29 @@ export default function Layout() {
             {open ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
+
+        {/* Lives inside the sticky header (not above it) so it sits below
+            the phone's status bar and stays on screen while scrolling —
+            "back to my account" must always be one tap away. */}
+        {actingAs && (
+          <div className="bg-brasssoft text-brass text-sm border-t border-line">
+            <div className="max-w-5xl mx-auto px-4 py-1.5 flex items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-1.5 min-w-0">
+                <UserCheck size={15} className="shrink-0" />
+                <span className="truncate">
+                  {t('layout.managingAccount')} <strong>{actingAs.name}</strong>
+                  {t('layout.accountSuffix')}
+                </span>
+              </span>
+              <button
+                onClick={() => setActingAs(null)}
+                className="shrink-0 rounded-md bg-brass text-ink font-medium px-3 py-1.5 text-xs hover:bg-brass/90"
+              >
+                {t('layout.backToMyAccount')}
+              </button>
+            </div>
+          </div>
+        )}
 
         {open && (
           <nav className="md:hidden border-t border-line px-4 py-2 flex flex-col gap-1">
@@ -119,6 +131,17 @@ export default function Layout() {
                 {t(l.labelKey)}
               </NavLink>
             ))}
+            <NavLink
+              to="/account"
+              onClick={() => setOpen(false)}
+              className={({ isActive }) =>
+                `flex items-center gap-2 px-2 py-2.5 rounded-md text-sm whitespace-nowrap ${
+                  isActive ? 'bg-surface2 text-chalk' : 'text-chalkdim'
+                }`
+              }
+            >
+              <CircleUser size={16} /> {t('nav.account')}
+            </NavLink>
             <NavLink
               to="/help"
               onClick={() => setOpen(false)}

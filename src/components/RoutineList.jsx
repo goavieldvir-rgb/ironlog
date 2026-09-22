@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { Plus, Play, Pencil, Trash2, Dumbbell, Copy, Send } from 'lucide-react'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { useCollection, deleteRoutine, addRoutine } from '../lib/db.js'
+import { useFeedback } from '../context/FeedbackContext.jsx'
+import { useCollection, deleteRoutine, addRoutine, copyRoutineToUser } from '../lib/db.js'
 import { loadDraft, clearDraft } from '../lib/draft.js'
 import { supabase } from '../supabase.js'
 import { Button, Card, CategoryTag, EmptyState } from './ui.jsx'
@@ -13,6 +14,7 @@ import { InfoTip } from './InfoTip.jsx'
 export default function RoutineList() {
   const { effectiveUid, isAdmin } = useAdmin()
   const { t } = useLanguage()
+  const { confirm, toast } = useFeedback()
   const [routines, loading, refresh] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [tab, setTab] = useState('all')
@@ -29,12 +31,18 @@ export default function RoutineList() {
   )
 
   async function duplicateRoutine(r) {
-    await addRoutine(effectiveUid, {
-      name: `${r.name} (copy)`,
-      category: r.category,
-      exercises: r.exercises,
-    })
-    refresh()
+    try {
+      await addRoutine(effectiveUid, {
+        name: `${r.name} ${t('routines.copySuffix')}`,
+        category: r.category,
+        exercises: r.exercises,
+      })
+      refresh()
+      toast(t('routines.duplicated'))
+    } catch (err) {
+      console.error(err)
+      toast(t('feedback.saveFailed'), 'error')
+    }
   }
 
   return (
@@ -105,11 +113,16 @@ export default function RoutineList() {
                 </Link>
                 <button
                   className="p-1.5 rounded hover:bg-ironsoft text-chalkdim hover:text-iron"
-                  onClick={() => {
-                    if (confirm(t('routines.deleteConfirm')(r.name))) {
-                      deleteRoutine(effectiveUid, r.id).then(refresh)
+                  onClick={async () => {
+                    if (!(await confirm({ title: t('routines.deleteConfirm')(r.name), confirmLabel: t('common.delete'), danger: true }))) return
+                    try {
+                      await deleteRoutine(effectiveUid, r.id)
                       const draft = loadDraft(effectiveUid)
                       if (draft?.routineId === r.id) clearDraft(effectiveUid)
+                      refresh()
+                      toast(t('feedback.deleted'))
+                    } catch {
+                      toast(t('feedback.deleteFailed'), 'error')
                     }
                   }}
                 >
@@ -152,6 +165,7 @@ export default function RoutineList() {
 
 function CopyToPersonModal({ routine, onClose }) {
   const { t } = useLanguage()
+  const { toast } = useFeedback()
   const [people, setPeople] = useState([])
   const [loading, setLoading] = useState(true)
   const [copiedTo, setCopiedTo] = useState(null)
@@ -169,12 +183,13 @@ function CopyToPersonModal({ routine, onClose }) {
   }, [])
 
   async function copyTo(person) {
-    await addRoutine(person.id, {
-      name: routine.name,
-      category: routine.category,
-      exercises: routine.exercises,
-    })
-    setCopiedTo(person.id)
+    try {
+      await copyRoutineToUser(person.id, routine)
+      setCopiedTo(person.id)
+    } catch (err) {
+      console.error(err)
+      toast(t('feedback.saveFailed'), 'error')
+    }
   }
 
   return (

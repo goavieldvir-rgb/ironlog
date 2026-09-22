@@ -18,6 +18,7 @@ import Stats from './components/Stats.jsx'
 import BodyWeight from './components/BodyWeight.jsx'
 import WeeklySummary from './components/WeeklySummary.jsx'
 import Help from './components/Help.jsx'
+import Account from './components/Account.jsx'
 import ResetPassword from './components/ResetPassword.jsx'
 
 export default function App() {
@@ -72,6 +73,7 @@ export default function App() {
         <Route path="/weight" element={<BodyWeight />} />
         <Route path="/summary" element={<WeeklySummary />} />
         <Route path="/help" element={<Help />} />
+        <Route path="/account" element={<Account />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

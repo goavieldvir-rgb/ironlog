@@ -4,6 +4,7 @@ import { Trash2, AlertTriangle } from 'lucide-react'
 import { BackChevron } from './DirectionalIcon.jsx'
 import { supabase } from '../supabase.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 import { Card, EmptyState, Button } from './ui.jsx'
 
 function formatDate(iso) {
@@ -17,6 +18,7 @@ function formatDate(iso) {
 
 export default function ErrorLogs() {
   const { t } = useLanguage()
+  const { confirm } = useFeedback()
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
   const [openId, setOpenId] = useState(null)
@@ -38,7 +40,7 @@ export default function ErrorLogs() {
   useEffect(load, [])
 
   async function clearAll() {
-    if (!confirm(t('errorLogs.clearAllConfirm')(logs.length))) return
+    if (!(await confirm({ title: t('errorLogs.clearAllConfirm')(logs.length), confirmLabel: t('common.delete'), danger: true }))) return
     await supabase.from('error_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000')
     load()
   }

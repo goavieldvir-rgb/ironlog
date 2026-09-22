@@ -4,6 +4,7 @@ import { Play, Pencil, MessageSquareText, Check } from 'lucide-react'
 import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, updateTrainerComment } from '../lib/db.js'
 import { Card, CategoryTag, Badge, Button } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
@@ -22,9 +23,11 @@ function formatSet(entry, s, t) {
   }
   if (entry.bodyweight) {
     const added = Number(s.weight) > 0 ? `+${s.weight}${entry.unit} ` : ''
-    return `${added}${t('sessionCard.bwShort')} × ${s.reps || 0}`
+    const rir = s.rir !== '' && s.rir != null ? ` · RIR ${s.rir}` : ''
+    return `${added}${t('sessionCard.bwShort')} × ${s.reps || 0}${rir}`
   }
-  return `${s.weight || 0}${entry.unit} × ${s.reps || 0}`
+  const rir = s.rir !== '' && s.rir != null ? ` · RIR ${s.rir}` : ''
+  return `${s.weight || 0}${entry.unit} × ${s.reps || 0}${rir}`
 }
 
 export default function SessionDetail() {
@@ -56,7 +59,10 @@ export default function SessionDetail() {
             <Pencil size={14} /> {t('sessionDetail.edit')}
           </Link>
         </div>
-        <p className="text-chalkdim text-sm mt-1">{formatDate(session.date)}</p>
+        <p className="text-chalkdim text-sm mt-1">
+          {formatDate(session.date)}
+          {session.duration_minutes ? ` · ${t('workout.durationShort', { min: session.duration_minutes })}` : ''}
+        </p>
       </div>
 
       <TrainerComment session={session} effectiveUid={effectiveUid} isAdmin={isAdmin} onSaved={refresh} t={t} />
@@ -103,6 +109,7 @@ function TrainerComment({ session, effectiveUid, isAdmin, onSaved, t }) {
   const [editing, setEditing] = useState(false)
   const [text, setText] = useState(session.trainer_comment || '')
   const [saving, setSaving] = useState(false)
+  const { toast } = useFeedback()
 
   // Nothing to show and nobody who can add anything — render nothing at all.
   if (!session.trainer_comment && !isAdmin) return null
@@ -113,6 +120,9 @@ function TrainerComment({ session, effectiveUid, isAdmin, onSaved, t }) {
       await updateTrainerComment(effectiveUid, session.id, text)
       onSaved?.()
       setEditing(false)
+    } catch (err) {
+      console.error(err)
+      toast(t('feedback.saveFailed'), 'error')
     } finally {
       setSaving(false)
     }

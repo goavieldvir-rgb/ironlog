@@ -12,6 +12,7 @@ import {
 import { useAdmin } from '../context/AdminContext.jsx'
 import { toLocalISODate } from '../lib/dates.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 import {
   useCollection,
   addBodyWeightEntry,
@@ -54,6 +55,7 @@ const emptyForm = { date: todayISO(), weight: '', unit: 'kg' }
 export default function BodyWeight() {
   const { effectiveUid } = useAdmin()
   const { t } = useLanguage()
+  const { confirm, toast } = useFeedback()
   const [entries, loading, refresh] = useCollection(effectiveUid, 'body_weight_logs', 'date', 'asc')
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
@@ -90,6 +92,9 @@ export default function BodyWeight() {
       refresh()
       setForm(emptyForm)
       setEditingId(null)
+    } catch (err) {
+      console.error(err)
+      toast(t('feedback.saveFailed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -210,8 +215,14 @@ export default function BodyWeight() {
                   <Pencil size={14} />
                 </button>
                 <button
-                  onClick={() => {
-                    if (confirm(t('bodyWeight.deleteConfirm'))) deleteBodyWeightEntry(effectiveUid, e.id).then(refresh)
+                  onClick={async () => {
+                    if (!(await confirm({ title: t('bodyWeight.deleteConfirm'), confirmLabel: t('common.delete'), danger: true }))) return
+                    try {
+                      await deleteBodyWeightEntry(effectiveUid, e.id)
+                      refresh()
+                    } catch {
+                      toast(t('feedback.deleteFailed'), 'error')
+                    }
                   }}
                   className="text-chalkdim hover:text-iron p-1"
                 >

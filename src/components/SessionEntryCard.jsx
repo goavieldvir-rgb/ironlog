@@ -71,7 +71,11 @@ export default function SessionEntryCard({
   const lastWeight = liveExercise ? liveExercise.last_weight : entry.lastWeight
   const lastReps = liveExercise ? liveExercise.last_reps : entry.lastReps
   const lastDistance = liveExercise ? liveExercise.last_distance : entry.lastDistance
-  const showRir = !isCardio && (liveExercise ? !!liveExercise.track_rir : !!entry.trackRir)
+  // Show RIR if the exercise tracks it now, OR if this entry already has
+  // RIR values logged (e.g. editing an old session) — logged data should
+  // never be hidden just because the setting was later switched off.
+  const hasLoggedRir = (entry.sets || []).some((s) => s.rir !== '' && s.rir != null)
+  const showRir = !isCardio && (hasLoggedRir || (liveExercise ? !!liveExercise.track_rir : !!entry.trackRir))
 
   function copyFromPrevious(setIdx) {
     const prev = entry.sets[setIdx - 1]
@@ -163,6 +167,23 @@ export default function SessionEntryCard({
             <p className="num text-chalkdim text-xs mt-0.5 inline-flex items-center gap-1 flex-wrap">
               {prevLabel}
               <InfoTip text={t('sessionCard.previousTip')} />
+            </p>
+          )}
+          {/* The last note written on this exercise — "seat on 4", "left
+              knee sore" — resurfaced the next time it comes up, which is
+              when it's actually useful. */}
+          {liveExercise?.last_note && (
+            <p className="text-brass text-xs mt-1 flex items-start gap-1">
+              <StickyNote size={12} className="shrink-0 mt-0.5" />
+              <span>
+                {liveExercise.last_note_date && (
+                  <span className="text-chalkdim">
+                    {new Date(liveExercise.last_note_date + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                    {': '}
+                  </span>
+                )}
+                {liveExercise.last_note}
+              </span>
             </p>
           )}
         </div>

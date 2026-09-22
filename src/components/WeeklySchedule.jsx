@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Play } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, setScheduleDay } from '../lib/db.js'
 import { Card, Button, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
@@ -14,6 +15,7 @@ const SLOT_LABEL_KEYS = ['slotMobility', 'slotStrength', 'slotCardio']
 
 export default function WeeklySchedule({ effectiveUid, routines }) {
   const { t } = useLanguage()
+  const { toast } = useFeedback()
   const navigate = useNavigate()
   const [schedule, , refreshSchedule] = useCollection(effectiveUid, 'weekly_schedule', 'day_of_week', 'asc')
   const [editingDay, setEditingDay] = useState(null)
@@ -52,6 +54,9 @@ export default function WeeklySchedule({ effectiveUid, routines }) {
       }
       refreshSchedule()
       setEditingDay(null)
+    } catch (err) {
+      console.error(err)
+      toast(t('feedback.saveFailed'), 'error')
     } finally {
       setSaving(false)
     }

@@ -4,17 +4,19 @@ import { Check } from 'lucide-react'
 import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, updateSession } from '../lib/db.js'
 import { Button, Card, CategoryTag, Field } from './ui.jsx'
 import SessionEntryCard from './SessionEntryCard.jsx'
 
 function emptySet(category) {
-  return category === 'cardio' ? { duration: '', intensity: '', distance: '' } : { weight: '', reps: '' }
+  return category === 'cardio' ? { duration: '', intensity: '', distance: '' } : { weight: '', reps: '', rir: '' }
 }
 
 export default function EditSession() {
   const { effectiveUid } = useAdmin()
   const { t } = useLanguage()
+  const { toast } = useFeedback()
   const { id } = useParams()
   const navigate = useNavigate()
   const [sessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
@@ -75,6 +77,9 @@ export default function EditSession() {
       await updateSession(effectiveUid, id, { date, notes, entries })
       setSaved(true)
       setTimeout(() => navigate(`/history/${id}`), 700)
+    } catch (err) {
+      console.error(err)
+      toast(t('feedback.saveFailed'), 'error')
     } finally {
       setSaving(false)
     }

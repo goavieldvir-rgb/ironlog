@@ -4,6 +4,7 @@ import { Trash2, Search, X } from 'lucide-react'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, deleteSession } from '../lib/db.js'
 import { Card, CategoryTag, EmptyState, Button, Field } from './ui.jsx'
 import { Tabs } from './ExerciseLibrary.jsx'
@@ -29,6 +30,7 @@ function matchesQuery(session, q) {
 export default function History() {
   const { effectiveUid } = useAdmin()
   const { t } = useLanguage()
+  const { confirm, toast } = useFeedback()
   const [sessions, loading, refresh] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [tab, setTab] = useState('all')
   const [q, setQ] = useState('')
@@ -135,13 +137,21 @@ export default function History() {
                   </div>
                   <p className="text-chalkdim text-xs mt-1">
                     {formatDate(s.date)} · {s.entries?.length || 0} {t('history.exercisesLabel')} · {totalSets} {t('history.setsLabel')}
+                    {s.duration_minutes ? ` · ${t('workout.durationShort', { min: s.duration_minutes })}` : ''}
                   </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <button
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.preventDefault()
-                      if (confirm(t('history.deleteConfirm'))) deleteSession(effectiveUid, s.id).then(refresh)
+                      if (!(await confirm({ title: t('history.deleteConfirm'), body: t('feedback.cantUndo'), confirmLabel: t('common.delete'), danger: true }))) return
+                      try {
+                        await deleteSession(effectiveUid, s.id)
+                        refresh()
+                        toast(t('feedback.deleted'))
+                      } catch {
+                        toast(t('feedback.deleteFailed'), 'error')
+                      }
                     }}
                     className="p-1.5 rounded hover:bg-ironsoft text-chalkdim hover:text-iron"
                   >

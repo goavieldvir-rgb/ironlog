@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { Plus, Play, Pencil, Trash2, Lock } from 'lucide-react'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, addExercise, updateExercise, deleteExercise } from '../lib/db.js'
 import { Button, Card, CategoryTag, Badge, EmptyState, Field } from './ui.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
@@ -37,6 +38,31 @@ export default function ExerciseLibrary() {
   const { t, lang } = useLanguage()
   const [exercises, loading, refresh] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [sessions] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const [routines] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
+  const { confirm, toast } = useFeedback()
+
+  // Deleting an exercise that a routine still uses would leave that
+  // routine pointing at nothing — so say which routines use it first.
+  async function handleDelete(ex) {
+    const usedIn = routines.filter((r) => (r.exercises || []).some((it) => it.exerciseId === ex.id))
+    const name = (lang === 'he' && ex.name_he) || ex.name
+    const ok = await confirm({
+      title: t('exercises.deleteConfirm')(name),
+      body: usedIn.length
+        ? t('exercises.deleteUsedIn', { routines: usedIn.map((r) => r.name).join(', ') })
+        : undefined,
+      confirmLabel: t('common.delete'),
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await deleteExercise(effectiveUid, ex.id)
+      refresh()
+      toast(t('feedback.deleted'))
+    } catch {
+      toast(t('feedback.deleteFailed'), 'error')
+    }
+  }
   const [tab, setTab] = useState('all')
   const [editing, setEditing] = useState(null)
   const [picking, setPicking] = useState(false)
@@ -123,11 +149,7 @@ export default function ExerciseLibrary() {
                 </button>
                 <button
                   className="p-1.5 rounded hover:bg-ironsoft text-chalkdim hover:text-iron"
-                  onClick={() => {
-                    if (confirm(t('exercises.deleteConfirm')(ex.name))) {
-                      deleteExercise(effectiveUid, ex.id).then(refresh)
-                    }
-                  }}
+                  onClick={() => handleDelete(ex)}
                   title={t('common.delete')}
                 >
                   <Trash2 size={15} />
@@ -177,6 +199,7 @@ export default function ExerciseLibrary() {
         <ExerciseModal
           key={editing.id || 'new'}
           initial={editing}
+          existingExercises={exercises}
           hasHistory={editing.id ? usedExerciseIds.has(editing.id) : false}
           onClose={() => setEditing(null)}
           onSave={async (data) => {
@@ -238,16 +261,47 @@ export function Tabs({ tab, setTab }) {
   )
 }
 
-export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, onCreateVariant }) {
-  const { t } = useLanguage()
+// Normalizes a name for duplicate comparison — "Bench Press", "bench press"
+// and "Bench  Press " are the same exercise to a person, so they should be
+// to this check too.
+function normalizeName(s) {
+  return String(s || '').trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
+export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, onCreateVariant, existingExercises = [] }) {
+  const { t, lang } = useLanguage()
+  const { confirm, toast } = useFeedback()
   const [form, setForm] = useState({ ...emptyExerciseForm, ...initial })
   const [saving, setSaving] = useState(false)
 
   async function handleSubmit(e) {
     e.preventDefault()
+    const cleanName = form.name.trim().replace(/\s+/g, ' ')
+    if (!cleanName) return
+
+    // Two exercises with the same name quietly split your history in two
+    // (half your bench sessions under one, half under the other), so warn
+    // before creating one — but still allow it, since sometimes it's
+    // deliberate (e.g. same movement tracked in kg and in lb).
+    const target = normalizeName(cleanName)
+    const clash = existingExercises.find(
+      (ex) => ex.id !== initial.id && (normalizeName(ex.name) === target || normalizeName(ex.name_he) === target),
+    )
+    if (clash) {
+      const ok = await confirm({
+        title: t('exercises.duplicateTitle', { name: (lang === 'he' && clash.name_he) || clash.name }),
+        body: t('exercises.duplicateBody'),
+        confirmLabel: t('exercises.duplicateConfirm'),
+      })
+      if (!ok) return
+    }
+
     setSaving(true)
     try {
-      await onSave(form)
+      await onSave({ ...form, name: cleanName })
+    } catch (err) {
+      console.error(err)
+      toast(t('feedback.saveFailed'), 'error')
     } finally {
       setSaving(false)
     }

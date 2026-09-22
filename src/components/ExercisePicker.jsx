@@ -3,10 +3,12 @@ import { Search, Plus, Check } from 'lucide-react'
 import { useGlobalExercises } from '../lib/db.js'
 import { disambiguateLabels } from '../lib/disambiguate.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 import { Button, CategoryTag, Badge } from './ui.jsx'
 
 export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, onClose, lockCategory }) {
   const { t, lang } = useLanguage()
+  const { toast } = useFeedback()
   const [globalExercises, loading] = useGlobalExercises()
   const [q, setQ] = useState('')
   const [tab, setTab] = useState(lockCategory || 'all')
@@ -49,7 +51,8 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
         next.delete(g.id)
         return next
       })
-      throw err
+      console.error(err)
+      toast(t('feedback.saveFailed'), 'error')
     }
   }
 

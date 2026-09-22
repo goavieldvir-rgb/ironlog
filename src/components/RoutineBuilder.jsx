@@ -4,6 +4,7 @@ import { Plus, Trash2, ArrowUp, ArrowDown, Library } from 'lucide-react'
 import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, addRoutine, updateRoutine, addExercise, updateExercise } from '../lib/db.js'
 import { Button, Card, Field } from './ui.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
@@ -14,6 +15,7 @@ import { disambiguateLabels } from '../lib/disambiguate.js'
 export default function RoutineBuilder() {
   const { effectiveUid } = useAdmin()
   const { t, lang } = useLanguage()
+  const { toast } = useFeedback()
   const { id } = useParams()
   const navigate = useNavigate()
   const [exercises, , refreshExercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
@@ -100,10 +102,15 @@ export default function RoutineBuilder() {
   const allRirOn = rirEligibleExercises.length > 0 && rirEligibleExercises.every((e) => e.track_rir)
 
   async function setRirForRoutine(enable) {
-    for (const id of rirEligibleIds) {
-      await updateExercise(effectiveUid, id, { trackRir: enable })
+    try {
+      await Promise.all(rirEligibleIds.map((id) => updateExercise(effectiveUid, id, { trackRir: enable })))
+      toast(enable ? t('routines.rirOnDone') : t('routines.rirOffDone'))
+    } catch (err) {
+      console.error(err)
+      toast(t('feedback.saveFailed'), 'error')
+    } finally {
+      refreshExercises()
     }
-    refreshExercises()
   }
 
   function updateItem(i, patch) {
@@ -132,7 +139,11 @@ export default function RoutineBuilder() {
       } else {
         await addRoutine(effectiveUid, payload)
       }
+      toast(t('feedback.saved'))
       navigate('/routines')
+    } catch (err) {
+      console.error(err)
+      toast(t('feedback.saveFailed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -299,6 +310,7 @@ export default function RoutineBuilder() {
       {creatingCustom && (
         <ExerciseModal
           initial={{ ...emptyExerciseForm, category }}
+          existingExercises={exercises}
           onClose={() => setCreatingCustom(false)}
           onSave={async (data) => {
             const ex = await addExercise(effectiveUid, data)

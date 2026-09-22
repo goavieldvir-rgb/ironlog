@@ -6,12 +6,14 @@ import { AuthProvider } from './context/AuthContext.jsx'
 import { AdminProvider } from './context/AdminContext.jsx'
 import { LanguageProvider } from './context/LanguageContext.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
+import { FeedbackProvider } from './context/FeedbackContext.jsx'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <LanguageProvider>
       <ErrorBoundary>
+        <FeedbackProvider>
         <HashRouter>
           <AuthProvider>
             <AdminProvider>
@@ -19,6 +21,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             </AdminProvider>
           </AuthProvider>
         </HashRouter>
+        </FeedbackProvider>
       </ErrorBoundary>
     </LanguageProvider>
   </React.StrictMode>,
