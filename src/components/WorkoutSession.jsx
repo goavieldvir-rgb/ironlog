@@ -7,7 +7,7 @@ import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, logSession, addExercise } from '../lib/db.js'
-import { saveDraft, loadDraft, clearDraft } from '../lib/draft.js'
+import { saveDraft, loadDraft, clearDraft, FREESTYLE_KEY } from '../lib/draft.js'
 import { toLocalISODate } from '../lib/dates.js'
 import { Button, Card, CategoryTag, Field } from './ui.jsx'
 import SessionEntryCard from './SessionEntryCard.jsx'
@@ -57,6 +57,9 @@ export default function WorkoutSession() {
     return best
   }, [pastSessions])
   const routine = useMemo(() => routines.find((r) => r.id === routineId), [routines, routineId])
+  // Each routine keeps its own in-progress workout, so starting a second
+  // one never overwrites an unfinished first.
+  const draftKey = isFreestyle ? FREESTYLE_KEY : routineId
 
   const [date, setDate] = useState(todayISO())
   const [notes, setNotes] = useState('')
@@ -115,7 +118,7 @@ export default function WorkoutSession() {
   // and also what saves you if Safari reloads the tab mid-session.
   useEffect(() => {
     if (isFreestyle) {
-      const draft = loadDraft(effectiveUid)
+      const draft = loadDraft(effectiveUid, draftKey)
       if (draft && draft.routineId === null) {
         setEntries(refreshLastKnownData(draft.entries || [], exercises))
         setDate(draft.date || todayISO())
@@ -130,7 +133,7 @@ export default function WorkoutSession() {
       return
     }
     if (routine) {
-      const draft = loadDraft(effectiveUid)
+      const draft = loadDraft(effectiveUid, draftKey)
       if (draft && draft.routineId === routine.id) {
         setEntries(refreshLastKnownData(draft.entries || [], exercises))
         setDate(draft.date || todayISO())
@@ -191,7 +194,7 @@ export default function WorkoutSession() {
   // never wipes out what's already been logged.
   useEffect(() => {
     if (!ready || entries.length === 0) return
-    saveDraft(effectiveUid, {
+    saveDraft(effectiveUid, draftKey, {
       routineId: isFreestyle ? null : routine?.id || null,
       routineName: isFreestyle ? t('workout.freestyleSession') : routine?.name,
       category,
@@ -367,7 +370,7 @@ export default function WorkoutSession() {
           sets: e.sets,
         })),
       })
-      clearDraft(effectiveUid)
+      clearDraft(effectiveUid, draftKey)
       setSaved(true)
       toast(t('workout.sessionSaved'))
       navigate('/history')
@@ -391,13 +394,13 @@ export default function WorkoutSession() {
       danger: true,
     })
     if (!ok) return
-    clearDraft(effectiveUid)
+    clearDraft(effectiveUid, draftKey)
     navigate('/')
   }
 
   if (!isFreestyle && !routinesLoading && !routine) {
-    const draft = loadDraft(effectiveUid)
-    if (draft?.routineId === routineId) clearDraft(effectiveUid)
+    const draft = loadDraft(effectiveUid, draftKey)
+    if (draft?.routineId === routineId) clearDraft(effectiveUid, draftKey)
     return <p className="text-chalkdim">{t('workout.routineNotFound')}</p>
   }
 

@@ -5,7 +5,7 @@ import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, deleteRoutine, addRoutine, copyRoutineToUser } from '../lib/db.js'
-import { loadDraft, clearDraft } from '../lib/draft.js'
+import { clearDraft } from '../lib/draft.js'
 import { supabase } from '../supabase.js'
 import { Button, Card, CategoryTag, EmptyState } from './ui.jsx'
 import { Tabs } from './ExerciseLibrary.jsx'
@@ -118,8 +118,7 @@ export default function RoutineList() {
                     if (!(await confirm({ title: t('routines.deleteConfirm')(r.name), confirmLabel: t('common.delete'), danger: true }))) return
                     try {
                       await deleteRoutine(effectiveUid, r.id)
-                      const draft = loadDraft(effectiveUid)
-                      if (draft?.routineId === r.id) clearDraft(effectiveUid)
+                      clearDraft(effectiveUid, r.id)
                       refresh()
                       toast(t('feedback.deleted'))
                     } catch {

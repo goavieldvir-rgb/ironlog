@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useCollection } from '../lib/db.js'
-import { loadDraft, clearDraft } from '../lib/draft.js'
+import { listDrafts, clearDraft } from '../lib/draft.js'
 import { Button, Card } from './ui.jsx'
 import WeeklySchedule from './WeeklySchedule.jsx'
 
@@ -53,14 +53,17 @@ export default function Dashboard() {
   const allDone = steps.every((s) => s.done)
   const showChecklist = !sessionsLoading && !allDone
 
-  const [draft, setDraft] = useState(null)
+  // Every unfinished workout, not just the most recent one — a day can
+  // hold three routines, and a half-done session shouldn't be hidden
+  // just because another was started after it.
+  const [drafts, setDrafts] = useState([])
   useEffect(() => {
-    setDraft(loadDraft(effectiveUid))
+    setDrafts(listDrafts(effectiveUid))
   }, [effectiveUid])
 
-  function discardDraft() {
-    clearDraft(effectiveUid)
-    setDraft(null)
+  function discardDraft(routineKey) {
+    clearDraft(effectiveUid, routineKey)
+    setDrafts((prev) => prev.filter((d) => d.routineKey !== routineKey))
   }
 
   const firstName = (user.displayName || user.email || '').split(/[\s@]/)[0]
@@ -78,8 +81,8 @@ export default function Dashboard() {
         </h1>
       </div>
 
-      {draft && (
-        <Card className="border-brass/60 flex items-center justify-between gap-3 flex-wrap">
+      {drafts.map((draft) => (
+        <Card key={draft.routineKey} className="border-brass/60 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-start gap-3">
             <Clock size={18} className="text-brass shrink-0 mt-0.5" />
             <div>
@@ -94,7 +97,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <button onClick={discardDraft} className="text-chalkdim text-xs hover:text-iron">
+            <button onClick={() => discardDraft(draft.routineKey)} className="text-chalkdim text-xs hover:text-iron">
               {t('dashboard.discard')}
             </button>
             <Link to={`/workout/${draft.routineId || 'freestyle'}`}>
@@ -104,7 +107,7 @@ export default function Dashboard() {
             </Link>
           </div>
         </Card>
-      )}
+      ))}
 
       {showChecklist && <OnboardingChecklist steps={steps} t={t} />}
 
