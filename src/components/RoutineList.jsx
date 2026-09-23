@@ -10,6 +10,7 @@ import { supabase } from '../supabase.js'
 import { Button, Card, CategoryTag, EmptyState } from './ui.jsx'
 import { Tabs } from './ExerciseLibrary.jsx'
 import { InfoTip } from './InfoTip.jsx'
+import { useScrollLock } from '../lib/scrollLock.js'
 
 export default function RoutineList() {
   const { effectiveUid, isAdmin } = useAdmin()
@@ -95,7 +96,7 @@ export default function RoutineList() {
                 <button
                   className="p-1.5 rounded hover:bg-surface2 text-chalkdim hover:text-chalk"
                   onClick={() => duplicateRoutine(r)}
-                  title={t('routines.duplicate')}
+                  title={t('routines.duplicate')} aria-label={t('routines.duplicate')}
                 >
                   <Copy size={15} />
                 </button>
@@ -103,7 +104,7 @@ export default function RoutineList() {
                   <button
                     className="p-1.5 rounded hover:bg-brasssoft text-chalkdim hover:text-brass"
                     onClick={() => setCopyTarget(r)}
-                    title={t('routines.copyToPerson')}
+                    title={t('routines.copyToPerson')} aria-label={t('routines.copyToPerson')}
                   >
                     <Send size={15} />
                   </button>
@@ -164,6 +165,7 @@ export default function RoutineList() {
 }
 
 function CopyToPersonModal({ routine, onClose }) {
+  useScrollLock(true)
   const { t } = useLanguage()
   const { toast } = useFeedback()
   const [people, setPeople] = useState([])

@@ -4,6 +4,7 @@ import { Dumbbell, LayoutDashboard, ListChecks, History, Library, LogOut, Menu, 
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useScrollLock } from '../lib/scrollLock.js'
 
 const links = [
   { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard, end: true },
@@ -20,6 +21,7 @@ export default function Layout() {
   const { isAdmin, actingAs, setActingAs } = useAdmin()
   const { t, lang, setLang } = useLanguage()
   const [open, setOpen] = useState(false)
+  useScrollLock(open)
 
   const navLinks = isAdmin ? [...links, { to: '/people', labelKey: 'nav.people', icon: Users }] : links
 
@@ -61,7 +63,7 @@ export default function Layout() {
             <button
               onClick={toggleLang}
               className="flex rounded-md bg-surface2 p-0.5 text-xs num"
-              title={t('layout.language')}
+              title={t('layout.language')} aria-label={t('layout.language')}
             >
               <span className={`px-2 py-1 rounded ${lang === 'en' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>EN</span>
               <span className={`px-2 py-1 rounded ${lang === 'he' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>עב</span>
@@ -79,13 +81,13 @@ export default function Layout() {
             <button
               onClick={logout}
               className="text-chalkdim hover:text-iron transition-colors p-2 rounded-md hover:bg-surface2"
-              title={t('nav.logout')}
+              title={t('nav.logout')} aria-label={t('nav.logout')}
             >
               <LogOut size={18} />
             </button>
           </div>
 
-          <button className="md:hidden p-2" onClick={() => setOpen(!open)}>
+          <button className="md:hidden p-2" aria-label={t('layout.menu')} aria-expanded={open} onClick={() => setOpen(!open)}>
             {open ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>

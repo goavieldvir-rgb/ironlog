@@ -5,11 +5,13 @@ import { disambiguateLabels } from '../lib/disambiguate.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { Button, CategoryTag, Badge } from './ui.jsx'
+import { useScrollLock } from '../lib/scrollLock.js'
 
 export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, onClose, lockCategory }) {
   const { t, lang } = useLanguage()
   const { toast } = useFeedback()
   const [globalExercises, loading] = useGlobalExercises()
+  useScrollLock(true)
   const [q, setQ] = useState('')
   const [tab, setTab] = useState(lockCategory || 'all')
   const [addedIds, setAddedIds] = useState(new Set())

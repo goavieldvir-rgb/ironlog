@@ -211,10 +211,11 @@ export default function BodyWeight() {
                   {e.weight}
                   {e.unit}
                 </span>
-                <button onClick={() => startEdit(e)} className="text-chalkdim hover:text-chalk p-1">
+                <button onClick={() => startEdit(e)} aria-label={t('common.edit')} className="text-chalkdim hover:text-chalk p-1">
                   <Pencil size={14} />
                 </button>
                 <button
+                  aria-label={t('common.delete')}
                   onClick={async () => {
                     if (!(await confirm({ title: t('bodyWeight.deleteConfirm'), confirmLabel: t('common.delete'), danger: true }))) return
                     try {

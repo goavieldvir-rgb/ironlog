@@ -1,10 +1,10 @@
-import React, { useState } from 'react'
-import { Play, Plus, Trash2, Minus, CornerDownLeft, History, StickyNote, ChevronDown, Repeat } from 'lucide-react'
+import React, { useEffect, useRef, useState } from 'react'
+import { Play, Plus, Trash2, Minus, CornerDownLeft, History, StickyNote, ChevronDown, Repeat, ArrowUp, ArrowDown, Trophy } from 'lucide-react'
 import { Card, Badge } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
-function Stepper({ value, onChange, step, min = 0, max }) {
+function Stepper({ value, onChange, step, min = 0, max, label }) {
   function bump(delta) {
     const current = Number(value) || 0
     let next = Math.max(min, Math.round((current + delta) * 100) / 100)
@@ -16,9 +16,10 @@ function Stepper({ value, onChange, step, min = 0, max }) {
       <button
         type="button"
         onClick={() => bump(-step)}
-        className="px-1 shrink-0 rounded-s-md bg-surface2 text-chalkdim hover:text-chalk border border-line border-e-0"
+        aria-label={label ? `${label} −${step}` : undefined}
+        className="px-2.5 min-h-[40px] shrink-0 rounded-s-md bg-surface2 text-chalkdim hover:text-chalk active:bg-line border border-line border-e-0 flex items-center justify-center"
       >
-        <Minus size={11} />
+        <Minus size={13} />
       </button>
       <input
         type="number"
@@ -26,14 +27,16 @@ function Stepper({ value, onChange, step, min = 0, max }) {
         step={step}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        aria-label={label}
         className="num text-center !rounded-none !px-0.5 min-w-0 w-full"
       />
       <button
         type="button"
         onClick={() => bump(step)}
-        className="px-1 shrink-0 rounded-e-md bg-surface2 text-chalkdim hover:text-chalk border border-line border-s-0"
+        aria-label={label ? `${label} +${step}` : undefined}
+        className="px-2.5 min-h-[40px] shrink-0 rounded-e-md bg-surface2 text-chalkdim hover:text-chalk active:bg-line border border-line border-s-0 flex items-center justify-center"
       >
-        <Plus size={11} />
+        <Plus size={13} />
       </button>
     </div>
   )
@@ -49,12 +52,16 @@ export default function SessionEntryCard({
   // exercise mid-workout) — one live source of truth instead of needing
   // every one of those code paths to remember to refresh it correctly.
   liveExercise,
+  // All-time best for this exercise, from sessions already saved.
+  personalBest,
   onUpdateSet,
   onAddSet,
   onRemoveSet,
   onRemoveEntry,
   onUpdateNote,
   onSwapExercise,
+  onMoveUp,
+  onMoveDown,
   removable = false,
 }) {
   const { t } = useLanguage()
@@ -97,6 +104,39 @@ export default function SessionEntryCard({
     if (entry.bodyweight) return lastSets.reduce((best, s) => (Number(s.reps) > Number(best.reps) ? s : best))
     return lastSets.reduce((best, s) => (Number(s.weight) > Number(best.weight) ? s : best))
   })()
+  // The number in a set that a PR is judged on, matching the coach's alert.
+  function prValue(s) {
+    const raw = isCardio ? s.duration : entry.bodyweight ? s.reps : s.weight
+    const n = Number(raw)
+    return raw !== '' && raw != null && isFinite(n) ? n : null
+  }
+  function isPrSet(s) {
+    // Only celebrate against a real previous best — the first time you
+    // ever do an exercise isn't something you beat.
+    if (personalBest == null) return false
+    const v = prValue(s)
+    return v != null && v > personalBest
+  }
+  const bestThisSession = (entry.sets || []).reduce((acc, s) => {
+    const v = isPrSet(s) ? prValue(s) : null
+    return v != null && (acc == null || v > acc) ? v : acc
+  }, null)
+  const prUnit = isCardio ? t('sessionCard.minUnit') : entry.bodyweight ? t('sessionCard.reps') : entry.unit
+
+  // A short buzz the first moment a set crosses the old best, so it lands
+  // while you're still holding the phone. Fires once per exercise.
+  const celebrated = useRef(false)
+  useEffect(() => {
+    if (bestThisSession == null) {
+      celebrated.current = false
+      return
+    }
+    if (!celebrated.current) {
+      celebrated.current = true
+      if (navigator.vibrate) navigator.vibrate([90, 60, 140])
+    }
+  }, [bestThisSession])
+
   const hasChoice = lastSetData && topSetData && JSON.stringify(lastSetData) !== JSON.stringify(topSetData)
   const hasAnyLastData = lastSetData != null || lastWeight != null
 
@@ -160,6 +200,15 @@ export default function SessionEntryCard({
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-lg">{entry.name}</h3>
+            {bestThisSession != null && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-brasssoft text-brass px-2 py-0.5 text-xs font-medium"
+                title={t('sessionCard.prTitle', { prev: `${personalBest}${prUnit}` })}
+              >
+                <Trophy size={12} /> {t('sessionCard.prBadge')} {bestThisSession}
+                {prUnit}
+              </span>
+            )}
             {isCardio && <Badge tone="cardio">{t('sessionCard.cardioBadge')}</Badge>}
             {!isCardio && entry.bodyweight && <Badge tone="brass">{t('sessionCard.bodyweightBadge')}</Badge>}
           </div>
@@ -188,10 +237,35 @@ export default function SessionEntryCard({
           )}
         </div>
         <div className="flex items-center gap-2">
+          {/* Reordering mid-workout: machines get taken, so the order you
+              planned isn't always the order you can train. */}
+          {(onMoveUp || onMoveDown) && (
+            <span className="flex items-center">
+              <button
+                onClick={onMoveUp}
+                disabled={!onMoveUp}
+                title={t('sessionCard.moveUp')}
+                aria-label={t('sessionCard.moveUp')}
+                className="text-chalkdim hover:text-chalk p-1 disabled:opacity-30 disabled:hover:text-chalkdim"
+              >
+                <ArrowUp size={15} />
+              </button>
+              <button
+                onClick={onMoveDown}
+                disabled={!onMoveDown}
+                title={t('sessionCard.moveDown')}
+                aria-label={t('sessionCard.moveDown')}
+                className="text-chalkdim hover:text-chalk p-1 disabled:opacity-30 disabled:hover:text-chalkdim"
+              >
+                <ArrowDown size={15} />
+              </button>
+            </span>
+          )}
           {onSwapExercise && (
             <button
               onClick={onSwapExercise}
               title={t('sessionCard.swapExercise')}
+              aria-label={t('sessionCard.swapExercise')}
               className="text-chalkdim hover:text-brass p-1"
             >
               <Repeat size={15} />
@@ -201,6 +275,7 @@ export default function SessionEntryCard({
             <button
               onClick={() => setShowNote(true)}
               title={t('sessionCard.addNote')}
+              aria-label={t('sessionCard.addNote')}
               className="text-chalkdim hover:text-brass p-1"
             >
               <StickyNote size={15} />
@@ -217,7 +292,7 @@ export default function SessionEntryCard({
             </a>
           )}
           {removable && (
-            <button onClick={onRemoveEntry} className="text-chalkdim hover:text-iron">
+            <button onClick={onRemoveEntry} aria-label={t('sessionCard.removeExercise')} className="text-chalkdim hover:text-iron">
               <Trash2 size={15} />
             </button>
           )}
@@ -258,33 +333,34 @@ export default function SessionEntryCard({
           {entry.sets.map((s, j) => (
             <div key={j} className="grid grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_3.25rem] gap-1 items-center">
               <span className="num text-chalkdim text-sm">{j + 1}</span>
-              <Stepper value={s.duration} step={1} min={0} onChange={(v) => onUpdateSet(j, { duration: v })} />
+              <Stepper value={s.duration} step={1} min={0} onChange={(v) => onUpdateSet(j, { duration: v })} label={`${t('sessionCard.set')} ${j + 1} ${t('sessionCard.min')}`} />
               <Stepper
+                label={`${t('sessionCard.set')} ${j + 1} ${intensityLabel}`}
                 value={s.intensity}
                 step={1}
                 min={1}
                 max={intensityMax}
                 onChange={(v) => onUpdateSet(j, { intensity: v })}
               />
-              <Stepper value={s.distance} step={0.1} min={0} onChange={(v) => onUpdateSet(j, { distance: v })} />
+              <Stepper value={s.distance} step={0.1} min={0} onChange={(v) => onUpdateSet(j, { distance: v })} label={`${t('sessionCard.set')} ${j + 1} ${distanceUnit}`} />
               <div className="flex items-center gap-0.5 justify-end min-w-0">
                 {j === 0 && hasAnyLastData ? (
                   <button
                     onClick={() => useLastTime(j)}
-                    title={hasChoice ? t('sessionCard.chooseLastTime') : t('sessionCard.useLastTime')}
+                    title={hasChoice ? t('sessionCard.chooseLastTime') : t('sessionCard.useLastTime')} aria-label={hasChoice ? t('sessionCard.chooseLastTime') : t('sessionCard.useLastTime')}
                     className="text-chalkdim hover:text-brass p-1 inline-flex items-center"
                   >
                     <History size={14} />
                     {hasChoice && <ChevronDown size={10} />}
                   </button>
                 ) : j > 0 ? (
-                  <button onClick={() => copyFromPrevious(j)} title={t('sessionCard.sameAsAbove')} className="text-chalkdim hover:text-brass p-1">
+                  <button onClick={() => copyFromPrevious(j)} title={t('sessionCard.sameAsAbove')} aria-label={t('sessionCard.sameAsAbove')} className="text-chalkdim hover:text-brass p-1">
                     <CornerDownLeft size={14} />
                   </button>
                 ) : (
                   <span className="w-6" />
                 )}
-                <button onClick={() => onRemoveSet(j)} className="text-chalkdim hover:text-iron p-1">
+                <button onClick={() => onRemoveSet(j)} aria-label={t('sessionCard.removeSet')} className="text-chalkdim hover:text-iron p-1">
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -321,27 +397,29 @@ export default function SessionEntryCard({
               }`}
             >
               <span className="num text-chalkdim text-sm">{j + 1}</span>
-              <Stepper value={s.weight} step={weightStep} onChange={(v) => onUpdateSet(j, { weight: v })} />
-              <Stepper value={s.reps} step={1} onChange={(v) => onUpdateSet(j, { reps: v })} />
-              {showRir && <Stepper value={s.rir} step={1} min={0} max={10} onChange={(v) => onUpdateSet(j, { rir: v })} />}
+              <Stepper value={s.weight} step={weightStep} onChange={(v) => onUpdateSet(j, { weight: v })} label={`${t('sessionCard.set')} ${j + 1} ${t('sessionCard.wt')} (${entry.unit})`} />
+              <Stepper value={s.reps} step={1} onChange={(v) => onUpdateSet(j, { reps: v })} label={`${t('sessionCard.set')} ${j + 1} ${t('sessionCard.reps')}`} />
+              {showRir && (
+                <Stepper value={s.rir} step={1} min={0} max={10} onChange={(v) => onUpdateSet(j, { rir: v })} label={`${t('sessionCard.set')} ${j + 1} RIR`} />
+              )}
               <div className="flex items-center gap-0.5 justify-end min-w-0">
                 {j === 0 && hasAnyLastData ? (
                   <button
                     onClick={() => useLastTime(j)}
-                    title={hasChoice ? t('sessionCard.chooseLastTime') : t('sessionCard.useLastTime')}
+                    title={hasChoice ? t('sessionCard.chooseLastTime') : t('sessionCard.useLastTime')} aria-label={hasChoice ? t('sessionCard.chooseLastTime') : t('sessionCard.useLastTime')}
                     className="text-chalkdim hover:text-brass p-1 inline-flex items-center"
                   >
                     <History size={14} />
                     {hasChoice && <ChevronDown size={10} />}
                   </button>
                 ) : j > 0 ? (
-                  <button onClick={() => copyFromPrevious(j)} title={t('sessionCard.sameAsSetAbove')} className="text-chalkdim hover:text-brass p-1">
+                  <button onClick={() => copyFromPrevious(j)} title={t('sessionCard.sameAsSetAbove')} aria-label={t('sessionCard.sameAsSetAbove')} className="text-chalkdim hover:text-brass p-1">
                     <CornerDownLeft size={14} />
                   </button>
                 ) : (
                   <span className="w-6" />
                 )}
-                <button onClick={() => onRemoveSet(j)} className="text-chalkdim hover:text-iron p-1">
+                <button onClick={() => onRemoveSet(j)} aria-label={t('sessionCard.removeSet')} className="text-chalkdim hover:text-iron p-1">
                   <Trash2 size={14} />
                 </button>
               </div>

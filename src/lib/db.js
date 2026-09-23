@@ -314,8 +314,84 @@ export async function logSession(uid, session) {
 }
 
 export async function deleteSession(uid, id) {
+  // Note which exercises this session touched BEFORE it's gone, so their
+  // "previously logged" hint can be recalculated afterwards.
+  const { data: existing } = await supabase.from('sessions').select('entries').eq('id', id).eq('user_id', uid).single()
   const { error } = await supabase.from('sessions').delete().eq('id', id).eq('user_id', uid)
   if (error) throw error
+  await recomputeLastKnown(uid, (existing?.entries || []).map((e) => e.exerciseId))
+}
+
+// Rebuilds the cached "last time you did this" values on an exercise from
+// whatever sessions actually exist now.
+//
+// Those values are a snapshot written when a session is logged, which is
+// fine for new sessions but wrong the moment history changes underneath
+// them: edit last Monday's bench from 80 to 82.5, or delete a session
+// entirely, and the hint kept showing the old number — the very number
+// people use to decide what to lift. This recomputes it from the real
+// sessions instead.
+export async function recomputeLastKnown(uid, exerciseIds) {
+  const ids = [...new Set((exerciseIds || []).filter(Boolean))]
+  if (ids.length === 0) return
+
+  const { data: sessions, error } = await supabase
+    .from('sessions')
+    .select('date, created_at, entries')
+    .eq('user_id', uid)
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
+  if (error) throw error
+
+  for (const exerciseId of ids) {
+    let found = null
+    for (const s of sessions || []) {
+      const entry = (s.entries || []).find((e) => e.exerciseId === exerciseId)
+      if (!entry) continue
+      const completed = (entry.sets || []).filter((set) => isCompletedSet(entry, set))
+      if (completed.length === 0) continue
+      found = { session: s, entry, completed }
+      break
+    }
+
+    // No sessions left for this exercise — clear the hint rather than
+    // leaving a number from a workout that no longer exists.
+    if (!found) {
+      await supabase
+        .from('exercises')
+        .update({ last_weight: null, last_reps: null, last_distance: null, last_date: null, last_sets: null })
+        .eq('id', exerciseId)
+        .eq('user_id', uid)
+      continue
+    }
+
+    const { session, entry, completed } = found
+    const last = completed[completed.length - 1]
+    const isCardio = entry.category === 'cardio'
+    await supabase
+      .from('exercises')
+      .update({
+        last_weight: isCardio ? Number(last.duration) || 0 : Number(last.weight) || 0,
+        last_reps: isCardio ? Number(last.intensity) || 0 : Number(last.reps),
+        ...(isCardio ? { last_distance: last.distance === '' || last.distance == null ? null : Number(last.distance) } : {}),
+        last_date: session.date,
+        last_sets: completed.map((s) =>
+          isCardio
+            ? {
+                duration: Number(s.duration) || 0,
+                intensity: Number(s.intensity) || 0,
+                ...(s.distance === '' || s.distance == null ? {} : { distance: Number(s.distance) }),
+              }
+            : {
+                weight: Number(s.weight) || 0,
+                reps: Number(s.reps),
+                ...(s.rir !== '' && s.rir != null ? { rir: Number(s.rir) } : {}),
+              },
+        ),
+      })
+      .eq('id', exerciseId)
+      .eq('user_id', uid)
+  }
 }
 
 // Trainer feedback on a specific session — kept separate from the
@@ -340,8 +416,19 @@ export async function updateSession(uid, id, patch) {
   if (patch.date !== undefined) row.date = patch.date
   if (patch.notes !== undefined) row.notes = patch.notes
   if (patch.entries !== undefined) row.entries = cleanEntries(patch.entries)
+
+  // Exercises in the session before the edit, so one removed by the edit
+  // still gets its hint recalculated.
+  const { data: before } = await supabase.from('sessions').select('entries').eq('id', id).eq('user_id', uid).single()
+
   const { error } = await supabase.from('sessions').update(row).eq('id', id).eq('user_id', uid)
   if (error) throw error
+
+  const touched = [
+    ...(before?.entries || []).map((e) => e.exerciseId),
+    ...(row.entries || []).map((e) => e.exerciseId),
+  ]
+  await recomputeLastKnown(uid, touched)
 }
 
 // ---- Body weight tracking ----

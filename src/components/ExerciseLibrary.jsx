@@ -3,10 +3,12 @@ import { Plus, Play, Pencil, Trash2, Lock } from 'lucide-react'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
+import { normalizeVideoUrl } from '../lib/url.js'
 import { useCollection, addExercise, updateExercise, deleteExercise } from '../lib/db.js'
 import { Button, Card, CategoryTag, Badge, EmptyState, Field } from './ui.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
 import { InfoTip } from './InfoTip.jsx'
+import { useScrollLock } from '../lib/scrollLock.js'
 
 export const emptyExerciseForm = {
   name: '',
@@ -143,14 +145,14 @@ export default function ExerciseLibrary() {
                 <button
                   className="p-1.5 rounded hover:bg-surface2 text-chalkdim hover:text-chalk"
                   onClick={() => setEditing({ ...ex, videoUrl: ex.video_url, intensityType: ex.intensity_type, trackRir: ex.track_rir })}
-                  title={t('common.edit')}
+                  title={t('common.edit')} aria-label={t('common.edit')}
                 >
                   <Pencil size={15} />
                 </button>
                 <button
                   className="p-1.5 rounded hover:bg-ironsoft text-chalkdim hover:text-iron"
                   onClick={() => handleDelete(ex)}
-                  title={t('common.delete')}
+                  title={t('common.delete')} aria-label={t('common.delete')}
                 >
                   <Trash2 size={15} />
                 </button>
@@ -269,6 +271,7 @@ function normalizeName(s) {
 }
 
 export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, onCreateVariant, existingExercises = [] }) {
+  useScrollLock(true)
   const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
   const [form, setForm] = useState({ ...emptyExerciseForm, ...initial })
@@ -298,7 +301,7 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
 
     setSaving(true)
     try {
-      await onSave({ ...form, name: cleanName })
+      await onSave({ ...form, name: cleanName, videoUrl: normalizeVideoUrl(form.videoUrl) })
     } catch (err) {
       console.error(err)
       toast(t('feedback.saveFailed'), 'error')
@@ -434,7 +437,8 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
 
           <Field label={t('exercises.videoLink')}>
             <input
-              type="url"
+              type="text"
+              inputMode="url"
               dir="ltr"
               value={form.videoUrl}
               onChange={(e) => setForm({ ...form, videoUrl: e.target.value })}

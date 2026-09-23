@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { Plus, Trash2, ArrowUp, ArrowDown, Library } from 'lucide-react'
+import { Plus, Trash2, ArrowUp, ArrowDown, Library, Video } from 'lucide-react'
 import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -8,9 +8,12 @@ import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, addRoutine, updateRoutine, addExercise, updateExercise } from '../lib/db.js'
 import { Button, Card, Field } from './ui.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
+import ExerciseSelect from './ExerciseSelect.jsx'
+import { normalizeVideoUrl } from '../lib/url.js'
 import { ExerciseModal, emptyExerciseForm } from './ExerciseLibrary.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { disambiguateLabels } from '../lib/disambiguate.js'
+import { useScrollLock } from '../lib/scrollLock.js'
 
 export default function RoutineBuilder() {
   const { effectiveUid } = useAdmin()
@@ -100,6 +103,35 @@ export default function RoutineBuilder() {
   const rirEligibleIds = [...new Set(items.filter((it) => it.category !== 'cardio').map((it) => it.exerciseId))]
   const rirEligibleExercises = rirEligibleIds.map((id) => exercises.find((e) => e.id === id)).filter(Boolean)
   const allRirOn = rirEligibleExercises.length > 0 && rirEligibleExercises.every((e) => e.track_rir)
+
+  // Demo videos belong to the exercise, not to this routine — setting one
+  // here updates the exercise itself, so it shows up everywhere that
+  // exercise appears (while logging, in past sessions, in My exercises).
+  const [videoFor, setVideoFor] = useState(null)
+  const [videoUrl, setVideoUrl] = useState('')
+  const [videoSaving, setVideoSaving] = useState(false)
+  useScrollLock(videoFor != null)
+
+  function openVideo(exerciseId) {
+    const ex = exercises.find((e) => e.id === exerciseId)
+    setVideoUrl(ex?.video_url || '')
+    setVideoFor(exerciseId)
+  }
+
+  async function saveVideo() {
+    setVideoSaving(true)
+    try {
+      await updateExercise(effectiveUid, videoFor, { videoUrl: normalizeVideoUrl(videoUrl) })
+      refreshExercises()
+      setVideoFor(null)
+      toast(t('feedback.saved'))
+    } catch (err) {
+      console.error(err)
+      toast(t('feedback.saveFailed'), 'error')
+    } finally {
+      setVideoSaving(false)
+    }
+  }
 
   async function setRirForRoutine(enable) {
     try {
@@ -211,6 +243,16 @@ export default function RoutineBuilder() {
                   })()}
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={() => openVideo(it.exerciseId)}
+                title={t('routines.videoFor')} aria-label={t('routines.videoFor')}
+                className={`p-1.5 rounded hover:bg-ink shrink-0 ${
+                  exercises.find((e) => e.id === it.exerciseId)?.video_url ? 'text-brass' : 'text-chalkdim hover:text-chalk'
+                }`}
+              >
+                <Video size={15} />
+              </button>
               {isCardio ? (
                 <>
                   <input
@@ -253,18 +295,19 @@ export default function RoutineBuilder() {
                 </>
               )}
               <div className="flex flex-col">
-                <button onClick={() => move(i, -1)} className="text-chalkdim hover:text-chalk disabled:opacity-30" disabled={i === 0}>
+                <button onClick={() => move(i, -1)} aria-label={t('sessionCard.moveUp')} className="text-chalkdim hover:text-chalk disabled:opacity-30" disabled={i === 0}>
                   <ArrowUp size={13} />
                 </button>
                 <button
                   onClick={() => move(i, 1)}
+                  aria-label={t('sessionCard.moveDown')}
                   className="text-chalkdim hover:text-chalk disabled:opacity-30"
                   disabled={i === items.length - 1}
                 >
                   <ArrowDown size={13} />
                 </button>
               </div>
-              <button onClick={() => removeItem(i)} className="text-chalkdim hover:text-iron p-1">
+              <button onClick={() => removeItem(i)} aria-label={t('common.remove')} className="text-chalkdim hover:text-iron p-1">
                 <Trash2 size={15} />
               </button>
             </div>
@@ -273,14 +316,13 @@ export default function RoutineBuilder() {
 
         <div className="flex gap-2 items-end pt-2 border-t border-line flex-wrap">
           <Field label={t('routines.yourExercisesLabel')(categoryLabel)}>
-            <select value={pickId} onChange={(e) => setPickId(e.target.value)} className="w-56">
-              <option value="">{t('routines.chooseAlreadyAdded')}</option>
-              {availableExercises.map((e, i) => (
-                <option key={e.id} value={e.id}>
-                  {availableExerciseLabels[i]}
-                </option>
-              ))}
-            </select>
+            <ExerciseSelect
+              value={pickId}
+              onChange={setPickId}
+              options={availableExercises.map((e, i) => ({ id: e.id, label: availableExerciseLabels[i] }))}
+              placeholder={t('routines.chooseAlreadyAdded')}
+              className="w-full sm:w-72"
+            />
           </Field>
           <Button type="button" variant="ghost" onClick={addItem} disabled={!pickId}>
             <Plus size={16} /> {t('common.add')}
@@ -293,6 +335,39 @@ export default function RoutineBuilder() {
           <p className="text-chalkdim text-xs">{t('routines.nothingInList')(categoryLabel)}</p>
         )}
       </Card>
+
+      {videoFor && (
+        <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" onClick={() => setVideoFor(null)}>
+          <div className="card p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-xl mb-1">{t('routines.videoTitle')}</h2>
+            <p className="text-chalkdim text-sm mb-4">{t('routines.videoBody')}</p>
+            <Field label={t('exercises.videoLink')}>
+              <input
+                type="text"
+                inputMode="url"
+                dir="ltr"
+                value={videoUrl}
+                onChange={(e) => setVideoUrl(e.target.value)}
+                placeholder={t('exercises.videoPlaceholder')}
+                className="w-full"
+              />
+            </Field>
+            {normalizeVideoUrl(videoUrl) && (
+              <a href={normalizeVideoUrl(videoUrl)} target="_blank" rel="noreferrer" className="text-brass text-sm hover:underline mt-2 inline-block">
+                {t('routines.videoPreview')}
+              </a>
+            )}
+            <div className="flex justify-end gap-2 mt-5">
+              <Button type="button" variant="ghost" onClick={() => setVideoFor(null)}>
+                {t('common.cancel')}
+              </Button>
+              <Button type="button" onClick={saveVideo} disabled={videoSaving}>
+                {t('common.save')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {picking && (
         <ExercisePicker

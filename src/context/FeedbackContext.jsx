@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react'
 import { AlertTriangle, CheckCircle2, X } from 'lucide-react'
 import { useLanguage } from './LanguageContext.jsx'
+import { useScrollLock } from '../lib/scrollLock.js'
 
 // One place for the two kinds of feedback every screen needs:
 //
@@ -17,6 +18,7 @@ const FeedbackContext = createContext(null)
 export function FeedbackProvider({ children }) {
   const { t } = useLanguage()
   const [dialog, setDialog] = useState(null)
+  useScrollLock(!!dialog)
   const [toasts, setToasts] = useState([])
   const resolverRef = useRef(null)
 

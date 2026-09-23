@@ -71,7 +71,7 @@ export default function Login({ resetLinkError }) {
       <button
         onClick={() => setLang(lang === 'en' ? 'he' : 'en')}
         className="absolute top-4 end-4 flex rounded-md bg-surface2 p-0.5 text-xs num"
-        title={t('layout.language')}
+        title={t('layout.language')} aria-label={t('layout.language')}
       >
         <span className={`px-2 py-1 rounded ${lang === 'en' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>EN</span>
         <span className={`px-2 py-1 rounded ${lang === 'he' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>עב</span>

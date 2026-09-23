@@ -13,6 +13,7 @@ import {
 } from 'recharts'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import ExerciseSelect from './ExerciseSelect.jsx'
 import { useCollection } from '../lib/db.js'
 import { toLocalISODate } from '../lib/dates.js'
 import { disambiguateLabels } from '../lib/disambiguate.js'
@@ -294,14 +295,13 @@ export default function Stats() {
               <InfoTip text={t('stats.progressTip')} />
             </h2>
             <Field label={t('stats.exercise')}>
-              <select value={exerciseId} onChange={(e) => setExerciseId(e.target.value)} className="w-56">
-                <option value="">{t('stats.chooseExercise')}</option>
-                {exerciseOptions.map((e, i) => (
-                  <option key={e.id} value={e.id}>
-                    {exerciseOptionLabels[i]}
-                  </option>
-                ))}
-              </select>
+              <ExerciseSelect
+                value={exerciseId}
+                onChange={setExerciseId}
+                options={exerciseOptions.map((e, i) => ({ id: e.id, label: exerciseOptionLabels[i] }))}
+                placeholder={t('stats.chooseExercise')}
+                className="w-full sm:w-72"
+              />
             </Field>
 
             {selectedProgress && selectedProgress.points.length > 0 ? (

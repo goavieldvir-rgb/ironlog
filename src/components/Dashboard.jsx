@@ -108,7 +108,7 @@ export default function Dashboard() {
 
       {showChecklist && <OnboardingChecklist steps={steps} t={t} />}
 
-      <WeeklySchedule effectiveUid={effectiveUid} routines={routines} />
+      <WeeklySchedule effectiveUid={effectiveUid} routines={routines} sessions={sessions} />
 
       <div className="grid grid-cols-2 gap-3">
         <Link to="/routines">

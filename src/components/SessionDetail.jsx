@@ -92,8 +92,10 @@ export default function SessionDetail() {
           </div>
           <div className="flex flex-wrap gap-2">
             {(entry.sets || []).map((s, j) => (
-              <div key={j} className="bg-surface2 rounded-md px-3 py-1.5 text-sm num">
-                <span className="text-chalkdim me-1">#{j + 1}</span>
+              <div key={j} className="bg-surface2 rounded-md px-3 py-1.5 text-sm num flex items-center gap-2">
+                {/* Set number sat flush against the weight, so "#1" then
+                    "82.5kg" read as "#182.5kg". Separated properly now. */}
+                <span className="text-chalkdim border-e border-line pe-2">{j + 1}</span>
                 {formatSet(entry, s, t)}
               </div>
             ))}
@@ -172,7 +174,7 @@ function TrainerComment({ session, effectiveUid, isAdmin, onSaved, t }) {
         </div>
       </div>
       {isAdmin && (
-        <button onClick={() => setEditing(true)} className="text-chalkdim hover:text-brass shrink-0 p-1">
+        <button onClick={() => setEditing(true)} aria-label={t('common.edit')} className="text-chalkdim hover:text-brass shrink-0 p-1">
           <Pencil size={14} />
         </button>
       )}

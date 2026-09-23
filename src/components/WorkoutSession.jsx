@@ -12,8 +12,10 @@ import { toLocalISODate } from '../lib/dates.js'
 import { Button, Card, CategoryTag, Field } from './ui.jsx'
 import SessionEntryCard from './SessionEntryCard.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
+import ExerciseSelect from './ExerciseSelect.jsx'
 import { ExerciseModal, emptyExerciseForm } from './ExerciseLibrary.jsx'
 import RestTimer from './RestTimer.jsx'
+import { useScrollLock } from '../lib/scrollLock.js'
 
 function todayISO() {
   return toLocalISODate()
@@ -33,6 +35,27 @@ export default function WorkoutSession() {
 
   const [routines, routinesLoading] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [exercises, , refreshExercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
+  const [pastSessions] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+
+  // All-time best per exercise, from every session already saved. Same
+  // rule the admin PR alert uses — heaviest weight for strength, most
+  // reps for a bodyweight move, longest interval for cardio — so what the
+  // lifter sees and what the coach gets notified about never disagree.
+  const personalBests = useMemo(() => {
+    const best = {}
+    for (const s of pastSessions) {
+      for (const e of s.entries || []) {
+        if (!e.exerciseId) continue
+        for (const set of e.sets || []) {
+          const raw = e.category === 'cardio' ? set.duration : e.bodyweight ? set.reps : set.weight
+          const n = Number(raw)
+          if (!raw || !isFinite(n) || n <= 0) continue
+          if (best[e.exerciseId] == null || n > best[e.exerciseId]) best[e.exerciseId] = n
+        }
+      }
+    }
+    return best
+  }, [pastSessions])
   const routine = useMemo(() => routines.find((r) => r.id === routineId), [routines, routineId])
 
   const [date, setDate] = useState(todayISO())
@@ -52,6 +75,7 @@ export default function WorkoutSession() {
   const [showLibraryPicker, setShowLibraryPicker] = useState(false)
   const [creatingCustom, setCreatingCustom] = useState(false)
   const [saving, setSaving] = useState(false)
+  useScrollLock(swapIndex != null || showLibraryPicker || creatingCustom)
   const [saved, setSaved] = useState(false)
   // When this workout was started — carried inside the draft, so resuming
   // after a phone lock or app switch keeps the original start time.
@@ -291,7 +315,32 @@ export default function WorkoutSession() {
     )
   }
 
-  function removeEntry(entryIdx) {
+  function moveEntry(entryIdx, dir) {
+    setEntries((prev) => {
+      const target = entryIdx + dir
+      if (target < 0 || target >= prev.length) return prev
+      const next = [...prev]
+      ;[next[entryIdx], next[target]] = [next[target], next[entryIdx]]
+      return next
+    })
+  }
+
+  async function removeEntry(entryIdx) {
+    const entry = entries[entryIdx]
+    // Only ask when there's something to lose — removing an untouched
+    // exercise shouldn't need a confirmation.
+    const hasLogged = (entry?.sets || []).some((s) =>
+      entry.category === 'cardio' ? s.duration : s.weight || s.reps,
+    )
+    if (hasLogged) {
+      const ok = await confirm({
+        title: t('workout.removeEntryTitle', { name: entry.name }),
+        body: t('workout.removeEntryBody'),
+        confirmLabel: t('common.remove'),
+        danger: true,
+      })
+      if (!ok) return
+    }
     setEntries((prev) => prev.filter((_, i) => i !== entryIdx))
   }
 
@@ -320,7 +369,8 @@ export default function WorkoutSession() {
       })
       clearDraft(effectiveUid)
       setSaved(true)
-      setTimeout(() => navigate('/history'), 900)
+      toast(t('workout.sessionSaved'))
+      navigate('/history')
     } catch (err) {
       console.error(err)
       // The draft is only cleared on success, so a failed save (usually
@@ -382,7 +432,10 @@ export default function WorkoutSession() {
             key={entry.exerciseId + i}
             entry={entry}
             liveExercise={exercises.find((e) => e.id === entry.exerciseId)}
-            removable={isFreestyle}
+            personalBest={personalBests[entry.exerciseId]}
+            removable
+            onMoveUp={i > 0 ? () => moveEntry(i, -1) : undefined}
+            onMoveDown={i < entries.length - 1 ? () => moveEntry(i, 1) : undefined}
             onUpdateSet={(setIdx, patch) => updateSet(i, setIdx, patch)}
             onAddSet={() => addSet(i)}
             onRemoveSet={(setIdx) => removeSet(i, setIdx)}
@@ -395,17 +448,22 @@ export default function WorkoutSession() {
           />
         ))}
 
-        {isFreestyle && (
-          <Card className="flex items-end gap-2 flex-wrap">
+        {/* Also available inside a planned routine: adding here affects
+            THIS session only — the routine itself is untouched, same as
+            swapping. */}
+        <Card className="flex flex-col gap-2">
+          <div className="flex items-end gap-2 flex-wrap">
             <Field label={t('workout.addExercise')}>
-              <select value={pickId} onChange={(e) => setPickId(e.target.value)} className="w-56">
-                <option value="">{t('workout.chooseFromLibrary')}</option>
-                {availableToAdd.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {(lang === 'he' && e.name_he) || e.name} {e.category !== 'strength' ? `(${e.category})` : ''}
-                  </option>
-                ))}
-              </select>
+              <ExerciseSelect
+                value={pickId}
+                onChange={setPickId}
+                options={availableToAdd.map((e) => ({
+                  id: e.id,
+                  label: `${(lang === 'he' && e.name_he) || e.name}${e.category !== 'strength' ? ` (${e.category})` : ''}`,
+                }))}
+                placeholder={t('workout.chooseFromLibrary')}
+                className="w-full sm:w-72"
+              />
             </Field>
             <Button type="button" variant="ghost" onClick={addFreestyleExercise} disabled={!pickId}>
               <Plus size={16} /> {t('common.add')}
@@ -413,8 +471,9 @@ export default function WorkoutSession() {
             <Button type="button" variant="brass" onClick={() => setShowLibraryPicker(true)}>
               <Library size={16} /> {t('routines.browseLibrary')}
             </Button>
-          </Card>
-        )}
+          </div>
+          {!isFreestyle && <p className="text-chalkdim text-xs">{t('workout.addOneOffNote')}</p>}
+        </Card>
 
         <Card>
           <Field
@@ -462,22 +521,32 @@ export default function WorkoutSession() {
               {t('workout.swapSubtitle', { name: entries[swapIndex]?.name })}
             </p>
             <Field label={t('workout.swapPickLabel')}>
-              <select value={swapPickId} onChange={(e) => setSwapPickId(e.target.value)} className="w-full">
-                <option value="">{t('workout.chooseFromLibrary')}</option>
-                {availableToAdd.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {(lang === 'he' && e.name_he) || e.name} {e.category !== 'strength' ? `(${e.category})` : ''}
-                  </option>
-                ))}
-              </select>
+              <ExerciseSelect
+                value={swapPickId}
+                onChange={setSwapPickId}
+                options={availableToAdd.map((e) => ({
+                  id: e.id,
+                  label: `${(lang === 'he' && e.name_he) || e.name}${e.category !== 'strength' ? ` (${e.category})` : ''}`,
+                }))}
+                placeholder={t('workout.chooseFromLibrary')}
+              />
             </Field>
-            <button
-              type="button"
-              onClick={() => setShowLibraryPicker(true)}
-              className="text-brass text-sm hover:underline mt-2 inline-flex items-center gap-1"
-            >
-              <Library size={14} /> {t('routines.browseLibrary')}
-            </button>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
+              <button
+                type="button"
+                onClick={() => setShowLibraryPicker(true)}
+                className="text-brass text-sm hover:underline inline-flex items-center gap-1"
+              >
+                <Library size={14} /> {t('routines.browseLibrary')}
+              </button>
+              {/* Same destination as the catalogue's "can't find it?" link,
+                  surfaced directly here — swapping usually happens because
+                  a machine is taken, and the replacement often isn't in
+                  anyone's list yet. */}
+              <button type="button" onClick={() => setCreatingCustom(true)} className="text-brass text-sm hover:underline inline-flex items-center gap-1">
+                <Plus size={14} /> {t('exercises.cantFind')}
+              </button>
+            </div>
             <p className="text-chalkdim text-xs mt-2">{t('workout.swapNote')}</p>
             <div className="flex justify-end gap-2 mt-5">
               <Button type="button" variant="ghost" onClick={() => setSwapIndex(null)}>

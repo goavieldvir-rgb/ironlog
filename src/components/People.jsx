@@ -9,6 +9,7 @@ import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { Card, Badge, EmptyState, Button, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
+import { useScrollLock } from '../lib/scrollLock.js'
 
 function startOfWeekISO() {
   const d = new Date()
@@ -157,6 +158,7 @@ export default function People() {
 }
 
 function InviteModal({ onClose, t }) {
+  useScrollLock(true)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [copiedLink, setCopiedLink] = useState(false)

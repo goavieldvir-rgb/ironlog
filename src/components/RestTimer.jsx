@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Play, Pause, RotateCcw, Timer } from 'lucide-react'
+import { Play, Pause, RotateCcw, Timer, Bell, BellOff } from 'lucide-react'
 import { Button } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -25,8 +25,14 @@ function beep() {
   }
 }
 
+// Notifications only exist in a browser that supports them, and on iPhone
+// only when the app was added to the Home Screen — so the bell is hidden
+// entirely rather than offering something that can't work.
+const canNotify = typeof window !== 'undefined' && 'Notification' in window
+
 export default function RestTimer() {
   const { t } = useLanguage()
+  const [notifyOn, setNotifyOn] = useState(canNotify && Notification.permission === 'granted')
   const [secondsLeft, setSecondsLeft] = useState(90)
   const [lastDuration, setLastDuration] = useState(90)
   const [running, setRunning] = useState(false)
@@ -48,6 +54,23 @@ export default function RestTimer() {
       setFinished(true)
       beep()
       if (navigator.vibrate) navigator.vibrate([200, 100, 200])
+      // Only worth a notification when you're not looking at the app —
+      // otherwise the screen already shows it's done.
+      if (notifyOn && document.visibilityState !== 'visible') {
+        try {
+          const n = new Notification(t('restTimer.doneTitle'), {
+            body: t('restTimer.doneBody'),
+            tag: 'ironlog-rest-timer',
+            silent: false,
+          })
+          n.onclick = () => {
+            window.focus()
+            n.close()
+          }
+        } catch {
+          // Some browsers only allow notifications via a service worker.
+        }
+      }
     }
   }
 
@@ -65,7 +88,22 @@ export default function RestTimer() {
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running])
+  }, [running, notifyOn])
+
+  async function toggleNotify() {
+    if (notifyOn) {
+      setNotifyOn(false)
+      return
+    }
+    if (Notification.permission === 'granted') {
+      setNotifyOn(true)
+      return
+    }
+    // Must be triggered by a real tap — browsers ignore permission
+    // requests that aren't tied to a user action.
+    const result = await Notification.requestPermission()
+    setNotifyOn(result === 'granted')
+  }
 
   function start(preset) {
     const duration = preset ?? secondsLeft
@@ -118,6 +156,15 @@ export default function RestTimer() {
       </div>
 
       <div className="flex items-center gap-1 ms-auto">
+        {canNotify && (
+          <button
+            onClick={toggleNotify}
+            title={notifyOn ? t('restTimer.notifyOn') : t('restTimer.notifyOff')} aria-label={notifyOn ? t('restTimer.notifyOn') : t('restTimer.notifyOff')}
+            className={`p-1.5 rounded hover:bg-surface2 ${notifyOn ? 'text-brass' : 'text-chalkdim hover:text-chalk'}`}
+          >
+            {notifyOn ? <Bell size={14} /> : <BellOff size={14} />}
+          </button>
+        )}
         {running ? (
           <Button variant="subtle" onClick={pause} className="!px-2.5 !py-1.5">
             <Pause size={14} />
