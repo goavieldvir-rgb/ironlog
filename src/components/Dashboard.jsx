@@ -115,7 +115,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-2 gap-3">
         <Link to="/routines">
-          <Card className="flex flex-col items-center justify-center py-6 gap-2 text-center hover:bg-surface2 transition-colors">
+          <Card className="press-row flex flex-col items-center justify-center py-6 gap-2 text-center hover:bg-surface2 transition-colors">
             <Dumbbell size={22} className="text-iron" />
             <span className="text-sm">{t('dashboard.navRoutines')}</span>
             <span className="text-chalkdim text-xs">
@@ -124,7 +124,7 @@ export default function Dashboard() {
           </Card>
         </Link>
         <Link to="/history">
-          <Card className="flex flex-col items-center justify-center py-6 gap-2 text-center hover:bg-surface2 transition-colors">
+          <Card className="press-row flex flex-col items-center justify-center py-6 gap-2 text-center hover:bg-surface2 transition-colors">
             <HistoryIcon size={22} className="text-iron" />
             <span className="text-sm">{t('dashboard.navHistory')}</span>
             <span className="text-chalkdim text-xs">

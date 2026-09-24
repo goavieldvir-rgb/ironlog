@@ -7,6 +7,7 @@ import { toLocalISODate } from '../lib/dates.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { TERMS_VERSION } from '../legal/terms.js'
 import { Card, Badge, EmptyState, Button, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
@@ -27,6 +28,7 @@ export default function People() {
   const [loading, setLoading] = useState(true)
   const [inviting, setInviting] = useState(false)
   const [activity, setActivity] = useState([])
+  const [consents, setConsents] = useState([])
 
   function daysAgo(iso) {
     const days = Math.round((Date.now() - new Date(iso + 'T00:00:00').getTime()) / 86400000)
@@ -36,6 +38,17 @@ export default function People() {
   }
 
   useEffect(() => {
+    // Who has accepted which version of the terms. Admins can read every
+    // row; nobody can change one.
+    supabase
+      .from('consents')
+      .select('user_id, version, variant, accepted_at, guardian_name')
+      .order('accepted_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) console.error(error)
+        setConsents(data || [])
+      })
+
     supabase
       .from('profiles')
       .select('*')
@@ -134,6 +147,19 @@ export default function People() {
                   )}
                 </div>
                 <p className="text-chalkdim text-xs mt-0.5 truncate">{p.email}</p>
+                {(() => {
+                  const cs = consents.find((x) => x.user_id === p.id)
+                  if (!cs) return <p className="text-xs mt-1 text-iron">{t('people.termsNotAccepted')}</p>
+                  const stale = cs.version < TERMS_VERSION
+                  return (
+                    <p className={`text-xs mt-1 ${stale ? 'text-brass' : 'text-chalkdim'}`}>
+                      {stale
+                        ? t('people.termsOutdated', { version: cs.version })
+                        : t('people.termsAccepted', { date: new Date(cs.accepted_at).toLocaleDateString() })}
+                      {cs.variant === 'minor' && cs.guardian_name ? ` · ${t('people.guardian', { name: cs.guardian_name })}` : ''}
+                    </p>
+                  )
+                })()}
                 {p.id !== user.uid && (
                   <p className="text-xs mt-1 inline-flex items-center gap-1.5">
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext.jsx'
 import { supabase } from './supabase.js'
 import Login from './components/Login.jsx'
@@ -20,10 +20,12 @@ import WeeklySummary from './components/WeeklySummary.jsx'
 import Help from './components/Help.jsx'
 import Account from './components/Account.jsx'
 import ResetPassword from './components/ResetPassword.jsx'
+import ConsentGate from './components/ConsentGate.jsx'
 
 export default function App() {
   const { user, loading } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [pendingReset, setPendingReset] = useState(false)
   const [resetLinkError, setResetLinkError] = useState('')
 
@@ -55,7 +57,10 @@ export default function App() {
 
   if (!user) return <Login resetLinkError={resetLinkError} />
 
-  return (
+  // Setting a new password has to stay reachable — someone arriving from a
+  // reset link shouldn't be asked to accept terms before they can even get
+  // into their account.
+  const content = (
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<Dashboard />} />
@@ -79,4 +84,8 @@ export default function App() {
       </Route>
     </Routes>
   )
+
+  if (location.pathname === '/reset-password') return content
+
+  return <ConsentGate uid={user.uid}>{content}</ConsentGate>
 }

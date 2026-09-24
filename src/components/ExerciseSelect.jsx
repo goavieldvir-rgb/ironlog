@@ -73,7 +73,7 @@ export default function ExerciseSelect({ value, onChange, options, placeholder, 
                 key={o.id}
                 type="button"
                 onClick={() => choose(o.id)}
-                className={`w-full text-start px-3 py-2 text-sm hover:bg-ink ${o.id === value ? 'text-brass' : 'text-chalk'}`}
+                className={`press-row w-full text-start px-3 py-2 text-sm hover:bg-ink ${o.id === value ? 'text-brass' : 'text-chalk'}`}
               >
                 {o.label}
               </button>

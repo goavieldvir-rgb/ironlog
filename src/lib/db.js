@@ -92,6 +92,36 @@ export async function updateDashboardStyle(uid, style) {
   if (error) throw error
 }
 
+// ---- Consent (terms acceptance) ----
+// Reads the newest acceptance for this person. The table only allows
+// inserts, so accepting again simply adds a row and the history is kept.
+export async function fetchLatestConsent(uid, docKey) {
+  const { data, error } = await supabase
+    .from('consents')
+    .select('*')
+    .eq('user_id', uid)
+    .eq('doc_key', docKey)
+    .order('version', { ascending: false })
+    .order('accepted_at', { ascending: false })
+    .limit(1)
+  if (error) throw error
+  return data?.[0] || null
+}
+
+export async function recordConsent(uid, consent) {
+  const { error } = await supabase.from('consents').insert({
+    user_id: uid,
+    doc_key: consent.docKey,
+    version: consent.version,
+    variant: consent.variant,
+    lang: consent.lang,
+    text_sha256: consent.textSha256,
+    guardian_name: consent.guardianName || null,
+    guardian_contact: consent.guardianContact || null,
+  })
+  if (error) throw error
+}
+
 // ---- Weekly schedule (recurring — "Sunday is always Pull Day") ----
 // day_of_week: 0 = Sunday ... 6 = Saturday. slot: 0-2, up to three
 // independent routines per day (e.g. cardio + strength on the same day).

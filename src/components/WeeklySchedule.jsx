@@ -139,7 +139,7 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
             key={dow}
             type="button"
             onClick={() => openDayPanel(dow)}
-            className={`flex items-center justify-between gap-2 rounded-md px-3 py-2.5 text-start transition-colors ${
+            className={`press-row flex items-center justify-between gap-2 rounded-md px-3 py-2.5 text-start transition-colors ${
               isToday ? 'bg-ironsoft border border-iron/40' : 'hover:bg-surface2 border border-transparent'
             }`}
           >
@@ -228,7 +228,7 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
                             key={r.id}
                             type="button"
                             onClick={() => startRoutine(r.id)}
-                            className="w-full text-start rounded-md bg-surface2 hover:bg-line px-3 py-2.5 text-sm flex items-center justify-between gap-2"
+                            className="press-row w-full text-start rounded-md bg-surface2 hover:bg-line px-3 py-2.5 text-sm flex items-center justify-between gap-2"
                           >
                             <span className="truncate">{r.name}</span>
                             <Play size={14} className="shrink-0 text-brass" />
@@ -264,7 +264,7 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
                       key={dow}
                       type="button"
                       onClick={() => switchDay(dow)}
-                      className={`px-2 py-1 rounded text-xs ${
+                      className={`press px-2 py-1 rounded text-xs ${
                         dow === openDay ? 'bg-brass text-ink' : 'bg-surface2 text-chalkdim hover:text-chalk'
                       }`}
                     >

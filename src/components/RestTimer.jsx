@@ -148,7 +148,7 @@ export default function RestTimer() {
           <button
             key={p}
             onClick={() => start(p)}
-            className="px-2 py-1 rounded text-xs num text-chalkdim hover:text-chalk hover:bg-surface2"
+            className="press px-2 py-1 rounded text-xs num text-chalkdim hover:text-chalk hover:bg-surface2"
           >
             {p}s
           </button>
