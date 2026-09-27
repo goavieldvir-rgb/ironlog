@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Link } from 'react-router-dom'
+import React, { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Play, Pencil, CalendarDays, Check } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
@@ -27,7 +27,16 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
   // button inside.
   const [openDay, setOpenDay] = useState(null)
   const [mode, setMode] = useState('view')
-  const [pickIds, setPickIds] = useState(['', '', ''])
+  // Unsaved edits, per day. Switching days in "Edit week" used to reload
+  // the next day's slots over the top of your changes, so editing Monday,
+  // then tapping Tuesday, silently threw Monday away. Now every day you
+  // touch keeps its edits until Save (which saves them all) or Cancel.
+  const [pending, setPending] = useState({})
+  // What was just saved, shown straight away while the fresh copy of the
+  // plan loads — otherwise the old routines flashed back for a moment
+  // after tapping Save.
+  const [justSaved, setJustSaved] = useState({})
+  useEffect(() => setJustSaved({}), [schedule])
   const [showOther, setShowOther] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -56,31 +65,32 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
   // slot order — filters out empty slots entirely, so an empty slot 1
   // with something in slot 2 doesn't show as a confusing gap.
   function routinesForDay(dow) {
-    return SLOTS.map((slot) => {
-      const row = schedule.find((s) => s.day_of_week === dow && s.slot === slot)
-      if (!row || !row.routine_id) return null
-      return routines.find((r) => r.id === row.routine_id) || null
-    }).filter(Boolean)
+    return savedSlots(dow)
+      .map((id) => (id ? routines.find((r) => r.id === id) || null : null))
+      .filter(Boolean)
   }
 
-  function loadSlots(dow) {
-    const next = ['', '', '']
-    SLOTS.forEach((slot) => {
-      const row = schedule.find((s) => s.day_of_week === dow && s.slot === slot)
-      next[slot] = row?.routine_id || ''
-    })
-    setPickIds(next)
+  function savedSlots(dow) {
+    if (justSaved[dow]) return justSaved[dow]
+    return SLOTS.map((slot) => schedule.find((s) => s.day_of_week === dow && s.slot === slot)?.routine_id || '')
+  }
+  const pickIds = openDay == null ? ['', '', ''] : pending[openDay] || savedSlots(openDay)
+  const dirtyDays = Object.keys(pending)
+    .map(Number)
+    .filter((dow) => pending[dow].some((id, slot) => id !== savedSlots(dow)[slot]))
+
+  function setPick(slot, id) {
+    setPending((prev) => ({ ...prev, [openDay]: pickIds.map((v, i) => (i === slot ? id : v)) }))
   }
 
   function openDayPanel(dow, startMode = 'view') {
-    loadSlots(dow)
+    setPending({})
     setShowOther(false)
     setMode(startMode)
     setOpenDay(dow)
   }
 
   function switchDay(dow) {
-    loadSlots(dow)
     setShowOther(false)
     setOpenDay(dow)
   }
@@ -89,14 +99,26 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
     setOpenDay(null)
     setShowOther(false)
     setMode('view')
+    setPending({})
+  }
+
+  // Tapping outside closes the panel, but never on top of unsaved edits —
+  // that's what Cancel is for.
+  function backdropClose() {
+    if (mode === 'edit' && dirtyDays.length > 0) return
+    close()
   }
 
   async function saveDay() {
     setSaving(true)
     try {
-      for (const slot of SLOTS) {
-        await setScheduleDay(effectiveUid, openDay, slot, pickIds[slot] || null)
+      for (const dow of dirtyDays) {
+        for (const slot of SLOTS) {
+          await setScheduleDay(effectiveUid, dow, slot, pending[dow][slot] || null)
+        }
       }
+      setJustSaved((prev) => ({ ...prev, ...Object.fromEntries(dirtyDays.map((d) => [d, pending[d]])) }))
+      setPending({})
       refreshSchedule()
       toast(t('feedback.saved'))
       setMode('view')
@@ -157,8 +179,10 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
         )
       })}
 
-      {openDay != null && (
-        <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-end sm:items-center justify-center p-4" onClick={close}>
+      {/* Rendered at the top level of the page so nothing it sits inside
+          (a card, a pressed row) can shift or clip the panel. */}
+      {openDay != null && createPortal(
+        <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-40 flex items-end sm:items-center justify-center p-4" onClick={backdropClose}>
           <div className="card p-6 w-full max-w-sm max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-2 mb-4">
               <h2 className="text-xl inline-flex items-center gap-2">
@@ -264,11 +288,12 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
                       key={dow}
                       type="button"
                       onClick={() => switchDay(dow)}
-                      className={`press px-2 py-1 rounded text-xs ${
+                      className={`press px-2.5 py-1.5 rounded text-xs ${
                         dow === openDay ? 'bg-brass text-ink' : 'bg-surface2 text-chalkdim hover:text-chalk'
                       }`}
                     >
                       {t(`dashboard.dayShort${dow}`)}
+                      {dirtyDays.includes(dow) && <span className="ms-0.5">•</span>}
                     </button>
                   ))}
                 </div>
@@ -279,7 +304,7 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
                     <Field key={slot} label={t(`dashboard.${SLOT_LABEL_KEYS[slot]}`)}>
                       <select
                         value={pickIds[slot]}
-                        onChange={(e) => setPickIds((prev) => prev.map((v, i) => (i === slot ? e.target.value : v)))}
+                        onChange={(e) => setPick(slot, e.target.value)}
                         className="w-full"
                       >
                         <option value="">{t('dashboard.slotEmpty')}</option>
@@ -297,14 +322,15 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
                   <Button type="button" variant="ghost" onClick={close}>
                     {t('common.cancel')}
                   </Button>
-                  <Button type="button" onClick={saveDay} disabled={saving}>
+                  <Button type="button" onClick={saveDay} disabled={saving || dirtyDays.length === 0}>
                     {t('common.save')}
                   </Button>
                 </div>
               </>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </Card>
   )

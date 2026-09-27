@@ -46,6 +46,7 @@ export default function ExerciseSelect({ value, onChange, options, placeholder, 
               className="text-chalkdim hover:text-iron"
               onClick={(e) => {
                 e.stopPropagation()
+                e.preventDefault()
                 choose('')
               }}
             />
@@ -72,7 +73,14 @@ export default function ExerciseSelect({ value, onChange, options, placeholder, 
               <button
                 key={o.id}
                 type="button"
-                onClick={() => choose(o.id)}
+                onClick={(e) => {
+                  // This picker usually sits inside a <label> (Field). Once
+                  // the tapped option disappears, the browser treats the tap
+                  // as a click on the label and "clicks" the first button in
+                  // it — the toggle — so the list popped straight back open.
+                  e.preventDefault()
+                  choose(o.id)
+                }}
                 className={`press-row w-full text-start px-3 py-2 text-sm hover:bg-ink ${o.id === value ? 'text-brass' : 'text-chalk'}`}
               >
                 {o.label}

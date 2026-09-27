@@ -5,23 +5,26 @@ import { InfoTip } from './InfoTip.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection } from '../lib/db.js'
 import { listDrafts, clearDraft } from '../lib/draft.js'
-import { Button, Card } from './ui.jsx'
+import { Card } from './ui.jsx'
 import WeeklySchedule from './WeeklySchedule.jsx'
 
-function timeAgo(ts) {
+// Was hard-coded English ("5m ago") even with the app in Hebrew.
+function timeAgo(ts, t) {
   const mins = Math.max(1, Math.round((Date.now() - ts) / 60000))
-  if (mins < 60) return `${mins}m ago`
+  if (mins < 60) return t('dashboard.minutesAgo', { n: mins })
   const hrs = Math.round(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  return `${Math.round(hrs / 24)}d ago`
+  if (hrs < 24) return t('dashboard.hoursAgo', { n: hrs })
+  return t('dashboard.daysAgo', { n: Math.round(hrs / 24) })
 }
 
 export default function Dashboard() {
   const { user } = useAuth()
   const { actingAs, effectiveUid, effectiveName } = useAdmin()
   const { t } = useLanguage()
+  const { confirm } = useFeedback()
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [routines] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [sessions, sessionsLoading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
@@ -58,10 +61,29 @@ export default function Dashboard() {
   // just because another was started after it.
   const [drafts, setDrafts] = useState([])
   useEffect(() => {
-    setDrafts(listDrafts(effectiveUid))
+    const refresh = () => setDrafts(listDrafts(effectiveUid))
+    refresh()
+    // Coming back to the app (another tab, or the phone unlocked) can mean
+    // a workout was saved or finished meanwhile — re-read instead of
+    // showing a stale "In progress" card.
+    const onVisible = () => document.visibilityState === 'visible' && refresh()
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', refresh)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', refresh)
+    }
   }, [effectiveUid])
 
-  function discardDraft(routineKey) {
+  // One stray tap used to throw away a half-logged workout with no way back.
+  async function discardDraft(routineKey) {
+    const ok = await confirm({
+      title: t('workout.discardTitle'),
+      body: t('workout.discardBody'),
+      confirmLabel: t('workout.discardConfirm'),
+      danger: true,
+    })
+    if (!ok) return
     clearDraft(effectiveUid, routineKey)
     setDrafts((prev) => prev.filter((d) => d.routineKey !== routineKey))
   }
@@ -92,18 +114,21 @@ export default function Dashboard() {
               </div>
               <p className="text-lg leading-tight">{draft.routineName}</p>
               <p className="text-chalkdim text-xs mt-0.5">
-                {timeAgo(draft.savedAt)} · {draft.entries?.length || 0} {t('dashboard.exerciseLoggedSoFar')}
+                {timeAgo(draft.savedAt, t)} · {draft.entries?.length || 0} {t('dashboard.exerciseLoggedSoFar')}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <button onClick={() => discardDraft(draft.routineKey)} className="text-chalkdim text-xs hover:text-iron">
+            <button type="button" onClick={() => discardDraft(draft.routineKey)} className="text-chalkdim text-xs hover:text-iron px-2 py-2">
               {t('dashboard.discard')}
             </button>
-            <Link to={`/workout/${draft.routineId || 'freestyle'}`}>
-              <Button variant="brass">
-                <Play size={15} /> {t('dashboard.resume')}
-              </Button>
+            {/* A link styled as a button, not a button inside a link — the
+                nested version is invalid HTML and could need two taps. */}
+            <Link
+              to={`/workout/${draft.routineId || 'freestyle'}`}
+              className="press inline-flex items-center justify-center gap-1.5 rounded-md px-3.5 py-2 text-sm font-medium bg-brass text-ink hover:bg-brass/90 transition-colors"
+            >
+              <Play size={15} /> {t('dashboard.resume')}
             </Link>
           </div>
         </Card>
@@ -119,7 +144,7 @@ export default function Dashboard() {
             <Dumbbell size={22} className="text-iron" />
             <span className="text-sm">{t('dashboard.navRoutines')}</span>
             <span className="text-chalkdim text-xs">
-              {routines.length} {t('dashboard.exercisesCount')}
+              {routines.length} {t('dashboard.routinesCount')}
             </span>
           </Card>
         </Link>

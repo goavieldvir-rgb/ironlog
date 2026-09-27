@@ -267,6 +267,20 @@ export default function SessionEntryCard({
             )}
             {isCardio && <Badge tone="cardio">{t('sessionCard.cardioBadge')}</Badge>}
             {!isCardio && entry.bodyweight && <Badge tone="brass">{t('sessionCard.bodyweightBadge')}</Badge>}
+            {/* Next to the name rather than in the icon row: sitting among
+                the icons it made that row so wide on a phone that the name,
+                "Previously" and the last note were squeezed into a narrow
+                column, a word or two per line. */}
+            {entry.videoUrl && (
+              <a
+                href={entry.videoUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-brass hover:underline"
+              >
+                <Play size={13} /> {t('sessionCard.example')}
+              </a>
+            )}
           </div>
           {prevLabel && (
             <p className="num text-chalkdim text-xs mt-0.5 inline-flex items-center gap-1 flex-wrap">
@@ -336,16 +350,6 @@ export default function SessionEntryCard({
             >
               <StickyNote size={15} />
             </button>
-          )}
-          {entry.videoUrl && (
-            <a
-              href={entry.videoUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-brass hover:underline"
-            >
-              <Play size={13} /> {t('sessionCard.example')}
-            </a>
           )}
           {removable && (
             <button onClick={onRemoveEntry} aria-label={t('sessionCard.removeExercise')} className="press text-chalkdim hover:text-iron">
@@ -438,7 +442,10 @@ export default function SessionEntryCard({
               showRir ? 'grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem_3.25rem]' : 'grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem]'
             }`}
           >
-            <span>{t('sessionCard.set')}</span>
+            {/* "#" like the cardio header: the word "Set" in wide-tracked
+                capitals is wider than this column and ran into the next
+                label, reading as "SETWT (KG)". */}
+            <span>#</span>
             <span className="truncate">
               {entry.bodyweight ? `+${t('sessionCard.wt')} (${entry.unit}) ${t('sessionCard.opt')}` : `${t('sessionCard.wt')} (${entry.unit})`}
             </span>

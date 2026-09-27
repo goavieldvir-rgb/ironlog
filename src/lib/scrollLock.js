@@ -37,6 +37,12 @@ function unlock() {
   window.scrollTo(0, savedY)
 }
 
+// After moving to a new page, whatever was locked should reopen at the top
+// of that page — not at the scroll position of the page we just left.
+export function resetLockedScroll() {
+  savedY = 0
+}
+
 export function useScrollLock(active) {
   useEffect(() => {
     if (!active) return
