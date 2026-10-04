@@ -19,6 +19,7 @@ import { toLocalISODate } from '../lib/dates.js'
 import { disambiguateLabels } from '../lib/disambiguate.js'
 import { Card, EmptyState, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
+import { workingSets } from '../lib/warmup.js'
 
 const COLORS = { iron: '#D64545', brass: '#C9A24B', cardio: '#4C8CC9', chalk: '#EDEDE6', chalkdim: '#9CA0AA', grid: '#31353E' }
 
@@ -62,7 +63,7 @@ export default function Stats() {
           if (e.category === 'cardio') {
             cardioMinutes += (e.sets || []).reduce((sv, set) => sv + (Number(set.duration) || 0), 0)
           } else {
-            volume += (e.sets || []).reduce((sv, set) => {
+            volume += workingSets(e.sets).reduce((sv, set) => {
               const w = Number(set.weight)
               const r = Number(set.reps)
               return sv + (isFinite(w) && isFinite(r) ? w * r : 0)
@@ -136,7 +137,7 @@ export default function Stats() {
           continue
         }
 
-        const completed = (entry.sets || []).filter((set) => {
+        const completed = workingSets(entry.sets).filter((set) => {
           const repsOk = set.reps !== '' && set.reps != null
           const weightOk = entry.bodyweight ? true : set.weight !== '' && set.weight != null
           return repsOk && weightOk

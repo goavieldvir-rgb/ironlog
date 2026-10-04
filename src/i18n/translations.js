@@ -354,6 +354,9 @@ export const translations = {
       rir: 'RIR',
       rirTip: 'Reps in Reserve — how many more reps you feel you could have done before failure. 0 means you went all the way; leave it blank if you\'d rather not log it for a set.',
       addSet: 'Add set',
+      addWarmups: 'Add warm-up sets',
+      warmupShort: 'W',
+      toggleWarmup: 'Mark as warm-up set',
       sameAsAbove: 'Same as above',
       sameAsSetAbove: 'Same as set above',
       chooseLastTime: "Choose last time's numbers",
@@ -568,6 +571,11 @@ automatically. If your last two sessions weren't identical (say you go
 heavy then light, or light then heavy), tapping it gives you a choice
 between "last set done" and "top set done" — pick whichever matches how
 you train.
+
+"Add warm-up sets" suggests a few lighter sets to ramp up to your working
+weight. Tap the number at the start of any set to mark it (or unmark it) as
+a warm-up — shown as "W". Warm-ups never count toward your records, volume
+or set totals.
 
 The little sticky-note icon lets you jot something down about that
 specific exercise that day — "used the other machine," "felt off today,"
@@ -1028,6 +1036,9 @@ whoever set your account up for you.`,
       rir: 'RIR',
       rirTip: 'חזרות בשמורה — כמה חזרות נוספות הרגשתם שיכולתם לבצע לפני כשל. 0 אומר שהגעתם עד הסוף; אפשר להשאיר ריק אם אתם מעדיפים לא לתעד את זה בסט מסוים.',
       addSet: 'הוספת סט',
+      addWarmups: 'הוספת סטים של חימום',
+      warmupShort: 'ח',
+      toggleWarmup: 'סימון כסט חימום',
       sameAsAbove: 'כמו למעלה',
       sameAsSetAbove: 'כמו בסט הקודם',
       chooseLastTime: 'בחירת מספרים מהפעם הקודמת',
@@ -1198,6 +1209,8 @@ whoever set your account up for you.`,
 אם אתם רואים "בפעם הקודמת: 60 ק"ג × 8" מתחת לשם תרגיל, זה בדיוק מה שביצעתם בפעם האחרונה שתרגלתם אותו — שימושי כדי לדעת למה לשאוף לשבור.
 
 סמל השעון הקטן בסט הראשון ממלא עבורכם את המספרים האחרונים אוטומטית. אם שני האימונים האחרונים שלכם לא היו זהים (למשל התחלתם כבד ואז קל, או קל ואז כבד), הקשה עליו תיתן לכם בחירה בין "הסט האחרון שבוצע" ל"הסט הכבד ביותר" — בחרו את מה שמתאים לסגנון האימון שלכם.
+
+"הוספת סטים של חימום" מציעה כמה סטים קלים יותר כדי להתכונן למשקל העבודה. הקישו על המספר בתחילת סט כדי לסמן אותו (או לבטל סימון) כסט חימום — מוצג כ"ח". סטים של חימום לא נספרים בשיאים, בנפח או בסך הסטים.
 
 סמל הפתקית הקטן מאפשר לרשום משהו על התרגיל הספציפי הזה באותו יום — "השתמשתי במכונה האחרת", "הרגשתי לא במיטבי היום", כל דבר שכדאי לזכור אחר כך.
 

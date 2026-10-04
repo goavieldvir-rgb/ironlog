@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase.js'
+import { workingSets } from './warmup.js'
 
 // Generic live-ish collection hook: fetches rows owned by `uid` from `table`,
 // ordered by `orderField`. Call the returned refresh() after any mutation
@@ -299,7 +300,7 @@ export async function logSession(uid, session) {
   // when building the next session.
   for (const entry of session.entries) {
     if (!entry.exerciseId) continue
-    const completedSets = (entry.sets || []).filter((s) => isCompletedSet(entry, s))
+    const completedSets = workingSets(entry.sets).filter((s) => isCompletedSet(entry, s))
     if (completedSets.length === 0) continue
     const last = completedSets[completedSets.length - 1]
 
@@ -378,7 +379,7 @@ export async function recomputeLastKnown(uid, exerciseIds) {
     for (const s of sessions || []) {
       const entry = (s.entries || []).find((e) => e.exerciseId === exerciseId)
       if (!entry) continue
-      const completed = (entry.sets || []).filter((set) => isCompletedSet(entry, set))
+      const completed = workingSets(entry.sets).filter((set) => isCompletedSet(entry, set))
       if (completed.length === 0) continue
       found = { session: s, entry, completed }
       break

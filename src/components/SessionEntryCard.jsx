@@ -4,6 +4,7 @@ import { Card, Badge } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import OverflowMenu from './OverflowMenu.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { isWarmup, workingSets, suggestWarmups } from '../lib/warmup.js'
 
 function Stepper({ value, onChange, step, min = 0, max, label, placeholder, bare }) {
   const holdRef = useRef(null)
@@ -104,6 +105,7 @@ export default function SessionEntryCard({
   personalBest,
   onUpdateSet,
   onAddSet,
+  onAddWarmups,
   onRemoveSet,
   onRemoveEntry,
   onUpdateNote,
@@ -169,9 +171,29 @@ export default function SessionEntryCard({
     return v != null && v > personalBest
   }
   const bestThisSession = (entry.sets || []).reduce((acc, s) => {
-    const v = isPrSet(s) ? prValue(s) : null
+    const v = !isWarmup(s) && isPrSet(s) ? prValue(s) : null
     return v != null && (acc == null || v > acc) ? v : acc
   }, null)
+
+  // Warm-ups: labels and last-time hints count working sets only, and the
+  // suggestion ramps toward the first working set's weight (else last
+  // time's top weight).
+  const firstWorkingIdx = (entry.sets || []).findIndex((s) => !isWarmup(s))
+  const setLabels = (() => {
+    let n = 0
+    return (entry.sets || []).map((s) => (isWarmup(s) ? t('sessionCard.warmupShort') : String(++n)))
+  })()
+  const firstWorking = workingSets(entry.sets)[0]
+  const workingWeight = (() => {
+    const filled = firstWorking && firstWorking.weight !== '' && firstWorking.weight != null ? Number(firstWorking.weight) : null
+    if (filled > 0) return filled
+    if (topSetData && Number(topSetData.weight) > 0) return Number(topSetData.weight)
+    return Number(lastWeight) > 0 ? Number(lastWeight) : null
+  })()
+  const warmupSuggestion = !isCardio && !entry.bodyweight && !(entry.sets || []).some(isWarmup) ? suggestWarmups(workingWeight, entry.unit) : []
+  function addWarmups() {
+    onAddWarmups(warmupSuggestion.map((w) => ({ weight: String(w.weight), reps: String(w.reps), rir: '', warmup: true })))
+  }
   const prUnit = isCardio ? t('sessionCard.minUnit') : entry.bodyweight ? t('sessionCard.reps') : entry.unit
 
   // A short buzz the first moment a set crosses the old best, so it lands
@@ -325,14 +347,14 @@ export default function SessionEntryCard({
           <span className="eyebrow">{t('sessionCard.copyInNumbers')}</span>
           <div className="flex flex-col sm:flex-row gap-1.5">
             <button
-              onClick={() => pickQuickFill(0, lastSetData)}
+              onClick={() => pickQuickFill(Math.max(0, firstWorkingIdx), lastSetData)}
               className="flex-1 text-start rounded-md bg-ink border border-line hover:border-brass px-3 py-2"
             >
               <p className="text-xs text-chalkdim">{t('sessionCard.lastSetDone')}</p>
               <p className="num text-sm">{formatQuickFillLabel(lastSetData)}</p>
             </button>
             <button
-              onClick={() => pickQuickFill(0, topSetData)}
+              onClick={() => pickQuickFill(Math.max(0, firstWorkingIdx), topSetData)}
               className="flex-1 text-start rounded-md bg-ink border border-line hover:border-brass px-3 py-2"
             >
               <p className="text-xs text-chalkdim">{t('sessionCard.topSetDone')}</p>
@@ -346,7 +368,8 @@ export default function SessionEntryCard({
         // Previous session's number for this set, shown greyed inside the
         // empty box so the last numbers are right there without a column.
         const prev = (j, key, fallback) => {
-          const v = lastSets[j]?.[key]
+          if (isWarmup(entry.sets[j])) return ''
+          const v = lastSets[workingSets(entry.sets.slice(0, j)).length]?.[key]
           if (v != null && v !== '') return String(v)
           return fallback != null && fallback !== '' ? String(fallback) : ''
         }
@@ -359,21 +382,21 @@ export default function SessionEntryCard({
                 label: hasChoice ? t('sessionCard.chooseLastTime') : t('sessionCard.useLastTime'),
                 icon: <History size={16} />,
                 onClick: () => useLastTime(j),
-                hidden: !(j === 0 && hasAnyLastData),
+                hidden: !(j === firstWorkingIdx && hasAnyLastData),
               },
               {
                 key: 'same',
                 label: isCardio ? t('sessionCard.sameAsAbove') : t('sessionCard.sameAsSetAbove'),
                 icon: <CornerDownLeft size={16} />,
                 onClick: () => copyFromPrevious(j),
-                hidden: j === 0,
+                hidden: j === 0 || j === firstWorkingIdx,
               },
               { key: 'remove', label: t('sessionCard.removeSet'), icon: <Trash2 size={16} />, onClick: () => onRemoveSet(j), danger: true },
             ]}
           />
         )
-        const rowBase = 'grid gap-1 items-center grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem]'
-        const extraCol = '!grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_2.75rem]'
+        const rowBase = 'grid gap-1 items-center grid-cols-[1.75rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem]'
+        const extraCol = '!grid-cols-[1.75rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_2.75rem]'
         const cardioExtraCol = extraCol
         // The third number (RIR, or distance for cardio) is a narrow input
         // in the same row; the +/- buttons are dropped on phones to make room.
@@ -438,23 +461,39 @@ export default function SessionEntryCard({
               <span />
             </div>
             {entry.sets.map((s, j) => (
-              <div key={j} className={`${strengthCols} ${justFilled === j ? 'flash-fill' : ''}`}>
-                <span className="num text-chalkdim text-sm">{j + 1}</span>
-                <Stepper bare={showRir} value={s.weight} step={weightStep} placeholder={prev(j, 'weight', lastWeight)} onChange={(v) => onUpdateSet(j, { weight: v })} label={`${t('sessionCard.set')} ${j + 1} ${t('sessionCard.wt')} (${entry.unit})`} />
-                <Stepper bare={showRir} value={s.reps} step={1} placeholder={prev(j, 'reps', lastReps)} onChange={(v) => onUpdateSet(j, { reps: v })} label={`${t('sessionCard.set')} ${j + 1} ${t('sessionCard.reps')}`} />
+              <div key={j} className={`${strengthCols} ${justFilled === j ? 'flash-fill' : ''} ${isWarmup(s) ? 'opacity-70' : ''}`}>
+                <button
+                  type="button"
+                  onClick={() => onUpdateSet(j, { warmup: !s.warmup })}
+                  title={t('sessionCard.toggleWarmup')}
+                  aria-label={t('sessionCard.toggleWarmup')}
+                  aria-pressed={isWarmup(s)}
+                  className={`num text-sm text-start min-h-[44px] ${isWarmup(s) ? 'text-brass' : 'text-chalkdim hover:text-chalk'}`}
+                >
+                  {setLabels[j]}
+                </button>
+                <Stepper bare={showRir} value={s.weight} step={weightStep} placeholder={prev(j, 'weight', lastWeight)} onChange={(v) => onUpdateSet(j, { weight: v })} label={`${t('sessionCard.set')} ${setLabels[j]} ${t('sessionCard.wt')} (${entry.unit})`} />
+                <Stepper bare={showRir} value={s.reps} step={1} placeholder={prev(j, 'reps', lastReps)} onChange={(v) => onUpdateSet(j, { reps: v })} label={`${t('sessionCard.set')} ${setLabels[j]} ${t('sessionCard.reps')}`} />
                 {showRir && (
                   <div className={thirdCell}>
                     <div>
-                      <Stepper bare value={s.rir} step={1} min={0} max={10} placeholder={prev(j, 'rir')} onChange={(v) => onUpdateSet(j, { rir: v })} label={`${t('sessionCard.set')} ${j + 1} RIR`} />
+                      <Stepper bare value={s.rir} step={1} min={0} max={10} placeholder={prev(j, 'rir')} onChange={(v) => onUpdateSet(j, { rir: v })} label={`${t('sessionCard.set')} ${setLabels[j]} RIR`} />
                     </div>
                   </div>
                 )}
                 <div className={showRir ? menuCell : 'justify-self-end'}>{setMenu(j)}</div>
               </div>
             ))}
-            <button onClick={onAddSet} className="text-chalkdim hover:text-chalk text-sm inline-flex items-center gap-1 min-h-[44px] pe-3 w-fit">
-              <Plus size={13} /> {t('sessionCard.addSet')}
-            </button>
+            <div className="flex flex-wrap items-center gap-x-3">
+              <button onClick={onAddSet} className="text-chalkdim hover:text-chalk text-sm inline-flex items-center gap-1 min-h-[44px] pe-3 w-fit">
+                <Plus size={13} /> {t('sessionCard.addSet')}
+              </button>
+              {onAddWarmups && warmupSuggestion.length > 0 && (
+                <button onClick={addWarmups} className="text-chalkdim hover:text-brass text-sm inline-flex items-center gap-1 min-h-[44px] pe-3 w-fit">
+                  <Plus size={13} /> {t('sessionCard.addWarmups')}
+                </button>
+              )}
+            </div>
           </div>
         )
       })()}

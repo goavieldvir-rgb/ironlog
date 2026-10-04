@@ -16,6 +16,7 @@ import ExerciseSelect from './ExerciseSelect.jsx'
 import { ExerciseModal, emptyExerciseForm } from './ExerciseLibrary.jsx'
 import RestTimer from './RestTimer.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
+import { isWarmup, workingSets } from '../lib/warmup.js'
 
 function todayISO() {
   return toLocalISODate()
@@ -47,6 +48,7 @@ export default function WorkoutSession() {
       for (const e of s.entries || []) {
         if (!e.exerciseId) continue
         for (const set of e.sets || []) {
+          if (isWarmup(set)) continue
           const raw = e.category === 'cardio' ? set.duration : e.bodyweight ? set.reps : set.weight
           const n = Number(raw)
           if (!raw || !isFinite(n) || n <= 0) continue
@@ -270,7 +272,7 @@ export default function WorkoutSession() {
     if (!ex || swapIndex == null) return
     // Keep whatever number of sets the original exercise had planned —
     // swapping shouldn't also reset how many sets you meant to do.
-    const targetSets = entries[swapIndex]?.sets?.length || 3
+    const targetSets = workingSets(entries[swapIndex]?.sets).length || 3
     setEntries((prev) => prev.map((e, i) => (i === swapIndex ? buildEntryFromExercise(ex, targetSets) : e)))
     setSwapIndex(null)
     setSwapPickId('')
@@ -282,7 +284,7 @@ export default function WorkoutSession() {
   // duplicating this per entry point.
   function applyPickedExercise(ex) {
     if (swapIndex != null) {
-      const targetSets = entries[swapIndex]?.sets?.length || 3
+      const targetSets = workingSets(entries[swapIndex]?.sets).length || 3
       setEntries((prev) => prev.map((e, i) => (i === swapIndex ? buildEntryFromExercise(ex, targetSets) : e)))
       setSwapIndex(null)
     } else {
@@ -312,6 +314,11 @@ export default function WorkoutSession() {
     )
   }
 
+  // Warm-ups go at the start of the exercise, ahead of the working sets.
+  function addWarmups(entryIdx, warmups) {
+    setEntries((prev) => prev.map((e, i) => (i !== entryIdx ? e : { ...e, sets: [...warmups, ...e.sets] })))
+  }
+
   function removeSet(entryIdx, setIdx) {
     setEntries((prev) =>
       prev.map((e, i) => (i !== entryIdx ? e : { ...e, sets: e.sets.filter((_, j) => j !== setIdx) })),
@@ -332,7 +339,7 @@ export default function WorkoutSession() {
     const entry = entries[entryIdx]
     // Only ask when there's something to lose — removing an untouched
     // exercise shouldn't need a confirmation.
-    const hasLogged = (entry?.sets || []).some((s) =>
+    const hasLogged = workingSets(entry?.sets).some((s) =>
       entry.category === 'cardio' ? s.duration : s.weight || s.reps,
     )
     if (hasLogged) {
@@ -441,6 +448,7 @@ export default function WorkoutSession() {
             onMoveDown={i < entries.length - 1 ? () => moveEntry(i, 1) : undefined}
             onUpdateSet={(setIdx, patch) => updateSet(i, setIdx, patch)}
             onAddSet={() => addSet(i)}
+            onAddWarmups={(sets) => addWarmups(i, sets)}
             onRemoveSet={(setIdx) => removeSet(i, setIdx)}
             onRemoveEntry={() => removeEntry(i)}
             onUpdateNote={(text) => updateNote(i, text)}

@@ -7,6 +7,7 @@ import { useCollection } from '../lib/db.js'
 import { toLocalISODate } from '../lib/dates.js'
 import { Button, Card, EmptyState, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
+import { isWarmup, workingSets } from '../lib/warmup.js'
 
 function mondayOf(d) {
   const date = new Date(d)
@@ -139,13 +140,13 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t }
   lines.push(`${formatRange(start, end, mode)}${personName ? ` — ${personName}` : ''}`)
   lines.push('')
 
-  const totalSets = sessions.reduce((n, s) => n + (s.entries || []).reduce((m, e) => m + (e.sets?.length || 0), 0), 0)
+  const totalSets = sessions.reduce((n, s) => n + (s.entries || []).reduce((m, e) => m + workingSets(e.sets).length, 0), 0)
   const totalVolume = sessions.reduce((sum, s) => {
     const v = (s.entries || []).reduce((eSum, e) => {
       if (e.category === 'cardio') return eSum
       return (
         eSum +
-        (e.sets || []).reduce((sv, set) => {
+        workingSets(e.sets).reduce((sv, set) => {
           const w = Number(set.weight) || 0
           const r = Number(set.reps) || 0
           return sv + w * r
@@ -178,7 +179,7 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t }
   for (const s of [...sessions].sort((a, b) => (a.date < b.date ? -1 : 1))) {
     lines.push(`## ${formatDay(s.date)} — ${s.routine_name} (${s.category})`)
     for (const e of s.entries || []) {
-      const setsStr = (e.sets || []).map((set) => formatSet(e, set, t)).join(', ')
+      const setsStr = (e.sets || []).map((set) => (isWarmup(set) ? `${t('sessionCard.warmupShort')} ` : '') + formatSet(e, set, t)).join(', ')
       lines.push(`- ${e.name}: ${setsStr || t('summary.docNoSetsLogged')}`)
       if (e.notes) lines.push(`  (${e.notes})`)
     }
