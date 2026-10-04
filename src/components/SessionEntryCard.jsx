@@ -395,8 +395,8 @@ export default function SessionEntryCard({
             ]}
           />
         )
-        const rowBase = 'grid gap-1 items-center grid-cols-[1.75rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem]'
-        const extraCol = '!grid-cols-[1.75rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_2.75rem]'
+        const rowBase = 'grid gap-1 items-center grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem]'
+        const extraCol = '!grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_2.75rem]'
         const cardioExtraCol = extraCol
         // The third number (RIR, or distance for cardio) is a narrow input
         // in the same row; the +/- buttons are dropped on phones to make room.
