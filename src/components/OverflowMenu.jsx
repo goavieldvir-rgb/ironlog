@@ -27,7 +27,10 @@ export default function OverflowMenu({ label, items }) {
       if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
     }
     const onKey = (e) => {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key === 'Escape') {
+        setOpen(false)
+        wrapRef.current?.querySelector('button')?.focus()
+      }
     }
     document.addEventListener('pointerdown', onDown)
     document.addEventListener('keydown', onKey)
