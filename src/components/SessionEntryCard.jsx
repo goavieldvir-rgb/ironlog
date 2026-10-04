@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Play, Plus, Trash2, Minus, CornerDownLeft, History, StickyNote, ChevronDown, Repeat, ArrowUp, ArrowDown, Trophy } from 'lucide-react'
+import { Play, Plus, Trash2, Minus, CornerDownLeft, History, StickyNote, Repeat, ArrowUp, ArrowDown, Trophy } from 'lucide-react'
 import { Card, Badge } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
+import OverflowMenu from './OverflowMenu.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
-function Stepper({ value, onChange, step, min = 0, max, label }) {
+function Stepper({ value, onChange, step, min = 0, max, label, placeholder, bare }) {
   const holdRef = useRef(null)
 
   function bump(delta) {
@@ -39,7 +40,7 @@ function Stepper({ value, onChange, step, min = 0, max, label }) {
   useEffect(() => stopHold, [])
 
   const btn =
-    'px-2 min-w-[34px] min-h-[44px] shrink-0 bg-surface2 text-chalkdim hover:text-chalk active:bg-line active:scale-90 ' +
+    (bare ? 'max-[559px]:hidden ' : '') + 'px-1.5 min-w-[30px] min-h-[44px] shrink-0 bg-surface2 text-chalkdim hover:text-chalk active:bg-line active:scale-90 ' +
     'transition-transform duration-75 select-none touch-none border border-line flex items-center justify-center'
 
   // Bumping happens on press for immediacy; the click handler only fires
@@ -72,9 +73,10 @@ function Stepper({ value, onChange, step, min = 0, max, label }) {
         inputMode="decimal"
         step={step}
         value={value}
+        placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         aria-label={label}
-        className="num text-center !rounded-none !px-0.5 min-w-0 w-full"
+        className={`num text-center !rounded-none !px-0.5 min-w-0 w-full ${bare ? 'max-[559px]:!rounded-md' : ''}`}
       />
       <button
         type="button"
@@ -251,9 +253,9 @@ export default function SessionEntryCard({
   })()
 
   return (
-    <Card className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
-        <div className="min-w-0 flex-1 basis-[12rem]">
+    <Card className="flex flex-col gap-2.5 !p-3 min-[560px]:!p-4">
+      <div className="flex items-start justify-between gap-2 -mt-1 -me-2">
+        <div className="min-w-0 flex-1 pt-1">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-lg">{entry.name}</h2>
             {bestThisSession != null && (
@@ -306,57 +308,16 @@ export default function SessionEntryCard({
             </p>
           )}
         </div>
-        <div className="flex items-center ms-auto">
-          {/* Reordering mid-workout: machines get taken, so the order you
-              planned isn't always the order you can train. */}
-          {(onMoveUp || onMoveDown) && (
-            <span className="flex items-center">
-              <button
-                onClick={onMoveUp}
-                disabled={!onMoveUp}
-                title={t('sessionCard.moveUp')}
-                aria-label={t('sessionCard.moveUp')}
-                className="press text-chalkdim hover:text-chalk inline-flex items-center justify-center min-w-[40px] min-h-[44px] disabled:opacity-30 disabled:hover:text-chalkdim"
-              >
-                <ArrowUp size={15} />
-              </button>
-              <button
-                onClick={onMoveDown}
-                disabled={!onMoveDown}
-                title={t('sessionCard.moveDown')}
-                aria-label={t('sessionCard.moveDown')}
-                className="press text-chalkdim hover:text-chalk inline-flex items-center justify-center min-w-[40px] min-h-[44px] disabled:opacity-30 disabled:hover:text-chalkdim"
-              >
-                <ArrowDown size={15} />
-              </button>
-            </span>
-          )}
-          {onSwapExercise && (
-            <button
-              onClick={onSwapExercise}
-              title={t('sessionCard.swapExercise')}
-              aria-label={t('sessionCard.swapExercise')}
-              className="press text-chalkdim hover:text-brass inline-flex items-center justify-center min-w-[40px] min-h-[44px]"
-            >
-              <Repeat size={15} />
-            </button>
-          )}
-          {onUpdateNote && !showNote && (
-            <button
-              onClick={() => setShowNote(true)}
-              title={t('sessionCard.addNote')}
-              aria-label={t('sessionCard.addNote')}
-              className="press text-chalkdim hover:text-brass inline-flex items-center justify-center min-w-[40px] min-h-[44px]"
-            >
-              <StickyNote size={15} />
-            </button>
-          )}
-          {removable && (
-            <button onClick={onRemoveEntry} title={t('sessionCard.removeExercise')} aria-label={t('sessionCard.removeExercise')} className="press text-chalkdim hover:text-irontext inline-flex items-center justify-center min-w-[40px] min-h-[44px]">
-              <Trash2 size={15} />
-            </button>
-          )}
-        </div>
+        <OverflowMenu
+          label={t('sessionCard.moreActions')}
+          items={[
+            { key: 'up', label: t('sessionCard.moveUp'), icon: <ArrowUp size={16} />, onClick: () => onMoveUp?.(), hidden: !onMoveUp },
+            { key: 'down', label: t('sessionCard.moveDown'), icon: <ArrowDown size={16} />, onClick: () => onMoveDown?.(), hidden: !onMoveDown },
+            { key: 'swap', label: t('sessionCard.swapExercise'), icon: <Repeat size={16} />, onClick: () => onSwapExercise?.(), hidden: !onSwapExercise },
+            { key: 'note', label: t('sessionCard.addNote'), icon: <StickyNote size={16} />, onClick: () => setShowNote(true), hidden: !onUpdateNote || showNote },
+            { key: 'remove', label: t('sessionCard.removeExercise'), icon: <Trash2 size={16} />, onClick: () => onRemoveEntry?.(), danger: true, hidden: !removable },
+          ]}
+        />
       </div>
 
       {showQuickFill && hasChoice && (
@@ -381,149 +342,122 @@ export default function SessionEntryCard({
         </div>
       )}
 
-      {isCardio ? (
-        <div className="flex flex-col gap-1.5">
-          <div className="grid grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)] min-[560px]:grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_5.5rem] gap-1 text-chalkdim eyebrow px-0.5">
-            <span>#</span>
-            <span className="truncate">{t('sessionCard.min')}</span>
-            <span className="truncate">{intensityLabel}</span>
-            <span className="hidden min-[560px]:block truncate">{distanceUnit} {t('sessionCard.opt')}</span>
-            <span className="hidden min-[560px]:inline">
-              <InfoTip text={t('sessionCard.copyAboveTip')} />
-            </span>
-          </div>
-          {entry.sets.map((s, j) => (
-            <div
-              key={j}
-              className={`grid grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)] min-[560px]:grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_5.5rem] gap-1 items-center ${
-                justFilled === j ? 'flash-fill' : ''
-              }`}
-            >
-              <span className="num text-chalkdim text-sm">{j + 1}</span>
-              <Stepper value={s.duration} step={1} min={0} onChange={(v) => onUpdateSet(j, { duration: v })} label={`${t('sessionCard.set')} ${j + 1} ${t('sessionCard.min')}`} />
-              <Stepper
-                label={`${t('sessionCard.set')} ${j + 1} ${intensityLabel}`}
-                value={s.intensity}
-                step={1}
-                min={1}
-                max={intensityMax}
-                onChange={(v) => onUpdateSet(j, { intensity: v })}
-              />
-              <div className="col-span-2 flex items-center gap-1.5 min-[560px]:col-span-1">
-                <span className="eyebrow w-14 shrink-0 min-[560px]:hidden">{distanceUnit} {t('sessionCard.opt')}</span>
-                <div className="flex-1 min-w-0">
-                  <Stepper value={s.distance} step={0.1} min={0} onChange={(v) => onUpdateSet(j, { distance: v })} label={`${t('sessionCard.set')} ${j + 1} ${distanceUnit}`} />
-                </div>
+      {(() => {
+        // Previous session's number for this set, shown greyed inside the
+        // empty box so the last numbers are right there without a column.
+        const prev = (j, key, fallback) => {
+          const v = lastSets[j]?.[key]
+          if (v != null && v !== '') return String(v)
+          return fallback != null && fallback !== '' ? String(fallback) : ''
+        }
+        const setMenu = (j) => (
+          <OverflowMenu
+            label={`${t('sessionCard.moreSetActions')} ${j + 1}`}
+            items={[
+              {
+                key: 'last',
+                label: hasChoice ? t('sessionCard.chooseLastTime') : t('sessionCard.useLastTime'),
+                icon: <History size={16} />,
+                onClick: () => useLastTime(j),
+                hidden: !(j === 0 && hasAnyLastData),
+              },
+              {
+                key: 'same',
+                label: isCardio ? t('sessionCard.sameAsAbove') : t('sessionCard.sameAsSetAbove'),
+                icon: <CornerDownLeft size={16} />,
+                onClick: () => copyFromPrevious(j),
+                hidden: j === 0,
+              },
+              { key: 'remove', label: t('sessionCard.removeSet'), icon: <Trash2 size={16} />, onClick: () => onRemoveSet(j), danger: true },
+            ]}
+          />
+        )
+        const rowBase = 'grid gap-1 items-center grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem]'
+        const extraCol = '!grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_2.75rem]'
+        const cardioExtraCol = extraCol
+        // The third number (RIR, or distance for cardio) is a narrow input
+        // in the same row; the +/- buttons are dropped on phones to make room.
+        const thirdCell = 'min-w-0'
+        const menuCell = 'justify-self-end'
+
+        if (isCardio) {
+          return (
+            <div className="flex flex-col gap-1.5">
+              <div className={`${rowBase} ${cardioExtraCol} text-chalkdim eyebrow px-0.5`}>
+                <span>#</span>
+                <span className="truncate">{t('sessionCard.min')}</span>
+                <span className="truncate">{intensityLabel}</span>
+                <span className="truncate">{distanceUnit}</span>
+                <span />
               </div>
-              <div className="col-start-3 flex items-center justify-end min-w-0 min-[560px]:col-auto">
-                {j === 0 && (
-                  <span className="min-[560px]:hidden">
-                    <InfoTip text={t('sessionCard.copyAboveTip')} />
-                  </span>
-                )}
-                {j === 0 && hasAnyLastData ? (
-                  <button
-                    onClick={() => useLastTime(j)}
-                    title={hasChoice ? t('sessionCard.chooseLastTime') : t('sessionCard.useLastTime')} aria-label={hasChoice ? t('sessionCard.chooseLastTime') : t('sessionCard.useLastTime')}
-                    className="text-chalkdim hover:text-brass inline-flex items-center justify-center min-w-[44px] min-h-[44px]"
-                  >
-                    <History size={14} />
-                    {hasChoice && <ChevronDown size={10} />}
-                  </button>
-                ) : j > 0 ? (
-                  <button onClick={() => copyFromPrevious(j)} title={t('sessionCard.sameAsAbove')} aria-label={t('sessionCard.sameAsAbove')} className="press text-chalkdim hover:text-brass inline-flex items-center justify-center min-w-[44px] min-h-[44px]">
-                    <CornerDownLeft size={14} />
-                  </button>
-                ) : (
-                  <span className="w-11" />
-                )}
-                <button onClick={() => onRemoveSet(j)} title={t('sessionCard.removeSet')} aria-label={t('sessionCard.removeSet')} className="press text-chalkdim hover:text-irontext inline-flex items-center justify-center min-w-[44px] min-h-[44px]">
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-          ))}
-          <button onClick={onAddSet} className="text-chalkdim hover:text-chalk text-sm inline-flex items-center gap-1 min-h-[44px] pe-3 w-fit">
-            <Plus size={13} /> {t('sessionCard.addInterval')}
-          </button>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-1.5">
-          <div
-            className={`grid gap-1 text-chalkdim eyebrow px-0.5 grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)] ${
-              showRir ? 'min-[560px]:grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_5.5rem]' : 'min-[560px]:grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_5.5rem]'
-            }`}
-          >
-            {/* "#" like the cardio header: the word "Set" in wide-tracked
-                capitals is wider than this column and ran into the next
-                label, reading as "SETWT (KG)". */}
-            <span>#</span>
-            <span className="truncate">
-              {entry.bodyweight ? `+${t('sessionCard.wt')} (${entry.unit}) ${t('sessionCard.opt')}` : `${t('sessionCard.wt')} (${entry.unit})`}
-            </span>
-            <span>{t('sessionCard.reps')}</span>
-            {showRir && (
-              <span className="hidden min-[560px]:inline-flex items-center gap-0.5">
-                {t('sessionCard.rir')} <InfoTip text={t('sessionCard.rirTip')} />
-              </span>
-            )}
-            <span className="hidden min-[560px]:inline">
-              <InfoTip text={t('sessionCard.copyAboveTip')} />
-            </span>
-          </div>
-          {entry.sets.map((s, j) => (
-            <div
-              key={j}
-              className={`grid gap-1 items-center grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)] ${justFilled === j ? 'flash-fill' : ''} ${
-                showRir ? 'min-[560px]:grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_5.5rem]' : 'min-[560px]:grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_5.5rem]'
-              }`}
-            >
-              <span className="num text-chalkdim text-sm">{j + 1}</span>
-              <Stepper value={s.weight} step={weightStep} onChange={(v) => onUpdateSet(j, { weight: v })} label={`${t('sessionCard.set')} ${j + 1} ${t('sessionCard.wt')} (${entry.unit})`} />
-              <Stepper value={s.reps} step={1} onChange={(v) => onUpdateSet(j, { reps: v })} label={`${t('sessionCard.set')} ${j + 1} ${t('sessionCard.reps')}`} />
-              {showRir && (
-                <div className="col-span-2 flex items-center gap-1.5 min-[560px]:col-span-1">
-                  <span className="eyebrow inline-flex items-center gap-0.5 w-12 shrink-0 min-[560px]:hidden">
-                    {t('sessionCard.rir')} {j === 0 && <InfoTip text={t('sessionCard.rirTip')} />}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <Stepper value={s.rir} step={1} min={0} max={10} onChange={(v) => onUpdateSet(j, { rir: v })} label={`${t('sessionCard.set')} ${j + 1} RIR`} />
+              {entry.sets.map((s, j) => (
+                <div key={j} className={`${rowBase} ${cardioExtraCol} ${justFilled === j ? 'flash-fill' : ''}`}>
+                  <span className="num text-chalkdim text-sm">{j + 1}</span>
+                  <Stepper bare value={s.duration} step={1} min={0} placeholder={prev(j, 'duration', lastWeight)} onChange={(v) => onUpdateSet(j, { duration: v })} label={`${t('sessionCard.set')} ${j + 1} ${t('sessionCard.min')}`} />
+                  <Stepper
+                    bare
+                    label={`${t('sessionCard.set')} ${j + 1} ${intensityLabel}`}
+                    value={s.intensity}
+                    step={1}
+                    min={1}
+                    max={intensityMax}
+                    placeholder={prev(j, 'intensity', lastReps)}
+                    onChange={(v) => onUpdateSet(j, { intensity: v })}
+                  />
+                  <div className={thirdCell}>
+                    <div>
+                      <Stepper bare value={s.distance} step={0.1} min={0} placeholder={prev(j, 'distance', lastDistance)} onChange={(v) => onUpdateSet(j, { distance: v })} label={`${t('sessionCard.set')} ${j + 1} ${distanceUnit}`} />
+                    </div>
                   </div>
+                  <div className={menuCell}>{setMenu(j)}</div>
                 </div>
-              )}
-              <div className="col-start-3 flex items-center justify-end min-w-0 min-[560px]:col-auto">
-                {j === 0 && (
-                  <span className="min-[560px]:hidden">
-                    <InfoTip text={t('sessionCard.copyAboveTip')} />
-                  </span>
-                )}
-                {j === 0 && hasAnyLastData ? (
-                  <button
-                    onClick={() => useLastTime(j)}
-                    title={hasChoice ? t('sessionCard.chooseLastTime') : t('sessionCard.useLastTime')} aria-label={hasChoice ? t('sessionCard.chooseLastTime') : t('sessionCard.useLastTime')}
-                    className="text-chalkdim hover:text-brass inline-flex items-center justify-center min-w-[44px] min-h-[44px]"
-                  >
-                    <History size={14} />
-                    {hasChoice && <ChevronDown size={10} />}
-                  </button>
-                ) : j > 0 ? (
-                  <button onClick={() => copyFromPrevious(j)} title={t('sessionCard.sameAsSetAbove')} aria-label={t('sessionCard.sameAsSetAbove')} className="press text-chalkdim hover:text-brass inline-flex items-center justify-center min-w-[44px] min-h-[44px]">
-                    <CornerDownLeft size={14} />
-                  </button>
-                ) : (
-                  <span className="w-11" />
-                )}
-                <button onClick={() => onRemoveSet(j)} title={t('sessionCard.removeSet')} aria-label={t('sessionCard.removeSet')} className="press text-chalkdim hover:text-irontext inline-flex items-center justify-center min-w-[44px] min-h-[44px]">
-                  <Trash2 size={14} />
-                </button>
-              </div>
+              ))}
+              <button onClick={onAddSet} className="text-chalkdim hover:text-chalk text-sm inline-flex items-center gap-1 min-h-[44px] pe-3 w-fit">
+                <Plus size={13} /> {t('sessionCard.addInterval')}
+              </button>
             </div>
-          ))}
-          <button onClick={onAddSet} className="text-chalkdim hover:text-chalk text-sm inline-flex items-center gap-1 min-h-[44px] pe-3 w-fit">
-            <Plus size={13} /> {t('sessionCard.addSet')}
-          </button>
-        </div>
-      )}
+          )
+        }
+        const strengthCols = showRir ? `${rowBase} ${extraCol}` : rowBase
+        return (
+          <div className="flex flex-col gap-1.5">
+            <div className={`${strengthCols} text-chalkdim eyebrow px-0.5`}>
+              {/* "#" like the cardio header: the word "Set" in wide-tracked
+                  capitals is wider than this column and ran into the next
+                  label, reading as "SETWT (KG)". */}
+              <span>#</span>
+              <span className="truncate">
+                {entry.bodyweight ? `+${t('sessionCard.wt')} (${entry.unit}) ${t('sessionCard.opt')}` : `${t('sessionCard.wt')} (${entry.unit})`}
+              </span>
+              <span>{t('sessionCard.reps')}</span>
+              {showRir && (
+                <span className="inline-flex items-center gap-0.5">
+                  {t('sessionCard.rir')} <InfoTip text={t('sessionCard.rirTip')} />
+                </span>
+              )}
+              <span />
+            </div>
+            {entry.sets.map((s, j) => (
+              <div key={j} className={`${strengthCols} ${justFilled === j ? 'flash-fill' : ''}`}>
+                <span className="num text-chalkdim text-sm">{j + 1}</span>
+                <Stepper bare={showRir} value={s.weight} step={weightStep} placeholder={prev(j, 'weight', lastWeight)} onChange={(v) => onUpdateSet(j, { weight: v })} label={`${t('sessionCard.set')} ${j + 1} ${t('sessionCard.wt')} (${entry.unit})`} />
+                <Stepper bare={showRir} value={s.reps} step={1} placeholder={prev(j, 'reps', lastReps)} onChange={(v) => onUpdateSet(j, { reps: v })} label={`${t('sessionCard.set')} ${j + 1} ${t('sessionCard.reps')}`} />
+                {showRir && (
+                  <div className={thirdCell}>
+                    <div>
+                      <Stepper bare value={s.rir} step={1} min={0} max={10} placeholder={prev(j, 'rir')} onChange={(v) => onUpdateSet(j, { rir: v })} label={`${t('sessionCard.set')} ${j + 1} RIR`} />
+                    </div>
+                  </div>
+                )}
+                <div className={showRir ? menuCell : 'justify-self-end'}>{setMenu(j)}</div>
+              </div>
+            ))}
+            <button onClick={onAddSet} className="text-chalkdim hover:text-chalk text-sm inline-flex items-center gap-1 min-h-[44px] pe-3 w-fit">
+              <Plus size={13} /> {t('sessionCard.addSet')}
+            </button>
+          </div>
+        )
+      })()}
 
       {onUpdateNote && showNote && (
         <div className="flex flex-col gap-1 pt-1 border-t border-line">
