@@ -159,7 +159,7 @@ export default function Account() {
       </Card>
 
       <Card className="flex flex-col gap-3 border-ironsoft">
-        <h2 className="eyebrow text-iron">{t('account.deleteTitle')}</h2>
+        <h2 className="eyebrow text-irontext">{t('account.deleteTitle')}</h2>
         {canDelete ? (
           <>
             <p className="text-chalkdim text-sm">{t('account.deleteBody')}</p>

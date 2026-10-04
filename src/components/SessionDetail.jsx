@@ -75,7 +75,7 @@ export default function SessionDetail() {
         <Card key={i} className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-lg">{entry.name}</h3>
+              <h2 className="text-lg">{entry.name}</h2>
               {entry.category === 'cardio' && <Badge tone="cardio">{t('sessionCard.cardioBadge')}</Badge>}
               {entry.category !== 'cardio' && entry.bodyweight && <Badge tone="brass">{t('sessionCard.bodyweightBadge')}</Badge>}
             </div>

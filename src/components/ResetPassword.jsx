@@ -70,7 +70,7 @@ export default function ResetPassword() {
                 required
               />
             </Field>
-            {error && <p className="text-iron text-sm">{error}</p>}
+            {error && <p className="text-irontext text-sm">{error}</p>}
             <Button type="submit" disabled={saving} className="w-full">
               {saving ? t('resetPassword.saving') : t('resetPassword.updatePassword')}
             </Button>

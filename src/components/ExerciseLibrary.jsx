@@ -132,7 +132,7 @@ export default function ExerciseLibrary() {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-lg leading-tight">{(lang === 'he' && ex.name_he) || ex.name}</h3>
+                  <h2 className="text-lg leading-tight">{(lang === 'he' && ex.name_he) || ex.name}</h2>
                   <CategoryTag category={ex.category} />
                   {ex.bodyweight && ex.category !== 'cardio' && <Badge tone="brass">{t('exercises.bodyweightBadge')}</Badge>}
                   {ex.category === 'cardio' && (
@@ -143,14 +143,14 @@ export default function ExerciseLibrary() {
               </div>
               <div className="flex gap-1 shrink-0">
                 <button
-                  className="p-1.5 rounded hover:bg-surface2 text-chalkdim hover:text-chalk"
+                  className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-surface2 text-chalkdim hover:text-chalk"
                   onClick={() => setEditing({ ...ex, videoUrl: ex.video_url, intensityType: ex.intensity_type, trackRir: ex.track_rir })}
                   title={t('common.edit')} aria-label={t('common.edit')}
                 >
                   <Pencil size={15} />
                 </button>
                 <button
-                  className="p-1.5 rounded hover:bg-ironsoft text-chalkdim hover:text-iron"
+                  className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-ironsoft text-chalkdim hover:text-irontext"
                   onClick={() => handleDelete(ex)}
                   title={t('common.delete')} aria-label={t('common.delete')}
                 >
@@ -252,7 +252,7 @@ export function Tabs({ tab, setTab }) {
         <button
           key={o.id}
           onClick={() => setTab(o.id)}
-          className={`px-3 py-1.5 rounded transition-colors ${
+          className={`px-3 min-h-[44px] rounded transition-colors ${
             tab === o.id ? 'bg-ink text-chalk' : 'text-chalkdim'
           }`}
         >

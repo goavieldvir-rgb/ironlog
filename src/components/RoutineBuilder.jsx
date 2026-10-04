@@ -307,7 +307,7 @@ export default function RoutineBuilder() {
                   <ArrowDown size={13} />
                 </button>
               </div>
-              <button onClick={() => removeItem(i)} aria-label={t('common.remove')} className="text-chalkdim hover:text-iron p-1">
+              <button onClick={() => removeItem(i)} aria-label={t('common.remove')} className="text-chalkdim hover:text-irontext p-1">
                 <Trash2 size={15} />
               </button>
             </div>

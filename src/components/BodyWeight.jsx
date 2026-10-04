@@ -211,7 +211,7 @@ export default function BodyWeight() {
                   {e.weight}
                   {e.unit}
                 </span>
-                <button onClick={() => startEdit(e)} aria-label={t('common.edit')} className="text-chalkdim hover:text-chalk p-1">
+                <button onClick={() => startEdit(e)} aria-label={t('common.edit')} className="text-chalkdim hover:text-chalk inline-flex items-center justify-center min-w-[44px] min-h-[44px]">
                   <Pencil size={14} />
                 </button>
                 <button
@@ -225,7 +225,7 @@ export default function BodyWeight() {
                       toast(t('feedback.deleteFailed'), 'error')
                     }
                   }}
-                  className="text-chalkdim hover:text-iron p-1"
+                  className="text-chalkdim hover:text-irontext inline-flex items-center justify-center min-w-[44px] min-h-[44px]"
                 >
                   <Trash2 size={14} />
                 </button>

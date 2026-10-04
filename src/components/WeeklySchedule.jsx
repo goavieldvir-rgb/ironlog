@@ -147,7 +147,7 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
         <button
           type="button"
           onClick={() => openDayPanel(today, 'edit')}
-          className="text-chalkdim text-xs hover:text-brass inline-flex items-center gap-1"
+          className="hit text-chalkdim text-xs hover:text-brass inline-flex items-center gap-1"
         >
           <Pencil size={12} /> {t('dashboard.editWeek')}
         </button>
@@ -161,13 +161,13 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
             key={dow}
             type="button"
             onClick={() => openDayPanel(dow)}
-            className={`press-row flex items-center justify-between gap-2 rounded-md px-3 py-2.5 text-start transition-colors ${
+            className={`press-row flex items-center justify-between gap-2 rounded-md px-3 py-2.5 min-h-[44px] text-start transition-colors ${
               isToday ? 'bg-ironsoft border border-iron/40' : 'hover:bg-surface2 border border-transparent'
             }`}
           >
             <span className={`text-sm inline-flex items-center gap-1.5 shrink-0 ${isToday ? 'text-chalk' : 'text-chalkdim'}`}>
               {t(`dashboard.day${dow}`)}
-              {isToday && <span className="eyebrow text-iron">{t('dashboard.today')}</span>}
+              {isToday && <span className="eyebrow text-irontext">{t('dashboard.today')}</span>}
             </span>
             <span className="flex items-center gap-1.5 min-w-0 max-w-[60%]">
               {loggedOnDay(dow).length > 0 && <Check size={14} className="text-good shrink-0" />}
@@ -187,7 +187,7 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
             <div className="flex items-center justify-between gap-2 mb-4">
               <h2 className="text-xl inline-flex items-center gap-2">
                 {t(`dashboard.day${openDay}`)}
-                {isTodayOpen && <span className="eyebrow text-iron">{t('dashboard.today')}</span>}
+                {isTodayOpen && <span className="eyebrow text-irontext">{t('dashboard.today')}</span>}
               </h2>
               {mode === 'view' && (
                 <button

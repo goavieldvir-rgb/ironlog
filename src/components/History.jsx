@@ -132,7 +132,7 @@ export default function History() {
               <Card className="flex items-center justify-between gap-3 hover:border-brass/50 transition-colors">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap min-w-0">
-                    <h3 className="text-lg leading-tight truncate min-w-0">{s.routine_name}</h3>
+                    <h2 className="text-lg leading-tight truncate min-w-0">{s.routine_name}</h2>
                     <CategoryTag category={s.category} />
                   </div>
                   <p className="text-chalkdim text-xs mt-1">
@@ -153,7 +153,9 @@ export default function History() {
                         toast(t('feedback.deleteFailed'), 'error')
                       }
                     }}
-                    className="p-1.5 rounded hover:bg-ironsoft text-chalkdim hover:text-iron"
+                    title={t('common.delete')}
+                    aria-label={t('common.delete')}
+                    className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-ironsoft text-chalkdim hover:text-irontext"
                   >
                     <Trash2 size={15} />
                   </button>

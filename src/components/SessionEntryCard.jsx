@@ -39,7 +39,7 @@ function Stepper({ value, onChange, step, min = 0, max, label }) {
   useEffect(() => stopHold, [])
 
   const btn =
-    'px-2.5 min-h-[40px] shrink-0 bg-surface2 text-chalkdim hover:text-chalk active:bg-line active:scale-90 ' +
+    'px-2 min-w-[34px] min-h-[44px] shrink-0 bg-surface2 text-chalkdim hover:text-chalk active:bg-line active:scale-90 ' +
     'transition-transform duration-75 select-none touch-none border border-line flex items-center justify-center'
 
   // Bumping happens on press for immediacy; the click handler only fires
@@ -252,10 +252,10 @@ export default function SessionEntryCard({
 
   return (
     <Card className="flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-2">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
+        <div className="min-w-0 flex-1 basis-[12rem]">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-lg">{entry.name}</h3>
+            <h2 className="text-lg">{entry.name}</h2>
             {bestThisSession != null && (
               <span
                 className="pr-pop inline-flex items-center gap-1 rounded-full bg-brasssoft text-brass px-2 py-0.5 text-xs font-medium"
@@ -283,7 +283,7 @@ export default function SessionEntryCard({
             )}
           </div>
           {prevLabel && (
-            <p className="num text-chalkdim text-xs mt-0.5 inline-flex items-center gap-1 flex-wrap">
+            <p className="num text-chalkdim text-sm mt-0.5 inline-flex items-center gap-1 flex-wrap">
               {prevLabel}
               <InfoTip text={t('sessionCard.previousTip')} />
             </p>
@@ -292,7 +292,7 @@ export default function SessionEntryCard({
               knee sore" — resurfaced the next time it comes up, which is
               when it's actually useful. */}
           {liveExercise?.last_note && (
-            <p className="text-brass text-xs mt-1 flex items-start gap-1">
+            <p className="text-brass text-sm mt-1 flex items-start gap-1">
               <StickyNote size={12} className="shrink-0 mt-0.5" />
               <span>
                 {liveExercise.last_note_date && (
@@ -306,7 +306,7 @@ export default function SessionEntryCard({
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center ms-auto">
           {/* Reordering mid-workout: machines get taken, so the order you
               planned isn't always the order you can train. */}
           {(onMoveUp || onMoveDown) && (
@@ -316,7 +316,7 @@ export default function SessionEntryCard({
                 disabled={!onMoveUp}
                 title={t('sessionCard.moveUp')}
                 aria-label={t('sessionCard.moveUp')}
-                className="press text-chalkdim hover:text-chalk p-1 disabled:opacity-30 disabled:hover:text-chalkdim"
+                className="press text-chalkdim hover:text-chalk inline-flex items-center justify-center min-w-[40px] min-h-[44px] disabled:opacity-30 disabled:hover:text-chalkdim"
               >
                 <ArrowUp size={15} />
               </button>
@@ -325,7 +325,7 @@ export default function SessionEntryCard({
                 disabled={!onMoveDown}
                 title={t('sessionCard.moveDown')}
                 aria-label={t('sessionCard.moveDown')}
-                className="press text-chalkdim hover:text-chalk p-1 disabled:opacity-30 disabled:hover:text-chalkdim"
+                className="press text-chalkdim hover:text-chalk inline-flex items-center justify-center min-w-[40px] min-h-[44px] disabled:opacity-30 disabled:hover:text-chalkdim"
               >
                 <ArrowDown size={15} />
               </button>
@@ -336,7 +336,7 @@ export default function SessionEntryCard({
               onClick={onSwapExercise}
               title={t('sessionCard.swapExercise')}
               aria-label={t('sessionCard.swapExercise')}
-              className="press text-chalkdim hover:text-brass p-1"
+              className="press text-chalkdim hover:text-brass inline-flex items-center justify-center min-w-[40px] min-h-[44px]"
             >
               <Repeat size={15} />
             </button>
@@ -346,13 +346,13 @@ export default function SessionEntryCard({
               onClick={() => setShowNote(true)}
               title={t('sessionCard.addNote')}
               aria-label={t('sessionCard.addNote')}
-              className="press text-chalkdim hover:text-brass p-1"
+              className="press text-chalkdim hover:text-brass inline-flex items-center justify-center min-w-[40px] min-h-[44px]"
             >
               <StickyNote size={15} />
             </button>
           )}
           {removable && (
-            <button onClick={onRemoveEntry} aria-label={t('sessionCard.removeExercise')} className="press text-chalkdim hover:text-iron">
+            <button onClick={onRemoveEntry} title={t('sessionCard.removeExercise')} aria-label={t('sessionCard.removeExercise')} className="press text-chalkdim hover:text-irontext inline-flex items-center justify-center min-w-[40px] min-h-[44px]">
               <Trash2 size={15} />
             </button>
           )}
@@ -383,17 +383,19 @@ export default function SessionEntryCard({
 
       {isCardio ? (
         <div className="flex flex-col gap-1.5">
-          <div className="grid grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_3.25rem] gap-1 text-chalkdim eyebrow px-0.5">
+          <div className="grid grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)] min-[560px]:grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_5.5rem] gap-1 text-chalkdim eyebrow px-0.5">
             <span>#</span>
             <span className="truncate">{t('sessionCard.min')}</span>
             <span className="truncate">{intensityLabel}</span>
-            <span className="truncate">{distanceUnit} {t('sessionCard.opt')}</span>
-            <InfoTip text={t('sessionCard.copyAboveTip')} />
+            <span className="hidden min-[560px]:block truncate">{distanceUnit} {t('sessionCard.opt')}</span>
+            <span className="hidden min-[560px]:inline">
+              <InfoTip text={t('sessionCard.copyAboveTip')} />
+            </span>
           </div>
           {entry.sets.map((s, j) => (
             <div
               key={j}
-              className={`grid grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_3.25rem] gap-1 items-center ${
+              className={`grid grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)] min-[560px]:grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_5.5rem] gap-1 items-center ${
                 justFilled === j ? 'flash-fill' : ''
               }`}
             >
@@ -407,39 +409,49 @@ export default function SessionEntryCard({
                 max={intensityMax}
                 onChange={(v) => onUpdateSet(j, { intensity: v })}
               />
-              <Stepper value={s.distance} step={0.1} min={0} onChange={(v) => onUpdateSet(j, { distance: v })} label={`${t('sessionCard.set')} ${j + 1} ${distanceUnit}`} />
-              <div className="flex items-center gap-0.5 justify-end min-w-0">
+              <div className="col-span-2 flex items-center gap-1.5 min-[560px]:col-span-1">
+                <span className="eyebrow w-14 shrink-0 min-[560px]:hidden">{distanceUnit} {t('sessionCard.opt')}</span>
+                <div className="flex-1 min-w-0">
+                  <Stepper value={s.distance} step={0.1} min={0} onChange={(v) => onUpdateSet(j, { distance: v })} label={`${t('sessionCard.set')} ${j + 1} ${distanceUnit}`} />
+                </div>
+              </div>
+              <div className="col-start-3 flex items-center justify-end min-w-0 min-[560px]:col-auto">
+                {j === 0 && (
+                  <span className="min-[560px]:hidden">
+                    <InfoTip text={t('sessionCard.copyAboveTip')} />
+                  </span>
+                )}
                 {j === 0 && hasAnyLastData ? (
                   <button
                     onClick={() => useLastTime(j)}
                     title={hasChoice ? t('sessionCard.chooseLastTime') : t('sessionCard.useLastTime')} aria-label={hasChoice ? t('sessionCard.chooseLastTime') : t('sessionCard.useLastTime')}
-                    className="text-chalkdim hover:text-brass p-1 inline-flex items-center"
+                    className="text-chalkdim hover:text-brass inline-flex items-center justify-center min-w-[44px] min-h-[44px]"
                   >
                     <History size={14} />
                     {hasChoice && <ChevronDown size={10} />}
                   </button>
                 ) : j > 0 ? (
-                  <button onClick={() => copyFromPrevious(j)} title={t('sessionCard.sameAsAbove')} aria-label={t('sessionCard.sameAsAbove')} className="press text-chalkdim hover:text-brass p-1">
+                  <button onClick={() => copyFromPrevious(j)} title={t('sessionCard.sameAsAbove')} aria-label={t('sessionCard.sameAsAbove')} className="press text-chalkdim hover:text-brass inline-flex items-center justify-center min-w-[44px] min-h-[44px]">
                     <CornerDownLeft size={14} />
                   </button>
                 ) : (
-                  <span className="w-6" />
+                  <span className="w-11" />
                 )}
-                <button onClick={() => onRemoveSet(j)} aria-label={t('sessionCard.removeSet')} className="press text-chalkdim hover:text-iron p-1">
+                <button onClick={() => onRemoveSet(j)} title={t('sessionCard.removeSet')} aria-label={t('sessionCard.removeSet')} className="press text-chalkdim hover:text-irontext inline-flex items-center justify-center min-w-[44px] min-h-[44px]">
                   <Trash2 size={14} />
                 </button>
               </div>
             </div>
           ))}
-          <button onClick={onAddSet} className="text-chalkdim hover:text-chalk text-xs inline-flex items-center gap-1 mt-1 w-fit">
+          <button onClick={onAddSet} className="text-chalkdim hover:text-chalk text-sm inline-flex items-center gap-1 min-h-[44px] pe-3 w-fit">
             <Plus size={13} /> {t('sessionCard.addInterval')}
           </button>
         </div>
       ) : (
         <div className="flex flex-col gap-1.5">
           <div
-            className={`grid gap-1 text-chalkdim eyebrow px-0.5 ${
-              showRir ? 'grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem_3.25rem]' : 'grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem]'
+            className={`grid gap-1 text-chalkdim eyebrow px-0.5 grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)] ${
+              showRir ? 'min-[560px]:grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_5.5rem]' : 'min-[560px]:grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_5.5rem]'
             }`}
           >
             {/* "#" like the cardio header: the word "Set" in wide-tracked
@@ -451,49 +463,63 @@ export default function SessionEntryCard({
             </span>
             <span>{t('sessionCard.reps')}</span>
             {showRir && (
-              <span className="inline-flex items-center gap-0.5">
+              <span className="hidden min-[560px]:inline-flex items-center gap-0.5">
                 {t('sessionCard.rir')} <InfoTip text={t('sessionCard.rirTip')} />
               </span>
             )}
-            <InfoTip text={t('sessionCard.copyAboveTip')} />
+            <span className="hidden min-[560px]:inline">
+              <InfoTip text={t('sessionCard.copyAboveTip')} />
+            </span>
           </div>
           {entry.sets.map((s, j) => (
             <div
               key={j}
-              className={`grid gap-1 items-center ${justFilled === j ? 'flash-fill' : ''} ${
-                showRir ? 'grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem_3.25rem]' : 'grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem]'
+              className={`grid gap-1 items-center grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)] ${justFilled === j ? 'flash-fill' : ''} ${
+                showRir ? 'min-[560px]:grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_5.5rem]' : 'min-[560px]:grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_5.5rem]'
               }`}
             >
               <span className="num text-chalkdim text-sm">{j + 1}</span>
               <Stepper value={s.weight} step={weightStep} onChange={(v) => onUpdateSet(j, { weight: v })} label={`${t('sessionCard.set')} ${j + 1} ${t('sessionCard.wt')} (${entry.unit})`} />
               <Stepper value={s.reps} step={1} onChange={(v) => onUpdateSet(j, { reps: v })} label={`${t('sessionCard.set')} ${j + 1} ${t('sessionCard.reps')}`} />
               {showRir && (
-                <Stepper value={s.rir} step={1} min={0} max={10} onChange={(v) => onUpdateSet(j, { rir: v })} label={`${t('sessionCard.set')} ${j + 1} RIR`} />
+                <div className="col-span-2 flex items-center gap-1.5 min-[560px]:col-span-1">
+                  <span className="eyebrow inline-flex items-center gap-0.5 w-12 shrink-0 min-[560px]:hidden">
+                    {t('sessionCard.rir')} {j === 0 && <InfoTip text={t('sessionCard.rirTip')} />}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <Stepper value={s.rir} step={1} min={0} max={10} onChange={(v) => onUpdateSet(j, { rir: v })} label={`${t('sessionCard.set')} ${j + 1} RIR`} />
+                  </div>
+                </div>
               )}
-              <div className="flex items-center gap-0.5 justify-end min-w-0">
+              <div className="col-start-3 flex items-center justify-end min-w-0 min-[560px]:col-auto">
+                {j === 0 && (
+                  <span className="min-[560px]:hidden">
+                    <InfoTip text={t('sessionCard.copyAboveTip')} />
+                  </span>
+                )}
                 {j === 0 && hasAnyLastData ? (
                   <button
                     onClick={() => useLastTime(j)}
                     title={hasChoice ? t('sessionCard.chooseLastTime') : t('sessionCard.useLastTime')} aria-label={hasChoice ? t('sessionCard.chooseLastTime') : t('sessionCard.useLastTime')}
-                    className="text-chalkdim hover:text-brass p-1 inline-flex items-center"
+                    className="text-chalkdim hover:text-brass inline-flex items-center justify-center min-w-[44px] min-h-[44px]"
                   >
                     <History size={14} />
                     {hasChoice && <ChevronDown size={10} />}
                   </button>
                 ) : j > 0 ? (
-                  <button onClick={() => copyFromPrevious(j)} title={t('sessionCard.sameAsSetAbove')} aria-label={t('sessionCard.sameAsSetAbove')} className="press text-chalkdim hover:text-brass p-1">
+                  <button onClick={() => copyFromPrevious(j)} title={t('sessionCard.sameAsSetAbove')} aria-label={t('sessionCard.sameAsSetAbove')} className="press text-chalkdim hover:text-brass inline-flex items-center justify-center min-w-[44px] min-h-[44px]">
                     <CornerDownLeft size={14} />
                   </button>
                 ) : (
-                  <span className="w-6" />
+                  <span className="w-11" />
                 )}
-                <button onClick={() => onRemoveSet(j)} aria-label={t('sessionCard.removeSet')} className="press text-chalkdim hover:text-iron p-1">
+                <button onClick={() => onRemoveSet(j)} title={t('sessionCard.removeSet')} aria-label={t('sessionCard.removeSet')} className="press text-chalkdim hover:text-irontext inline-flex items-center justify-center min-w-[44px] min-h-[44px]">
                   <Trash2 size={14} />
                 </button>
               </div>
             </div>
           ))}
-          <button onClick={onAddSet} className="text-chalkdim hover:text-chalk text-xs inline-flex items-center gap-1 mt-1 w-fit">
+          <button onClick={onAddSet} className="text-chalkdim hover:text-chalk text-sm inline-flex items-center gap-1 min-h-[44px] pe-3 w-fit">
             <Plus size={13} /> {t('sessionCard.addSet')}
           </button>
         </div>

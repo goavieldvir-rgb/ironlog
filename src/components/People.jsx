@@ -149,7 +149,7 @@ export default function People() {
                 <p className="text-chalkdim text-xs mt-0.5 truncate">{p.email}</p>
                 {(() => {
                   const cs = consents.find((x) => x.user_id === p.id)
-                  if (!cs) return <p className="text-xs mt-1 text-iron">{t('people.termsNotAccepted')}</p>
+                  if (!cs) return <p className="text-xs mt-1 text-irontext">{t('people.termsNotAccepted')}</p>
                   const stale = cs.version < TERMS_VERSION
                   return (
                     <p className={`text-xs mt-1 ${stale ? 'text-brass' : 'text-chalkdim'}`}>

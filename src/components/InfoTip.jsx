@@ -26,7 +26,7 @@ export function InfoTip({ text }) {
           e.stopPropagation()
           setOpen(true)
         }}
-        className="text-chalkdim hover:text-brass inline-flex align-middle shrink-0"
+        className="hit text-chalkdim hover:text-brass inline-flex align-middle shrink-0"
         aria-label={t('common.whatDoesThisMean')}
       >
         <HelpCircle size={13} />
