@@ -234,9 +234,12 @@ export default function RoutineBuilder() {
 
         <div className="flex flex-col gap-2">
           {items.map((it, i) => (
-            <div key={i} className="flex items-center gap-2 bg-surface2 rounded-md p-2.5 flex-wrap">
+            <div key={i} className="flex flex-col gap-1 bg-surface2 rounded-md p-2.5">
+              {/* Name and video button on their own line, so a long exercise
+                  name wraps instead of being cut to a few letters. */}
+              <div className="flex items-center gap-2">
               <div className="flex-1 min-w-0">
-                <p className="truncate">
+                <p className="break-words">
                   {(() => {
                     const found = exercises.find((e) => e.id === it.exerciseId)
                     return (lang === 'he' && found?.name_he) || found?.name || it.name
@@ -247,12 +250,14 @@ export default function RoutineBuilder() {
                 type="button"
                 onClick={() => openVideo(it.exerciseId)}
                 title={t('routines.videoFor')} aria-label={t('routines.videoFor')}
-                className={`p-1.5 rounded hover:bg-ink shrink-0 ${
+                className={`inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-ink shrink-0 ${
                   exercises.find((e) => e.id === it.exerciseId)?.video_url ? 'text-brass' : 'text-chalkdim hover:text-chalk'
                 }`}
               >
                 <Video size={15} />
               </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
               {isCardio ? (
                 <>
                   <input
@@ -294,22 +299,24 @@ export default function RoutineBuilder() {
                   />
                 </>
               )}
-              <div className="flex flex-col">
-                <button onClick={() => move(i, -1)} aria-label={t('sessionCard.moveUp')} className="text-chalkdim hover:text-chalk disabled:opacity-30" disabled={i === 0}>
-                  <ArrowUp size={13} />
+              <div className="flex items-center ms-auto">
+                <button onClick={() => move(i, -1)} title={t('sessionCard.moveUp')} aria-label={t('sessionCard.moveUp')} className="inline-flex items-center justify-center min-w-[40px] min-h-[44px] text-chalkdim hover:text-chalk disabled:opacity-30" disabled={i === 0}>
+                  <ArrowUp size={15} />
                 </button>
                 <button
                   onClick={() => move(i, 1)}
+                  title={t('sessionCard.moveDown')}
                   aria-label={t('sessionCard.moveDown')}
-                  className="text-chalkdim hover:text-chalk disabled:opacity-30"
+                  className="inline-flex items-center justify-center min-w-[40px] min-h-[44px] text-chalkdim hover:text-chalk disabled:opacity-30"
                   disabled={i === items.length - 1}
                 >
-                  <ArrowDown size={13} />
+                  <ArrowDown size={15} />
+                </button>
+                <button onClick={() => removeItem(i)} title={t('common.remove')} aria-label={t('common.remove')} className="inline-flex items-center justify-center min-w-[40px] min-h-[44px] text-chalkdim hover:text-irontext">
+                  <Trash2 size={15} />
                 </button>
               </div>
-              <button onClick={() => removeItem(i)} aria-label={t('common.remove')} className="text-chalkdim hover:text-irontext p-1">
-                <Trash2 size={15} />
-              </button>
+              </div>
             </div>
           ))}
         </div>
