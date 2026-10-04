@@ -11,7 +11,7 @@ create table if not exists exercises (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   name text not null,
-  category text not null default 'strength' check (category in ('strength', 'mobility')),
+  category text not null default 'strength' check (category in ('strength', 'mobility', 'cardio')),
   video_url text default '',
   notes text default '',
   unit text not null default 'kg',
@@ -27,7 +27,7 @@ create table if not exists routines (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   name text not null,
-  category text not null default 'strength' check (category in ('strength', 'mobility')),
+  category text not null default 'strength' check (category in ('strength', 'mobility', 'cardio')),
   exercises jsonb not null default '[]',
   created_at timestamptz not null default now()
 );
@@ -38,7 +38,7 @@ create table if not exists sessions (
   user_id uuid not null references auth.users (id) on delete cascade,
   routine_id uuid,
   routine_name text not null default 'Freestyle',
-  category text not null default 'strength' check (category in ('strength', 'mobility')),
+  category text not null default 'strength' check (category in ('strength', 'mobility', 'cardio')),
   date date not null,
   notes text default '',
   entries jsonb not null default '[]',
