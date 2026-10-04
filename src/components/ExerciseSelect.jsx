@@ -30,42 +30,34 @@ export default function ExerciseSelect({ value, onChange, options, placeholder, 
 
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
-      <button
-        type="button"
-        onClick={() => {
-          setOpen((v) => !v)
-          setTimeout(() => inputRef.current?.focus(), 0)
-        }}
-        className="w-full rounded-md border border-line bg-surface2 px-3 py-2 text-sm text-start flex items-center justify-between gap-2"
-      >
-        <span className={`truncate ${selected ? 'text-chalk' : 'text-chalkdim'}`}>{selected ? selected.label : placeholder}</span>
-        <span className="flex items-center gap-1 shrink-0">
-          {selected && (
-            <span
-              role="button"
-              tabIndex={0}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => {
+            setOpen((v) => !v)
+            setTimeout(() => inputRef.current?.focus(), 0)
+          }}
+          className={`w-full rounded-md border border-line bg-surface2 px-3 py-2 min-h-[44px] text-sm text-start flex items-center justify-between gap-2 ${selected ? 'pe-12' : ''}`}
+        >
+          <span className={`truncate ${selected ? 'text-chalk' : 'text-chalkdim'}`}>{selected ? selected.label : placeholder}</span>
+          <span className="flex items-center gap-1 shrink-0">
+            <ChevronDown size={15} className={`text-chalkdim transition-transform ${open ? 'rotate-180' : ''}`} />
+          </span>
+        </button>
+        {selected && (
+          <span className="absolute end-9 top-1/2 -translate-y-1/2 inline-flex">
+            <button
+              type="button"
               title={t('common.clear')}
               aria-label={t('common.clear')}
               className="hit text-chalkdim hover:text-irontext inline-flex"
-              onClick={(e) => {
-                e.stopPropagation()
-                e.preventDefault()
-                choose('')
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.stopPropagation()
-                  e.preventDefault()
-                  choose('')
-                }
-              }}
+              onClick={() => choose('')}
             >
               <X size={14} />
-            </span>
-          )}
-          <ChevronDown size={15} className={`text-chalkdim transition-transform ${open ? 'rotate-180' : ''}`} />
-        </span>
-      </button>
+            </button>
+          </span>
+        )}
+      </div>
 
       {open && (
         <div className="rounded-md border border-line bg-surface2 overflow-hidden">
