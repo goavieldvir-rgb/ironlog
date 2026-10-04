@@ -136,19 +136,19 @@ export default function RestTimer() {
       style={{ paddingBottom: 'calc(0.625rem + env(safe-area-inset-bottom, 0px))' }}
     >
       <div className="flex items-center gap-1.5">
-        <Timer size={16} className={finished ? 'text-iron' : 'text-chalkdim'} />
-        <span className={`num text-2xl leading-none ${finished ? 'text-iron' : 'text-chalk'}`}>
+        <Timer size={16} className={finished ? 'text-irontext' : 'text-chalkdim'} />
+        <span className={`num text-2xl leading-none ${finished ? 'text-irontext' : 'text-chalk'}`}>
           {mm}:{ss}
         </span>
         <InfoTip text={t('restTimer.tip')} />
       </div>
 
-      <div className="flex gap-1">
+      <div className="flex gap-1 order-last w-full justify-between min-[560px]:order-none min-[560px]:w-auto">
         {PRESETS.map((p) => (
           <button
             key={p}
             onClick={() => start(p)}
-            className="press px-2 py-1 rounded text-xs num text-chalkdim hover:text-chalk hover:bg-surface2"
+            className="press px-2.5 min-h-[44px] min-w-[44px] flex-1 min-[560px]:flex-none rounded text-sm num text-chalkdim hover:text-chalk hover:bg-surface2"
           >
             {p}s
           </button>
@@ -160,21 +160,21 @@ export default function RestTimer() {
           <button
             onClick={toggleNotify}
             title={notifyOn ? t('restTimer.notifyOn') : t('restTimer.notifyOff')} aria-label={notifyOn ? t('restTimer.notifyOn') : t('restTimer.notifyOff')}
-            className={`p-1.5 rounded hover:bg-surface2 ${notifyOn ? 'text-brass' : 'text-chalkdim hover:text-chalk'}`}
+            className={`inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-surface2 ${notifyOn ? 'text-brass' : 'text-chalkdim hover:text-chalk'}`}
           >
             {notifyOn ? <Bell size={14} /> : <BellOff size={14} />}
           </button>
         )}
         {running ? (
-          <Button variant="subtle" onClick={pause} className="!px-2.5 !py-1.5">
+          <Button variant="subtle" onClick={pause} title={t('restTimer.pause')} aria-label={t('restTimer.pause')} className="!px-2.5 !min-w-[44px] !min-h-[44px]">
             <Pause size={14} />
           </Button>
         ) : (
-          <Button variant="subtle" onClick={() => start()} className="!px-2.5 !py-1.5">
+          <Button variant="subtle" onClick={() => start()} title={t('restTimer.start')} aria-label={t('restTimer.start')} className="!px-2.5 !min-w-[44px] !min-h-[44px]">
             <Play size={14} />
           </Button>
         )}
-        <Button variant="ghost" onClick={restart} className="!px-2.5 !py-1.5">
+        <Button variant="ghost" onClick={restart} title={t('restTimer.restart')} aria-label={t('restTimer.restart')} className="!px-2.5 !min-w-[44px] !min-h-[44px]">
           <RotateCcw size={14} />
         </Button>
       </div>

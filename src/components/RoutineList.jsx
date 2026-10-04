@@ -85,7 +85,7 @@ export default function RoutineList() {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-lg leading-tight">{r.name}</h3>
+                  <h2 className="text-lg leading-tight">{r.name}</h2>
                   <CategoryTag category={r.category} />
                 </div>
                 <p className="text-chalkdim text-xs mt-1">
@@ -94,7 +94,7 @@ export default function RoutineList() {
               </div>
               <div className="flex gap-1 shrink-0">
                 <button
-                  className="p-1.5 rounded hover:bg-surface2 text-chalkdim hover:text-chalk"
+                  className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-surface2 text-chalkdim hover:text-chalk"
                   onClick={() => duplicateRoutine(r)}
                   title={t('routines.duplicate')} aria-label={t('routines.duplicate')}
                 >
@@ -102,18 +102,20 @@ export default function RoutineList() {
                 </button>
                 {isAdmin && (
                   <button
-                    className="p-1.5 rounded hover:bg-brasssoft text-chalkdim hover:text-brass"
+                    className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-brasssoft text-chalkdim hover:text-brass"
                     onClick={() => setCopyTarget(r)}
                     title={t('routines.copyToPerson')} aria-label={t('routines.copyToPerson')}
                   >
                     <Send size={15} />
                   </button>
                 )}
-                <Link to={`/routines/${r.id}/edit`} className="p-1.5 rounded hover:bg-surface2 text-chalkdim hover:text-chalk">
+                <Link to={`/routines/${r.id}/edit`} title={t('common.edit')} aria-label={t('common.edit')} className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-surface2 text-chalkdim hover:text-chalk">
                   <Pencil size={15} />
                 </Link>
                 <button
-                  className="p-1.5 rounded hover:bg-ironsoft text-chalkdim hover:text-iron"
+                  title={t('common.delete')}
+                  aria-label={t('common.delete')}
+                  className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-ironsoft text-chalkdim hover:text-irontext"
                   onClick={async () => {
                     if (!(await confirm({ title: t('routines.deleteConfirm')(r.name), confirmLabel: t('common.delete'), danger: true }))) return
                     try {

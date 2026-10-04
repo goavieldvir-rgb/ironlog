@@ -41,15 +41,27 @@ export default function ExerciseSelect({ value, onChange, options, placeholder, 
         <span className={`truncate ${selected ? 'text-chalk' : 'text-chalkdim'}`}>{selected ? selected.label : placeholder}</span>
         <span className="flex items-center gap-1 shrink-0">
           {selected && (
-            <X
-              size={14}
-              className="text-chalkdim hover:text-iron"
+            <span
+              role="button"
+              tabIndex={0}
+              title={t('common.clear')}
+              aria-label={t('common.clear')}
+              className="hit text-chalkdim hover:text-irontext inline-flex"
               onClick={(e) => {
                 e.stopPropagation()
                 e.preventDefault()
                 choose('')
               }}
-            />
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  choose('')
+                }
+              }}
+            >
+              <X size={14} />
+            </span>
           )}
           <ChevronDown size={15} className={`text-chalkdim transition-transform ${open ? 'rotate-180' : ''}`} />
         </span>

@@ -119,7 +119,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <button type="button" onClick={() => discardDraft(draft.routineKey)} className="text-chalkdim text-xs hover:text-iron px-2 py-2">
+            <button type="button" onClick={() => discardDraft(draft.routineKey)} className="text-chalkdim text-xs hover:text-irontext px-2 py-2">
               {t('dashboard.discard')}
             </button>
             {/* A link styled as a button, not a button inside a link — the
@@ -141,7 +141,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 gap-3">
         <Link to="/routines">
           <Card className="press-row flex flex-col items-center justify-center py-6 gap-2 text-center hover:bg-surface2 transition-colors">
-            <Dumbbell size={22} className="text-iron" />
+            <Dumbbell size={22} className="text-irontext" />
             <span className="text-sm">{t('dashboard.navRoutines')}</span>
             <span className="text-chalkdim text-xs">
               {routines.length} {t('dashboard.routinesCount')}
@@ -150,7 +150,7 @@ export default function Dashboard() {
         </Link>
         <Link to="/history">
           <Card className="press-row flex flex-col items-center justify-center py-6 gap-2 text-center hover:bg-surface2 transition-colors">
-            <HistoryIcon size={22} className="text-iron" />
+            <HistoryIcon size={22} className="text-irontext" />
             <span className="text-sm">{t('dashboard.navHistory')}</span>
             <span className="text-chalkdim text-xs">
               {sessions.length} {t('dashboard.sessions')}

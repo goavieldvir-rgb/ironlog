@@ -60,7 +60,7 @@ export default function Layout() {
       >
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Dumbbell className="text-iron" size={22} strokeWidth={2.5} />
+            <Dumbbell className="text-irontext" size={22} strokeWidth={2.5} />
             <span className="font-display text-2xl tracking-wide">Ironlog</span>
           </div>
 
@@ -103,14 +103,14 @@ export default function Layout() {
             </NavLink>
             <button
               onClick={logout}
-              className="text-chalkdim hover:text-iron transition-colors p-2 rounded-md hover:bg-surface2"
+              className="text-chalkdim hover:text-irontext transition-colors p-2 rounded-md hover:bg-surface2"
               title={t('nav.logout')} aria-label={t('nav.logout')}
             >
               <LogOut size={18} />
             </button>
           </div>
 
-          <button className="md:hidden p-2" aria-label={t('layout.menu')} aria-expanded={open} onClick={() => setOpen(!open)}>
+          <button className="md:hidden inline-flex items-center justify-center min-w-[44px] min-h-[44px] -me-2" aria-label={t('layout.menu')} aria-expanded={open} onClick={() => setOpen(!open)}>
             {open ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
@@ -154,7 +154,7 @@ export default function Layout() {
             <div className="border-b border-line" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
               <div className="px-4 h-16 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Dumbbell className="text-iron" size={22} strokeWidth={2.5} />
+                  <Dumbbell className="text-irontext" size={22} strokeWidth={2.5} />
                   <span className="font-display text-2xl tracking-wide">Ironlog</span>
                 </div>
                 <button className="p-2" aria-label={t('common.close')} onClick={() => setOpen(false)}>
@@ -211,7 +211,7 @@ export default function Layout() {
                   <span className={`px-2 py-1 rounded ${lang === 'he' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>עב</span>
                 </span>
               </button>
-              <button onClick={logout} className="flex items-center gap-2 px-2 py-2.5 rounded-md text-sm text-iron whitespace-nowrap">
+              <button onClick={logout} className="flex items-center gap-2 px-2 py-2.5 rounded-md text-sm text-irontext whitespace-nowrap">
                 <LogOut size={16} /> {t('nav.logout')}
               </button>
             </nav>

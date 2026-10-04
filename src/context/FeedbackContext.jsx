@@ -62,7 +62,7 @@ export function FeedbackProvider({ children }) {
                 onClick={() => close(true)}
                 autoFocus
                 className={`rounded-md px-3.5 py-2 text-sm font-medium ${
-                  dialog.danger ? 'bg-iron text-chalk hover:bg-iron/90' : 'bg-brass text-ink hover:bg-brass/90'
+                  dialog.danger ? 'bg-ironbtn text-chalk hover:bg-ironbtn/90' : 'bg-brass text-ink hover:bg-brass/90'
                 }`}
               >
                 {dialog.confirmLabel || t('feedback.confirm')}
@@ -85,7 +85,7 @@ export function FeedbackProvider({ children }) {
             }`}
           >
             {x.tone === 'error' ? (
-              <AlertTriangle size={16} className="text-iron shrink-0" />
+              <AlertTriangle size={16} className="text-irontext shrink-0" />
             ) : (
               <CheckCircle2 size={16} className="text-good shrink-0" />
             )}

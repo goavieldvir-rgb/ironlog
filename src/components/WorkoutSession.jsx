@@ -409,7 +409,7 @@ export default function WorkoutSession() {
   return (
     <div className="flex flex-col">
       <div className="flex flex-col gap-5 max-w-2xl pb-4">
-        <Link to="/routines" className="text-chalkdim text-sm inline-flex items-center gap-1 hover:text-chalk w-fit">
+        <Link to="/routines" className="text-chalkdim text-sm inline-flex items-center gap-1 min-h-[44px] hover:text-chalk w-fit">
           <BackChevron size={15} /> {t('routines.title')}
         </Link>
 

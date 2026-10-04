@@ -176,7 +176,7 @@ export default function Login({ resetLinkError }) {
                 </button>
               )}
 
-              {error && <p className="text-iron text-sm">{error}</p>}
+              {error && <p className="text-irontext text-sm">{error}</p>}
 
               <Button type="submit" disabled={busy} className="mt-2 w-full">
                 {busy

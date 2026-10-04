@@ -3,13 +3,13 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 
 export function Button({ children, variant = 'primary', className = '', ...props }) {
   const base =
-    'inline-flex items-center justify-center gap-1.5 rounded-md px-3.5 py-2 text-sm font-medium transition-colors press disabled:opacity-40 disabled:pointer-events-none'
+    'inline-flex items-center justify-center gap-1.5 rounded-md px-3.5 py-2 min-h-[44px] text-sm font-medium transition-colors press disabled:opacity-40 disabled:pointer-events-none'
   const variants = {
-    primary: 'bg-iron text-chalk hover:bg-iron/90',
+    primary: 'bg-ironbtn text-chalk hover:bg-ironbtn/90',
     brass: 'bg-brass text-ink hover:bg-brass/90',
     ghost: 'bg-transparent text-chalk hover:bg-surface2 border border-line',
     subtle: 'bg-surface2 text-chalk hover:bg-surface2/70',
-    danger: 'bg-transparent text-iron hover:bg-ironsoft border border-ironsoft',
+    danger: 'bg-transparent text-irontext hover:bg-ironsoft border border-ironsoft',
   }
   return (
     <button className={`${base} ${variants[variant]} ${className}`} {...props}>
@@ -26,8 +26,8 @@ export function Badge({ children, tone = 'default' }) {
   const tones = {
     default: 'bg-surface2 text-chalkdim',
     brass: 'bg-brasssoft text-brass',
-    iron: 'bg-ironsoft text-iron',
-    cardio: 'bg-cardiosoft text-cardio',
+    iron: 'bg-ironsoft text-irontext',
+    cardio: 'bg-cardiosoft text-cardiotext',
     good: 'bg-good/10 text-good',
   }
   return (
@@ -47,7 +47,7 @@ export function CategoryTag({ category }) {
 export function EmptyState({ title, body, action }) {
   return (
     <div className="card p-10 text-center flex flex-col items-center gap-3">
-      <h3 className="text-xl text-chalk">{title}</h3>
+      <h2 className="text-xl text-chalk">{title}</h2>
       <p className="text-chalkdim text-sm max-w-sm">{body}</p>
       {action}
     </div>

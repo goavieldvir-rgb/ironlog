@@ -93,7 +93,7 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
               <button
                 key={opt.id}
                 onClick={() => setTab(opt.id)}
-                className={`px-3 py-1.5 rounded transition-colors ${tab === opt.id ? 'bg-ink text-chalk' : 'text-chalkdim'}`}
+                className={`px-3 min-h-[44px] rounded transition-colors ${tab === opt.id ? 'bg-ink text-chalk' : 'text-chalkdim'}`}
               >
                 {opt.label}
               </button>

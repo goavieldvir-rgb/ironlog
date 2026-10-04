@@ -58,7 +58,7 @@ class ErrorBoundaryInner extends React.Component {
             <p className="text-chalkdim text-sm">{t('errorBoundary.body')}</p>
             <button
               onClick={() => window.location.reload()}
-              className="bg-iron text-chalk rounded-md px-4 py-2 text-sm font-medium hover:bg-iron/90 mx-auto"
+              className="bg-ironbtn text-chalk rounded-md px-4 py-2 text-sm font-medium hover:bg-ironbtn/90 mx-auto"
             >
               {t('errorBoundary.reload')}
             </button>
