@@ -219,8 +219,8 @@ export default function SessionEntryCard({
 
   const sameSet = (a, b) =>
     isCardio
-      ? Number(a.duration) === Number(b.duration) && Number(a.intensity) === Number(b.intensity)
-      : Number(a.weight) === Number(b.weight) && Number(a.reps) === Number(b.reps)
+      ? (Number(a.duration) || 0) === (Number(b.duration) || 0) && (Number(a.intensity) || 0) === (Number(b.intensity) || 0)
+      : (Number(a.weight) || 0) === (Number(b.weight) || 0) && (Number(a.reps) || 0) === (Number(b.reps) || 0)
   const hasChoice = lastSetData && topSetData && !sameSet(lastSetData, topSetData)
   const hasAnyLastData = lastSetData != null || lastWeight != null
 
