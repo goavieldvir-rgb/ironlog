@@ -461,7 +461,10 @@ export default function SessionEntryCard({
               <span />
             </div>
             {entry.sets.map((s, j) => (
-              <div key={j} className={`${strengthCols} ${justFilled === j ? 'flash-fill' : ''} ${isWarmup(s) ? 'opacity-70' : ''}`}>
+              // Warm-ups are muted cell by cell, not on the whole row: opacity
+              // on the row also faded the "..." menu inside it and trapped it
+              // under the next rows, so its items couldn't be tapped.
+              <div key={j} className={`${strengthCols} ${justFilled === j ? 'flash-fill' : ''} ${isWarmup(s) ? '[&>*:not(:last-child)]:opacity-70' : ''}`}>
                 <button
                   type="button"
                   onClick={() => onUpdateSet(j, { warmup: !s.warmup })}
