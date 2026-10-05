@@ -150,13 +150,19 @@ export default function SessionEntryCard({
   // set was done last (reverse-pyramid friendly); "top set" is the
   // heaviest/longest one, wherever in the session it fell (pyramid
   // friendly). Falls back to the single last-known value for older data.
-  const lastSets = (liveExercise ? liveExercise.last_sets : entry.lastSets) || []
+  const lastSets = workingSets((liveExercise ? liveExercise.last_sets : entry.lastSets) || [])
   const lastSetData = lastSets.length > 0 ? lastSets[lastSets.length - 1] : null
+  // Best set = biggest main number; on a tie, the one with the bigger second
+  // number (reps for weighted lifts, extra weight for bodyweight, intensity
+  // for cardio). A full tie keeps the earlier set.
   const topSetData = (() => {
     if (lastSets.length === 0) return null
-    if (isCardio) return lastSets.reduce((best, s) => (Number(s.duration) > Number(best.duration) ? s : best))
-    if (entry.bodyweight) return lastSets.reduce((best, s) => (Number(s.reps) > Number(best.reps) ? s : best))
-    return lastSets.reduce((best, s) => (Number(s.weight) > Number(best.weight) ? s : best))
+    const [main, second] = isCardio ? ['duration', 'intensity'] : entry.bodyweight ? ['reps', 'weight'] : ['weight', 'reps']
+    return lastSets.reduce((best, s) => {
+      const dm = (Number(s[main]) || 0) - (Number(best[main]) || 0)
+      if (dm !== 0) return dm > 0 ? s : best
+      return (Number(s[second]) || 0) > (Number(best[second]) || 0) ? s : best
+    })
   })()
   // The number in a set that a PR is judged on, matching the coach's alert.
   function prValue(s) {
@@ -211,7 +217,11 @@ export default function SessionEntryCard({
     }
   }, [bestThisSession])
 
-  const hasChoice = lastSetData && topSetData && JSON.stringify(lastSetData) !== JSON.stringify(topSetData)
+  const sameSet = (a, b) =>
+    isCardio
+      ? (Number(a.duration) || 0) === (Number(b.duration) || 0) && (Number(a.intensity) || 0) === (Number(b.intensity) || 0)
+      : (Number(a.weight) || 0) === (Number(b.weight) || 0) && (Number(a.reps) || 0) === (Number(b.reps) || 0)
+  const hasChoice = lastSetData && topSetData && !sameSet(lastSetData, topSetData)
   const hasAnyLastData = lastSetData != null || lastWeight != null
 
   function flashFilled(setIdx) {
