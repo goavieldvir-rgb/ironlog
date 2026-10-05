@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Play, Plus, Trash2, Minus, CornerDownLeft, History, StickyNote, Repeat, ArrowUp, ArrowDown, Trophy } from 'lucide-react'
+import { X, Play, Plus, Trash2, Minus, CornerDownLeft, History, StickyNote, Repeat, ArrowUp, ArrowDown, Trophy } from 'lucide-react'
 import { Card, Badge } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import OverflowMenu from './OverflowMenu.jsx'
@@ -109,6 +109,7 @@ export default function SessionEntryCard({
   onRemoveSet,
   onRemoveEntry,
   onUpdateNote,
+  onClearLastNote,
   onSwapExercise,
   onMoveUp,
   onMoveDown,
@@ -337,6 +338,7 @@ export default function SessionEntryCard({
             { key: 'down', label: t('sessionCard.moveDown'), icon: <ArrowDown size={16} />, onClick: () => onMoveDown?.(), hidden: !onMoveDown },
             { key: 'swap', label: t('sessionCard.swapExercise'), icon: <Repeat size={16} />, onClick: () => onSwapExercise?.(), hidden: !onSwapExercise },
             { key: 'note', label: t('sessionCard.addNote'), icon: <StickyNote size={16} />, onClick: () => setShowNote(true), hidden: !onUpdateNote || showNote },
+            { key: 'clearNote', label: t('sessionCard.clearNote'), icon: <X size={16} />, onClick: () => onClearLastNote?.(), hidden: !onClearLastNote || !liveExercise?.last_note },
             { key: 'remove', label: t('sessionCard.removeExercise'), icon: <Trash2 size={16} />, onClick: () => onRemoveEntry?.(), danger: true, hidden: !removable },
           ]}
         />
