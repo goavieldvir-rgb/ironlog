@@ -324,7 +324,7 @@ export const translations = {
       swapPickLabel: 'Replace with',
       swapNote: "Pick from your existing exercises above, or use Browse library to search the full list or add something new.",
       swapConfirm: 'Swap',
-      sessionNotesTip: "This is for the whole workout — how it felt overall, energy levels, anything general. If it's about one specific exercise instead, use the note icon on that exercise's card so it stays attached to the right one.",
+      sessionNotesTip: "This is for the whole workout — how it felt overall, energy levels, anything general. If it's about one specific exercise instead, use “Add a note for this exercise” in the three-dot menu on that exercise's card so it stays attached to the right one.",
     },
     sessionCard: {
       prBadge: 'PR',
@@ -579,9 +579,11 @@ weight. Tap the number at the start of any set to mark it (or unmark it) as
 a warm-up — shown as "W". Warm-ups never count toward your records, volume
 or set totals.
 
-The little sticky-note icon lets you jot something down about that
-specific exercise that day — "used the other machine," "felt off today,"
-whatever's useful to remember later.
+Open the three-dot menu on an exercise and choose "Add a note for this
+exercise" to jot something down about it that day — "used the other
+machine," "felt off today," whatever's useful to remember later. The note
+shows up the next time you do that exercise. Once you no longer need it,
+open the same menu and choose "Remove saved note".
 
 At the bottom of the screen there's a rest timer — tap 60/90/120/180 to
 start a countdown between sets, it'll beep and buzz your phone when time's
@@ -1002,7 +1004,7 @@ whoever set your account up for you.`,
       saved: 'נשמר',
       saving: 'שומר…',
       finishSave: 'סיום ושמירת האימון',
-      sessionNotesTip: 'זה לאימון כולו — איך הוא הרגיש בסך הכל, רמת אנרגיה, כל דבר כללי. אם זה על תרגיל ספציפי אחד, השתמשו בסמל ההערה בכרטיס של אותו תרגיל כדי שזה יישאר מחובר לתרגיל הנכון.',
+      sessionNotesTip: 'זה לאימון כולו — איך הוא הרגיש בסך הכל, רמת אנרגיה, כל דבר כללי. אם זה על תרגיל ספציפי אחד, השתמשו ב"הוספת הערה לתרגיל הזה" בתפריט שלוש הנקודות בכרטיס של אותו תרגיל כדי שזה יישאר מחובר לתרגיל הנכון.',
       date: 'תאריך',
       swapTitle: 'החלפת תרגיל',
       swapSubtitle: 'מחליפים את {name} לאימון הזה בלבד — התוכנית עצמה תישאר ללא שינוי בפעם הבאה.',
@@ -1024,7 +1026,7 @@ whoever set your account up for you.`,
       previously: 'בפעם הקודמת:',
       previousTip: 'זה מה שתועד בפעם הקודמת — סמל השעון בסט הראשון ימלא עבורכם את המספרים האלה. אם שני האימונים האחרונים לא היו זהים, תופיע אפשרות לבחור אם להשתמש בסט האחרון שבוצע או בסט הכבד/הארוך ביותר.',
       addNote: 'הוספת הערה לתרגיל הזה',
-      clearNote: 'הסרת ההערה',
+      clearNote: 'הסרת ההערה השמורה',
       clearNoteFailed: 'לא הצלחנו להסיר את ההערה. נסו שוב.',
       swapExercise: 'החלפת התרגיל הזה להיום',
       example: 'הדגמה',
@@ -1216,7 +1218,7 @@ whoever set your account up for you.`,
 
 "הוספת סטים של חימום" מציעה כמה סטים קלים יותר כדי להתכונן למשקל העבודה. הקישו על המספר בתחילת סט כדי לסמן אותו (או לבטל סימון) כסט חימום — מוצג כ"ח". סטים של חימום לא נספרים בשיאים, בנפח או בסך הסטים.
 
-סמל הפתקית הקטן מאפשר לרשום משהו על התרגיל הספציפי הזה באותו יום — "השתמשתי במכונה האחרת", "הרגשתי לא במיטבי היום", כל דבר שכדאי לזכור אחר כך.
+בתפריט שלוש הנקודות של תרגיל בחרו "הוספת הערה לתרגיל הזה" כדי לרשום משהו על התרגיל באותו יום — "השתמשתי במכונה האחרת", "הרגשתי לא במיטבי היום", כל דבר שכדאי לזכור אחר כך. ההערה תופיע בפעם הבאה שתעשו את התרגיל. כשכבר לא צריך אותה, פתחו את אותו תפריט ובחרו "הסרת ההערה השמורה".
 
 בתחתית המסך יש טיימר מנוחה — הקישו על 60/90/120/180 כדי להתחיל ספירה לאחור בין סטים, הוא יצפצף ויְרַעֵד את הטלפון כשהזמן נגמר.
 
