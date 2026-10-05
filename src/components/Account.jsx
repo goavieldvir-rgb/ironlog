@@ -41,7 +41,7 @@ function download(filename, text, type) {
 function toCsv(sessions) {
   const header = [
     'date', 'routine', 'exercise', 'category', 'set', 'weight', 'unit', 'reps', 'rir',
-    'duration_min', 'intensity', 'distance', 'exercise_note', 'session_note', 'workout_minutes',
+    'duration_min', 'intensity', 'distance', 'exercise_note', 'session_note', 'workout_minutes', 'warmup',
   ]
   const esc = (v) => {
     const s = v == null ? '' : String(v)
@@ -58,7 +58,7 @@ function toCsv(sessions) {
             s.date, s.routine_name, e.name, e.category || 'strength', i + 1,
             cardio ? '' : set.weight, e.unit, cardio ? '' : set.reps, cardio ? '' : set.rir,
             cardio ? set.duration : '', cardio ? set.intensity : '', cardio ? set.distance : '',
-            e.notes, s.notes, s.duration_minutes,
+            e.notes, s.notes, s.duration_minutes, set.warmup ? 'yes' : '',
           ].map(esc).join(','),
         )
       })

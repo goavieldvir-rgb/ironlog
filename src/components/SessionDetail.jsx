@@ -8,6 +8,7 @@ import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, updateTrainerComment } from '../lib/db.js'
 import { Card, CategoryTag, Badge, Button } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
+import { isWarmup } from '../lib/warmup.js'
 
 function formatDate(iso) {
   if (!iso) return ''
@@ -91,14 +92,18 @@ export default function SessionDetail() {
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            {(entry.sets || []).map((s, j) => (
-              <div key={j} className="bg-surface2 rounded-md px-3 py-1.5 text-sm num flex items-center gap-2">
-                {/* Set number sat flush against the weight, so "#1" then
-                    "82.5kg" read as "#182.5kg". Separated properly now. */}
-                <span className="text-chalkdim border-e border-line pe-2">{j + 1}</span>
-                {formatSet(entry, s, t)}
-              </div>
-            ))}
+            {(() => {
+              // Warm-ups read "W" and sit muted; working sets count from 1.
+              let n = 0
+              return (entry.sets || []).map((s, j) => (
+                <div key={j} className={`bg-surface2 rounded-md px-3 py-1.5 text-sm num flex items-center gap-2 ${isWarmup(s) ? 'opacity-70' : ''}`}>
+                  {/* Set number sat flush against the weight, so "#1" then
+                      "82.5kg" read as "#182.5kg". Separated properly now. */}
+                  <span className="text-chalkdim border-e border-line pe-2">{isWarmup(s) ? t('sessionCard.warmupShort') : ++n}</span>
+                  {formatSet(entry, s, t)}
+                </div>
+              ))
+            })()}
           </div>
           {entry.notes && <p className="text-chalkdim text-sm italic">"{entry.notes}"</p>}
         </Card>

@@ -39,7 +39,7 @@ export default function EditSession() {
           sets: (e.sets || []).map((s) =>
             e.category === 'cardio'
               ? { duration: s.duration ?? '', intensity: s.intensity ?? '', distance: s.distance ?? '' }
-              : { weight: s.weight ?? '', reps: s.reps ?? '' },
+              : { weight: s.weight ?? '', reps: s.reps ?? '', ...(s.warmup ? { warmup: true } : {}) },
           ),
         })),
       )
@@ -59,6 +59,11 @@ export default function EditSession() {
     setEntries((prev) =>
       prev.map((e, i) => (i !== entryIdx ? e : { ...e, sets: [...e.sets, emptySet(e.category)] })),
     )
+  }
+
+  // Warm-ups go at the start of the exercise, ahead of the working sets.
+  function addWarmups(entryIdx, warmups) {
+    setEntries((prev) => prev.map((e, i) => (i !== entryIdx ? e : { ...e, sets: [...warmups, ...e.sets] })))
   }
 
   function removeSet(entryIdx, setIdx) {
@@ -110,6 +115,7 @@ export default function EditSession() {
           entry={entry}
           onUpdateSet={(setIdx, patch) => updateSet(i, setIdx, patch)}
           onAddSet={() => addSet(i)}
+          onAddWarmups={(sets) => addWarmups(i, sets)}
           onRemoveSet={(setIdx) => removeSet(i, setIdx)}
           onUpdateNote={(text) => updateNote(i, text)}
         />

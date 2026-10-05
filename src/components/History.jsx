@@ -9,6 +9,7 @@ import { useCollection, deleteSession } from '../lib/db.js'
 import { Card, CategoryTag, EmptyState, Button, Field } from './ui.jsx'
 import { Tabs } from './ExerciseLibrary.jsx'
 import { InfoTip } from './InfoTip.jsx'
+import { workingSets } from '../lib/warmup.js'
 
 function formatDate(iso) {
   if (!iso) return ''
@@ -126,7 +127,7 @@ export default function History() {
 
       <div className="flex flex-col gap-2">
         {filtered.map((s) => {
-          const totalSets = (s.entries || []).reduce((n, e) => n + (e.sets?.length || 0), 0)
+          const totalSets = (s.entries || []).reduce((n, e) => n + workingSets(e.sets).length, 0)
           return (
             <Link key={s.id} to={`/history/${s.id}`}>
               <Card className="flex items-center justify-between gap-3 hover:border-brass/50 transition-colors">
