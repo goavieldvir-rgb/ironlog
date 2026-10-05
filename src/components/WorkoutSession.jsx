@@ -6,7 +6,7 @@ import { InfoTip } from './InfoTip.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
-import { useCollection, logSession, addExercise } from '../lib/db.js'
+import { useCollection, logSession, addExercise, clearExerciseNote } from '../lib/db.js'
 import { saveDraft, loadDraft, clearDraft, FREESTYLE_KEY } from '../lib/draft.js'
 import { toLocalISODate } from '../lib/dates.js'
 import { Button, Card, CategoryTag, Field } from './ui.jsx'
@@ -354,6 +354,16 @@ export default function WorkoutSession() {
     setEntries((prev) => prev.filter((_, i) => i !== entryIdx))
   }
 
+  async function clearLastNote(exerciseId) {
+    try {
+      await clearExerciseNote(effectiveUid, exerciseId)
+      refreshExercises()
+    } catch (err) {
+      console.error(err)
+      toast(t('sessionCard.clearNoteFailed'), 'error')
+    }
+  }
+
   async function handleFinish() {
     setSaving(true)
     try {
@@ -452,6 +462,7 @@ export default function WorkoutSession() {
             onRemoveSet={(setIdx) => removeSet(i, setIdx)}
             onRemoveEntry={() => removeEntry(i)}
             onUpdateNote={(text) => updateNote(i, text)}
+            onClearLastNote={() => clearLastNote(entry.exerciseId)}
             onSwapExercise={() => {
               setSwapIndex(i)
               setSwapPickId('')

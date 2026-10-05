@@ -175,6 +175,17 @@ export async function updateExercise(uid, id, patch) {
   if (error) throw error
 }
 
+// Forgets the note that resurfaces on an exercise. Notes already saved in
+// past workouts stay as they are.
+export async function clearExerciseNote(uid, id) {
+  const { error } = await supabase
+    .from('exercises')
+    .update({ last_note: null, last_note_date: null })
+    .eq('id', id)
+    .eq('user_id', uid)
+  if (error) throw error
+}
+
 export async function deleteExercise(uid, id) {
   const { error } = await supabase.from('exercises').delete().eq('id', id).eq('user_id', uid)
   if (error) throw error
