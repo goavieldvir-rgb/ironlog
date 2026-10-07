@@ -22,10 +22,13 @@ function formatDate(iso) {
 function formatSet(entry, s, t) {
   if (entry.category === 'cardio') {
     const intensityLabel = entry.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe')
-    const dist = s.distance !== '' && s.distance != null ? ` · ${s.distance}${entry.unit}` : ''
     const sd = Number(s.distance), sm = Number(s.duration)
-    const pace = sd > 0 && sm > 0 ? ` · ${formatPace(sm / sd)}/${entry.unit === 'mi' ? 'mi' : 'km'}` : ''
-    return `${s.duration || 0} ${t('sessionCard.minUnit')} · ${intensityLabel} ${s.intensity || 0}${dist}${pace}`
+    // Each piece is isolated left-to-right (U+2066 ... U+2069) so a Hebrew
+    // unit label can't reorder the numbers around it.
+    const parts = [`${s.duration || 0} ${t('sessionCard.minUnit')}`, `${intensityLabel} ${s.intensity || 0}`]
+    if (s.distance !== '' && s.distance != null) parts.push(`${s.distance}${entry.unit}`)
+    if (sd > 0 && sm > 0) parts.push(`${formatPace(sm / sd)}/${entry.unit === 'mi' ? 'mi' : 'km'}`)
+    return parts.map((p) => `\u2066${p}\u2069`).join(' · ')
   }
   if (entry.timed) {
     const added = Number(s.weight) > 0 ? `+${s.weight}${entry.unit} · ` : ''
