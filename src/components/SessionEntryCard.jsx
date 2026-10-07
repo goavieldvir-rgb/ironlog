@@ -1,3 +1,4 @@
+import { safeVideoUrl } from '../lib/url.js'
 import React, { useEffect, useRef, useState } from 'react'
 import { X, Play, Plus, Trash2, Minus, CornerDownLeft, History, StickyNote, Repeat, ArrowUp, ArrowDown, Trophy } from 'lucide-react'
 import { Card, Badge } from './ui.jsx'
@@ -321,9 +322,9 @@ export default function SessionEntryCard({
                 the icons it made that row so wide on a phone that the name,
                 "Previously" and the last note were squeezed into a narrow
                 column, a word or two per line. */}
-            {entry.videoUrl && (
+            {safeVideoUrl(entry.videoUrl) && (
               <a
-                href={entry.videoUrl}
+                href={safeVideoUrl(entry.videoUrl)}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 text-xs text-brass hover:underline"

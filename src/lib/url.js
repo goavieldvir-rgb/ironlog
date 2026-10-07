@@ -8,3 +8,11 @@ export function normalizeVideoUrl(raw) {
   if (/^https?:\/\//i.test(s)) return s
   return `https://${s.replace(/^\/+/, '')}`
 }
+
+// Only web links are ever opened from a saved video link. Anything else
+// (for example "javascript:…") could run code when someone taps it, and the
+// link may have been saved by a different account than the one viewing it.
+export function safeVideoUrl(raw) {
+  const s = String(raw || '').trim()
+  return /^https?:\/\//i.test(s) ? s : ''
+}
