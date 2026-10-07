@@ -17,6 +17,8 @@ import { ExerciseModal, emptyExerciseForm } from './ExerciseLibrary.jsx'
 import RestTimer from './RestTimer.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { isWarmup, workingSets } from '../lib/warmup.js'
+import { buildSummary } from '../lib/shareSummary.js'
+import WorkoutDone from './WorkoutDone.jsx'
 
 function todayISO() {
   return toLocalISODate()
@@ -82,6 +84,7 @@ export default function WorkoutSession() {
   const [saving, setSaving] = useState(false)
   useScrollLock(swapIndex != null || showLibraryPicker || creatingCustom)
   const [saved, setSaved] = useState(false)
+  const [summary, setSummary] = useState(null)
   // When this workout was started — carried inside the draft, so resuming
   // after a phone lock or app switch keeps the original start time.
   const [startedAt, setStartedAt] = useState(null)
@@ -369,6 +372,15 @@ export default function WorkoutSession() {
   async function handleFinish() {
     setSaving(true)
     try {
+      const summaryData = buildSummary({
+        entries,
+        personalBests,
+        routineName: isFreestyle ? t('workout.freestyleSession') : routine?.name,
+        date,
+        durationMinutes: finalDuration(),
+        minLabel: t('sessionCard.minUnit'),
+        bwLabel: t('sessionCard.bwShort'),
+      })
       await logSession(effectiveUid, {
         routineId: isFreestyle ? null : routine?.id,
         routineName: isFreestyle ? t('workout.freestyleSession') : routine?.name,
@@ -393,7 +405,8 @@ export default function WorkoutSession() {
       clearDraft(effectiveUid, draftKey)
       setSaved(true)
       toast(t('workout.sessionSaved'))
-      navigate('/history')
+      // Show the recap (with Share) instead of jumping straight to History.
+      setSummary(summaryData)
     } catch (err) {
       console.error(err)
       // The draft is only cleared on success, so a failed save (usually
@@ -423,6 +436,8 @@ export default function WorkoutSession() {
     if (draft?.routineId === routineId) clearDraft(effectiveUid, draftKey)
     return <p className="text-chalkdim">{t('workout.routineNotFound')}</p>
   }
+
+  if (summary) return <WorkoutDone summary={summary} onDone={() => navigate('/history', { replace: true })} />
 
   const availableToAdd = exercises.filter((e) => !entries.some((en) => en.exerciseId === e.id))
 
