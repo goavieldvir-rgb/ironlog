@@ -47,3 +47,18 @@ create trigger protect_admin_flag_trg
 --
 -- If someone is listed who should not be, remove them (put their email in):
 --   update public.profiles set is_admin = false where email = 'their@email';
+
+-- ---------- STEP 3 (separate run): stop strangers calling the alert functions ----------
+-- Why: send_admin_email / send_admin_push can be called through the public
+-- API by anyone holding the public key, even signed out, and have no check
+-- inside. That lets a stranger send the admin any email or phone alert from
+-- Ironlog. The database's own triggers and the daily cron job run as the
+-- owner (postgres), which keeps access, so nothing in the app changes.
+-- (is_admin() and delete_my_account() are left alone on purpose.)
+--
+-- revoke execute on function public.send_admin_email(text, text) from public, anon, authenticated;
+-- revoke execute on function public.send_admin_push(text, text) from public, anon, authenticated;
+-- revoke execute on function public.check_inactive_trainees() from public, anon, authenticated;
+-- revoke execute on function public.check_for_new_prs() from public, anon, authenticated;
+-- revoke execute on function public.protect_admin_flag() from public, anon, authenticated;
+-- revoke execute on function public.handle_new_user() from public, anon, authenticated;
