@@ -4,7 +4,10 @@
 -- Why: the policy on "profiles" lets each person update their own row, and
 -- the row holds the is_admin flag. Anyone signed in could have switched it
 -- on from the browser and then read and edit every person's workouts.
--- This guard refuses any change to is_admin that comes from the app.
+-- This guard refuses any change to is_admin that comes from the app, unless
+-- the person making it is already an admin.
+-- NOTE: the live database already got this fix applied on 2026-10-07 (and
+-- already had a stricter policy on profiles). The file is kept for the record.
 -- Changes made in the SQL Editor still work, so you can
 -- still promote a coach with:
 --   update public.profiles set is_admin = true where email = '...';
@@ -23,7 +26,7 @@ begin
   end if;
   if tg_op = 'INSERT' then
     new.is_admin := false;
-  elsif new.is_admin is distinct from old.is_admin then
+  elsif new.is_admin is distinct from old.is_admin and not public.is_admin() then
     raise exception 'ADMIN_FLAG_PROTECTED';
   end if;
   return new;
