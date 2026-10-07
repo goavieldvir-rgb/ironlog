@@ -44,7 +44,7 @@ export function bestSetText(entry, set, bwLabel) {
   return `${num(set.weight)}${entry.unit} × ${num(set.reps)}`
 }
 
-export function buildSummary({ entries, personalBests = {}, routineName, date, durationMinutes, minLabel, bwLabel }) {
+export function buildSummary({ entries, personalBests = {}, routineName, date, durationMinutes, streakWeeks = null, minLabel, bwLabel }) {
   let volume = 0
   let volumeUnit = null
   let mixedVolumeUnits = false
@@ -98,6 +98,8 @@ export function buildSummary({ entries, personalBests = {}, routineName, date, d
     routineName,
     date,
     durationMinutes: durationMinutes || null,
+    // Weeks in a row with a workout; null when it couldn't be worked out.
+    streakWeeks: streakWeeks > 0 ? streakWeeks : null,
     rows,
     prCount,
     setCount,

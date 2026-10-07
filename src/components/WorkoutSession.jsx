@@ -18,6 +18,7 @@ import RestTimer from './RestTimer.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { isWarmup, workingSets } from '../lib/warmup.js'
 import { buildSummary } from '../lib/shareSummary.js'
+import { weeklyStreak } from '../lib/streak.js'
 import WorkoutDone from './WorkoutDone.jsx'
 
 function todayISO() {
@@ -38,7 +39,7 @@ export default function WorkoutSession() {
 
   const [routines, routinesLoading] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [exercises, , refreshExercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
-  const [pastSessions] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const [pastSessions, pastLoading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
 
   // All-time best per exercise, from every session already saved. Same
   // rule the admin PR alert uses — heaviest weight for strength, most
@@ -382,6 +383,8 @@ export default function WorkoutSession() {
           routineName: isFreestyle ? t('workout.freestyleSession') : routine?.name,
           date,
           durationMinutes: finalDuration(),
+          // No streak while past workouts are still loading (or failed to load).
+          streakWeeks: pastLoading ? null : weeklyStreak(pastSessions, date),
           minLabel: t('sessionCard.minUnit'),
           bwLabel: t('sessionCard.bwShort'),
         })
