@@ -100,7 +100,7 @@ export function FeedbackProvider({ children }) {
           <div key={x.id} className="pointer-events-auto card flex items-center gap-2 px-3.5 py-2.5 text-sm max-w-sm w-full shadow-lg border-iron text-chalk">
             <AlertTriangle size={16} className="text-irontext shrink-0" />
             <span className="flex-1">{x.message}</span>
-            <button onClick={() => setToasts((prev) => prev.filter((y) => y.id !== x.id))} className="text-chalkdim hover:text-chalk" aria-label={t('common.cancel')}>
+            <button onClick={() => setToasts((prev) => prev.filter((y) => y.id !== x.id))} className="text-chalkdim hover:text-chalk" aria-label={t('common.close')}>
               <X size={14} />
             </button>
           </div>
