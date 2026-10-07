@@ -8,7 +8,7 @@ import { toLocalISODate } from '../lib/dates.js'
 import { Button, Card, EmptyState, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { isWarmup, workingSets } from '../lib/warmup.js'
-import { formatSeconds } from '../lib/timed.js'
+import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
 
 function mondayOf(d) {
   const date = new Date(d)
@@ -207,9 +207,10 @@ export default function WeeklySummary() {
   const { effectiveUid, effectiveName, actingAs } = useAdmin()
   const { t } = useLanguage()
   const MODES = getModes(t)
-  const [sessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const [rawSessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [bodyWeightAll] = useCollection(effectiveUid, 'body_weight_logs', 'date', 'desc')
   const [exercises, exercisesLoading] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
+  const sessions = useMemo(() => applyCurrentTimed(rawSessions, exercises), [rawSessions, exercises])
   const [routines, routinesLoading] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
 
   const [mode, setMode] = useState('week')

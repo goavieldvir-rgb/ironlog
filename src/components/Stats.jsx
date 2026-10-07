@@ -20,7 +20,7 @@ import { disambiguateLabels } from '../lib/disambiguate.js'
 import { Card, EmptyState, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { workingSets } from '../lib/warmup.js'
-import { formatSeconds } from '../lib/timed.js'
+import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
 
 const COLORS = { iron: '#D64545', brass: '#C9A24B', cardio: '#4C8CC9', chalk: '#EDEDE6', chalkdim: '#9CA0AA', grid: '#31353E' }
 
@@ -49,7 +49,9 @@ function last12Mondays() {
 export default function Stats() {
   const { effectiveUid } = useAdmin()
   const { t } = useLanguage()
-  const [sessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const [rawSessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
+  const sessions = useMemo(() => applyCurrentTimed(rawSessions, exercises), [rawSessions, exercises])
   const [exerciseId, setExerciseId] = useState('')
 
   const weeks = useMemo(() => last12Mondays(), [])

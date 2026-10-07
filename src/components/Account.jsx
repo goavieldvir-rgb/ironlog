@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Download, FileSpreadsheet, Trash2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
+import { applyCurrentTimed } from '../lib/timed.js'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
@@ -99,7 +100,8 @@ export default function Account() {
     try {
       const { data, error } = await supabase.from('sessions').select('*').eq('user_id', effectiveUid)
       if (error) throw error
-      download(`ironlog-workouts-${stamp}.csv`, toCsv(data || []), 'text/csv;charset=utf-8')
+      const { data: exs } = await supabase.from('exercises').select('id, timed').eq('user_id', effectiveUid)
+      download(`ironlog-workouts-${stamp}.csv`, toCsv(applyCurrentTimed(data || [], exs || [])), 'text/csv;charset=utf-8')
     } catch (err) {
       console.error(err)
       toast(t('account.exportFailed'), 'error')

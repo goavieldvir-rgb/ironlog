@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Play, Pencil, MessageSquareText, Check } from 'lucide-react'
 import { BackChevron } from './DirectionalIcon.jsx'
@@ -9,7 +9,7 @@ import { useCollection, updateTrainerComment } from '../lib/db.js'
 import { Card, CategoryTag, Badge, Button } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { isWarmup } from '../lib/warmup.js'
-import { formatSeconds } from '../lib/timed.js'
+import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
 
 function formatDate(iso) {
   if (!iso) return ''
@@ -40,7 +40,9 @@ export default function SessionDetail() {
   const { effectiveUid, isAdmin } = useAdmin()
   const { t } = useLanguage()
   const { id } = useParams()
-  const [sessions, loading, refresh] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const [rawSessions, loading, refresh] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
+  const sessions = useMemo(() => applyCurrentTimed(rawSessions, exercises), [rawSessions, exercises])
   const session = sessions.find((s) => s.id === id)
 
   if (!loading && !session) return <p className="text-chalkdim">{t('sessionDetail.notFound')}</p>
