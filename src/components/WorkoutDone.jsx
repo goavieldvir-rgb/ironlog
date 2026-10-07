@@ -10,7 +10,7 @@ const iso = (s) => `⁦${s}⁩`
 function formatDate(date, lang) {
   if (!date) return ''
   const d = new Date(date + 'T00:00:00')
-  return d.toLocaleDateString(lang === 'he' ? 'he-IL' : undefined, { day: 'numeric', month: 'long', year: 'numeric' })
+  return d.toLocaleDateString(lang === 'he' ? 'he-IL' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 // Shown right after a workout is saved: a short recap with a Share button
@@ -122,9 +122,11 @@ export default function WorkoutDone({ summary, onDone }) {
       </Card>
 
       <div className="flex gap-3">
-        <Button variant="brass" className="flex-1" onClick={handleShare} disabled={busy || !file || failed}>
-          <Share2 size={16} /> {busy || (!file && !failed) ? t('share.sharing') : t('share.share')}
-        </Button>
+        {!failed && (
+          <Button variant="brass" className="flex-1" onClick={handleShare} disabled={busy || !file}>
+            <Share2 size={16} /> {busy || !file ? t('share.sharing') : t('share.share')}
+          </Button>
+        )}
         <Button variant="ghost" className="flex-1" onClick={onDone}>
           {t('share.done')}
         </Button>

@@ -6,6 +6,11 @@ const FONT = '"Inter", "Rubik", system-ui, -apple-system, "Segoe UI", sans-serif
 const C = { ink: '#14161A', surface: '#1C1F26', chalk: '#EDEDE6', dim: '#9CA0AA', brass: '#C9A24B', line: '#31353E' }
 const LRI = '⁦'
 const PDI = '⁩'
+// ctx.roundRect is missing before iOS 16, so fall back to a plain rectangle.
+function roundRect(ctx, x, y, w, h, r) {
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r)
+  else ctx.rect(x, y, w, h)
+}
 const iso = (s) => `${LRI}${s}${PDI}`
 
 function fit(ctx, text, maxW) {
@@ -66,10 +71,12 @@ export function renderShareCard(summary, { rtl, dateText, labels }) {
   const n = shownStats.length
   const tileW = (W - pad * 2 - gap * (n - 1)) / n
   shownStats.forEach(([label, value], i) => {
-    const x = pad + i * (tileW + gap)
+    // Hebrew reads right to left, so the first stat sits on the right.
+    const slot = rtl ? n - 1 - i : i
+    const x = pad + slot * (tileW + gap)
     ctx.fillStyle = C.surface
     ctx.beginPath()
-    ctx.roundRect(x, 260, tileW, 170, 22)
+    roundRect(ctx, x, 260, tileW, 170, 22)
     ctx.fill()
     ctx.textAlign = 'center'
     ctx.direction = 'ltr'
@@ -116,7 +123,7 @@ export function renderShareCard(summary, { rtl, dateText, labels }) {
       const bx = rtl ? tagX - tw : tagX
       ctx.fillStyle = C.brass
       ctx.beginPath()
-      ctx.roundRect(bx, base - 32, tw, 40, 20)
+      roundRect(ctx, bx, base - 32, tw, 40, 20)
       ctx.fill()
       ctx.fillStyle = C.ink
       ctx.textAlign = 'center'
