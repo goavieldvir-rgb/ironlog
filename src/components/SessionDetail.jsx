@@ -10,6 +10,8 @@ import { Card, CategoryTag, Badge, Button } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { isWarmup } from '../lib/warmup.js'
 import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
+import { formatPace } from '../lib/cardio.js'
+import CardioTotals from './CardioTotals.jsx'
 
 function formatDate(iso) {
   if (!iso) return ''
@@ -20,8 +22,13 @@ function formatDate(iso) {
 function formatSet(entry, s, t) {
   if (entry.category === 'cardio') {
     const intensityLabel = entry.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe')
-    const dist = s.distance !== '' && s.distance != null ? ` · ${s.distance}${entry.unit}` : ''
-    return `${s.duration || 0} ${t('sessionCard.minUnit')} · ${intensityLabel} ${s.intensity || 0}${dist}`
+    const sd = Number(s.distance), sm = Number(s.duration)
+    // Each piece is isolated left-to-right (U+2066 ... U+2069) so a Hebrew
+    // unit label can't reorder the numbers around it.
+    const parts = [`${s.duration || 0} ${t('sessionCard.minUnit')}`, `${intensityLabel} ${s.intensity || 0}`]
+    if (s.distance !== '' && s.distance != null) parts.push(`${s.distance}${entry.unit}`)
+    if (sd > 0 && sm > 0) parts.push(`${formatPace(sm / sd)}/${entry.unit === 'mi' ? 'mi' : 'km'}`)
+    return parts.map((p) => `\u2066${p}\u2069`).join(' · ')
   }
   if (entry.timed) {
     const added = Number(s.weight) > 0 ? `+${s.weight}${entry.unit} · ` : ''
@@ -112,6 +119,12 @@ export default function SessionDetail() {
               ))
             })()}
           </div>
+          {entry.category === 'cardio' && (entry.sets || []).length > 0 && (
+            <p className="num text-sm">
+              <span className="text-chalkdim">{t('sessionDetail.cardioTotal')}: </span>
+              <CardioTotals sets={entry.sets} unit={entry.unit} minLabel={t('sessionCard.minUnit')} />
+            </p>
+          )}
           {entry.notes && <p className="text-chalkdim text-sm italic">"{entry.notes}"</p>}
         </Card>
       ))}
