@@ -11,6 +11,7 @@ export function unitSuffix(item, t) {
     const intensityType = item.intensityType || item.intensity_type
     return intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe')
   }
+  if (item.timed) return t('exercises.timedWord')
   if (item.bodyweight) return t('exercises.bodyweightWord')
   return item.unit || 'kg'
 }

@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Download, FileSpreadsheet, Trash2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
+import { applyCurrentTimed } from '../lib/timed.js'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
@@ -41,7 +42,7 @@ function download(filename, text, type) {
 function toCsv(sessions) {
   const header = [
     'date', 'routine', 'exercise', 'category', 'set', 'weight', 'unit', 'reps', 'rir',
-    'duration_min', 'intensity', 'distance', 'exercise_note', 'session_note', 'workout_minutes', 'warmup',
+    'duration_min', 'intensity', 'distance', 'exercise_note', 'session_note', 'workout_minutes', 'warmup', 'seconds',
   ]
   const esc = (v) => {
     const s = v == null ? '' : String(v)
@@ -56,9 +57,9 @@ function toCsv(sessions) {
         rows.push(
           [
             s.date, s.routine_name, e.name, e.category || 'strength', i + 1,
-            cardio ? '' : set.weight, e.unit, cardio ? '' : set.reps, cardio ? '' : set.rir,
+            cardio ? '' : set.weight, e.unit, cardio || e.timed ? '' : set.reps, cardio ? '' : set.rir,
             cardio ? set.duration : '', cardio ? set.intensity : '', cardio ? set.distance : '',
-            e.notes, s.notes, s.duration_minutes, set.warmup ? 'yes' : '',
+            e.notes, s.notes, s.duration_minutes, set.warmup ? 'yes' : '', e.timed ? set.reps : '',
           ].map(esc).join(','),
         )
       })
@@ -99,7 +100,8 @@ export default function Account() {
     try {
       const { data, error } = await supabase.from('sessions').select('*').eq('user_id', effectiveUid)
       if (error) throw error
-      download(`ironlog-workouts-${stamp}.csv`, toCsv(data || []), 'text/csv;charset=utf-8')
+      const { data: exs } = await supabase.from('exercises').select('id, timed').eq('user_id', effectiveUid)
+      download(`ironlog-workouts-${stamp}.csv`, toCsv(applyCurrentTimed(data || [], exs || [])), 'text/csv;charset=utf-8')
     } catch (err) {
       console.error(err)
       toast(t('account.exportFailed'), 'error')

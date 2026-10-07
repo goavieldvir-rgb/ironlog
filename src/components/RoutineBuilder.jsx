@@ -65,9 +65,10 @@ export default function RoutineBuilder() {
       name: ex.name,
       unit: ex.unit,
       bodyweight: !!ex.bodyweight,
+      timed: !!ex.timed,
       videoUrl: ex.video_url || ex.videoUrl || '',
       targetSets: 3,
-      targetReps: 10,
+      targetReps: ex.timed ? 30 : 10, // seconds for a timed hold
     }
   }
 
@@ -87,6 +88,7 @@ export default function RoutineBuilder() {
         category: g.category,
         unit: g.unit,
         bodyweight: g.bodyweight,
+        timed: g.timed,
         intensityType: g.intensity_type,
         videoUrl: '',
         notes: '',
@@ -294,9 +296,10 @@ export default function RoutineBuilder() {
                     value={it.targetReps}
                     onChange={(e) => updateItem(i, { targetReps: e.target.value })}
                     className="w-16 text-center num"
-                    title={t('routines.targetReps')}
-                    placeholder="10"
+                    title={it.timed ? t('routines.targetSeconds') : t('routines.targetReps')}
+                    placeholder={it.timed ? '30' : '10'}
                   />
+                  {it.timed && <span className="text-chalkdim text-xs">s</span>}
                 </>
               )}
               <div className="flex items-center ms-auto">
