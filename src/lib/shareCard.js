@@ -17,12 +17,19 @@ const C = { ink: T.ink, surface: T.surface, chalk: T.chalk, dim: T.chalkdim, bra
 const DISPLAY = '"Barlow Condensed", "Rubik", system-ui, sans-serif'
 const BODY = 'Inter, "Rubik", system-ui, -apple-system, "Segoe UI", sans-serif'
 const MONO = '"IBM Plex Mono", "Rubik", ui-monospace, monospace'
+// Every family and weight the card draws with. Hebrew letters aren't in the
+// condensed or mono fonts, so Rubik (the app's Hebrew font) is loaded at the
+// same weights, using Hebrew sample text so its Hebrew pieces download too.
 const FONT_REQUESTS = [
   `500 100px ${DISPLAY}`,
+  `600 100px ${DISPLAY}`,
   `700 100px ${DISPLAY}`,
   `600 40px ${BODY}`,
   `500 30px ${MONO}`,
+  `700 30px ${MONO}`,
+  '500 40px Rubik',
   '600 40px Rubik',
+  '700 40px Rubik',
 ]
 const LRI = '\u2066'
 const PDI = '\u2069'
@@ -107,8 +114,15 @@ export function renderShareCard(summary, { rtl, dateText, labels }) {
   ctx.fillText(rtl ? hero.label : hero.label.toUpperCase(), start, y + 24)
   ctx.direction = 'ltr'
   ctx.fillStyle = C.chalk
-  ctx.font = `500 300px ${DISPLAY}`
-  const heroValue = fit(ctx, hero.value, W - pad * 2 - 200)
+  // Long numbers (1,234,567 lb) shrink to fit instead of being cut off.
+  const heroValue = hero.value
+  const heroMax = W - pad * 2 - (hero.unit ? 200 : 0)
+  let heroSize = 300
+  ctx.font = `500 ${heroSize}px ${DISPLAY}`
+  while (heroSize > 120 && ctx.measureText(heroValue).width > heroMax) {
+    heroSize -= 10
+    ctx.font = `500 ${heroSize}px ${DISPLAY}`
+  }
   const heroBase = y + 290
   ctx.fillText(heroValue, start, heroBase)
   if (hero.unit) {
