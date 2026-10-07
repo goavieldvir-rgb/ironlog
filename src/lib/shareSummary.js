@@ -71,7 +71,8 @@ export function buildSummary({ entries, personalBests = {}, routineName, date, d
       const best = e.exerciseId ? personalBests[e.exerciseId] : null
       const pr = best != null && sets.some((s) => (prValue(e, s) || 0) > best)
       if (pr) prCount += 1
-      rows.push({ name: e.name, text: parts.join(' · '), pr })
+      // each piece isolated left-to-right so a Hebrew unit can't reorder the numbers
+      rows.push({ name: e.name, text: parts.map((p) => `\u2066${p}\u2069`).join(' · '), pr })
       setCount += sets.filter((s) => num(s.duration) > 0).length
       continue
     }
