@@ -6,6 +6,8 @@ import OverflowMenu from './OverflowMenu.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { isWarmup, workingSets, suggestWarmups } from '../lib/warmup.js'
 import { formatSeconds } from '../lib/timed.js'
+import { cardioSummary } from '../lib/cardio.js'
+import CardioTotals from './CardioTotals.jsx'
 
 function Stepper({ value, onChange, step, min = 0, max, label, placeholder, bare }) {
   const holdRef = useRef(null)
@@ -463,6 +465,15 @@ export default function SessionEntryCard({
               <button onClick={onAddSet} className="text-chalkdim hover:text-chalk text-sm inline-flex items-center gap-1 min-h-[44px] pe-3 w-fit">
                 <Plus size={13} /> {t('sessionCard.addInterval')}
               </button>
+              {/* Pace and speed appear as soon as a set has both a time and a distance. */}
+              {(() => {
+                const sum = cardioSummary(entry.sets)
+                return sum && sum.distance != null ? (
+                  <p className="num text-sm text-chalkdim -mt-1 text-start">
+                    <CardioTotals sets={entry.sets} unit={entry.unit} minLabel={t('sessionCard.minUnit')} />
+                  </p>
+                ) : null
+              })()}
             </div>
           )
         }

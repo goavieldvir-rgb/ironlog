@@ -21,6 +21,7 @@ import { Card, EmptyState, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { workingSets } from '../lib/warmup.js'
 import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
+import { cardioSummary, formatPace, formatSpeed, formatDistance, toKm } from '../lib/cardio.js'
 
 const COLORS = { iron: '#D64545', brass: '#C9A24B', cardio: '#4C8CC9', chalk: '#EDEDE6', chalkdim: '#9CA0AA', grid: '#31353E' }
 
@@ -53,6 +54,7 @@ export default function Stats() {
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const sessions = useMemo(() => applyCurrentTimed(rawSessions, exercises), [rawSessions, exercises])
   const [exerciseId, setExerciseId] = useState('')
+  const [cardioMetric, setCardioMetric] = useState('duration')
 
   const weeks = useMemo(() => last12Mondays(), [])
 
@@ -61,10 +63,13 @@ export default function Stats() {
       const inWeek = sessions.filter((s) => mondayOf(s.date) === weekStart)
       let volume = 0
       let cardioMinutes = 0
+      let cardioKm = 0
       for (const s of inWeek) {
         for (const e of s.entries || []) {
           if (e.category === 'cardio') {
             cardioMinutes += (e.sets || []).reduce((sv, set) => sv + (Number(set.duration) || 0), 0)
+            const c = cardioSummary(e.sets)
+            if (c && c.distance != null) cardioKm += toKm(c.distance, e.unit)
           } else if (!e.timed) {
             // Holds have no weight × reps volume — their reps are seconds.
             volume += workingSets(e.sets).reduce((sv, set) => {
@@ -81,6 +86,7 @@ export default function Stats() {
         sessions: inWeek.length,
         volume: Math.round(volume),
         cardioMinutes: Math.round(cardioMinutes),
+        cardioKm: Math.round(cardioKm * 10) / 10,
       }
     })
   }, [sessions, weeks])
@@ -96,6 +102,7 @@ export default function Stats() {
 
   const totalVolume = useMemo(() => weeklyData.reduce((s, w) => s + w.volume, 0), [weeklyData])
   const totalCardioMinutes = useMemo(() => weeklyData.reduce((s, w) => s + w.cardioMinutes, 0), [weeklyData])
+  const totalCardioKm = useMemo(() => weeklyData.reduce((s, w) => s + w.cardioKm, 0), [weeklyData])
   const hasCardio = useMemo(
     () => totalCardioMinutes > 0 || sessions.some((s) => (s.entries || []).some((e) => e.category === 'cardio')),
     [totalCardioMinutes, sessions],
@@ -116,9 +123,18 @@ export default function Stats() {
           if (completed.length === 0) continue
           const topSet = completed.reduce((best, set) => (Number(set.duration) > Number(best.duration) ? set : best))
 
+          // Whole-workout numbers for the chart: total time, distance,
+          // speed, pace and average effort (null when not logged).
+          const sum = cardioSummary(entry.sets)
+          if (!sum) continue
+
           const existing = recMap[entry.exerciseId]
           if (!existing || Number(topSet.duration) > existing.duration) {
             recMap[entry.exerciseId] = {
+              // Farthest and best pace are kept across sessions, whichever
+              // one holds the longest interval.
+              farthest: existing?.farthest ?? null,
+              bestPace: existing?.bestPace ?? null,
               name: entry.name,
               category: 'cardio',
               unit: entry.unit,
@@ -130,13 +146,20 @@ export default function Stats() {
             }
           }
 
+          const r = recMap[entry.exerciseId]
+          if (sum.distance != null && (r.farthest == null || sum.distance > r.farthest)) r.farthest = sum.distance
+          if (sum.pace != null && (r.bestPace == null || sum.pace < r.bestPace)) r.bestPace = sum.pace
           if (!progMap[entry.exerciseId]) {
             progMap[entry.exerciseId] = { name: entry.name, category: 'cardio', unit: entry.unit, intensityType: entry.intensityType, points: [] }
           }
           progMap[entry.exerciseId].points.push({
             date: s.date,
             label: shortDate(s.date),
-            duration: Number(topSet.duration),
+            duration: sum.minutes,
+            distance: sum.distance,
+            speed: sum.speed,
+            pace: sum.pace,
+            effort: sum.intensity,
           })
           continue
         }
@@ -209,6 +232,20 @@ export default function Stats() {
 
   const selectedProgress = exerciseId ? progressByExercise[exerciseId] : null
 
+  // Cardio chart: time is always there; the others only when logged.
+  const isCardioSel = selectedProgress?.category === 'cardio'
+  const cardioMetrics = isCardioSel
+    ? ['duration', 'distance', 'speed', 'pace', 'effort'].filter((k) => k === 'duration' || selectedProgress.points.some((p) => p[k] != null))
+    : []
+  const metric = cardioMetrics.includes(cardioMetric) ? cardioMetric : 'duration'
+  const distUnit = selectedProgress?.unit === 'mi' ? 'mi' : 'km'
+  const metricLabel = {
+    duration: t('stats.metricTime'),
+    distance: t('stats.metricDistance'),
+    speed: t('stats.metricSpeed'),
+    pace: t('stats.metricPace'),
+    effort: selectedProgress?.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe'),
+  }
   const hasData = !loading && sessions.length > 0
 
   return (
@@ -227,11 +264,12 @@ export default function Stats() {
 
       {hasData && (
         <>
-          <div className={`grid grid-cols-2 ${hasCardio ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3`}>
+          <div className={`grid grid-cols-2 ${totalCardioKm > 0 ? 'sm:grid-cols-6' : hasCardio ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3`}>
             <Stat icon={Flame} label={t('stats.weekStreak')} value={streak} />
             <Stat icon={BarChart3} label={t('stats.sessionsLogged')} value={sessions.length} />
             <Stat icon={TrendingUp} label={t('stats.totalVolume')} value={totalVolume.toLocaleString()} />
             {hasCardio && <Stat icon={Heart} label={t('stats.cardioMinutes')} value={totalCardioMinutes.toLocaleString()} />}
+            {totalCardioKm > 0 && <Stat icon={Heart} label={t('stats.cardioDistance')} value={formatDistance(totalCardioKm)} />}
             <Stat icon={Trophy} label={t('stats.personalRecords')} value={records.length} />
           </div>
 
@@ -295,6 +333,27 @@ export default function Stats() {
             </Card>
           )}
 
+          {totalCardioKm > 0 && (
+            <Card>
+              <h2 className="eyebrow mb-4">{t('stats.cardioDistancePerWeek')}</h2>
+              <div dir="ltr">
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={weeklyData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
+                    <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} width={32} />
+                    <Tooltip
+                      contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
+                      labelStyle={{ color: COLORS.chalk }}
+                      formatter={(value) => [`${value} km`, t('stats.cardioTooltipLabel')]}
+                    />
+                    <Bar dataKey="cardioKm" fill={COLORS.cardio} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          )}
+
           <Card className="flex flex-col gap-3">
             <h2 className="eyebrow flex items-center gap-1.5 flex-wrap">
               {t('stats.progressByExercise')}
@@ -310,6 +369,22 @@ export default function Stats() {
               />
             </Field>
 
+            {cardioMetrics.length > 1 && (
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('stats.chartShows')}>
+                {cardioMetrics.map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setCardioMetric(k)}
+                    aria-pressed={metric === k}
+                    className={`min-h-[44px] px-3 rounded-md border text-sm ${metric === k ? 'border-brass text-brass bg-brasssoft' : 'border-line text-chalkdim hover:text-chalk'}`}
+                  >
+                    {metricLabel[k]}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {selectedProgress && selectedProgress.points.length > 0 ? (
               <div dir="ltr">
                 <ResponsiveContainer width="100%" height={220}>
@@ -322,13 +397,31 @@ export default function Stats() {
                       tickLine={false}
                       axisLine={false}
                       width={36}
-                      domain={selectedProgress.category === 'cardio' || selectedProgress.bodyweight ? [0, 'dataMax + 5'] : ['dataMin - 5', 'dataMax + 5']}
+                      reversed={isCardioSel && metric === 'pace'}
+                      tickFormatter={isCardioSel && metric === 'pace' ? formatPace : undefined}
+                      domain={
+                        isCardioSel
+                          ? metric === 'duration'
+                            ? [0, 'dataMax + 5']
+                            : metric === 'pace'
+                              ? [(min) => Math.max(0, Math.floor(min * 2 - 1) / 2), (max) => Math.ceil(max * 2 + 1) / 2]
+                              : [0, 'auto']
+                          : selectedProgress.bodyweight
+                            ? [0, 'dataMax + 5']
+                            : ['dataMin - 5', 'dataMax + 5']
+                      }
                     />
                     <Tooltip
                       contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
                       labelStyle={{ color: COLORS.chalk }}
                       formatter={(value) => {
-                        if (selectedProgress.category === 'cardio') return [`${value} min`, t('stats.duration')]
+                        if (isCardioSel) {
+                          if (metric === 'distance') return [`${formatDistance(value)} ${distUnit}`, metricLabel.distance]
+                          if (metric === 'speed') return [`${formatSpeed(value)} ${distUnit === 'mi' ? 'mph' : 'km/h'}`, metricLabel.speed]
+                          if (metric === 'pace') return [`${formatPace(value)} /${distUnit}`, metricLabel.pace]
+                          if (metric === 'effort') return [Math.round(value * 10) / 10, metricLabel.effort]
+                          return [`${formatDistance(value)} min`, t('stats.duration')]
+                        }
                         if (selectedProgress.timed) return [formatSeconds(value), t('stats.longestHold')]
                         if (selectedProgress.bodyweight) return [`${value} reps`, t('stats.topSet')]
                         return [`${value}${selectedProgress.unit}`, t('stats.topSet')]
@@ -336,7 +429,8 @@ export default function Stats() {
                     />
                     <Line
                       type="monotone"
-                      dataKey={selectedProgress.category === 'cardio' ? 'duration' : selectedProgress.bodyweight ? 'reps' : 'weight'}
+                      connectNulls
+                      dataKey={isCardioSel ? metric : selectedProgress.bodyweight ? 'reps' : 'weight'}
                       stroke={selectedProgress.category === 'cardio' ? COLORS.cardio : COLORS.iron}
                       strokeWidth={2.5}
                       dot={{ fill: selectedProgress.category === 'cardio' ? COLORS.cardio : COLORS.iron, r: 3 }}
@@ -367,7 +461,7 @@ export default function Stats() {
             ) : (
               <div className="flex flex-col divide-y divide-line">
                 {records.map((r, i) => (
-                  <div key={r.id} className="flex items-center justify-between gap-2 py-2.5">
+                  <div key={r.id} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 py-2.5">
                     <p className="truncate min-w-0">{recordLabels[i]}</p>
                     <div className="text-end shrink-0">
                       <p className="num text-chalk">
@@ -383,6 +477,21 @@ export default function Stats() {
                       </p>
                       <p className="text-chalkdim text-xs">{shortDate(r.date)}</p>
                     </div>
+                    {r.category === 'cardio' && (r.farthest != null || r.bestPace != null) && (
+                      <p className="num text-chalkdim text-xs basis-full">
+                        {r.farthest != null && (
+                          <>
+                            {t('stats.farthest')} <bdi dir="ltr">{formatDistance(r.farthest)}{r.unit}</bdi>
+                          </>
+                        )}
+                        {r.farthest != null && r.bestPace != null && ' · '}
+                        {r.bestPace != null && (
+                          <>
+                            {t('stats.bestPace')} <bdi dir="ltr">{formatPace(r.bestPace)}/{r.unit}</bdi>
+                          </>
+                        )}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>

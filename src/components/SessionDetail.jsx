@@ -10,6 +10,8 @@ import { Card, CategoryTag, Badge, Button } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { isWarmup } from '../lib/warmup.js'
 import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
+import { formatPace } from '../lib/cardio.js'
+import CardioTotals from './CardioTotals.jsx'
 
 function formatDate(iso) {
   if (!iso) return ''
@@ -21,7 +23,9 @@ function formatSet(entry, s, t) {
   if (entry.category === 'cardio') {
     const intensityLabel = entry.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe')
     const dist = s.distance !== '' && s.distance != null ? ` · ${s.distance}${entry.unit}` : ''
-    return `${s.duration || 0} ${t('sessionCard.minUnit')} · ${intensityLabel} ${s.intensity || 0}${dist}`
+    const sd = Number(s.distance), sm = Number(s.duration)
+    const pace = sd > 0 && sm > 0 ? ` · ${formatPace(sm / sd)}/${entry.unit === 'mi' ? 'mi' : 'km'}` : ''
+    return `${s.duration || 0} ${t('sessionCard.minUnit')} · ${intensityLabel} ${s.intensity || 0}${dist}${pace}`
   }
   if (entry.timed) {
     const added = Number(s.weight) > 0 ? `+${s.weight}${entry.unit} · ` : ''
@@ -112,6 +116,12 @@ export default function SessionDetail() {
               ))
             })()}
           </div>
+          {entry.category === 'cardio' && (entry.sets || []).length > 0 && (
+            <p className="num text-sm">
+              <span className="text-chalkdim">{t('sessionDetail.cardioTotal')}: </span>
+              <CardioTotals sets={entry.sets} unit={entry.unit} minLabel={t('sessionCard.minUnit')} />
+            </p>
+          )}
           {entry.notes && <p className="text-chalkdim text-sm italic">"{entry.notes}"</p>}
         </Card>
       ))}

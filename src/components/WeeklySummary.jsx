@@ -9,6 +9,7 @@ import { Button, Card, EmptyState, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { isWarmup, workingSets } from '../lib/warmup.js'
 import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
+import { cardioSummary, formatPace, formatDistance, toKm } from '../lib/cardio.js'
 
 function mondayOf(d) {
   const date = new Date(d)
@@ -81,7 +82,9 @@ function formatSet(entry, s, t) {
   if (entry.category === 'cardio') {
     const intensityLabel = entry.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe')
     const dist = s.distance !== '' && s.distance != null ? ` · ${s.distance}${entry.unit}` : ''
-    return `${s.duration || 0}min·${intensityLabel}${s.intensity || 0}${dist}`
+    const sd = Number(s.distance), sm = Number(s.duration)
+    const pace = sd > 0 && sm > 0 ? `·${formatPace(sm / sd)}/${entry.unit === 'mi' ? 'mi' : 'km'}` : ''
+    return `${s.duration || 0}min·${intensityLabel}${s.intensity || 0}${dist}${pace}`
   }
   if (entry.timed) {
     const added = Number(s.weight) > 0 ? `+${s.weight}${entry.unit} ` : ''
@@ -168,12 +171,24 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t }
     return sum + m
   }, 0)
 
+  const totalCardioKm = sessions.reduce((sum, s) => {
+    return (
+      sum +
+      (s.entries || []).reduce((eSum, e) => {
+        if (e.category !== 'cardio') return eSum
+        const c = cardioSummary(e.sets)
+        return c && c.distance != null ? eSum + toKm(c.distance, e.unit) : eSum
+      }, 0)
+    )
+  }, 0)
+
   const parts = [
     `${sessions.length} ${sessions.length === 1 ? t('summary.docSession') : t('summary.docSessions')}`,
     `${totalSets} ${t('summary.docTotalSets')}`,
     `~${Math.round(totalVolume).toLocaleString()} ${t('summary.docTotalVolume')}`,
   ]
   if (totalCardioMinutes > 0) parts.push(`${Math.round(totalCardioMinutes)} ${t('summary.docCardioMinutes')}`)
+  if (totalCardioKm > 0) parts.push(`${formatDistance(totalCardioKm)} ${t('summary.docCardioDistance')}`)
   lines.push(parts.join(' · '))
   lines.push('')
 
