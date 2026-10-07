@@ -5,7 +5,7 @@
 -- the row holds the is_admin flag. Anyone signed in could have switched it
 -- on from the browser and then read and edit every person's workouts.
 -- This guard refuses any change to is_admin that comes from the app.
--- Changes made in the SQL Editor (no signed-in user) still work, so you can
+-- Changes made in the SQL Editor still work, so you can
 -- still promote a coach with:
 --   update public.profiles set is_admin = true where email = '...';
 
@@ -16,8 +16,10 @@ security definer
 set search_path = public
 as $$
 begin
-  if auth.uid() is null then
-    return new;               -- SQL Editor / server-side: allowed
+  -- Only requests that come through the app's public API (signed in or not)
+  -- are checked. The SQL Editor and server-side jobs have no such role.
+  if coalesce(auth.jwt() ->> 'role', '') not in ('anon', 'authenticated') then
+    return new;
   end if;
   if tg_op = 'INSERT' then
     new.is_admin := false;
@@ -32,3 +34,12 @@ drop trigger if exists protect_admin_flag_trg on profiles;
 create trigger protect_admin_flag_trg
   before insert or update on profiles
   for each row execute function protect_admin_flag();
+
+-- ---------- check whether anyone already used the hole ----------
+-- Run this too. It lists everyone currently marked admin. Only you (and any
+-- coach you chose) should be on it.
+select id, email, full_name, is_admin, created_at from profiles where is_admin;
+
+-- If someone is on that list who should not be, remove them (put their
+-- email in; run only this line):
+--   update public.profiles set is_admin = false where email = 'their@email';
