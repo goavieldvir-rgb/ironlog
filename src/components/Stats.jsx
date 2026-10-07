@@ -481,13 +481,13 @@ export default function Stats() {
                       <p className="num text-chalkdim text-xs basis-full">
                         {r.farthest != null && (
                           <>
-                            {t('stats.farthest')} <bdi dir="ltr">{formatDistance(r.farthest)}{r.unit}</bdi>
+                            {t('stats.farthest')} <bdi dir="ltr">{formatDistance(r.farthest)}{r.unit === 'mi' ? 'mi' : 'km'}</bdi>
                           </>
                         )}
                         {r.farthest != null && r.bestPace != null && ' · '}
                         {r.bestPace != null && (
                           <>
-                            {t('stats.bestPace')} <bdi dir="ltr">{formatPace(r.bestPace)}/{r.unit}</bdi>
+                            {t('stats.bestPace')} <bdi dir="ltr">{formatPace(r.bestPace)}/{r.unit === 'mi' ? 'mi' : 'km'}</bdi>
                           </>
                         )}
                       </p>

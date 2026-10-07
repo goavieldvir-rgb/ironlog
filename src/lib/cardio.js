@@ -67,13 +67,6 @@ export const formatSpeed = (v) => (isFinite(Number(v)) && Number(v) > 0 ? (Math.
 export const formatDistance = (v) => (Math.round(Number(v) * 100) / 100).toString()
 export const toKm = (distance, unit) => (unit === 'mi' ? distance * KM_PER_MI : distance)
 
-// "5:30 /km · 10.9 km/h", or '' when there's no distance.
-export function paceSpeedLabel(summary, unit) {
-  if (!summary || summary.pace == null) return ''
-  const u = unit === 'mi' ? 'mi' : 'km'
-  return `${formatPace(summary.pace)} /${u} · ${formatSpeed(summary.speed)} ${u === 'mi' ? 'mph' : 'km/h'}`
-}
-
 // ["40 min", "5 km", "6:00 /km", "10 km/h"] — the whole exercise at a glance.
 export function cardioTotalParts(summary, unit, minLabel) {
   if (!summary) return []
