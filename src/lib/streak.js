@@ -14,11 +14,14 @@ function mondayOf(dateISO) {
 // still gets its streak. `justSaved` is that workout's date; it isn't in
 // `sessions` yet.
 export function weeklyStreak(sessions, justSaved) {
+  // An empty or unreadable date must not reach the loop below (an invalid
+  // date never leaves the set, so it would spin forever).
+  if (!justSaved || Number.isNaN(new Date(justSaved + 'T00:00:00').getTime())) return 0
   const weeks = new Set((sessions || []).map((s) => mondayOf(s.date)))
   weeks.add(mondayOf(justSaved))
   let count = 0
   const d = new Date(mondayOf(justSaved) + 'T00:00:00')
-  while (weeks.has(toLocalISODate(d))) {
+  while (count < 520 && weeks.has(toLocalISODate(d))) {
     count += 1
     d.setDate(d.getDate() - 7)
   }
