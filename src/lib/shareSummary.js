@@ -47,6 +47,7 @@ export function bestSetText(entry, set, bwLabel) {
 export function buildSummary({ entries, personalBests = {}, routineName, date, durationMinutes, minLabel, bwLabel }) {
   let volume = 0
   let volumeUnit = null
+  let mixedVolumeUnits = false
   let setCount = 0
   let prCount = 0
   let cardioMinutes = 0
@@ -79,8 +80,12 @@ export function buildSummary({ entries, personalBests = {}, routineName, date, d
     if (!best) continue
     setCount += sets.filter((s) => num(s.weight) > 0 || num(s.reps) > 0).length
     if (!e.timed) {
-      for (const s of sets) volume += num(s.weight) * num(s.reps)
-      if (volume > 0 && !volumeUnit) volumeUnit = e.unit
+      const v = sets.reduce((sum, s) => sum + num(s.weight) * num(s.reps), 0)
+      if (v > 0) {
+        volume += v
+        if (volumeUnit && volumeUnit !== e.unit) mixedVolumeUnits = true
+        volumeUnit = volumeUnit || e.unit
+      }
     }
     const prev = e.exerciseId ? personalBests[e.exerciseId] : null
     const pr = prev != null && sets.some((s) => (prValue(e, s) || 0) > prev)
@@ -95,7 +100,8 @@ export function buildSummary({ entries, personalBests = {}, routineName, date, d
     rows,
     prCount,
     setCount,
-    volume: Math.round(volume),
+    // Kilos and pounds can't be added together, so a mixed workout shows no volume.
+    volume: mixedVolumeUnits ? 0 : Math.round(volume),
     volumeUnit: volumeUnit || 'kg',
     cardioMinutes: Math.round(cardioMinutes),
     cardioDistance: cardioDistance > 0 && cardioUnit !== 'mixed' ? cardioDistance : null,

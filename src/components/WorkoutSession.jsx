@@ -372,15 +372,23 @@ export default function WorkoutSession() {
   async function handleFinish() {
     setSaving(true)
     try {
-      const summaryData = buildSummary({
-        entries,
-        personalBests,
-        routineName: isFreestyle ? t('workout.freestyleSession') : routine?.name,
-        date,
-        durationMinutes: finalDuration(),
-        minLabel: t('sessionCard.minUnit'),
-        bwLabel: t('sessionCard.bwShort'),
-      })
+      // The recap is a bonus: if building it ever fails, saving carries on
+      // and we go to History exactly as before.
+      let summaryData = null
+      try {
+        summaryData = buildSummary({
+          entries,
+          personalBests,
+          routineName: isFreestyle ? t('workout.freestyleSession') : routine?.name,
+          date,
+          durationMinutes: finalDuration(),
+          minLabel: t('sessionCard.minUnit'),
+          bwLabel: t('sessionCard.bwShort'),
+        })
+        if (!summaryData.rows.length) summaryData = null
+      } catch (err) {
+        console.error(err)
+      }
       await logSession(effectiveUid, {
         routineId: isFreestyle ? null : routine?.id,
         routineName: isFreestyle ? t('workout.freestyleSession') : routine?.name,
@@ -406,7 +414,8 @@ export default function WorkoutSession() {
       setSaved(true)
       toast(t('workout.sessionSaved'))
       // Show the recap (with Share) instead of jumping straight to History.
-      setSummary(summaryData)
+      if (summaryData) setSummary(summaryData)
+      else navigate('/history')
     } catch (err) {
       console.error(err)
       // The draft is only cleared on success, so a failed save (usually
