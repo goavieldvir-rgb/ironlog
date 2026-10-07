@@ -3,7 +3,7 @@ import { Share2, Trophy, Check, ImagePlus, Copy, Download } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { Button, Card } from './ui.jsx'
-import { prepareCard, shareFile, loadPhoto, downloadFile, copyImage, canCopyImage } from '../lib/shareCard.js'
+import { prepareCard, shareFile, loadPhoto, downloadFile, copyImage, canCopyImage, isIOS } from '../lib/shareCard.js'
 
 const iso = (s) => `⁦${s}⁩`
 
@@ -118,10 +118,17 @@ export default function WorkoutDone({ summary, onDone }) {
     }
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!current) return
-    downloadFile(current.file)
-    toast(t('share.saved'))
+    try {
+      let result = 'downloaded'
+      if (isIOS()) result = await shareFile(current.file, {}) // share sheet -> Save Image -> Photos
+      else downloadFile(current.file)
+      if (result === 'downloaded') toast(t('share.saved'))
+    } catch (err) {
+      console.error(err)
+      toast(t('share.failed'), 'error')
+    }
   }
 
   const stats = [
@@ -236,8 +243,8 @@ export default function WorkoutDone({ summary, onDone }) {
       )}
 
       <div className="flex gap-3">
-        {!failed && (
-          <Button variant={variant === 'sticker' && canCopyImage() ? 'ghost' : 'brass'} className="flex-1" onClick={handleShare} disabled={busy || !current}>
+        {!failed && variant !== 'sticker' && (
+          <Button variant="brass" className="flex-1" onClick={handleShare} disabled={busy || !current}>
             <Share2 size={16} /> {busy || (!current && variant !== 'photo') ? t('share.sharing') : t('share.share')}
           </Button>
         )}

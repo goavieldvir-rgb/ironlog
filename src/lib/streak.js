@@ -8,14 +8,16 @@ function mondayOf(dateISO) {
   return toLocalISODate(d)
 }
 
-// Weeks in a row, ending with this week, that have at least one workout.
-// Matches the "week streak" tile on Stats; `justSaved` is the date of the
-// workout being saved right now, which isn't in `sessions` yet.
-export function weeklyStreak(sessions, justSaved, today = toLocalISODate()) {
+// Weeks in a row, ending with the week of the workout just saved, that have
+// at least one workout. Counting back from that workout's own week (not
+// "today") means a Sunday workout saved after midnight, or a backdated one,
+// still gets its streak. `justSaved` is that workout's date; it isn't in
+// `sessions` yet.
+export function weeklyStreak(sessions, justSaved) {
   const weeks = new Set((sessions || []).map((s) => mondayOf(s.date)))
-  if (justSaved) weeks.add(mondayOf(justSaved))
+  weeks.add(mondayOf(justSaved))
   let count = 0
-  const d = new Date(mondayOf(today) + 'T00:00:00')
+  const d = new Date(mondayOf(justSaved) + 'T00:00:00')
   while (weeks.has(toLocalISODate(d))) {
     count += 1
     d.setDate(d.getDate() - 7)

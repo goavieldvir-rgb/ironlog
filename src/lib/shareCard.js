@@ -50,7 +50,7 @@ function pickStats(summary, labels) {
   const dist = summary.cardioDistance != null ? Math.round(summary.cardioDistance * 100) / 100 : null
   const stats = {
     volume: summary.volume > 0 && { label: labels.volume, value: summary.volume.toLocaleString('en-US'), unit: summary.volumeUnit },
-    distance: dist != null && { label: labels.distance, value: String(dist), unit: summary.cardioUnit },
+    distance: dist > 0 && { label: labels.distance, value: String(dist), unit: summary.cardioUnit },
     duration: duration && { label: labels.duration, value: String(duration), unit: labels.min },
     sets: { label: labels.sets, value: String(summary.setCount), unit: '' },
     streak: summary.streakWeeks > 0 && { label: labels.streak, value: String(summary.streakWeeks), unit: labels.weekUnit },
@@ -186,10 +186,10 @@ export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo
     drawPhoto(ctx, photo)
     // Sits low, over the darker part of the gradient, clear of the bottom 250px.
     const look = { text: '#FFFFFF', dim: 'rgba(255,255,255,0.8)', accent: C.brass, line: 'rgba(255,255,255,0.4)', shadow: true }
-    drawBlock(ctx, summary, { rtl, labels, y: H - SAFE_BOTTOM - 70 - BLOCK_H, look })
+    drawBlock(ctx, summary, { rtl, labels, y: H - SAFE_BOTTOM - 100 - BLOCK_H, look })
     ctx.shadowColor = 'rgba(0,0,0,0.5)'
     ctx.shadowBlur = 12
-    drawBrand(ctx, H - SAFE_BOTTOM + 10, look)
+    drawBrand(ctx, H - SAFE_BOTTOM - 15, look)
     return canvas
   }
 
@@ -202,7 +202,7 @@ export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo
   ctx.fillStyle = glow
   ctx.fillRect(0, 0, W, H)
   drawBlock(ctx, summary, { rtl, labels, y: SAFE_TOP + (H - SAFE_TOP - SAFE_BOTTOM - BLOCK_H) / 2, look: light })
-  drawBrand(ctx, H - SAFE_BOTTOM - 10, light)
+  drawBrand(ctx, H - SAFE_BOTTOM - 15, light)
   return canvas
 }
 
@@ -268,6 +268,13 @@ export function downloadFile(file) {
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 10000)
 }
+
+// iPhone and iPad (newer iPads call themselves Macs but have a touch screen).
+// A downloaded picture lands in the Files app there, not in Photos, so Save
+// uses the share sheet instead, whose "Save Image" puts it in Photos.
+export const isIOS = () =>
+  typeof navigator !== 'undefined' &&
+  (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
 
 // Can this browser put a picture on the clipboard? (Not Firefox, for one.)
 export const canCopyImage = () =>
