@@ -72,25 +72,35 @@ export function FeedbackProvider({ children }) {
         </div>
       )}
 
+      {/* Success: big, green, top of the screen, nothing to tap (it never
+          blocks the header). Errors stay at the bottom with a close button. */}
+      <div
+        className="fixed inset-x-0 z-50 flex flex-col items-center gap-2 px-4 pointer-events-none"
+        style={{ top: 'calc(0.75rem + env(safe-area-inset-top, 0px))' }}
+        role="status"
+        aria-live="polite"
+      >
+        {toasts.filter((x) => x.tone !== 'error').map((x) => (
+          <div
+            key={x.id}
+            className="flex items-center justify-center gap-2.5 rounded-lg bg-green-800 text-white px-4 py-3 text-base font-medium w-full max-w-sm shadow-lg border border-green-600"
+          >
+            <CheckCircle2 size={22} className="shrink-0" />
+            <span>{x.message}</span>
+          </div>
+        ))}
+      </div>
+
       <div
         className="fixed inset-x-0 z-50 flex flex-col items-center gap-2 px-4 pointer-events-none"
         style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}
-        aria-live="polite"
+        role="alert"
       >
-        {toasts.map((x) => (
-          <div
-            key={x.id}
-            className={`pointer-events-auto card flex items-center gap-2 px-3.5 py-2.5 text-sm max-w-sm w-full shadow-lg ${
-              x.tone === 'error' ? 'border-iron text-chalk' : 'border-line text-chalk'
-            }`}
-          >
-            {x.tone === 'error' ? (
-              <AlertTriangle size={16} className="text-irontext shrink-0" />
-            ) : (
-              <CheckCircle2 size={16} className="text-good shrink-0" />
-            )}
+        {toasts.filter((x) => x.tone === 'error').map((x) => (
+          <div key={x.id} className="pointer-events-auto card flex items-center gap-2 px-3.5 py-2.5 text-sm max-w-sm w-full shadow-lg border-iron text-chalk">
+            <AlertTriangle size={16} className="text-irontext shrink-0" />
             <span className="flex-1">{x.message}</span>
-            <button onClick={() => setToasts((prev) => prev.filter((y) => y.id !== x.id))} className="text-chalkdim hover:text-chalk">
+            <button onClick={() => setToasts((prev) => prev.filter((y) => y.id !== x.id))} className="text-chalkdim hover:text-chalk" aria-label={t('common.cancel')}>
               <X size={14} />
             </button>
           </div>
