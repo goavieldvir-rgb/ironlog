@@ -20,6 +20,7 @@ import { disambiguateLabels } from '../lib/disambiguate.js'
 import { Card, EmptyState, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { workingSets } from '../lib/warmup.js'
+import { formatSeconds } from '../lib/timed.js'
 
 const COLORS = { iron: '#D64545', brass: '#C9A24B', cardio: '#4C8CC9', chalk: '#EDEDE6', chalkdim: '#9CA0AA', grid: '#31353E' }
 
@@ -62,7 +63,8 @@ export default function Stats() {
         for (const e of s.entries || []) {
           if (e.category === 'cardio') {
             cardioMinutes += (e.sets || []).reduce((sv, set) => sv + (Number(set.duration) || 0), 0)
-          } else {
+          } else if (!e.timed) {
+            // Holds have no weight × reps volume — their reps are seconds.
             volume += workingSets(e.sets).reduce((sv, set) => {
               const w = Number(set.weight)
               const r = Number(set.reps)
@@ -158,6 +160,7 @@ export default function Stats() {
             category: entry.category || 'strength',
             unit: entry.unit,
             bodyweight: !!entry.bodyweight,
+            timed: !!entry.timed,
             weight: Number(topSet.weight) || 0,
             reps: Number(topSet.reps),
             date: s.date,
@@ -165,7 +168,7 @@ export default function Stats() {
         }
 
         if (!progMap[entry.exerciseId]) {
-          progMap[entry.exerciseId] = { name: entry.name, category: entry.category, unit: entry.unit, bodyweight: !!entry.bodyweight, points: [] }
+          progMap[entry.exerciseId] = { name: entry.name, category: entry.category, unit: entry.unit, bodyweight: !!entry.bodyweight, timed: !!entry.timed, points: [] }
         }
         progMap[entry.exerciseId].points.push({
           date: s.date,
@@ -180,7 +183,7 @@ export default function Stats() {
       .map(([id, r]) => ({ id, ...r }))
       .sort((a, b) => a.name.localeCompare(b.name))
 
-    const exerciseOptions = Object.entries(progMap).map(([id, p]) => ({ id, name: p.name, category: p.category, unit: p.unit, bodyweight: p.bodyweight, intensityType: p.intensityType }))
+    const exerciseOptions = Object.entries(progMap).map(([id, p]) => ({ id, name: p.name, category: p.category, unit: p.unit, bodyweight: p.bodyweight, timed: p.timed, intensityType: p.intensityType }))
     exerciseOptions.sort((a, b) => a.name.localeCompare(b.name))
 
     // Sessions come back newest-first (needed elsewhere), but a progress
@@ -324,6 +327,7 @@ export default function Stats() {
                       labelStyle={{ color: COLORS.chalk }}
                       formatter={(value) => {
                         if (selectedProgress.category === 'cardio') return [`${value} min`, t('stats.duration')]
+                        if (selectedProgress.timed) return [formatSeconds(value), t('stats.longestHold')]
                         if (selectedProgress.bodyweight) return [`${value} reps`, t('stats.topSet')]
                         return [`${value}${selectedProgress.unit}`, t('stats.topSet')]
                       }}
@@ -346,7 +350,7 @@ export default function Stats() {
             )}
             {selectedProgress?.bodyweight && selectedProgress?.category !== 'cardio' && (
               <p className="text-chalkdim text-xs">
-                {t('stats.bodyweightTrackingNote')}
+                {selectedProgress.timed ? t('stats.timedTrackingNote') : t('stats.bodyweightTrackingNote')}
               </p>
             )}
           </Card>
@@ -369,6 +373,8 @@ export default function Stats() {
                           ? `${r.duration} ${t('sessionCard.minUnit')} · ${r.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe')} ${r.intensity}${
                               r.distance != null ? ` · ${r.distance}${r.unit}` : ''
                             }`
+                          : r.timed
+                            ? `${r.weight > 0 ? `+${r.weight}${r.unit} · ` : ''}${formatSeconds(r.reps)}`
                           : r.bodyweight
                             ? `${r.weight > 0 ? `+${r.weight}${r.unit} ` : ''}${t('sessionCard.bwShort')} × ${r.reps}`
                             : `${r.weight}${r.unit} × ${r.reps}`}

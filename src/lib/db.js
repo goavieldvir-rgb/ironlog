@@ -152,6 +152,9 @@ export async function addExercise(uid, exercise) {
       notes: exercise.notes || '',
       unit: exercise.unit || 'kg', // weight unit, or distance unit (km/mi) for cardio
       bodyweight: !!exercise.bodyweight,
+      // Only sent when on, so adding a normal exercise works even before the
+      // `timed` column exists in Supabase.
+      ...(exercise.timed ? { timed: true } : {}),
       intensity_type: exercise.intensityType || 'rpe', // 'rpe' | 'hr_zone', cardio only
       track_rir: !!exercise.trackRir, // strength/bodyweight only — reps in reserve per set
     })
@@ -169,6 +172,7 @@ export async function updateExercise(uid, id, patch) {
   if (patch.notes !== undefined) row.notes = patch.notes
   if (patch.unit !== undefined) row.unit = patch.unit
   if (patch.bodyweight !== undefined) row.bodyweight = patch.bodyweight
+  if (patch.timed !== undefined) row.timed = patch.timed
   if (patch.intensityType !== undefined) row.intensity_type = patch.intensityType
   if (patch.trackRir !== undefined) row.track_rir = patch.trackRir
   const { error } = await supabase.from('exercises').update(row).eq('id', id).eq('user_id', uid)
@@ -226,6 +230,7 @@ export async function copyRoutineToUser(targetUid, routine) {
         category,
         unit: src?.unit || it.unit,
         bodyweight: src?.bodyweight ?? it.bodyweight,
+        timed: src?.timed ?? it.timed,
         intensityType: src?.intensity_type || it.intensityType,
         trackRir: src?.track_rir,
         videoUrl: src?.video_url || it.videoUrl || '',

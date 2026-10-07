@@ -111,7 +111,7 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="truncate min-w-0">{filteredLabels[i]}</span>
                   <CategoryTag category={g.category} />
-                  {g.bodyweight && g.category !== 'cardio' && <Badge tone="brass">{t('sessionCard.bwShort')}</Badge>}
+                  {g.bodyweight && !g.timed && g.category !== 'cardio' && <Badge tone="brass">{t('sessionCard.bwShort')}</Badge>}
                 </div>
                 <button
                   onClick={() => !already && handleAdd(g)}

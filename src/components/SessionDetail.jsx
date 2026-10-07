@@ -9,6 +9,7 @@ import { useCollection, updateTrainerComment } from '../lib/db.js'
 import { Card, CategoryTag, Badge, Button } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { isWarmup } from '../lib/warmup.js'
+import { formatSeconds } from '../lib/timed.js'
 
 function formatDate(iso) {
   if (!iso) return ''
@@ -21,6 +22,10 @@ function formatSet(entry, s, t) {
     const intensityLabel = entry.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe')
     const dist = s.distance !== '' && s.distance != null ? ` · ${s.distance}${entry.unit}` : ''
     return `${s.duration || 0} ${t('sessionCard.minUnit')} · ${intensityLabel} ${s.intensity || 0}${dist}`
+  }
+  if (entry.timed) {
+    const added = Number(s.weight) > 0 ? `+${s.weight}${entry.unit} · ` : ''
+    return `${added}${formatSeconds(s.reps) || '0s'}`
   }
   if (entry.bodyweight) {
     const added = Number(s.weight) > 0 ? `+${s.weight}${entry.unit} ` : ''
@@ -78,7 +83,7 @@ export default function SessionDetail() {
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-lg">{entry.name}</h2>
               {entry.category === 'cardio' && <Badge tone="cardio">{t('sessionCard.cardioBadge')}</Badge>}
-              {entry.category !== 'cardio' && entry.bodyweight && <Badge tone="brass">{t('sessionCard.bodyweightBadge')}</Badge>}
+              {entry.category !== 'cardio' && entry.timed ? <Badge tone="brass">{t('exercises.timedBadge')}</Badge> : entry.category !== 'cardio' && entry.bodyweight && <Badge tone="brass">{t('sessionCard.bodyweightBadge')}</Badge>}
             </div>
             {entry.videoUrl && (
               <a

@@ -9,6 +9,7 @@ import { Button, Card, CategoryTag, Badge, EmptyState, Field } from './ui.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
+import { formatSeconds } from '../lib/timed.js'
 
 export const emptyExerciseForm = {
   name: '',
@@ -17,6 +18,7 @@ export const emptyExerciseForm = {
   notes: '',
   unit: 'kg',
   bodyweight: false,
+  timed: false,
   intensityType: 'rpe',
   trackRir: false,
 }
@@ -27,6 +29,10 @@ function formatLast(ex, t) {
     const dist = ex.last_distance != null ? ` · ${ex.last_distance}${ex.unit}` : ''
     const intensityLabel = ex.intensity_type === 'hr_zone' ? `${t('exercises.hrZone')} ${ex.last_reps}` : `${t('exercises.rpe')} ${ex.last_reps}`
     return `${t('exercises.lastPrefix')} ${ex.last_weight} min · ${intensityLabel}${dist}`
+  }
+  if (ex.timed) {
+    const added = Number(ex.last_weight) > 0 ? `+${ex.last_weight}${ex.unit} · ` : ''
+    return `${t('exercises.lastPrefix')} ${added}${formatSeconds(ex.last_reps)}`
   }
   if (ex.bodyweight) {
     const added = Number(ex.last_weight) > 0 ? `+${ex.last_weight}${ex.unit} ` : ''
@@ -134,7 +140,7 @@ export default function ExerciseLibrary() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-lg leading-tight">{(lang === 'he' && ex.name_he) || ex.name}</h2>
                   <CategoryTag category={ex.category} />
-                  {ex.bodyweight && ex.category !== 'cardio' && <Badge tone="brass">{t('exercises.bodyweightBadge')}</Badge>}
+                  {ex.timed && ex.category !== 'cardio' ? <Badge tone="brass">{t('exercises.timedBadge')}</Badge> : ex.bodyweight && ex.category !== 'cardio' && <Badge tone="brass">{t('exercises.bodyweightBadge')}</Badge>}
                   {ex.category === 'cardio' && (
                     <Badge tone="cardio">{ex.intensity_type === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe')}</Badge>
                   )}
@@ -183,6 +189,7 @@ export default function ExerciseLibrary() {
               category: g.category,
               unit: g.unit,
               bodyweight: g.bodyweight,
+              timed: g.timed,
               intensityType: g.intensity_type,
               videoUrl: '',
               notes: '',
@@ -228,6 +235,7 @@ export default function ExerciseLibrary() {
               category: currentForm.category,
               unit: currentForm.unit,
               bodyweight: currentForm.bodyweight,
+              timed: !!currentForm.timed,
               intensityType: currentForm.intensityType,
               trackRir: currentForm.trackRir,
             })
@@ -301,10 +309,17 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
 
     setSaving(true)
     try {
-      await onSave({ ...form, name: cleanName, videoUrl: normalizeVideoUrl(form.videoUrl) })
+      const data = { ...form, name: cleanName, videoUrl: normalizeVideoUrl(form.videoUrl) }
+      // Leave `timed` out unless it matters, so saving an ordinary exercise
+      // never touches a column that may not exist yet.
+      if (!form.timed && !initial.timed) delete data.timed
+      await onSave(data)
     } catch (err) {
       console.error(err)
-      toast(t('feedback.saveFailed'), 'error')
+      // The "timed" column is added in Supabase once; until then only the
+      // save that turns timed on can fail, and it says why.
+      const missingColumn = /timed/i.test(`${err?.message || ''} ${err?.details || ''}`)
+      toast(missingColumn ? t('exercises.timedNeedsSetup') : t('feedback.saveFailed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -371,17 +386,23 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
                 }
               >
                 <select
-                  value={form.bodyweight ? 'bodyweight' : form.unit}
-                  disabled={locked}
+                  value={form.timed ? 'timed' : form.bodyweight ? 'bodyweight' : form.unit}
+                  // An exercise with history stays locked, except that a
+                  // bodyweight move can be flipped to a timed hold and back:
+                  // both store the same numbers (the main one is just labelled
+                  // seconds instead of reps).
+                  disabled={locked && !form.bodyweight}
                   onChange={(e) => {
                     const v = e.target.value
-                    if (v === 'bodyweight') setForm({ ...form, bodyweight: true })
-                    else setForm({ ...form, bodyweight: false, unit: v })
+                    if (v === 'timed') setForm({ ...form, bodyweight: true, timed: true })
+                    else if (v === 'bodyweight') setForm({ ...form, bodyweight: true, timed: false })
+                    else setForm({ ...form, bodyweight: false, timed: false, unit: v })
                   }}
                 >
-                  <option value="kg">{t('exercises.optKg')}</option>
-                  <option value="lb">{t('exercises.optLb')}</option>
+                  {!(locked && form.bodyweight) && <option value="kg">{t('exercises.optKg')}</option>}
+                  {!(locked && form.bodyweight) && <option value="lb">{t('exercises.optLb')}</option>}
                   <option value="bodyweight">{t('exercises.optBodyweight')}</option>
+                  <option value="timed">{t('exercises.optTimed')}</option>
                 </select>
               </Field>
 

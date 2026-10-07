@@ -8,6 +8,7 @@ import { toLocalISODate } from '../lib/dates.js'
 import { Button, Card, EmptyState, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { isWarmup, workingSets } from '../lib/warmup.js'
+import { formatSeconds } from '../lib/timed.js'
 
 function mondayOf(d) {
   const date = new Date(d)
@@ -82,6 +83,10 @@ function formatSet(entry, s, t) {
     const dist = s.distance !== '' && s.distance != null ? ` · ${s.distance}${entry.unit}` : ''
     return `${s.duration || 0}min·${intensityLabel}${s.intensity || 0}${dist}`
   }
+  if (entry.timed) {
+    const added = Number(s.weight) > 0 ? `+${s.weight}${entry.unit} ` : ''
+    return `${added}${formatSeconds(s.reps) || '0s'}`
+  }
   if (entry.bodyweight) {
     const added = Number(s.weight) > 0 ? `+${s.weight}${entry.unit} ` : ''
     return `${added}${t('sessionCard.bwShort')}×${s.reps || 0}`
@@ -143,7 +148,7 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t }
   const totalSets = sessions.reduce((n, s) => n + (s.entries || []).reduce((m, e) => m + workingSets(e.sets).length, 0), 0)
   const totalVolume = sessions.reduce((sum, s) => {
     const v = (s.entries || []).reduce((eSum, e) => {
-      if (e.category === 'cardio') return eSum
+      if (e.category === 'cardio' || e.timed) return eSum
       return (
         eSum +
         workingSets(e.sets).reduce((sv, set) => {

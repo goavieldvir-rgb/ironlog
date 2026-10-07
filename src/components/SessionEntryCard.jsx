@@ -5,6 +5,7 @@ import { InfoTip } from './InfoTip.jsx'
 import OverflowMenu from './OverflowMenu.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { isWarmup, workingSets, suggestWarmups } from '../lib/warmup.js'
+import { formatSeconds } from '../lib/timed.js'
 
 function Stepper({ value, onChange, step, min = 0, max, label, placeholder, bare }) {
   const holdRef = useRef(null)
@@ -121,6 +122,9 @@ export default function SessionEntryCard({
   // Index of the set that numbers were just filled into, so it can flash.
   const [justFilled, setJustFilled] = useState(null)
   const isCardio = entry.category === 'cardio'
+  // Timed holds (plank, wall sit) are bodyweight-style sets whose "reps"
+  // field holds seconds, so everything else about them carries over.
+  const isTimed = !isCardio && !!entry.timed
   const weightStep = entry.unit === 'lb' ? 5 : 2.5
   const intensityMax = entry.intensityType === 'hr_zone' ? 5 : 10
   const intensityLabel = entry.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe')
@@ -201,7 +205,7 @@ export default function SessionEntryCard({
   function addWarmups() {
     onAddWarmups(warmupSuggestion.map((w) => ({ weight: String(w.weight), reps: String(w.reps), rir: '', warmup: true })))
   }
-  const prUnit = isCardio ? t('sessionCard.minUnit') : entry.bodyweight ? t('sessionCard.reps') : entry.unit
+  const prUnit = isCardio ? t('sessionCard.minUnit') : isTimed ? 's' : entry.bodyweight ? t('sessionCard.reps') : entry.unit
 
   // A short buzz the first moment a set crosses the old best, so it lands
   // while you're still holding the phone. Fires once per exercise.
@@ -269,6 +273,10 @@ export default function SessionEntryCard({
       return `${data.duration} ${t('sessionCard.minUnit')} · ${intensityLabel} ${data.intensity}${dist}`
     }
     const rirPart = showRir && data.rir != null && data.rir !== '' ? ` · RIR ${data.rir}` : ''
+    if (isTimed) {
+      const added = Number(data.weight) > 0 ? `+${data.weight}${entry.unit} · ` : ''
+      return `${added}${formatSeconds(data.reps)}${rirPart}`
+    }
     return `${data.weight}${entry.unit} × ${data.reps}${rirPart}`
   }
 
@@ -277,6 +285,10 @@ export default function SessionEntryCard({
     if (isCardio) {
       const dist = lastDistance != null ? ` · ${lastDistance}${distanceUnit}` : ''
       return `${t('sessionCard.previously')} ${lastWeight} ${t('sessionCard.minUnit')} · ${intensityLabel} ${lastReps}${dist}`
+    }
+    if (isTimed) {
+      const added = Number(lastWeight) > 0 ? `+${lastWeight}${entry.unit} · ` : ''
+      return `${t('sessionCard.previously')} ${added}${formatSeconds(lastReps)}`
     }
     if (entry.bodyweight) {
       const added = Number(lastWeight) > 0 ? `+${lastWeight}${entry.unit} ` : ''
@@ -301,7 +313,8 @@ export default function SessionEntryCard({
               </span>
             )}
             {isCardio && <Badge tone="cardio">{t('sessionCard.cardioBadge')}</Badge>}
-            {!isCardio && entry.bodyweight && <Badge tone="brass">{t('sessionCard.bodyweightBadge')}</Badge>}
+            {isTimed && <Badge tone="brass">{t('exercises.timedBadge')}</Badge>}
+            {!isCardio && !isTimed && entry.bodyweight && <Badge tone="brass">{t('sessionCard.bodyweightBadge')}</Badge>}
             {/* Next to the name rather than in the icon row: sitting among
                 the icons it made that row so wide on a phone that the name,
                 "Previously" and the last note were squeezed into a narrow
@@ -464,7 +477,7 @@ export default function SessionEntryCard({
               <span className="truncate">
                 {entry.bodyweight ? `+${t('sessionCard.wt')} (${entry.unit}) ${t('sessionCard.opt')}` : `${t('sessionCard.wt')} (${entry.unit})`}
               </span>
-              <span>{t('sessionCard.reps')}</span>
+              <span>{isTimed ? t('sessionCard.seconds') : t('sessionCard.reps')}</span>
               {showRir && (
                 <span className="inline-flex items-center gap-0.5">
                   {t('sessionCard.rir')} <InfoTip text={t('sessionCard.rirTip')} />
@@ -488,7 +501,7 @@ export default function SessionEntryCard({
                   {setLabels[j]}
                 </button>
                 <Stepper bare={showRir} value={s.weight} step={weightStep} placeholder={prev(j, 'weight', lastWeight)} onChange={(v) => onUpdateSet(j, { weight: v })} label={`${t('sessionCard.set')} ${setLabels[j]} ${t('sessionCard.wt')} (${entry.unit})`} />
-                <Stepper bare={showRir} value={s.reps} step={1} placeholder={prev(j, 'reps', lastReps)} onChange={(v) => onUpdateSet(j, { reps: v })} label={`${t('sessionCard.set')} ${setLabels[j]} ${t('sessionCard.reps')}`} />
+                <Stepper bare={showRir} value={s.reps} step={isTimed ? 5 : 1} placeholder={prev(j, 'reps', lastReps)} onChange={(v) => onUpdateSet(j, { reps: v })} label={`${t('sessionCard.set')} ${setLabels[j]} ${isTimed ? t('sessionCard.seconds') : t('sessionCard.reps')}`} />
                 {showRir && (
                   <div className={thirdCell}>
                     <div>
