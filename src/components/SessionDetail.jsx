@@ -1,3 +1,4 @@
+import { safeVideoUrl } from '../lib/url.js'
 import React, { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Play, Pencil, MessageSquareText, Check } from 'lucide-react'
@@ -94,9 +95,9 @@ export default function SessionDetail() {
               {entry.category === 'cardio' && <Badge tone="cardio">{t('sessionCard.cardioBadge')}</Badge>}
               {entry.category !== 'cardio' && entry.timed ? <Badge tone="brass">{t('exercises.timedBadge')}</Badge> : entry.category !== 'cardio' && entry.bodyweight && <Badge tone="brass">{t('sessionCard.bodyweightBadge')}</Badge>}
             </div>
-            {entry.videoUrl && (
+            {safeVideoUrl(entry.videoUrl) && (
               <a
-                href={entry.videoUrl}
+                href={safeVideoUrl(entry.videoUrl)}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 text-xs text-brass hover:underline"

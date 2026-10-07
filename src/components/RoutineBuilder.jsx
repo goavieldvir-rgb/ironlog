@@ -9,7 +9,7 @@ import { useCollection, addRoutine, updateRoutine, addExercise, updateExercise }
 import { Button, Card, Field } from './ui.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
 import ExerciseSelect from './ExerciseSelect.jsx'
-import { normalizeVideoUrl } from '../lib/url.js'
+import { normalizeVideoUrl, safeVideoUrl } from '../lib/url.js'
 import { ExerciseModal, emptyExerciseForm } from './ExerciseLibrary.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { disambiguateLabels } from '../lib/disambiguate.js'
@@ -362,8 +362,8 @@ export default function RoutineBuilder() {
                 className="w-full"
               />
             </Field>
-            {normalizeVideoUrl(videoUrl) && (
-              <a href={normalizeVideoUrl(videoUrl)} target="_blank" rel="noreferrer" className="text-brass text-sm hover:underline mt-2 inline-block">
+            {safeVideoUrl(normalizeVideoUrl(videoUrl)) && (
+              <a href={safeVideoUrl(normalizeVideoUrl(videoUrl))} target="_blank" rel="noreferrer" className="text-brass text-sm hover:underline mt-2 inline-block">
                 {t('routines.videoPreview')}
               </a>
             )}
