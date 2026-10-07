@@ -35,11 +35,12 @@ create trigger protect_admin_flag_trg
   before insert or update on profiles
   for each row execute function protect_admin_flag();
 
--- ---------- check whether anyone already used the hole ----------
--- Run this too. It lists everyone currently marked admin. Only you (and any
--- coach you chose) should be on it.
-select id, email, full_name, is_admin, created_at from profiles where is_admin;
-
--- If someone is on that list who should not be, remove them (put their
--- email in; run only this line):
+-- ---------- STEP 2 (run separately, after step 1 says Success) ----------
+-- The hole may already have been used, so check who is marked admin. Paste
+-- ONLY the line below into a new query (not together with step 1, so a
+-- problem here can never undo the fix above). Only you, and any coach you
+-- chose, should be listed.
+--   select id, email, full_name, is_admin, created_at from profiles where is_admin;
+--
+-- If someone is listed who should not be, remove them (put their email in):
 --   update public.profiles set is_admin = false where email = 'their@email';
