@@ -54,11 +54,11 @@ create trigger protect_admin_flag_trg
 -- inside. That lets a stranger send the admin any email or phone alert from
 -- Ironlog. The database's own triggers and the daily cron job run as the
 -- owner (postgres), which keeps access, so nothing in the app changes.
--- (is_admin() and delete_my_account() are left alone on purpose.)
+-- (is_admin() and delete_my_account() are left alone on purpose. The trigger
+-- functions can't be called through the API, so they need no change.)
+-- Note: new functions in the public schema are callable by anyone by default,
+-- so any new security definer function needs the same revoke.
 --
 -- revoke execute on function public.send_admin_email(text, text) from public, anon, authenticated;
 -- revoke execute on function public.send_admin_push(text, text) from public, anon, authenticated;
 -- revoke execute on function public.check_inactive_trainees() from public, anon, authenticated;
--- revoke execute on function public.check_for_new_prs() from public, anon, authenticated;
--- revoke execute on function public.protect_admin_flag() from public, anon, authenticated;
--- revoke execute on function public.handle_new_user() from public, anon, authenticated;
