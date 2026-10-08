@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Play, X } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -70,18 +70,94 @@ function VideoModal({ video, name, onClose }) {
         </div>
         {/* Same 16:9 frame for every exercise. */}
         <div className="relative w-full aspect-video rounded-md overflow-hidden bg-black" dir="ltr">
-          <iframe
-            className="absolute inset-0 w-full h-full border-0"
-            src={youtubeEmbedUrl(video.id, { start: video.start, end: video.end })}
-            title={t('sessionCard.exampleOf', { name })}
-            allow="autoplay; encrypted-media; picture-in-picture"
-            allowFullScreen
-            referrerPolicy="strict-origin-when-cross-origin"
-            loading="lazy"
-          />
+          <LoopingClip video={video} title={t('sessionCard.exampleOf', { name })} />
         </div>
       </div>
     </div>,
     document.body,
   )
+}
+
+// YouTube's own loop setting always jumps back to 0:00, ignoring the start
+// time, so a clip trimmed to just the movement would replay any intro on
+// every pass. Driving the player through YouTube's iframe API lets us send
+// it back to the clip's start ourselves when it reaches its end.
+let apiPromise = null
+function loadYouTubeApi() {
+  if (window.YT?.Player) return Promise.resolve(window.YT)
+  if (!apiPromise) {
+    apiPromise = new Promise((resolve, reject) => {
+      const prev = window.onYouTubeIframeAPIReady
+      window.onYouTubeIframeAPIReady = () => {
+        prev?.()
+        resolve(window.YT)
+      }
+      const tag = document.createElement('script')
+      tag.src = 'https://www.youtube.com/iframe_api'
+      tag.onerror = () => {
+        apiPromise = null
+        reject(new Error('YouTube player failed to load'))
+      }
+      document.head.appendChild(tag)
+    })
+  }
+  return apiPromise
+}
+
+function LoopingClip({ video, title }) {
+  const box = useRef(null)
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    let player = null
+    let cancelled = false
+    const start = Number.isFinite(video.start) && video.start > 0 ? Math.floor(video.start) : 0
+    const end = Number.isFinite(video.end) && video.end > start ? Math.floor(video.end) : undefined
+    loadYouTubeApi()
+      .then((YT) => {
+        if (cancelled || !box.current) return
+        // The player swaps this node for its iframe, so it's created here
+        // rather than by React, which would otherwise lose track of it.
+        const el = document.createElement('div')
+        box.current.appendChild(el)
+        player = new YT.Player(el, {
+          host: 'https://www.youtube-nocookie.com',
+          videoId: video.id,
+          playerVars: { autoplay: 1, mute: 1, playsinline: 1, rel: 0, modestbranding: 1, start, end },
+          events: {
+            onReady: (e) => {
+              e.target.getIframe()?.setAttribute('title', title)
+              e.target.mute()
+              e.target.playVideo()
+            },
+            onStateChange: (e) => {
+              if (e.data === YT.PlayerState.ENDED) {
+                // loadVideoById keeps the end time; seekTo alone would not.
+                e.target.loadVideoById({ videoId: video.id, startSeconds: start, endSeconds: end })
+              }
+            },
+          },
+        })
+      })
+      .catch(() => !cancelled && setFailed(true))
+    return () => {
+      cancelled = true
+      player?.destroy?.()
+      if (box.current) box.current.textContent = ''
+    }
+  }, [video.id, video.start, video.end, title])
+  // If the iframe API can't load, fall back to a plain embed: it still
+  // plays and loops, just from 0:00.
+  if (failed) {
+    return (
+      <iframe
+        className="absolute inset-0 w-full h-full border-0"
+        src={youtubeEmbedUrl(video.id, { start: video.start, end: video.end })}
+        title={title}
+        allow="autoplay; encrypted-media; picture-in-picture"
+        allowFullScreen
+        referrerPolicy="strict-origin-when-cross-origin"
+      />
+    )
+  }
+  return <div ref={box} className="absolute inset-0 [&>iframe]:w-full [&>iframe]:h-full [&>iframe]:border-0" />
 }

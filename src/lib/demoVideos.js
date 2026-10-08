@@ -6,74 +6,73 @@ import { safeVideoUrl } from './url.js'
 // library onto those keys. An entry with an empty id is "not filled in
 // yet" and is treated as no demo at all.
 //   { id: 'YOUTUBE_ID', start?: seconds, end?: seconds }
-const e = () => ({ id: '' })
 
 export const DEMO_VIDEOS = {
-  bench_press: e(),
-  incline_bench_press: e(),
-  incline_dumbbell_press: e(),
-  incline_smith_press: e(),
-  chest_press_machine: e(),
-  cable_chest_press: e(),
-  cable_fly: e(),
-  pec_deck: e(),
-  push_up: e(),
-  scapular_push_up: e(),
-  dips: e(),
-  bench_dips: e(),
-  assisted_dips: e(),
-  pull_up: e(),
-  weighted_pull_up: e(),
-  assisted_pull_up: e(),
-  lat_pulldown: e(),
-  wide_grip_lat_pulldown: e(),
-  close_grip_lat_pulldown: e(),
-  single_arm_lat_pulldown: e(),
-  seated_cable_row: e(),
-  chest_supported_row: e(),
-  t_bar_row: e(),
-  dumbbell_row: e(),
-  machine_single_arm_row: e(),
-  back_extension: e(),
-  romanian_deadlift: e(),
-  leg_press: e(),
-  hack_squat: e(),
-  leg_extension: e(),
-  leg_curl: e(),
-  seated_leg_curl: e(),
-  adductor_machine: e(),
-  calf_raise: e(),
-  split_squat: e(),
-  static_lunge: e(),
-  step_down: e(),
-  captains_chair_leg_raise: e(),
-  wall_slide: e(),
-  barbell_curl: e(),
-  dumbbell_curl: e(),
-  seated_dumbbell_curl: e(),
-  cable_curl: e(),
-  ez_bar_curl: e(),
-  hammer_curl: e(),
-  preacher_curl: e(),
-  concentration_curl: e(),
-  tricep_pushdown: e(),
-  overhead_tricep_extension: e(),
-  cable_overhead_tricep_extension: e(),
-  lateral_raise: e(),
-  cable_lateral_raise: e(),
-  machine_lateral_raise: e(),
-  rear_delt_fly: e(),
-  arnold_press: e(),
-  seated_dumbbell_shoulder_press: e(),
-  machine_shoulder_press: e(),
-  cable_crunch: e(),
-  hanging_leg_raise: e(),
-  plank: e(),
-  ab_wheel_rollout: e(),
-  treadmill: e(),
-  elliptical: e(),
-  assault_bike: e(),
-  jump_rope: e(),
+  bench_press: { id: 'rT7DgCr-3pg' }, // ScottHermanFitness
+  incline_bench_press: { id: 'SrqOu55lrYU' }, // ScottHermanFitness
+  incline_dumbbell_press: { id: 'hChjZQhX1Ls' }, // ScottHermanFitness
+  incline_smith_press: { id: 'pd2fnOrggI8' }, // MyTraining App
+  chest_press_machine: { id: 'ksTNcvc6sKs' }, // Rehab My Patient
+  cable_chest_press: { id: 'N2RB0Qvab7o' }, // Live Lean TV Daily Exercises
+  cable_fly: { id: '8Um35Es-ROE' }, // ScottHermanFitness
+  pec_deck: { id: '-DZXcuPi4vk' }, // Live Lean TV Daily Exercises
+  push_up: { id: 'vh72hbUqqfs' }, // ScottHermanFitness
+  scapular_push_up: { id: 'Ng-iiDUd_fs' }, // SaturnoMovement
+  dips: { id: '8UugSoVJLag' }, // ScottHermanFitness
+  bench_dips: { id: 'n6F4t5PHEmM' }, // Rachel Scheer
+  assisted_dips: { id: 'kbmVlw-i0Vs' }, // Travis Tarrant
+  pull_up: { id: 'ylVmNQlKdAI' }, // ScottHermanFitness
+  weighted_pull_up: { id: 'ylVmNQlKdAI' }, // ScottHermanFitness
+  assisted_pull_up: { id: 'gnElpp3Fm50' }, // All Strong Fitness
+  lat_pulldown: { id: 'CAwf7n6Luuc' }, // ScottHermanFitness
+  wide_grip_lat_pulldown: { id: '7JnP8dFbS14' }, // PureGym
+  close_grip_lat_pulldown: { id: 'IjoFCmLX7z0' }, // PureGym
+  single_arm_lat_pulldown: { id: 'nav4bUA3QZM' }, // Live Lean TV Daily Exercises
+  seated_cable_row: { id: 'GZbfZ033f74' }, // ScottHermanFitness
+  chest_supported_row: { id: 'QpLTp2AJ_cI' }, // Fox Body Fitness
+  t_bar_row: { id: 'j3Igk5nyZE4' }, // ScottHermanFitness
+  dumbbell_row: { id: 'sUqz6oaISkQ' }, // ScottHermanFitness
+  machine_single_arm_row: { id: '0GDPa0w2_k0' }, // Fitness Lab
+  back_extension: { id: 'CgbmrF-DRSE' }, // Enterprise Fitness
+  romanian_deadlift: { id: '2SHsk9AzdjA' }, // Buff Dudes
+  leg_press: { id: 'IZxyjW7MPJQ' }, // ScottHermanFitness
+  hack_squat: { id: 'plv5ur26Q7A' }, // Bodybuilding.com
+  leg_extension: { id: 'gI0cn4DMFFI' }, // Live Lean TV Daily Exercises
+  leg_curl: { id: '5Uvvd6NsCyU' }, // Live Lean TV Daily Exercises
+  seated_leg_curl: { id: 'jq03iefZxjc' }, // PartnerMD
+  adductor_machine: { id: 'fpVHoidfg60' }, // Live Lean TV Daily Exercises
+  calf_raise: { id: '3UWi44yN-wM' }, // ScottHermanFitness
+  split_squat: { id: '2C-uNgKwPLE' }, // ScottHermanFitness
+  static_lunge: { id: 'T2s9nByxqvk' }, // Get Healthy U - with Chris Freytag
+  step_down: { id: 'Or4C-UQ63Xc' }, // Dr. Carl Baird
+  captains_chair_leg_raise: { id: '7KDDZtaUaxw' }, // Live Lean TV Daily Exercises
+  wall_slide: { id: 'D351y9ecIwc' }, // MGHOrthopaedics
+  barbell_curl: { id: 'QZEqB6wUPxQ' }, // ScottHermanFitness
+  dumbbell_curl: { id: 'w7hl4IbHMtY' }, // Live Lean TV Daily Exercises
+  seated_dumbbell_curl: { id: 's9GGVuUXgmY' }, // Live Lean TV Daily Exercises
+  cable_curl: { id: '_hRnRorKRWs' }, // Live Lean TV Daily Exercises
+  ez_bar_curl: { id: 'wGi7k6JGs1k' }, // No Pain Project
+  hammer_curl: { id: 'zC3nLlEvin4' }, // ScottHermanFitness
+  preacher_curl: { id: 'RgN216Cumtw' }, // Bodybuilding.com
+  concentration_curl: { id: 'ZcU2hN76UyA' }, // Bodybuilding.com
+  tricep_pushdown: { id: '2-LAMcpzODU' }, // ScottHermanFitness
+  overhead_tricep_extension: { id: 'YbX7Wd8jQ-Q' }, // ScottHermanFitness
+  cable_overhead_tricep_extension: { id: 'mRozZKkGIfg' }, // Bodybuilding.com
+  lateral_raise: { id: 'XPPfnSEATJA' }, // National Academy of Sports Medicine (NASM)
+  cable_lateral_raise: { id: 'Z9KwFXXxkKQ' }, // Live Lean TV Daily Exercises
+  machine_lateral_raise: { id: 'dTwa2piwU-A' }, // Live Lean TV Daily Exercises
+  rear_delt_fly: { id: 'hmtnyIGgR9A' }, // Ignore Limits
+  arnold_press: { id: 'ZsVxV2dV5YU' }, // Live Lean TV Daily Exercises
+  seated_dumbbell_shoulder_press: { id: '8kwDkC8JhdY' }, // Live Lean TV Daily Exercises
+  machine_shoulder_press: { id: 'Anu8s_nkNpM' }, // Live Lean TV Daily Exercises
+  cable_crunch: { id: 'kc0PRn372lo' }, // Live Lean TV Daily Exercises
+  hanging_leg_raise: { id: 'Nw0LOKe3_l8' }, // Bodybuilding.com
+  plank: { id: 'pvIjsG5Svck' }, // Children's Hospital Colorado
+  ab_wheel_rollout: { id: 'trOxwfSlFFo' }, // Tom Houpt
+  treadmill: { id: '76XnbF5DBFY' }, // Global Triathlon Network
+  elliptical: { id: 'mNM01g9wLy4' }, // LIVESTRONG
+  assault_bike: { id: 'RPY7HTGfOiU' }, // Peak Human Performance
+  jump_rope: { id: 'Y3wzaWE9QRY' }, // Karina Inkster
 }
 
 // Lowercase, trimmed, single-spaced, with hyphens and en/em dashes read as

@@ -166,7 +166,6 @@ export default function WorkoutSession() {
             return {
               exerciseId: it.exerciseId,
               name: (lang === 'he' && full?.name_he) || full?.name || it.name,
-            nameEn: full?.name || it.name,
               nameEn: full?.name || it.name,
               unit: it.unit,
               category: 'cardio',
@@ -252,7 +251,6 @@ export default function WorkoutSession() {
       return {
         exerciseId: ex.id,
         name: (lang === 'he' && ex.name_he) || ex.name,
-      nameEn: ex.name,
         nameEn: ex.name,
         unit: ex.unit,
         category: 'cardio',
