@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ExternalLink, Play, Volume2, VolumeX, X } from 'lucide-react'
+import { Play, Volume2, VolumeX, X } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { resolveExerciseVideo, youtubeEmbedUrl } from '../lib/demoVideos.js'
@@ -117,8 +117,8 @@ function VideoModal({ video, name, onClose }) {
         </div>
         {/* Fixed height so the modal doesn't shift when the button appears
             once the player is ready (or never does, in the fallbacks). */}
-        <div className="flex items-center justify-between gap-2 mt-1 min-h-[44px]">
-          {ready ? (
+        <div className="flex items-center gap-2 mt-1 min-h-[44px]">
+          {ready && (
             <button
               type="button"
               onClick={toggleSound}
@@ -127,19 +127,7 @@ function VideoModal({ video, name, onClose }) {
               {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
               {soundOn ? t('sessionCard.soundOff') : t('sessionCard.soundOn')}
             </button>
-          ) : (
-            <span />
           )}
-          {/* A way out when a clip won't play here (removed, or its owner
-              blocks embedding), and the full video with chapters. */}
-          <a
-            href={watchUrl(video)}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 min-h-[44px] -me-1 px-1 text-sm text-brass"
-          >
-            <ExternalLink size={16} /> {t('sessionCard.openOnYouTube')}
-          </a>
         </div>
       </div>
     </div>,
@@ -170,11 +158,6 @@ function loadYouTubeApi() {
     })
   }
   return apiPromise
-}
-
-function watchUrl({ id, start }) {
-  const t = Number.isFinite(start) && start > 0 ? `&t=${Math.floor(start)}s` : ''
-  return `https://www.youtube.com/watch?v=${id}${t}`
 }
 
 // Plain embed, used when the iframe API can't be used: muted and looping
