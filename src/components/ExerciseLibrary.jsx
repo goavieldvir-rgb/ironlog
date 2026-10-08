@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react'
-import { Plus, Play, Pencil, Trash2, Lock } from 'lucide-react'
+import { Plus, Pencil, Trash2, Lock } from 'lucide-react'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
-import { normalizeVideoUrl, safeVideoUrl } from '../lib/url.js'
+import { normalizeVideoUrl } from '../lib/url.js'
+import ExerciseVideo from './ExerciseVideo.jsx'
 import { useCollection, addExercise, updateExercise, deleteExercise } from '../lib/db.js'
 import { Button, Card, CategoryTag, Badge, EmptyState, Field } from './ui.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
@@ -165,16 +166,13 @@ export default function ExerciseLibrary() {
               </div>
             </div>
             {ex.notes && <p className="text-chalkdim text-sm">{ex.notes}</p>}
-            {safeVideoUrl(ex.video_url) && (
-              <a
-                href={safeVideoUrl(ex.video_url)}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm text-brass hover:underline w-fit"
-              >
-                <Play size={14} /> {t('exercises.watchExample')}
-              </a>
-            )}
+            <ExerciseVideo
+              name={(lang === 'he' && ex.name_he) || ex.name}
+              matchNames={[ex.name]}
+              videoUrl={ex.video_url}
+              className="text-sm"
+              iconSize={14}
+            />
           </Card>
         ))}
       </div>

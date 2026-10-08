@@ -1,7 +1,7 @@
-import { safeVideoUrl } from '../lib/url.js'
+import ExerciseVideo from './ExerciseVideo.jsx'
 import React, { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Play, Pencil, MessageSquareText, Check } from 'lucide-react'
+import { Pencil, MessageSquareText, Check } from 'lucide-react'
 import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -95,16 +95,12 @@ export default function SessionDetail() {
               {entry.category === 'cardio' && <Badge tone="cardio">{t('sessionCard.cardioBadge')}</Badge>}
               {entry.category !== 'cardio' && entry.timed ? <Badge tone="brass">{t('exercises.timedBadge')}</Badge> : entry.category !== 'cardio' && entry.bodyweight && <Badge tone="brass">{t('sessionCard.bodyweightBadge')}</Badge>}
             </div>
-            {safeVideoUrl(entry.videoUrl) && (
-              <a
-                href={safeVideoUrl(entry.videoUrl)}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-brass hover:underline"
-              >
-                <Play size={13} /> {t('sessionCard.example')}
-              </a>
-            )}
+            <ExerciseVideo
+              name={entry.name}
+              matchNames={[exercises.find((x) => x.id === entry.exerciseId)?.name, entry.nameEn]}
+              videoUrl={entry.videoUrl}
+              className="text-xs"
+            />
           </div>
           <div className="flex flex-wrap gap-2">
             {(() => {
