@@ -65,7 +65,22 @@ export async function enableReminder(uid, remindTime, lang) {
   const sub =
     (await reg.pushManager.getSubscription()) ||
     (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) }))
+  if (!isSupportedService(sub.endpoint)) {
+    await sub.unsubscribe()
+    throw new Error('unsupported-service')
+  }
   await saveReminder(uid, sub, remindTime, lang)
+}
+
+// Same list the server accepts (see the function and the table's check).
+function isSupportedService(endpoint) {
+  try {
+    const u = new URL(endpoint)
+    const h = u.hostname
+    return u.protocol === 'https:' && (h === 'fcm.googleapis.com' || h === 'updates.push.services.mozilla.com' || h === 'web.push.apple.com' || h.endsWith('.notify.windows.com'))
+  } catch {
+    return false
+  }
 }
 
 async function saveReminder(uid, sub, remindTime, lang) {

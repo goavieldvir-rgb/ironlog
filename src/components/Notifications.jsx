@@ -41,7 +41,7 @@ export default function Notifications() {
       }
     } catch (e) {
       console.error(e)
-      toast(e.message === 'denied' ? t('notifications.denied') : t('notifications.failed'), 'error')
+      toast(e.message === 'denied' ? t('notifications.denied') : e.message === 'unsupported-service' ? t('notifications.unsupported') : t('notifications.failed'), 'error')
     } finally {
       setBusy(false)
     }
