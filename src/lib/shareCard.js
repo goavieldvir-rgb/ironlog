@@ -106,7 +106,7 @@ function pickStats(summary, labels) {
 // Vertical positions for the full poster card and for the shorter block that
 // sits over a photo or becomes the sticker. All measured from the block top.
 const FULL = { nameSize: 96, nameY: 110, ruleY: 146, heroMax: 700, heroY: 700, capY: 830, divY: 1030, statY: 1200, labelY: 1258, statSize: 150 }
-const COMPACT = { nameSize: 72, nameY: 70, ruleY: 102, heroMax: 440, heroY: 560, capY: 650, divY: 710, statY: 850, labelY: 904, statSize: 120 }
+const COMPACT = { nameSize: 72, nameY: 70, ruleY: 102, heroMax: 440, heroY: 560, capY: 690, divY: 750, statY: 890, labelY: 944, statSize: 120 }
 
 // Draws name, hero number, caption and small stats from y; returns the
 // bottom of the block. `look` sets colours and an optional soft shadow.
@@ -130,9 +130,12 @@ function drawBlock(ctx, summary, { rtl, labels, y, look, layout }) {
   // workout name
   ctx.direction = dir
   ctx.fillStyle = look.text
-  const name = rtl ? summary.routineName : summary.routineName.toUpperCase()
-  const nameWeight = rtl ? 700 : 800
-  fitSize(ctx, name, nameWeight, disp, rtl ? L.nameSize * 1.25 : L.nameSize, 52, W - M * 2)
+  // A Hebrew screen can still hold a workout named in English: that one gets
+  // the English capitals, since Karantina has no Latin lowercase of its own.
+  const hebName = rtl && /[\u0590-\u05FF]/.test(summary.routineName)
+  const name = hebName ? summary.routineName : summary.routineName.toUpperCase()
+  const nameFont = hebName ? HEB_DISPLAY : NUM
+  fitSize(ctx, name, hebName ? 700 : 800, nameFont, hebName ? L.nameSize * 1.25 : L.nameSize, 52, W - M * 2)
   ctx.fillText(fit(ctx, name, W - M * 2), x0, y + L.nameY)
   ctx.fillStyle = look.accent
   ctx.fillRect(rtl ? W - M - 72 : M, y + L.ruleY, 72, 8)
@@ -148,7 +151,7 @@ function drawBlock(ctx, summary, { rtl, labels, y, look, layout }) {
   ctx.fillStyle = look.accent
   ctx.font = `700 40px ${lbl}`
   ctx.direction = dir
-  const cap = [hero.unit, hero.label].filter(Boolean).join(' · ')
+  const cap = (rtl ? [hero.label, hero.unit] : [hero.unit, hero.label]).filter(Boolean).join(' · ')
   if (rtl) {
     ctx.textAlign = 'right'
     ctx.fillText(cap, x0, y + L.capY)
@@ -225,7 +228,7 @@ export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo
 
   if (variant === 'sticker') {
     // Transparent picture: white text with a soft shadow reads on any photo.
-    canvas.height = 1060
+    canvas.height = 1080
     // A lighter gold than the app's brass so it still reads on pale photos.
     const look = { text: '#FFFFFF', dim: 'rgba(255,255,255,0.9)', accent: '#F0CF7A', line: 'rgba(255,255,255,0.5)', shadow: true }
     const end = drawBlock(ctx, summary, { rtl, labels, y: 20, look, layout: COMPACT })
