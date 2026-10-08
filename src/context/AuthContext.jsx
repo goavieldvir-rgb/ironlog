@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../supabase.js'
+import { removeDeviceReminder } from '../lib/push.js'
 
 const AuthContext = createContext(null)
 
@@ -38,7 +39,11 @@ export function AuthProvider({ children }) {
       })
       if (error) throw error
     },
-    logout: () => supabase.auth.signOut(),
+    logout: async () => {
+      // Best effort, but never let a slow connection stall signing out.
+      if (user) await Promise.race([removeDeviceReminder(user.id), new Promise((r) => setTimeout(r, 3000))])
+      return supabase.auth.signOut()
+    },
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
