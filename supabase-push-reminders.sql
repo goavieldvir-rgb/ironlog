@@ -5,7 +5,7 @@
 create table if not exists public.push_subscriptions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
-  endpoint text not null,
+  endpoint text not null check (endpoint ~ '^https://(fcm\.googleapis\.com|updates\.push\.services\.mozilla\.com|web\.push\.apple\.com|[a-z0-9.-]+\.notify\.windows\.com)/'),
   p256dh text not null,
   auth text not null,
   remind_time time not null default '08:00',

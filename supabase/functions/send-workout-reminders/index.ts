@@ -7,13 +7,10 @@
 //    that user's own subscriptions, at most once a minute.
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import webpush from 'npm:web-push@3.6.7'
+import { isAllowedEndpoint, isDue, localParts } from './helpers.ts'
 
 const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
-// A reminder goes out between its set time and WINDOW_MIN minutes later, but
-// never past local midnight, so a 23:00 reminder can't fire at 00:15 as
-// the next day's.
-const WINDOW_MIN = 180
 const TEST_COOLDOWN_MS = 60_000
 
 const cors = {
@@ -23,26 +20,6 @@ const cors = {
 }
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'content-type': 'application/json' } })
-
-// One instant, formatted once in the subscriber's own time zone. Date,
-// weekday and time all come from the same formatted result, so they can't
-// disagree around midnight.
-export function localParts(tz: string, at = new Date()) {
-  const f = new Intl.DateTimeFormat('en-CA', {
-    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hourCycle: 'h23', weekday: 'short',
-  })
-  const p = Object.fromEntries(f.formatToParts(at).map((x) => [x.type, x.value]))
-  const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(p.weekday)
-  return { date: `${p.year}-${p.month}-${p.day}`, minutes: Number(p.hour) * 60 + Number(p.minute), dow }
-}
-
-const toMinutes = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5))
-
-export function isDue(remindTime: string, minutesNow: number) {
-  const start = toMinutes(remindTime)
-  return minutesNow >= start && minutesNow < Math.min(start + WINDOW_MIN, 24 * 60)
-}
 
 const COPY = {
   en: (names: string) => ({ title: "Today's workout", body: `${names} is on the plan today. Let's go.` }),
@@ -55,6 +32,10 @@ const TEST_COPY = {
 
 // Returns 'sent' | 'removed' (expired on the phone's side). Throws otherwise.
 async function deliver(s: any, msg: { title: string; body: string }, tag: string) {
+  if (!isAllowedEndpoint(s.endpoint)) {
+    await db.from('push_subscriptions').delete().eq('id', s.id)
+    return 'removed'
+  }
   try {
     await webpush.sendNotification(
       { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
@@ -129,17 +110,15 @@ async function runReminders() {
   return json({ sent, skipped, removed, failed })
 }
 
-if (import.meta.main) {
-  Deno.serve(async (req) => {
-    if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
-    if (req.method !== 'POST') return json({ error: 'method' }, 405)
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
+  if (req.method !== 'POST') return json({ error: 'method' }, 405)
 
-    const { data: cfgRows } = await db.from('push_config').select('key, value')
-    const cfg = Object.fromEntries((cfgRows || []).map((r) => [r.key, r.value]))
-    webpush.setVapidDetails(cfg.vapid_subject, cfg.vapid_public, cfg.vapid_private)
+  const { data: cfgRows } = await db.from('push_config').select('key, value')
+  const cfg = Object.fromEntries((cfgRows || []).map((r) => [r.key, r.value]))
+  webpush.setVapidDetails(cfg.vapid_subject, cfg.vapid_public, cfg.vapid_private)
 
-    const secret = req.headers.get('x-cron-secret')
-    if (secret) return secret === cfg.cron_secret ? runReminders() : json({ error: 'forbidden' }, 403)
-    return runTest(req)
-  })
-}
+  const secret = req.headers.get('x-cron-secret')
+  if (secret) return secret === cfg.cron_secret ? runReminders() : json({ error: 'forbidden' }, 403)
+  return runTest(req)
+})
