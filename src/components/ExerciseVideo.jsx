@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ExternalLink, Play, X } from 'lucide-react'
+import { ExternalLink, Play, Volume2, VolumeX, X } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { resolveExerciseVideo, youtubeEmbedUrl } from '../lib/demoVideos.js'
@@ -45,6 +45,37 @@ export default function ExerciseVideo({ name, matchNames = [], videoUrl, classNa
 function VideoModal({ video, name, onClose }) {
   const { t } = useLanguage()
   useScrollLock(true)
+  // YouTube's player on iPhone has no mute or volume button of its own, so
+  // the clip's sound is switched from here instead. The phone's side
+  // buttons still set how loud it is.
+  const player = useRef(null)
+  const [ready, setReady] = useState(false)
+  const [soundOn, setSoundOn] = useState(false)
+  // Set when the phone wouldn't let us unmute a playing clip: the clip is
+  // then reloaded with sound and waits for a tap on YouTube's play button.
+  const [withSound, setWithSound] = useState(false)
+
+  function toggleSound() {
+    const p = player.current
+    if (!p) return
+    if (soundOn) {
+      p.mute()
+      setSoundOn(false)
+      return
+    }
+    p.unMute()
+    p.setVolume?.(100)
+    p.playVideo()
+    setSoundOn(true)
+    setTimeout(() => {
+      if (player.current === p && p.isMuted?.()) {
+        setReady(false)
+        setWithSound(true)
+      }
+    }, 600)
+  }
+
+  const title = t('sessionCard.exampleOf', { name })
   return createPortal(
     <div
       className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center px-4 py-4"
@@ -70,28 +101,54 @@ function VideoModal({ video, name, onClose }) {
         </div>
         {/* Same 16:9 frame for every exercise. */}
         <div className="relative w-full aspect-video rounded-md overflow-hidden bg-black" dir="ltr">
-          <LoopingClip video={video} title={t('sessionCard.exampleOf', { name })} />
+          {withSound ? (
+            <PlainClip video={video} title={title} sound />
+          ) : (
+            <ApiClip
+              video={video}
+              title={title}
+              soundOn={soundOn}
+              onPlayer={(p) => {
+                player.current = p
+                setReady(!!p)
+              }}
+            />
+          )}
         </div>
-        {/* A way out when a clip won't play here (removed, or its owner
-            blocks embedding), and the full video with sound and chapters. */}
-        <a
-          href={watchUrl(video)}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-brass hover:underline mt-2"
-        >
-          <ExternalLink size={12} /> {t('sessionCard.openOnYouTube')}
-        </a>
+        <div className="flex items-center justify-between gap-2 mt-2">
+          {ready ? (
+            <button
+              type="button"
+              onClick={toggleSound}
+              aria-pressed={soundOn}
+              className="inline-flex items-center gap-1.5 min-h-[44px] -ms-1 px-1 text-sm text-brass hover:underline"
+            >
+              {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
+              {soundOn ? t('sessionCard.soundOff') : t('sessionCard.soundOn')}
+            </button>
+          ) : (
+            <span />
+          )}
+          {/* A way out when a clip won't play here (removed, or its owner
+              blocks embedding), and the full video with chapters. */}
+          <a
+            href={watchUrl(video)}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-brass hover:underline"
+          >
+            <ExternalLink size={12} /> {t('sessionCard.openOnYouTube')}
+          </a>
+        </div>
       </div>
     </div>,
     document.body,
   )
 }
 
-// YouTube's own loop setting always jumps back to 0:00, ignoring the start
-// time, so a clip trimmed to just the movement would replay any intro on
-// every pass. Driving the player through YouTube's iframe API lets us send
-// it back to the clip's start ourselves when it reaches its end.
+// The clip is driven through YouTube's iframe API, so the sound button can
+// reach it and a clip with a start time loops back to that start rather than
+// to 0:00 (YouTube's own loop setting ignores the start time).
 let apiPromise = null
 function loadYouTubeApi() {
   if (window.YT?.Player) return Promise.resolve(window.YT)
@@ -119,13 +176,14 @@ function watchUrl({ id, start }) {
   return `https://www.youtube.com/watch?v=${id}${t}`
 }
 
-// Plain embed: plays muted, loops from 0:00, YouTube's own controls shown so
-// a trainee can unmute or scrub.
-function PlainClip({ video, title }) {
+// Plain embed, used when the iframe API can't be used: muted and looping
+// from 0:00, or with sound (waiting for a tap on play, since phones won't
+// autoplay with sound) after the sound button couldn't unmute it.
+function PlainClip({ video, title, sound = false }) {
   return (
     <iframe
       className="absolute inset-0 w-full h-full border-0"
-      src={youtubeEmbedUrl(video.id, { start: video.start, end: video.end })}
+      src={youtubeEmbedUrl(video.id, { start: video.start, end: video.end, sound })}
       title={title}
       allow="autoplay; encrypted-media; picture-in-picture"
       allowFullScreen
@@ -134,25 +192,27 @@ function PlainClip({ video, title }) {
   )
 }
 
-function LoopingClip({ video, title }) {
-  const trimmed = (Number.isFinite(video.start) && video.start > 0) || (Number.isFinite(video.end) && video.end > 0)
-  if (!trimmed) return <PlainClip video={video} title={title} />
-  return <TrimmedClip video={video} title={title} />
-}
-
-// Only clips with a start or end time go through the iframe API. If it
-// doesn't come up in time, or the player reports an error, the plain embed
-// takes over: it still plays, just looping from 0:00.
-function TrimmedClip({ video, title }) {
+// If the API doesn't come up in time, or the player reports an error, the
+// plain embed takes over: it still plays, just looping from 0:00 and
+// without our sound button.
+function ApiClip({ video, title, soundOn, onPlayer }) {
   const box = useRef(null)
   const [failed, setFailed] = useState(false)
+  const sound = useRef(soundOn)
+  sound.current = soundOn
+  const report = useRef(onPlayer)
+  report.current = onPlayer
   useEffect(() => {
     let player = null
     let cancelled = false
     let ready = false
     const start = Number.isFinite(video.start) && video.start > 0 ? Math.floor(video.start) : 0
     const end = Number.isFinite(video.end) && video.end > start ? Math.floor(video.end) : undefined
-    const fail = () => !cancelled && setFailed(true)
+    const fail = () => {
+      if (cancelled) return
+      report.current(null)
+      setFailed(true)
+    }
     const timer = setTimeout(() => !ready && fail(), 8000)
     loadYouTubeApi()
       .then((YT) => {
@@ -171,12 +231,14 @@ function TrimmedClip({ video, title }) {
               e.target.getIframe()?.setAttribute('title', title)
               e.target.mute()
               e.target.playVideo()
+              report.current(e.target)
             },
             onError: fail,
             onStateChange: (e) => {
               if (e.data === YT.PlayerState.ENDED) {
                 // loadVideoById keeps the end time; seekTo alone would not.
                 e.target.loadVideoById({ videoId: video.id, startSeconds: start, endSeconds: end })
+                if (sound.current) e.target.unMute()
               }
             },
           },
@@ -186,6 +248,7 @@ function TrimmedClip({ video, title }) {
     return () => {
       cancelled = true
       clearTimeout(timer)
+      report.current(null)
       player?.destroy?.()
     }
   }, [video.id, video.start, video.end, title])
