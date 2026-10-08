@@ -7,40 +7,83 @@
 // duration and the week streak. No exercises or sets, so it's easy to post
 // and doesn't give the training plan away.
 //
-// Three looks: the plain Ironlog card, the same stats over the trainee's own
-// photo, and a see-through sticker. Colours come straight from the app's
-// Tailwind theme and the fonts are the app's own. Cards are a 1080 x 1920
+// Three looks, one style: a poster-style Ironlog card, the same stats over
+// the trainee's own photo, and a see-through sticker. Colours come from the
+// app's Tailwind theme. The poster fonts are loaded only when this screen
+// opens, so the rest of the app doesn't get heavier. Cards are a 1080 x 1920
 // Instagram story; the top and bottom ~250px stay empty because Instagram
 // puts its own buttons there. Photos are only ever drawn on this phone.
 import tailwind from '../../tailwind.config.js'
 
 const W = 1080
 const H = 1920
+const M = 96 // side margin
 const SAFE_TOP = 250
 const SAFE_BOTTOM = 250
-const BLOCK_H = 790 // height of the name + big number + small stats block
 const T = tailwind.theme.extend.colors
 const C = { ink: T.ink, chalk: T.chalk, dim: T.chalkdim, brass: T.brass, line: T.line }
-const DISPLAY = '"Barlow Condensed", "Rubik", system-ui, sans-serif'
-const MONO = '"IBM Plex Mono", "Rubik", ui-monospace, monospace'
-// Every family and weight the card draws with. Hebrew letters aren't in the
-// condensed or mono fonts, so Rubik (the app's Hebrew font) is loaded at the
-// same weights, using Hebrew sample text so its Hebrew pieces download too.
+
+// Numbers are always the tall condensed face; English words use it too,
+// Hebrew words use Karantina (same proportions, real Hebrew letters).
+const NUM = '"Big Shoulders Display", "Barlow Condensed", sans-serif'
+const HEB_DISPLAY = '"Karantina", "Rubik", sans-serif'
+const LBL_EN = '"Inter", system-ui, sans-serif'
+const LBL_HE = '"Heebo", "Rubik", system-ui, sans-serif'
+const FONT_CSS =
+  'https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800;900&family=Karantina:wght@700&family=Heebo:wght@600;700&display=swap'
+// Everything the card draws with. Hebrew sample text makes the Hebrew pieces
+// of each font download too.
 const FONT_REQUESTS = [
-  `500 100px ${DISPLAY}`,
-  `600 100px ${DISPLAY}`,
-  `700 100px ${DISPLAY}`,
-  `500 30px ${MONO}`,
-  '500 40px Rubik',
-  '600 40px Rubik',
-  '700 40px Rubik',
+  `800 100px ${NUM}`,
+  `900 100px ${NUM}`,
+  `700 100px ${HEB_DISPLAY}`,
+  `700 30px ${LBL_EN}`,
+  `600 30px ${LBL_EN}`,
+  `600 30px ${LBL_HE}`,
+  `700 30px ${LBL_HE}`,
 ]
+
+let fontLink = null
+function addFontStylesheet() {
+  if (fontLink || typeof document === 'undefined') return
+  fontLink = document.createElement('link')
+  fontLink.rel = 'stylesheet'
+  fontLink.href = FONT_CSS
+  document.head.appendChild(fontLink)
+}
 
 function fit(ctx, text, maxW) {
   if (ctx.measureText(text).width <= maxW) return text
   let t = text
   while (t.length > 1 && ctx.measureText(`${t}…`).width > maxW) t = t.slice(0, -1)
   return `${t}…`
+}
+
+// Largest font size (down to `min`) at which the text fits `maxW`.
+function fitSize(ctx, text, weight, family, max, min, maxW) {
+  let s = max
+  ctx.font = `${weight} ${s}px ${family}`
+  while (s > min && ctx.measureText(text).width > maxW) {
+    s -= 6
+    ctx.font = `${weight} ${s}px ${family}`
+  }
+  return s
+}
+
+// Letter-spaced text (ctx.letterSpacing isn't in older Safari). Only used
+// for Latin capitals, never Hebrew.
+function tracked(ctx, text, x, y, spacing, align) {
+  const chars = [...text]
+  const widths = chars.map((c) => ctx.measureText(c).width)
+  const total = widths.reduce((a, b) => a + b, 0) + spacing * (chars.length - 1)
+  let cx = align === 'right' ? x - total : align === 'center' ? x - total / 2 : x
+  const prev = ctx.textAlign
+  ctx.textAlign = 'left'
+  chars.forEach((c, i) => {
+    ctx.fillText(c, cx, y)
+    cx += widths[i] + spacing
+  })
+  ctx.textAlign = prev
 }
 
 // The big number and the small ones. Hero: volume lifted, else cardio
@@ -60,15 +103,21 @@ function pickStats(summary, labels) {
   return { hero: stats[heroKey], small }
 }
 
-// Draws the name, hero number and small stats starting at y; returns the
-// y where the block ends. `look` sets colours and an optional soft shadow.
-function drawBlock(ctx, summary, { rtl, labels, y, look }) {
-  const pad = 88
-  const start = rtl ? W - pad : pad
-  const startAlign = rtl ? 'right' : 'left'
+// Vertical positions for the full poster card and for the shorter block that
+// sits over a photo or becomes the sticker. All measured from the block top.
+const FULL = { nameSize: 96, nameY: 110, ruleY: 146, heroMax: 700, heroY: 700, capY: 830, divY: 1030, statY: 1200, labelY: 1258, statSize: 150 }
+const COMPACT = { nameSize: 72, nameY: 70, ruleY: 102, heroMax: 440, heroY: 560, capY: 650, divY: 710, statY: 850, labelY: 904, statSize: 120 }
+
+// Draws name, hero number, caption and small stats from y; returns the
+// bottom of the block. `look` sets colours and an optional soft shadow.
+function drawBlock(ctx, summary, { rtl, labels, y, look, layout }) {
+  const L = layout
+  const x0 = rtl ? W - M : M
+  const align = rtl ? 'right' : 'left'
   const dir = rtl ? 'rtl' : 'ltr'
   const { hero, small } = pickStats(summary, labels)
-
+  const lbl = rtl ? LBL_HE : LBL_EN
+  const disp = rtl ? HEB_DISPLAY : NUM
   const shadow = (on) => {
     ctx.shadowColor = on ? 'rgba(0,0,0,0.55)' : 'transparent'
     ctx.shadowBlur = on ? 18 : 0
@@ -76,62 +125,69 @@ function drawBlock(ctx, summary, { rtl, labels, y, look }) {
   }
   shadow(look.shadow)
   ctx.textBaseline = 'alphabetic'
-  ctx.textAlign = startAlign
+  ctx.textAlign = align
 
   // workout name
   ctx.direction = dir
   ctx.fillStyle = look.text
-  ctx.font = `700 104px ${DISPLAY}`
-  ctx.fillText(fit(ctx, summary.routineName, W - pad * 2), start, y + 100)
+  const name = rtl ? summary.routineName : summary.routineName.toUpperCase()
+  const nameWeight = rtl ? 700 : 800
+  fitSize(ctx, name, nameWeight, disp, rtl ? L.nameSize * 1.25 : L.nameSize, 52, W - M * 2)
+  ctx.fillText(fit(ctx, name, W - M * 2), x0, y + L.nameY)
   ctx.fillStyle = look.accent
-  ctx.fillRect(rtl ? W - pad - 96 : pad, y + 136, 96, 8)
+  ctx.fillRect(rtl ? W - M - 72 : M, y + L.ruleY, 72, 8)
 
-  // hero label and number (long numbers shrink to fit instead of being cut)
-  ctx.fillStyle = look.dim
-  ctx.font = `500 30px ${MONO}`
-  ctx.fillText(rtl ? hero.label : hero.label.toUpperCase(), start, y + 244)
+  // hero number: long totals shrink to the width instead of being cut
   ctx.direction = 'ltr'
-  const heroMax = W - pad * 2 - (hero.unit ? 200 : 0)
-  let heroSize = 300
-  ctx.font = `500 ${heroSize}px ${DISPLAY}`
-  while (heroSize > 120 && ctx.measureText(hero.value).width > heroMax) {
-    heroSize -= 10
-    ctx.font = `500 ${heroSize}px ${DISPLAY}`
-  }
-  const heroBase = y + 510
+  fitSize(ctx, hero.value, 900, NUM, L.heroMax, 200, W - M * 2 + 16)
   ctx.fillStyle = look.text
-  ctx.fillText(hero.value, start, heroBase)
-  if (hero.unit) {
-    const vw = ctx.measureText(hero.value).width
-    ctx.font = `600 64px ${DISPLAY}`
-    ctx.fillStyle = look.accent
-    ctx.fillText(hero.unit, rtl ? start - vw - 24 : start + vw + 24, heroBase)
+  ctx.textAlign = align
+  ctx.fillText(hero.value, x0 + (rtl ? 8 : -8), y + L.heroY)
+
+  // unit and what it measures, in the accent colour
+  ctx.fillStyle = look.accent
+  ctx.font = `700 40px ${lbl}`
+  ctx.direction = dir
+  const cap = [hero.unit, hero.label].filter(Boolean).join(' · ')
+  if (rtl) {
+    ctx.textAlign = 'right'
+    ctx.fillText(cap, x0, y + L.capY)
+  } else {
+    tracked(ctx, cap.toUpperCase(), x0, y + L.capY, 7, 'left')
   }
 
   // small stats side by side, the first on the reading-start side
-  let end = heroBase
+  let end = y + L.capY
   if (small.length) {
-    const sy = heroBase + 90
-    ctx.shadowColor = 'transparent'
+    shadow(false)
     ctx.fillStyle = look.line
-    ctx.fillRect(pad, sy, W - pad * 2, 2)
+    ctx.fillRect(M, y + L.divY, W - M * 2, 2)
     shadow(look.shadow)
-    const colW = (W - pad * 2) / 2
+    const colW = (W - M * 2) / 2
     small.forEach((st, i) => {
       const slot = rtl ? 1 - i : i
-      const x = pad + slot * colW + (rtl ? colW - 8 : 8)
-      ctx.textAlign = startAlign
+      const sx = rtl ? M + slot * colW + colW : M + slot * colW
       ctx.direction = 'ltr'
+      ctx.textAlign = align
       ctx.fillStyle = look.text
-      ctx.font = `500 96px ${DISPLAY}`
-      const val = st.unit ? `${st.value} ${st.unit}` : st.value
-      ctx.fillText(fit(ctx, val, colW - 24), x, sy + 120)
-      ctx.direction = dir
+      ctx.font = `800 ${L.statSize}px ${NUM}`
+      ctx.fillText(st.value, sx, y + L.statY)
+      const vw = ctx.measureText(st.value).width
+      ctx.fillStyle = look.accent
+      ctx.font = `${rtl ? 700 : 800} ${Math.round(L.statSize * 0.5)}px ${disp}`
+      const unit = rtl ? st.unit : st.unit.toUpperCase()
+      ctx.fillText(fit(ctx, unit, colW - vw - 40), rtl ? sx - vw - 18 : sx + vw + 18, y + L.statY)
       ctx.fillStyle = look.dim
-      ctx.font = `500 26px ${MONO}`
-      ctx.fillText(fit(ctx, rtl ? st.label : st.label.toUpperCase(), colW - 24), x, sy + 170)
+      ctx.font = `600 28px ${lbl}`
+      ctx.direction = dir
+      if (rtl) {
+        ctx.textAlign = 'right'
+        ctx.fillText(fit(ctx, st.label, colW - 24), sx, y + L.labelY)
+      } else {
+        tracked(ctx, fit(ctx, st.label.toUpperCase(), colW - 24), sx, y + L.labelY, 5, 'left')
+      }
     })
-    end = sy + 190
+    end = y + L.labelY
   }
   shadow(false)
   return end
@@ -139,10 +195,9 @@ function drawBlock(ctx, summary, { rtl, labels, y, look }) {
 
 function drawBrand(ctx, y, look) {
   ctx.direction = 'ltr'
-  ctx.textAlign = 'center'
   ctx.fillStyle = look.accent
-  ctx.font = `700 40px ${DISPLAY}`
-  ctx.fillText('IRONLOG', W / 2, y)
+  ctx.font = `800 36px ${NUM}`
+  tracked(ctx, 'IRONLOG', W / 2, y, 10, 'center')
 }
 
 // Fill-and-crop a photo to cover the whole story, then darken it with a
@@ -154,9 +209,9 @@ function drawPhoto(ctx, photo) {
   ctx.drawImage(photo.source, (W - dw) / 2, (H - dh) / 2, dw, dh)
   const g = ctx.createLinearGradient(0, 0, 0, H)
   g.addColorStop(0, 'rgba(20,22,26,0.35)')
-  g.addColorStop(0.35, 'rgba(20,22,26,0.15)')
-  g.addColorStop(0.62, 'rgba(20,22,26,0.62)')
-  g.addColorStop(1, 'rgba(20,22,26,0.92)')
+  g.addColorStop(0.3, 'rgba(20,22,26,0.1)')
+  g.addColorStop(0.5, 'rgba(20,22,26,0.55)')
+  g.addColorStop(1, 'rgba(20,22,26,0.94)')
   ctx.fillStyle = g
   ctx.fillRect(0, 0, W, H)
 }
@@ -170,39 +225,40 @@ export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo
 
   if (variant === 'sticker') {
     // Transparent picture: white text with a soft shadow reads on any photo.
-    canvas.height = 940
+    canvas.height = 1060
     // A lighter gold than the app's brass so it still reads on pale photos.
     const look = { text: '#FFFFFF', dim: 'rgba(255,255,255,0.9)', accent: '#F0CF7A', line: 'rgba(255,255,255,0.5)', shadow: true }
-    const end = drawBlock(ctx, summary, { rtl, labels, y: 30, look })
+    const end = drawBlock(ctx, summary, { rtl, labels, y: 20, look, layout: COMPACT })
     ctx.shadowColor = 'rgba(0,0,0,0.55)'
     ctx.shadowBlur = 14
-    drawBrand(ctx, end + 85, look)
+    drawBrand(ctx, end + 90, look)
     return canvas
   }
 
   canvas.height = H
-  const light = { text: C.chalk, dim: C.dim, accent: C.brass, line: C.line, shadow: false }
   if (variant === 'photo' && photo) {
     drawPhoto(ctx, photo)
     // Sits low, over the darker part of the gradient, clear of the bottom 250px.
-    const look = { text: '#FFFFFF', dim: 'rgba(255,255,255,0.8)', accent: C.brass, line: 'rgba(255,255,255,0.4)', shadow: true }
-    drawBlock(ctx, summary, { rtl, labels, y: H - SAFE_BOTTOM - 100 - BLOCK_H, look })
+    const look = { text: '#FFFFFF', dim: 'rgba(255,255,255,0.85)', accent: C.brass, line: 'rgba(255,255,255,0.4)', shadow: true }
+    const top = H - SAFE_BOTTOM - 80 - 960
+    const end = drawBlock(ctx, summary, { rtl, labels, y: top, look, layout: COMPACT })
     ctx.shadowColor = 'rgba(0,0,0,0.5)'
     ctx.shadowBlur = 12
-    drawBrand(ctx, H - SAFE_BOTTOM - 15, look)
+    drawBrand(ctx, end + 70, look)
     return canvas
   }
 
-  // plain card: ink background with a faint brass glow, content centred
+  // plain card: ink background, a faint warm light from the top corner
+  const look = { text: C.chalk, dim: C.dim, accent: C.brass, line: C.line, shadow: false }
   ctx.fillStyle = C.ink
   ctx.fillRect(0, 0, W, H)
-  const glow = ctx.createRadialGradient(W / 2, 0, 80, W / 2, 0, 1100)
-  glow.addColorStop(0, 'rgba(201,162,75,0.15)')
+  const glow = ctx.createRadialGradient(W, 0, 0, W, 0, 1300)
+  glow.addColorStop(0, 'rgba(201,162,75,0.16)')
   glow.addColorStop(1, 'rgba(201,162,75,0)')
   ctx.fillStyle = glow
   ctx.fillRect(0, 0, W, H)
-  drawBlock(ctx, summary, { rtl, labels, y: SAFE_TOP + (H - SAFE_TOP - SAFE_BOTTOM - BLOCK_H) / 2, look: light })
-  drawBrand(ctx, H - SAFE_BOTTOM - 15, light)
+  drawBlock(ctx, summary, { rtl, labels, y: 250, look, layout: FULL })
+  drawBrand(ctx, H - SAFE_BOTTOM - 30, look)
   return canvas
 }
 
@@ -247,6 +303,7 @@ export async function prepareCard(summary, opts, fileName) {
   try {
     // Canvas won't pull web fonts by itself: ask for the ones the card uses
     // so it matches the app, then wait for them.
+    addFontStylesheet()
     await Promise.all(FONT_REQUESTS.map((f) => document.fonts.load(f, 'Aa אב 123')))
     await document.fonts.ready
   } catch {

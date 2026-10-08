@@ -172,18 +172,6 @@ export default function WorkoutDone({ summary, onDone }) {
         </p>
       )}
 
-      <Card className="flex flex-col gap-2">
-        {summary.rows.map((r, i) => (
-          <div key={i} className="flex items-baseline justify-between gap-3 text-sm">
-            <span className="min-w-0 truncate">
-              {r.name}
-              {r.pr && <span className="ms-2 text-xs bg-brass text-ink rounded-full px-2 py-0.5 font-semibold">{t('share.prTag')}</span>}
-            </span>
-            <span className="num text-chalkdim shrink-0">{iso(r.text)}</span>
-          </div>
-        ))}
-      </Card>
-
       {!failed && (
         <div className="flex flex-col gap-3" data-testid="share-section">
           <div role="tablist" className="grid grid-cols-3 gap-1 bg-surface2 rounded-lg p-1">
@@ -252,6 +240,18 @@ export default function WorkoutDone({ summary, onDone }) {
           {t('share.done')}
         </Button>
       </div>
+
+      <Card className="flex flex-col gap-2">
+        {summary.rows.map((r, i) => (
+          <div key={i} className="flex items-baseline justify-between gap-3 text-sm">
+            <span className="min-w-0 truncate">
+              {r.name}
+              {r.pr && <span className="ms-2 text-xs bg-brass text-ink rounded-full px-2 py-0.5 font-semibold">{t('share.prTag')}</span>}
+            </span>
+            <span className="num text-chalkdim shrink-0">{iso(r.text)}</span>
+          </div>
+        ))}
+      </Card>
     </div>
   )
 }
