@@ -294,11 +294,12 @@ export function youtubeStartFromUrl(url) {
 
 // Muted autoplay that loops (YouTube only loops when playlist = the same
 // id), with related videos and branding kept quiet. nocookie so nothing is
-// tracked until the clip is actually opened.
-export function youtubeEmbedUrl(id, { start, end } = {}) {
+// tracked until the clip is actually opened. With `sound` it starts unmuted
+// and waits for a tap on play, since phones won't autoplay with sound.
+export function youtubeEmbedUrl(id, { start, end, sound = false } = {}) {
   const p = new URLSearchParams({
-    autoplay: '1',
-    mute: '1',
+    autoplay: sound ? '0' : '1',
+    mute: sound ? '0' : '1',
     playsinline: '1',
     loop: '1',
     playlist: id,
