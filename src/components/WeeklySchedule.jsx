@@ -18,7 +18,7 @@ const SLOT_LABEL_KEYS = ['slotMobility', 'slotStrength', 'slotCardio']
 
 export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }) {
   const { t } = useLanguage()
-  const { toast } = useFeedback()
+  const { toast, confirm } = useFeedback()
   const navigate = useNavigate()
   const [schedule, , refreshSchedule] = useCollection(effectiveUid, 'weekly_schedule', 'day_of_week', 'asc')
 
@@ -135,6 +135,18 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
     navigate(`/workout/${id}`)
   }
 
+  // Another day's workout can be started too, after a quick heads-up that
+  // it will be logged as today's session (the plan itself is untouched).
+  async function startOtherDay(r, dow) {
+    const day = t(`dashboard.day${dow}`)
+    const ok = await confirm({
+      title: t('dashboard.otherDayTitle', { day }),
+      body: t('dashboard.otherDayBody', { day, name: r.name }),
+      confirmLabel: t('dashboard.otherDayConfirm'),
+    })
+    if (ok) startRoutine(r.id)
+  }
+
   const dayRoutines = openDay == null ? [] : routinesForDay(openDay)
   const isTodayOpen = openDay === today
 
@@ -204,18 +216,18 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
               <>
                 {dayRoutines.length > 0 ? (
                   <div className="flex flex-col gap-2">
-                    {dayRoutines.map((r) =>
-                      isTodayOpen ? (
-                        <Button key={r.id} type="button" onClick={() => startRoutine(r.id)} className="justify-between">
-                          <span className="truncate">{r.name}</span>
-                          <Play size={15} className="shrink-0" />
-                        </Button>
-                      ) : (
-                        <div key={r.id} className="rounded-md bg-surface2 px-3 py-2.5 text-sm truncate">
-                          {r.name}
-                        </div>
-                      ),
-                    )}
+                    {dayRoutines.map((r) => (
+                      <Button
+                        key={r.id}
+                        type="button"
+                        variant={isTodayOpen ? undefined : 'subtle'}
+                        onClick={() => (isTodayOpen ? startRoutine(r.id) : startOtherDay(r, openDay))}
+                        className="justify-between min-h-[44px]"
+                      >
+                        <span className="truncate">{r.name}</span>
+                        <Play size={15} className="shrink-0" />
+                      </Button>
+                    ))}
                   </div>
                 ) : (
                   <p className="text-chalkdim text-sm">{isTodayOpen ? t('dashboard.restDayToday') : t('dashboard.restDayPlanned')}</p>
