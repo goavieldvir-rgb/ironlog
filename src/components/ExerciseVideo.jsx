@@ -115,13 +115,14 @@ function VideoModal({ video, name, onClose }) {
             />
           )}
         </div>
-        <div className="flex items-center justify-between gap-2 mt-2">
+        {/* Fixed height so the modal doesn't shift when the button appears
+            once the player is ready (or never does, in the fallbacks). */}
+        <div className="flex items-center justify-between gap-2 mt-1 min-h-[44px]">
           {ready ? (
             <button
               type="button"
               onClick={toggleSound}
-              aria-pressed={soundOn}
-              className="inline-flex items-center gap-1.5 min-h-[44px] -ms-1 px-1 text-sm text-brass hover:underline"
+              className="inline-flex items-center gap-1.5 min-h-[44px] -ms-1 px-1 text-sm text-brass"
             >
               {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
               {soundOn ? t('sessionCard.soundOff') : t('sessionCard.soundOn')}
@@ -135,9 +136,9 @@ function VideoModal({ video, name, onClose }) {
             href={watchUrl(video)}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-brass hover:underline"
+            className="inline-flex items-center gap-1.5 min-h-[44px] -me-1 px-1 text-sm text-brass"
           >
-            <ExternalLink size={12} /> {t('sessionCard.openOnYouTube')}
+            <ExternalLink size={16} /> {t('sessionCard.openOnYouTube')}
           </a>
         </div>
       </div>
