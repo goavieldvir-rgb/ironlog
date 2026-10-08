@@ -41,7 +41,7 @@ export function AuthProvider({ children }) {
     },
     logout: async () => {
       // Best effort, but never let a slow connection stall signing out.
-      if (user) await Promise.race([removeDeviceReminder(user.uid), new Promise((r) => setTimeout(r, 3000))])
+      if (user) await Promise.race([removeDeviceReminder(user.id), new Promise((r) => setTimeout(r, 3000))])
       return supabase.auth.signOut()
     },
   }
