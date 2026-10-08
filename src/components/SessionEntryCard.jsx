@@ -1,6 +1,6 @@
-import { safeVideoUrl } from '../lib/url.js'
+import ExerciseVideo from './ExerciseVideo.jsx'
 import React, { useEffect, useRef, useState } from 'react'
-import { X, Play, Plus, Trash2, Minus, CornerDownLeft, History, StickyNote, Repeat, ArrowUp, ArrowDown, Trophy } from 'lucide-react'
+import { X, Plus, Trash2, Minus, CornerDownLeft, History, StickyNote, Repeat, ArrowUp, ArrowDown, Trophy } from 'lucide-react'
 import { Card, Badge } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import OverflowMenu from './OverflowMenu.jsx'
@@ -343,16 +343,12 @@ export default function SessionEntryCard({
                 the icons it made that row so wide on a phone that the name,
                 "Previously" and the last note were squeezed into a narrow
                 column, a word or two per line. */}
-            {safeVideoUrl(entry.videoUrl) && (
-              <a
-                href={safeVideoUrl(entry.videoUrl)}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-brass hover:underline"
-              >
-                <Play size={13} /> {t('sessionCard.example')}
-              </a>
-            )}
+            <ExerciseVideo
+              name={entry.name}
+              matchNames={[liveExercise?.name, entry.nameEn]}
+              videoUrl={entry.videoUrl}
+              className="text-xs"
+            />
           </div>
           {prevLabel && (
             <p className="num text-chalkdim text-sm mt-0.5 inline-flex items-center gap-1 flex-wrap">

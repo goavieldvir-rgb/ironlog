@@ -166,6 +166,7 @@ export default function WorkoutSession() {
             return {
               exerciseId: it.exerciseId,
               name: (lang === 'he' && full?.name_he) || full?.name || it.name,
+              nameEn: full?.name || it.name,
               unit: it.unit,
               category: 'cardio',
               intensityType: it.intensityType || full?.intensity_type || 'rpe',
@@ -187,6 +188,7 @@ export default function WorkoutSession() {
           return {
             exerciseId: it.exerciseId,
             name: (lang === 'he' && full?.name_he) || full?.name || it.name,
+            nameEn: full?.name || it.name,
             unit: it.unit,
             bodyweight: it.bodyweight ?? full?.bodyweight ?? false,
             timed: full?.timed ?? it.timed ?? false,
@@ -249,6 +251,7 @@ export default function WorkoutSession() {
       return {
         exerciseId: ex.id,
         name: (lang === 'he' && ex.name_he) || ex.name,
+        nameEn: ex.name,
         unit: ex.unit,
         category: 'cardio',
         intensityType: ex.intensity_type || 'rpe',
@@ -264,6 +267,7 @@ export default function WorkoutSession() {
     return {
       exerciseId: ex.id,
       name: (lang === 'he' && ex.name_he) || ex.name,
+      nameEn: ex.name,
       unit: ex.unit,
       bodyweight: !!ex.bodyweight,
       timed: !!ex.timed,
@@ -414,6 +418,7 @@ export default function WorkoutSession() {
         entries: entries.map((e) => ({
           exerciseId: e.exerciseId,
           name: e.name,
+          nameEn: e.nameEn,
           unit: e.unit,
           category: e.category || 'strength',
           bodyweight: e.bodyweight,
