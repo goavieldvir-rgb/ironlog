@@ -334,8 +334,11 @@ export default function SessionEntryCard({
                 className="pr-pop inline-flex items-center gap-1 rounded-full bg-brasssoft text-brass px-2 py-0.5 text-xs font-medium"
                 title={t('sessionCard.repsPrTitle', { weight: `${repsPr.weight}${entry.unit}` })}
               >
-                <Trophy size={12} /> {t('sessionCard.repsPrBadge')} {repsPr.reps} × {repsPr.weight}
-                {entry.unit}
+                <Trophy size={12} /> {t('sessionCard.repsPrBadge')}{' '}
+                <bdi dir="ltr">
+                  {repsPr.weight}
+                  {entry.unit} × {repsPr.reps}
+                </bdi>
               </span>
             )}
             {isCardio && <Badge tone="cardio">{t('sessionCard.cardioBadge')}</Badge>}

@@ -167,7 +167,7 @@ begin
 
         if reps_set is not null then
           select coalesce(full_name, email) into trainee_name from profiles where id = NEW.user_id;
-          detail_text := 'Reps PR ' || (reps_set->>'reps') || ' reps × ' || (reps_set->>'weight') || ex_unit;
+          detail_text := 'Reps PR ' || (reps_set->>'weight') || ex_unit || ' × ' || (reps_set->>'reps') || ' reps';
 
           perform send_admin_email(
             trainee_name || ' just hit a new PR 🏆',
