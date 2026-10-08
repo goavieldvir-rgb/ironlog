@@ -24,7 +24,9 @@ self.addEventListener('notificationclick', (event) => {
   const target = self.registration.scope
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-      const open = list[0]
+      // Only a tab inside this app's own folder: every GitHub Pages project
+      // on this account shares one origin.
+      const open = list.find((c) => c.url.startsWith(target))
       if (open) return open.focus()
       return self.clients.openWindow(target)
     }),
