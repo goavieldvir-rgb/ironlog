@@ -7,6 +7,7 @@ import OverflowMenu from './OverflowMenu.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { isWarmup, workingSets, suggestWarmups } from '../lib/warmup.js'
 import { formatSeconds } from '../lib/timed.js'
+import { prKind } from '../lib/records.js'
 import { cardioSummary } from '../lib/cardio.js'
 import CardioTotals from './CardioTotals.jsx'
 
@@ -107,6 +108,8 @@ export default function SessionEntryCard({
   liveExercise,
   // All-time best for this exercise, from sessions already saved.
   personalBest,
+  // Earlier working sets {weight, reps}, to spot a reps record at a weight.
+  pastSets,
   onUpdateSet,
   onAddSet,
   onAddWarmups,
@@ -177,17 +180,28 @@ export default function SessionEntryCard({
     const n = Number(raw)
     return raw !== '' && raw != null && isFinite(n) ? n : null
   }
-  function isPrSet(s) {
-    // Only celebrate against a real previous best — the first time you
-    // ever do an exercise isn't something you beat.
-    if (personalBest == null) return false
-    const v = prValue(s)
-    return v != null && v > personalBest
+  const single = isCardio || !!entry.bodyweight
+  function prKindOf(s) {
+    if (isWarmup(s)) return null
+    if (single) {
+      const v = prValue(s)
+      return v != null && personalBest != null && v > personalBest ? 'weight' : null
+    }
+    return prKind(s, { single: false, best: personalBest, past: pastSets })
   }
-  const bestThisSession = (entry.sets || []).reduce((acc, s) => {
-    const v = !isWarmup(s) && isPrSet(s) ? prValue(s) : null
-    return v != null && (acc == null || v > acc) ? v : acc
-  }, null)
+  // Best weight record and best reps record among this session's sets.
+  let weightPr = null
+  let repsPr = null
+  for (const s of entry.sets || []) {
+    const k = prKindOf(s)
+    if (k === 'weight') {
+      const v = prValue(s)
+      if (weightPr == null || v > weightPr) weightPr = v
+    } else if (k === 'reps') {
+      if (repsPr == null || Number(s.reps) > Number(repsPr.reps)) repsPr = s
+    }
+  }
+  const bestThisSession = weightPr ?? (repsPr ? Number(repsPr.reps) : null)
 
   // Warm-ups: labels and last-time hints count working sets only, and the
   // suggestion ramps toward the first working set's weight (else last
@@ -306,13 +320,22 @@ export default function SessionEntryCard({
         <div className="min-w-0 flex-1 pt-1">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-lg">{entry.name}</h2>
-            {bestThisSession != null && (
+            {weightPr != null && (
               <span
                 className="pr-pop inline-flex items-center gap-1 rounded-full bg-brasssoft text-brass px-2 py-0.5 text-xs font-medium"
                 title={t('sessionCard.prTitle', { prev: `${personalBest}${prUnit}` })}
               >
-                <Trophy size={12} /> {t('sessionCard.prBadge')} {bestThisSession}
+                <Trophy size={12} /> {single ? t('sessionCard.prBadge') : t('sessionCard.weightPrBadge')} {weightPr}
                 {prUnit}
+              </span>
+            )}
+            {repsPr && (
+              <span
+                className="pr-pop inline-flex items-center gap-1 rounded-full bg-brasssoft text-brass px-2 py-0.5 text-xs font-medium"
+                title={t('sessionCard.repsPrTitle', { weight: `${repsPr.weight}${entry.unit}` })}
+              >
+                <Trophy size={12} /> {t('sessionCard.repsPrBadge')} {repsPr.reps} × {repsPr.weight}
+                {entry.unit}
               </span>
             )}
             {isCardio && <Badge tone="cardio">{t('sessionCard.cardioBadge')}</Badge>}
