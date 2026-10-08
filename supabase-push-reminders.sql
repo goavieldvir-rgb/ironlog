@@ -19,6 +19,9 @@ create table if not exists public.push_subscriptions (
 );
 
 alter table public.push_subscriptions enable row level security;
+revoke all on public.push_subscriptions from anon;
+-- RLS doesn't cover TRUNCATE, so signed-in users don't get it.
+revoke truncate, references, trigger on public.push_subscriptions from authenticated;
 create policy "own push subs select" on public.push_subscriptions for select to authenticated using (auth.uid() = user_id);
 create policy "own push subs insert" on public.push_subscriptions for insert to authenticated with check (auth.uid() = user_id);
 create policy "own push subs update" on public.push_subscriptions for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
