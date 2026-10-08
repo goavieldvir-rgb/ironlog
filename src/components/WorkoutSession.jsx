@@ -18,6 +18,7 @@ import RestTimer from './RestTimer.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { isWarmup, workingSets } from '../lib/warmup.js'
 import { buildSummary } from '../lib/shareSummary.js'
+import { preloadShareFonts } from '../lib/shareCard.js'
 import { weeklyStreak } from '../lib/streak.js'
 import WorkoutDone from './WorkoutDone.jsx'
 
@@ -126,6 +127,11 @@ export default function WorkoutSession() {
   // (or this exact freestyle session) sitting in local storage, restore it
   // instead of starting fresh — this is what makes "Resume workout" work,
   // and also what saves you if Safari reloads the tab mid-session.
+  // Fetch the share picture's fonts now so they're ready when the workout ends.
+  useEffect(() => {
+    preloadShareFonts()
+  }, [])
+
   useEffect(() => {
     if (isFreestyle) {
       const draft = loadDraft(effectiveUid, draftKey)
@@ -384,6 +390,7 @@ export default function WorkoutSession() {
         summaryData = buildSummary({
           entries,
           personalBests,
+          pastSets: pastStrengthSets,
           routineName: isFreestyle ? t('workout.freestyleSession') : routine?.name,
           date,
           durationMinutes: finalDuration(),

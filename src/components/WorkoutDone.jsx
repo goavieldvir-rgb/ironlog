@@ -244,9 +244,13 @@ export default function WorkoutDone({ summary, onDone }) {
       <Card className="flex flex-col gap-2">
         {summary.rows.map((r, i) => (
           <div key={i} className="flex items-baseline justify-between gap-3 text-sm">
-            <span className="min-w-0 truncate">
-              {r.name}
-              {r.pr && <span className="ms-2 text-xs bg-brass text-ink rounded-full px-2 py-0.5 font-semibold">{t('share.prTag')}</span>}
+            <span className="min-w-0 flex items-center gap-2">
+              <span className="truncate">{r.name}</span>
+              {r.prKind && (
+                <span className="shrink-0 text-xs bg-brass text-ink rounded-full px-2 py-0.5 font-semibold">
+                  {r.prKind === 'reps' ? t('sessionCard.repsPrBadge') : r.single ? t('sessionCard.prBadge') : t('sessionCard.weightPrBadge')}
+                </span>
+              )}
             </span>
             <span className="num text-chalkdim shrink-0">{iso(r.text)}</span>
           </div>

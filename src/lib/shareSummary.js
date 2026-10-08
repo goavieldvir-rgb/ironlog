@@ -5,17 +5,23 @@
 import { workingSets } from './warmup.js'
 import { cardioSummary, formatPace, formatDistance } from './cardio.js'
 import { formatSeconds } from './timed.js'
+import { entryPrKind } from './records.js'
 
 const num = (v) => {
   const n = Number(v)
   return v !== '' && v != null && isFinite(n) ? n : 0
 }
 
-// The number a record is judged on, same rule as the workout screen.
-function prValue(entry, set) {
-  const raw = entry.category === 'cardio' ? set.duration : entry.bodyweight ? set.reps : set.weight
-  const n = Number(raw)
-  return raw !== '' && raw != null && isFinite(n) && n > 0 ? n : null
+// This workout's best record on an exercise: 'weight' beats 'reps', and null
+// when no set broke one. Judged by the same rule as the workout screen.
+function recordKind(entry, sets, best, past) {
+  let kind = null
+  for (const s of sets) {
+    const k = entryPrKind(entry, s, best, past)
+    if (k === 'weight') return 'weight'
+    if (k === 'reps') kind = 'reps'
+  }
+  return kind
 }
 
 // Best working set: biggest main number, then the bigger second number.
@@ -44,7 +50,7 @@ export function bestSetText(entry, set, bwLabel) {
   return `${num(set.weight)}${entry.unit} × ${num(set.reps)}`
 }
 
-export function buildSummary({ entries, personalBests = {}, routineName, date, durationMinutes, streakWeeks = null, minLabel, bwLabel }) {
+export function buildSummary({ entries, personalBests = {}, pastSets = {}, routineName, date, durationMinutes, streakWeeks = null, minLabel, bwLabel }) {
   let volume = 0
   let volumeUnit = null
   let mixedVolumeUnits = false
@@ -68,11 +74,10 @@ export function buildSummary({ entries, personalBests = {}, routineName, date, d
         cardioUnit = cardioUnit && cardioUnit !== u ? 'mixed' : u
       }
       cardioMinutes += c.minutes
-      const best = e.exerciseId ? personalBests[e.exerciseId] : null
-      const pr = best != null && sets.some((s) => (prValue(e, s) || 0) > best)
-      if (pr) prCount += 1
+      const prKind = recordKind(e, e.sets || [], e.exerciseId ? personalBests[e.exerciseId] : null, null)
+      if (prKind) prCount += 1
       // each piece isolated left-to-right so a Hebrew unit can't reorder the numbers
-      rows.push({ name: e.name, text: parts.map((p) => `\u2066${p}\u2069`).join(' · '), pr })
+      rows.push({ name: e.name, text: parts.map((p) => `\u2066${p}\u2069`).join(' · '), pr: !!prKind, prKind, single: true })
       setCount += sets.filter((s) => num(s.duration) > 0).length
       continue
     }
@@ -89,9 +94,9 @@ export function buildSummary({ entries, personalBests = {}, routineName, date, d
       }
     }
     const prev = e.exerciseId ? personalBests[e.exerciseId] : null
-    const pr = prev != null && sets.some((s) => (prValue(e, s) || 0) > prev)
-    if (pr) prCount += 1
-    rows.push({ name: e.name, text: bestSetText(e, best, bwLabel), pr })
+    const prKind = recordKind(e, e.sets || [], prev, e.exerciseId ? pastSets[e.exerciseId] : null)
+    if (prKind) prCount += 1
+    rows.push({ name: e.name, text: bestSetText(e, best, bwLabel), pr: !!prKind, prKind, single: !!(e.bodyweight || e.timed) })
   }
 
   return {

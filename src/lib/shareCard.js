@@ -43,13 +43,40 @@ const FONT_REQUESTS = [
   `700 30px ${LBL_HE}`,
 ]
 
-let fontLink = null
+// The stylesheet is added once, and everyone waits on the same promise. It
+// settles when the stylesheet loads, fails, or 3 seconds pass, so a slow or
+// blocked Google Fonts can never hold up the Share buttons.
+const FONT_WAIT_MS = 3000
+let fontSheet = null
 function addFontStylesheet() {
-  if (fontLink || typeof document === 'undefined') return
-  fontLink = document.createElement('link')
-  fontLink.rel = 'stylesheet'
-  fontLink.href = FONT_CSS
-  document.head.appendChild(fontLink)
+  if (fontSheet || typeof document === 'undefined') return fontSheet || Promise.resolve()
+  fontSheet = new Promise((resolve) => {
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.href = FONT_CSS
+    link.onload = resolve
+    link.onerror = resolve
+    document.head.appendChild(link)
+    setTimeout(resolve, FONT_WAIT_MS)
+  })
+  return fontSheet
+}
+
+// Google splits each font by script, so a font only downloads the part that
+// covers the text it's asked about: ask with the Latin and Hebrew sample
+// text plus whatever the card is about to draw.
+const SAMPLE = 'Aa 0123456789,. אבגדהוזחטיכלמנסעפצקרשת״׳'
+async function loadFonts(extraText = '') {
+  await addFontStylesheet()
+  const text = `${SAMPLE} ${extraText}`
+  const loads = Promise.all(FONT_REQUESTS.map((f) => document.fonts.load(f, text)))
+  await Promise.race([loads, new Promise((resolve) => setTimeout(resolve, FONT_WAIT_MS))])
+}
+
+// Called when the workout screen opens, so the fonts are already on the phone
+// by the time the workout is finished.
+export function preloadShareFonts() {
+  loadFonts().catch(() => {})
 }
 
 function fit(ctx, text, maxW) {
@@ -130,9 +157,10 @@ function drawBlock(ctx, summary, { rtl, labels, y, look, layout }) {
   // workout name
   ctx.direction = dir
   ctx.fillStyle = look.text
-  // A Hebrew screen can still hold a workout named in English: that one gets
-  // the English capitals, since Karantina has no Latin lowercase of its own.
-  const hebName = rtl && /[\u0590-\u05FF]/.test(summary.routineName)
+  // The name's face follows the letters in it, not the screen's language: a
+  // Hebrew name gets Karantina, an English one gets the English capitals (Big
+  // Shoulders has no Hebrew, Karantina has no Latin lowercase).
+  const hebName = /[\u0590-\u05FF]/.test(summary.routineName)
   const name = hebName ? summary.routineName : summary.routineName.toUpperCase()
   const nameFont = hebName ? HEB_DISPLAY : NUM
   fitSize(ctx, name, hebName ? 700 : 800, nameFont, hebName ? L.nameSize * 1.25 : L.nameSize, 52, W - M * 2)
@@ -304,11 +332,9 @@ export async function loadPhoto(file) {
 // share menu if we're still busy making the picture when we ask for it.
 export async function prepareCard(summary, opts, fileName) {
   try {
-    // Canvas won't pull web fonts by itself: ask for the ones the card uses
-    // so it matches the app, then wait for them.
-    addFontStylesheet()
-    await Promise.all(FONT_REQUESTS.map((f) => document.fonts.load(f, 'Aa אב 123')))
-    await document.fonts.ready
+    // Canvas won't pull web fonts by itself: ask for the ones the card uses,
+    // with the exact text it draws, and wait (briefly) for them.
+    await loadFonts([summary.routineName, ...Object.values(opts.labels || {})].join(' '))
   } catch {
     /* fonts are optional: the fallback stack still draws a fine card */
   }
