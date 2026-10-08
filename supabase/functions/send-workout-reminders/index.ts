@@ -43,7 +43,7 @@ async function deliver(s: any, msg: { title: string; body: string }, tag: string
       { TTL: 3600 },
     )
     return 'sent'
-  } catch (e) {
+  } catch (e: any) {
     if (e.statusCode === 404 || e.statusCode === 410) {
       await db.from('push_subscriptions').delete().eq('id', s.id)
       return 'removed'
@@ -67,7 +67,7 @@ async function runTest(req: Request) {
     await db.from('push_subscriptions').update({ last_test_at: new Date().toISOString() }).eq('id', s.id)
     try {
       if ((await deliver(s, TEST_COPY[s.lang as 'en' | 'he'] || TEST_COPY.en, 'ironlog-test')) === 'sent') sent++
-    } catch (e) {
+    } catch (e: any) {
       console.error('test push failed', s.id, e?.message || e)
     }
   }
@@ -102,7 +102,7 @@ async function runReminders() {
         await db.from('push_subscriptions').update({ last_sent_date: now.date }).eq('id', s.id)
         sent++
       } else removed++
-    } catch (e) {
+    } catch (e: any) {
       console.error('reminder failed', s.id, e?.message || e)
       failed++
     }
