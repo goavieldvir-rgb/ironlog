@@ -17,6 +17,10 @@ import { ExerciseModal, emptyExerciseForm } from './ExerciseLibrary.jsx'
 import RestTimer from './RestTimer.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { isWarmup, workingSets } from '../lib/warmup.js'
+import { buildSummary } from '../lib/shareSummary.js'
+import { preloadShareFonts } from '../lib/shareCard.js'
+import { weeklyStreak } from '../lib/streak.js'
+import WorkoutDone from './WorkoutDone.jsx'
 
 function todayISO() {
   return toLocalISODate()
@@ -36,7 +40,7 @@ export default function WorkoutSession() {
 
   const [routines, routinesLoading] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [exercises, , refreshExercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
-  const [pastSessions] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const [pastSessions, pastLoading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
 
   // All-time best per exercise, from every session already saved. Same
   // rule the admin PR alert uses — heaviest weight for strength, most
@@ -86,6 +90,7 @@ export default function WorkoutSession() {
   const [saving, setSaving] = useState(false)
   useScrollLock(swapIndex != null || showLibraryPicker || creatingCustom)
   const [saved, setSaved] = useState(false)
+  const [summary, setSummary] = useState(null)
   // When this workout was started — carried inside the draft, so resuming
   // after a phone lock or app switch keeps the original start time.
   const [startedAt, setStartedAt] = useState(null)
@@ -122,6 +127,11 @@ export default function WorkoutSession() {
   // (or this exact freestyle session) sitting in local storage, restore it
   // instead of starting fresh — this is what makes "Resume workout" work,
   // and also what saves you if Safari reloads the tab mid-session.
+  // Fetch the share picture's fonts now so they're ready when the workout ends.
+  useEffect(() => {
+    preloadShareFonts()
+  }, [])
+
   useEffect(() => {
     if (isFreestyle) {
       const draft = loadDraft(effectiveUid, draftKey)
@@ -373,6 +383,26 @@ export default function WorkoutSession() {
   async function handleFinish() {
     setSaving(true)
     try {
+      // The recap is a bonus: if building it ever fails, saving carries on
+      // and we go to History exactly as before.
+      let summaryData = null
+      try {
+        summaryData = buildSummary({
+          entries,
+          personalBests,
+          pastSets: pastStrengthSets,
+          routineName: isFreestyle ? t('workout.freestyleSession') : routine?.name,
+          date,
+          durationMinutes: finalDuration(),
+          // No streak while past workouts are still loading (or failed to load).
+          streakWeeks: pastLoading ? null : weeklyStreak(pastSessions, date),
+          minLabel: t('sessionCard.minUnit'),
+          bwLabel: t('sessionCard.bwShort'),
+        })
+        if (!summaryData.rows.length) summaryData = null
+      } catch (err) {
+        console.error(err)
+      }
       await logSession(effectiveUid, {
         routineId: isFreestyle ? null : routine?.id,
         routineName: isFreestyle ? t('workout.freestyleSession') : routine?.name,
@@ -397,7 +427,9 @@ export default function WorkoutSession() {
       clearDraft(effectiveUid, draftKey)
       setSaved(true)
       toast(t('workout.sessionSaved'))
-      navigate('/history')
+      // Show the recap (with Share) instead of jumping straight to History.
+      if (summaryData) setSummary(summaryData)
+      else navigate('/history')
     } catch (err) {
       console.error(err)
       // The draft is only cleared on success, so a failed save (usually
@@ -427,6 +459,8 @@ export default function WorkoutSession() {
     if (draft?.routineId === routineId) clearDraft(effectiveUid, draftKey)
     return <p className="text-chalkdim">{t('workout.routineNotFound')}</p>
   }
+
+  if (summary) return <WorkoutDone summary={summary} onDone={() => navigate('/history', { replace: true })} />
 
   const availableToAdd = exercises.filter((e) => !entries.some((en) => en.exerciseId === e.id))
 

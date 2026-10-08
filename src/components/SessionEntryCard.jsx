@@ -7,7 +7,7 @@ import OverflowMenu from './OverflowMenu.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { isWarmup, workingSets, suggestWarmups } from '../lib/warmup.js'
 import { formatSeconds } from '../lib/timed.js'
-import { prKind } from '../lib/records.js'
+import { entryPrKind } from '../lib/records.js'
 import { cardioSummary } from '../lib/cardio.js'
 import CardioTotals from './CardioTotals.jsx'
 
@@ -182,12 +182,7 @@ export default function SessionEntryCard({
   }
   const single = isCardio || !!entry.bodyweight
   function prKindOf(s) {
-    if (isWarmup(s)) return null
-    if (single) {
-      const v = prValue(s)
-      return v != null && personalBest != null && v > personalBest ? 'weight' : null
-    }
-    return prKind(s, { single: false, best: personalBest, past: pastSets })
+    return entryPrKind(entry, s, personalBest, pastSets)
   }
   // Best weight record and best reps record among this session's sets.
   let weightPr = null
