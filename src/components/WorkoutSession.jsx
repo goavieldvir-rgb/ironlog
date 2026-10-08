@@ -42,8 +42,9 @@ export default function WorkoutSession() {
   // rule the admin PR alert uses — heaviest weight for strength, most
   // reps for a bodyweight move, longest interval for cardio — so what the
   // lifter sees and what the coach gets notified about never disagree.
-  const personalBests = useMemo(() => {
+  const { personalBests, pastStrengthSets } = useMemo(() => {
     const best = {}
+    const past = {}
     for (const s of pastSessions) {
       for (const e of s.entries || []) {
         if (!e.exerciseId) continue
@@ -51,12 +52,15 @@ export default function WorkoutSession() {
           if (isWarmup(set)) continue
           const raw = e.category === 'cardio' ? set.duration : e.bodyweight ? set.reps : set.weight
           const n = Number(raw)
+          if (e.category !== 'cardio' && !e.bodyweight && n > 0 && Number(set.reps) > 0) {
+            ;(past[e.exerciseId] ||= []).push({ weight: n, reps: Number(set.reps) })
+          }
           if (!raw || !isFinite(n) || n <= 0) continue
           if (best[e.exerciseId] == null || n > best[e.exerciseId]) best[e.exerciseId] = n
         }
       }
     }
-    return best
+    return { personalBests: best, pastStrengthSets: past }
   }, [pastSessions])
   const routine = useMemo(() => routines.find((r) => r.id === routineId), [routines, routineId])
   // Each routine keeps its own in-progress workout, so starting a second
@@ -456,6 +460,7 @@ export default function WorkoutSession() {
             entry={entry}
             liveExercise={exercises.find((e) => e.id === entry.exerciseId)}
             personalBest={personalBests[entry.exerciseId]}
+            pastSets={pastStrengthSets[entry.exerciseId]}
             removable
             onMoveUp={i > 0 ? () => moveEntry(i, -1) : undefined}
             onMoveDown={i < entries.length - 1 ? () => moveEntry(i, 1) : undefined}
