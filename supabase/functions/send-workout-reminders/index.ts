@@ -7,7 +7,7 @@
 //    that user's own subscriptions, at most once a minute.
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import webpush from 'npm:web-push@3.6.7'
-import { isAllowedEndpoint, isDue, localParts } from './helpers.ts'
+import { isAllowedEndpoint, isDue, localParts, reminderKind } from './helpers.ts'
 
 const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
@@ -24,6 +24,10 @@ const json = (body: unknown, status = 200) =>
 const COPY = {
   en: (names: string) => ({ title: "Today's workout", body: `${names} is on the plan today. Let's go.` }),
   he: (names: string) => ({ title: 'האימון של היום', body: `${names} מחכה לכם היום. בואו נתחיל.` }),
+}
+const REST_COPY = {
+  en: { title: 'Rest day', body: 'Recovery is key. Rest well today.' },
+  he: { title: 'יום מנוחה', body: 'התאוששות היא המפתח. נוחו היטב היום.' },
 }
 const TEST_COPY = {
   en: { title: 'Ironlog', body: 'Test notification. Reminders are working.' },
@@ -84,19 +88,24 @@ async function runReminders() {
       const now = localParts(s.tz)
       if (s.last_sent_date === now.date || !isDue(s.remind_time, now.minutes)) { skipped++; continue }
 
-      const { data: sched } = await db.from('weekly_schedule').select('routine_id')
-        .eq('user_id', s.user_id).eq('day_of_week', now.dow).not('routine_id', 'is', null)
-      const ids = [...new Set((sched || []).map((r) => r.routine_id))]
-      if (!ids.length) { skipped++; continue }
+      const { data: sched } = await db.from('weekly_schedule').select('day_of_week, routine_id')
+        .eq('user_id', s.user_id).not('routine_id', 'is', null)
+      const planned = sched || []
+      const ids = [...new Set(planned.filter((r) => r.day_of_week === now.dow).map((r) => r.routine_id))]
 
-      // Already trained as much as was planned today? Then no nudge.
       const { count } = await db.from('sessions').select('id', { count: 'exact', head: true })
         .eq('user_id', s.user_id).eq('date', now.date)
-      if ((count || 0) >= ids.length) { skipped++; continue }
+      const kind = reminderKind(ids.length, planned.length, count || 0)
+      if (!kind) { skipped++; continue }
 
-      const { data: routines } = await db.from('routines').select('name').in('id', ids)
-      const names = (routines || []).map((r) => r.name).join(' + ') || 'Workout'
-      const msg = (COPY[s.lang as 'en' | 'he'] || COPY.en)(names)
+      let msg
+      if (kind === 'rest') {
+        msg = REST_COPY[s.lang as 'en' | 'he'] || REST_COPY.en
+      } else {
+        const { data: routines } = await db.from('routines').select('name').in('id', ids)
+        const names = (routines || []).map((r) => r.name).join(' + ') || 'Workout'
+        msg = (COPY[s.lang as 'en' | 'he'] || COPY.en)(names)
+      }
 
       if ((await deliver(s, msg, 'ironlog-daily')) === 'sent') {
         await db.from('push_subscriptions').update({ last_sent_date: now.date }).eq('id', s.id)

@@ -1,5 +1,5 @@
 // Run with: deno test supabase/functions/send-workout-reminders/helpers.test.ts
-import { isAllowedEndpoint, isDue, localParts } from './helpers.ts'
+import { isAllowedEndpoint, isDue, localParts, reminderKind } from './helpers.ts'
 
 const assert = (c: boolean, m: string) => { if (!c) throw new Error('FAIL ' + m) }
 
@@ -29,4 +29,13 @@ Deno.test('only real push services are contacted', () => {
     'https://evil.com/.notify.windows.com/', 'https://user@fcm.googleapis.com/x', 'https://fcm.googleapis.com:8443/x',
     'https://notify.windows.com.evil.com/', 'https://127.0.0.1/x', 'not a url'])
     assert(!isAllowedEndpoint(bad), 'rejects ' + bad)
+})
+
+Deno.test('workout, rest day or nothing', () => {
+  assert(reminderKind(1, 4, 0) === 'workout', 'planned and not done yet')
+  assert(reminderKind(2, 4, 1) === 'workout', 'one of two done')
+  assert(reminderKind(1, 4, 1) === null, 'planned work already logged')
+  assert(reminderKind(0, 4, 0) === 'rest', 'rest day')
+  assert(reminderKind(0, 4, 1) === null, 'trained on a rest day: no rest note')
+  assert(reminderKind(0, 0, 0) === null, 'no plan at all: nothing')
 })
