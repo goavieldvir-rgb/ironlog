@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useRef, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, CheckCircle2, X } from 'lucide-react'
 import { useLanguage } from './LanguageContext.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
@@ -35,6 +35,13 @@ export function FeedbackProvider({ children }) {
     resolverRef.current = null
   }
 
+  useEffect(() => {
+    if (!dialog) return
+    const onKey = (e) => e.key === 'Escape' && close(false)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [dialog])
+
   const toast = useCallback((message, tone = 'success') => {
     const id = Math.random().toString(36).slice(2)
     setToasts((prev) => [...prev, { id, message, tone }])
@@ -54,14 +61,14 @@ export function FeedbackProvider({ children }) {
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => close(false)}
-                className="rounded-md px-3.5 py-2 text-sm font-medium border border-line text-chalk hover:bg-surface2"
+                className="rounded-md px-3.5 py-2 min-h-[44px] text-sm font-medium border border-line text-chalk hover:bg-surface2"
               >
                 {dialog.cancelLabel || t('common.cancel')}
               </button>
               <button
                 onClick={() => close(true)}
                 autoFocus
-                className={`rounded-md px-3.5 py-2 text-sm font-medium ${
+                className={`rounded-md px-3.5 py-2 min-h-[44px] text-sm font-medium ${
                   dialog.danger ? 'bg-ironbtn text-chalk hover:bg-ironbtn/90' : 'bg-brass text-ink hover:bg-brass/90'
                 }`}
               >
