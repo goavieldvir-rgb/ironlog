@@ -129,7 +129,7 @@ begin
         insert into admin_notifications (type, trainee_id, detail)
         values ('pr', NEW.user_id, ex_name || ': ' || detail_text);
 
-      elsif ex_category <> 'cardio' and not ex_bodyweight then
+      elsif coalesce(ex_category, '') <> 'cardio' and not coalesce(ex_bodyweight, false) then
         -- Not a heavier lift, but maybe more reps than ever at this weight
         -- or heavier (a Reps PR). Needs an earlier set to beat. Mirrors the
         -- app: working sets only, judged against other sessions.
