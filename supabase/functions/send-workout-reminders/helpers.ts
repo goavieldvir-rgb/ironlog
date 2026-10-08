@@ -44,3 +44,13 @@ export function isAllowedEndpoint(endpoint: string) {
     return false
   }
 }
+
+// What to send on a given day: the workout reminder, a rest day note, or
+// nothing. Someone with nothing scheduled all week hasn't set up a plan, so
+// they get nothing rather than a rest day message every day. Already having
+// trained as planned (or trained on a rest day) also means no nudge.
+export function reminderKind(plannedToday: number, plannedThisWeek: number, loggedToday: number): 'workout' | 'rest' | null {
+  if (plannedThisWeek === 0) return null
+  if (plannedToday > 0) return loggedToday >= plannedToday ? null : 'workout'
+  return loggedToday > 0 ? null : 'rest'
+}
