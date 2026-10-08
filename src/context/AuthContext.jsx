@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../supabase.js'
+import { removeDeviceReminder } from '../lib/push.js'
 
 const AuthContext = createContext(null)
 
@@ -38,7 +39,10 @@ export function AuthProvider({ children }) {
       })
       if (error) throw error
     },
-    logout: () => supabase.auth.signOut(),
+    logout: async () => {
+      if (user) await removeDeviceReminder(user.uid)
+      return supabase.auth.signOut()
+    },
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

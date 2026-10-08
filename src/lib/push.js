@@ -81,7 +81,7 @@ async function saveReminder(uid, sub, remindTime, lang) {
       lang,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: 'endpoint' },
+    { onConflict: 'user_id,endpoint' },
   )
   if (error) throw error
 }
@@ -99,4 +99,29 @@ export async function disableReminder(uid) {
   if (!sub) return
   await supabase.from('push_subscriptions').delete().eq('user_id', uid).eq('endpoint', sub.endpoint)
   await sub.unsubscribe()
+}
+
+// Asks the server to push a test notification to this person's own devices.
+// Returns 'sent' | 'too-soon' | 'failed'.
+export async function sendTestNotification() {
+  const { data, error } = await supabase.functions.invoke('send-workout-reminders', { body: { test: true } })
+  if (error) {
+    return error.context?.status === 429 ? 'too-soon' : 'failed'
+  }
+  return data?.sent > 0 ? 'sent' : 'failed'
+}
+
+// Signing out removes this phone's reminder, so the next person who signs in
+// here doesn't get the previous person's workout notifications.
+export async function removeDeviceReminder(uid) {
+  try {
+    if (!('serviceWorker' in navigator)) return
+    const reg = await navigator.serviceWorker.getRegistration()
+    const sub = await reg?.pushManager.getSubscription()
+    if (!sub) return
+    await supabase.from('push_subscriptions').delete().eq('user_id', uid).eq('endpoint', sub.endpoint)
+    await sub.unsubscribe()
+  } catch (e) {
+    console.error(e)
+  }
 }

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import { Bell, Share, SquarePlus, Smartphone } from 'lucide-react'
+import { Bell, Share, SquarePlus, Smartphone, Send } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
-import { Card } from './ui.jsx'
-import { DEFAULT_REMIND_TIME, pushStatus, getMyReminder, enableReminder, updateReminder, disableReminder, isIOS } from '../lib/push.js'
+import { Card, Button } from './ui.jsx'
+import { DEFAULT_REMIND_TIME, pushStatus, getMyReminder, enableReminder, updateReminder, disableReminder, sendTestNotification, isIOS } from '../lib/push.js'
 
 export default function Notifications() {
   const { user } = useAuth()
@@ -42,6 +42,16 @@ export default function Notifications() {
     } catch (e) {
       console.error(e)
       toast(e.message === 'denied' ? t('notifications.denied') : t('notifications.failed'), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function sendTest() {
+    setBusy(true)
+    try {
+      const r = await sendTestNotification()
+      toast(t(r === 'sent' ? 'notifications.testSent' : r === 'too-soon' ? 'notifications.testWait' : 'notifications.failed'), r === 'sent' ? undefined : 'error')
     } finally {
       setBusy(false)
     }
@@ -125,6 +135,13 @@ export default function Notifications() {
               className="num bg-surface2 rounded-md px-3 min-h-[44px] text-chalk"
             />
           </label>
+          {on && (
+            <div className="border-t border-line pt-4">
+              <Button variant="ghost" onClick={sendTest} disabled={busy}>
+                <Send size={16} /> {t('notifications.testButton')}
+              </Button>
+            </div>
+          )}
         </Card>
       )}
 
