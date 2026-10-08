@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Play, X } from 'lucide-react'
+import { ExternalLink, Play, X } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { resolveExerciseVideo, youtubeEmbedUrl } from '../lib/demoVideos.js'
@@ -72,6 +72,16 @@ function VideoModal({ video, name, onClose }) {
         <div className="relative w-full aspect-video rounded-md overflow-hidden bg-black" dir="ltr">
           <LoopingClip video={video} title={t('sessionCard.exampleOf', { name })} />
         </div>
+        {/* A way out when a clip won't play here (removed, or its owner
+            blocks embedding), and the full video with sound and chapters. */}
+        <a
+          href={watchUrl(video)}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 text-xs text-brass hover:underline mt-2"
+        >
+          <ExternalLink size={12} /> {t('sessionCard.openOnYouTube')}
+        </a>
       </div>
     </div>,
     document.body,
@@ -104,14 +114,46 @@ function loadYouTubeApi() {
   return apiPromise
 }
 
+function watchUrl({ id, start }) {
+  const t = Number.isFinite(start) && start > 0 ? `&t=${Math.floor(start)}s` : ''
+  return `https://www.youtube.com/watch?v=${id}${t}`
+}
+
+// Plain embed: plays muted, loops from 0:00, YouTube's own controls shown so
+// a trainee can unmute or scrub.
+function PlainClip({ video, title }) {
+  return (
+    <iframe
+      className="absolute inset-0 w-full h-full border-0"
+      src={youtubeEmbedUrl(video.id, { start: video.start, end: video.end })}
+      title={title}
+      allow="autoplay; encrypted-media; picture-in-picture"
+      allowFullScreen
+      referrerPolicy="strict-origin-when-cross-origin"
+    />
+  )
+}
+
 function LoopingClip({ video, title }) {
+  const trimmed = (Number.isFinite(video.start) && video.start > 0) || (Number.isFinite(video.end) && video.end > 0)
+  if (!trimmed) return <PlainClip video={video} title={title} />
+  return <TrimmedClip video={video} title={title} />
+}
+
+// Only clips with a start or end time go through the iframe API. If it
+// doesn't come up in time, or the player reports an error, the plain embed
+// takes over: it still plays, just looping from 0:00.
+function TrimmedClip({ video, title }) {
   const box = useRef(null)
   const [failed, setFailed] = useState(false)
   useEffect(() => {
     let player = null
     let cancelled = false
+    let ready = false
     const start = Number.isFinite(video.start) && video.start > 0 ? Math.floor(video.start) : 0
     const end = Number.isFinite(video.end) && video.end > start ? Math.floor(video.end) : undefined
+    const fail = () => !cancelled && setFailed(true)
+    const timer = setTimeout(() => !ready && fail(), 8000)
     loadYouTubeApi()
       .then((YT) => {
         if (cancelled || !box.current) return
@@ -122,13 +164,15 @@ function LoopingClip({ video, title }) {
         player = new YT.Player(el, {
           host: 'https://www.youtube-nocookie.com',
           videoId: video.id,
-          playerVars: { autoplay: 1, mute: 1, playsinline: 1, rel: 0, modestbranding: 1, start, end },
+          playerVars: { autoplay: 1, mute: 1, playsinline: 1, controls: 1, rel: 0, modestbranding: 1, start, end },
           events: {
             onReady: (e) => {
+              ready = true
               e.target.getIframe()?.setAttribute('title', title)
               e.target.mute()
               e.target.playVideo()
             },
+            onError: fail,
             onStateChange: (e) => {
               if (e.data === YT.PlayerState.ENDED) {
                 // loadVideoById keeps the end time; seekTo alone would not.
@@ -138,26 +182,13 @@ function LoopingClip({ video, title }) {
           },
         })
       })
-      .catch(() => !cancelled && setFailed(true))
+      .catch(fail)
     return () => {
       cancelled = true
+      clearTimeout(timer)
       player?.destroy?.()
-      if (box.current) box.current.textContent = ''
     }
   }, [video.id, video.start, video.end, title])
-  // If the iframe API can't load, fall back to a plain embed: it still
-  // plays and loops, just from 0:00.
-  if (failed) {
-    return (
-      <iframe
-        className="absolute inset-0 w-full h-full border-0"
-        src={youtubeEmbedUrl(video.id, { start: video.start, end: video.end })}
-        title={title}
-        allow="autoplay; encrypted-media; picture-in-picture"
-        allowFullScreen
-        referrerPolicy="strict-origin-when-cross-origin"
-      />
-    )
-  }
+  if (failed) return <PlainClip video={video} title={title} />
   return <div ref={box} className="absolute inset-0 [&>iframe]:w-full [&>iframe]:h-full [&>iframe]:border-0" />
 }

@@ -95,10 +95,12 @@ export default function SessionDetail() {
               {entry.category === 'cardio' && <Badge tone="cardio">{t('sessionCard.cardioBadge')}</Badge>}
               {entry.category !== 'cardio' && entry.timed ? <Badge tone="brass">{t('exercises.timedBadge')}</Badge> : entry.category !== 'cardio' && entry.bodyweight && <Badge tone="brass">{t('sessionCard.bodyweightBadge')}</Badge>}
             </div>
+            {/* The exercise's current link first (a coach may have set or
+                changed it since), then the one saved with the session. */}
             <ExerciseVideo
               name={entry.name}
               matchNames={[exercises.find((x) => x.id === entry.exerciseId)?.name, entry.nameEn]}
-              videoUrl={entry.videoUrl}
+              videoUrl={exercises.find((x) => x.id === entry.exerciseId)?.video_url || entry.videoUrl}
               className="text-xs"
             />
           </div>

@@ -42,7 +42,8 @@ export const DEMO_VIDEOS = {
   seated_leg_curl: { id: 'jq03iefZxjc' }, // PartnerMD
   adductor_machine: { id: 'fpVHoidfg60' }, // Live Lean TV Daily Exercises
   calf_raise: { id: '3UWi44yN-wM' }, // ScottHermanFitness
-  split_squat: { id: '2C-uNgKwPLE' }, // ScottHermanFitness
+  split_squat: { id: '5VG4UnfA7Bk' }, // Steev
+  bulgarian_split_squat: { id: '2C-uNgKwPLE' }, // ScottHermanFitness
   static_lunge: { id: 'T2s9nByxqvk' }, // Get Healthy U - with Chris Freytag
   step_down: { id: 'Or4C-UQ63Xc' }, // Dr. Carl Baird
   captains_chair_leg_raise: { id: '7KDDZtaUaxw' }, // Live Lean TV Daily Exercises
@@ -115,7 +116,6 @@ const ALIASES = {
   'bicep curls': 'dumbbell_curl',
   'biceps curl': 'dumbbell_curl',
   'bicep curl seated dumbbells': 'seated_dumbbell_curl',
-  'bicep short head': 'concentration_curl',
   'cable chest fly': 'cable_fly',
   'cable fly': 'cable_fly',
   'cable flyes': 'cable_fly',
@@ -210,6 +210,8 @@ const ALIASES = {
   'single arm lat pulldown': 'single_arm_lat_pulldown',
   'split squat': 'split_squat',
   'split squats': 'split_squat',
+  'bulgarian split squat': 'bulgarian_split_squat',
+  'bulgarian split squats': 'bulgarian_split_squat',
   'static lunge': 'static_lunge',
   'static lunges': 'static_lunge',
   'step down': 'step_down',
@@ -264,11 +266,30 @@ export function youtubeIdFromUrl(url) {
   if (host === 'youtu.be' || host === 'www.youtu.be') {
     id = u.pathname.split('/')[1]
   } else if (YT_HOSTS.test(host)) {
+    // embed/videoseries is a playlist, not a video: left as a plain link.
     const m = u.pathname.match(/^\/(?:shorts|embed|live|v)\/([^/?#]+)/)
     if (m) id = m[1]
     else if (u.pathname === '/watch') id = u.searchParams.get('v')
   }
-  return id && YT_ID.test(id) ? id : null
+  return id && YT_ID.test(id) && id !== 'videoseries' ? id : null
+}
+
+// A shared link's own start time ("t=95", "t=95s", "start=95", "t=1m35s"),
+// in seconds, or undefined.
+export function youtubeStartFromUrl(url) {
+  let u
+  try {
+    const raw = String(url || '').trim()
+    u = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`)
+  } catch {
+    return undefined
+  }
+  const v = u.searchParams.get('t') || u.searchParams.get('start') || (u.hash.match(/t=([^&]+)/) || [])[1]
+  if (!v) return undefined
+  const m = String(v).match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/)
+  if (!m || !m[0]) return undefined
+  const secs = (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0)
+  return secs > 0 ? secs : undefined
 }
 
 // Muted autoplay that loops (YouTube only loops when playlist = the same
@@ -295,7 +316,7 @@ export function resolveExerciseVideo({ name, videoUrl }) {
   const own = String(videoUrl || '').trim()
   if (own) {
     const id = youtubeIdFromUrl(own)
-    if (id) return { kind: 'embed', id }
+    if (id) return { kind: 'embed', id, start: youtubeStartFromUrl(own) }
     const url = safeVideoUrl(own)
     return url ? { kind: 'link', url } : null
   }
