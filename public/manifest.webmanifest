@@ -1,0 +1,12 @@
+{
+  "name": "Ironlog — Training Log",
+  "short_name": "Ironlog",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#14161A",
+  "theme_color": "#14161A",
+  "icons": [
+    { "src": "./apple-touch-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

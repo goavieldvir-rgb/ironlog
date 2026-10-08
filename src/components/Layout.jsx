@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom'
-import { Dumbbell, LayoutDashboard, ListChecks, History, Library, LogOut, Menu, X, Users, UserCheck, BarChart3, Scale, FileText, HelpCircle, CircleUser } from 'lucide-react'
+import { Dumbbell, LayoutDashboard, ListChecks, History, Library, LogOut, Menu, X, Users, UserCheck, BarChart3, Scale, FileText, HelpCircle, CircleUser, Bell } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -92,6 +92,13 @@ export default function Layout() {
               <span className={`px-2 py-1 rounded ${lang === 'he' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>עב</span>
             </button>
             <NavLink
+              to="/notifications"
+              className="text-chalkdim hover:text-brass transition-colors p-2 rounded-md hover:bg-surface2"
+              title={t('nav.notifications')} aria-label={t('nav.notifications')}
+            >
+              <Bell size={18} />
+            </NavLink>
+            <NavLink
               to="/help"
               className="text-chalkdim hover:text-brass transition-colors p-2 rounded-md hover:bg-surface2"
               title={t('layout.howItWorks')}
@@ -179,6 +186,17 @@ export default function Layout() {
                   {t(l.labelKey)}
                 </NavLink>
               ))}
+              <NavLink
+                to="/notifications"
+                onClick={() => setOpen(false)}
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-2 py-3 rounded-md whitespace-nowrap ${
+                    isActive ? 'bg-surface2 text-chalk' : 'text-chalkdim'
+                  }`
+                }
+              >
+                <Bell size={16} /> {t('nav.notifications')}
+              </NavLink>
               <NavLink
                 to="/account"
                 onClick={() => setOpen(false)}
