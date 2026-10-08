@@ -173,7 +173,7 @@ export default function RoutineBuilder() {
       } else {
         await addRoutine(effectiveUid, payload)
       }
-      toast(t('feedback.saved'))
+      toast(t('routines.routineSaved'))
       navigate('/routines')
     } catch (err) {
       console.error(err)
