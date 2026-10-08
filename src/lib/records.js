@@ -15,6 +15,12 @@ export function prKind(set, { single, best, past }) {
   if (w > best) return 'weight'
   if (!set.reps || !isFinite(r) || r <= 0) return null
   let most = 0
-  for (const p of past || []) if (p.weight >= w && p.reps > most) most = p.reps
-  return r > most ? 'reps' : null
+  let found = false
+  for (const p of past || []) {
+    if (p.weight < w) continue
+    found = true
+    if (p.reps > most) most = p.reps
+  }
+  // No earlier set at this weight or heavier to beat: nothing to call a record.
+  return found && r > most ? 'reps' : null
 }
