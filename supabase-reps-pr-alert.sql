@@ -137,11 +137,11 @@ begin
         reps_top := null;
         for set_row in select * from jsonb_array_elements(entry->'sets')
         loop
-          if coalesce((set_row->>'warmup')::boolean, false)
-            or not (coalesce(set_row->>'weight', '') ~ numeric_pattern)
-            or not (coalesce(set_row->>'reps', '') ~ numeric_pattern)
-            or (set_row->>'weight')::numeric <= 0
-            or (set_row->>'reps')::numeric <= 0 then
+          -- CASE keeps the numeric casts from running on blank or non-numeric
+          -- text (SQL does not promise AND/OR short-circuiting).
+          if coalesce(set_row->>'warmup', '') = 'true'
+            or coalesce(case when (set_row->>'weight') ~ numeric_pattern then (set_row->>'weight')::numeric end, 0) <= 0
+            or coalesce(case when (set_row->>'reps') ~ numeric_pattern then (set_row->>'reps')::numeric end, 0) <= 0 then
             continue;
           end if;
 
@@ -153,10 +153,10 @@ begin
           where sess.user_id = NEW.user_id
             and sess.id != NEW.id
             and e.entry_elem ->> 'exerciseId' = ex_id
-            and not coalesce((s.set_elem->>'warmup')::boolean, false)
-            and coalesce(s.set_elem->>'weight', '') ~ numeric_pattern
-            and coalesce(s.set_elem->>'reps', '') ~ numeric_pattern
-            and (s.set_elem->>'weight')::numeric >= (set_row->>'weight')::numeric;
+            and coalesce(s.set_elem->>'warmup', '') <> 'true'
+            and coalesce(case when (s.set_elem->>'weight') ~ numeric_pattern
+                               and (s.set_elem->>'reps') ~ numeric_pattern
+                              then (s.set_elem->>'weight')::numeric end, -1) >= (set_row->>'weight')::numeric;
 
           if prev_cnt > 0 and (set_row->>'reps')::numeric > prev_reps
             and (reps_top is null or (set_row->>'reps')::numeric > reps_top) then
