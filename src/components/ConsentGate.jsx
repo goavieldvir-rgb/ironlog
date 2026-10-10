@@ -2,8 +2,10 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { fetchLatestConsent, recordConsent } from '../lib/db.js'
+import { privacy } from '../legal/privacy.js'
 import { terms, termsPlainText, hashText, TERMS_VERSION, TERMS_DOC_KEY } from '../legal/terms.js'
 import { Button, Card, Field } from './ui.jsx'
+import { PrivacySections } from './Privacy.jsx'
 
 // Shown after signing in, before anything else, until the current version
 // of the terms has been accepted. Gating here rather than at signup means
@@ -12,12 +14,14 @@ import { Button, Card, Field } from './ui.jsx'
 export default function ConsentGate({ uid, children }) {
   const { t, lang } = useLanguage()
   const { toast } = useFeedback()
-  const [state, setState] = useState('checking') // checking | needed | ok
+  const [state, setState] = useState('checking') // checking | needed | ok | error
   const [isMinor, setIsMinor] = useState(false)
   const [guardianName, setGuardianName] = useState('')
   const [guardianContact, setGuardianContact] = useState('')
   const [readToEnd, setReadToEnd] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [showPrivacy, setShowPrivacy] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const scrollRef = useRef(null)
 
   useEffect(() => {
@@ -32,13 +36,15 @@ export default function ConsentGate({ uid, children }) {
       .catch((err) => {
         console.error(err)
         // If the check itself fails (offline, or the table isn't there
-        // yet), don't lock someone out of their own training log.
-        if (!cancelled) setState('ok')
+        // yet), don't let anyone in without a recorded acceptance: show a
+        // retry instead. Failing open would let people use the app having
+        // never agreed to the terms.
+        if (!cancelled) setState('error')
       })
     return () => {
       cancelled = true
     }
-  }, [uid])
+  }, [uid, attempt])
 
   // Switching between the adult and under-18 text means a different
   // document, so the "read it" check starts again.
@@ -89,6 +95,19 @@ export default function ConsentGate({ uid, children }) {
   if (state === 'checking') return null
   if (state === 'ok') return children
 
+  if (state === 'error') {
+    return (
+      <div className="min-h-screen bg-ink px-4 py-8 flex justify-center">
+        <div className="w-full max-w-lg flex flex-col gap-4 items-center text-center">
+          <p className="text-chalkdim text-sm">{t('consent.checkFailed')}</p>
+          <Button onClick={() => setAttempt((n) => n + 1)}>{t('consent.retry')}</Button>
+        </div>
+      </div>
+    )
+  }
+
+  const privacyDoc = privacy[lang] || privacy.en
+
   return (
     <div className="min-h-screen bg-ink px-4 py-8 flex justify-center">
       <div className="w-full max-w-lg flex flex-col gap-4">
@@ -123,6 +142,21 @@ export default function ConsentGate({ uid, children }) {
             </div>
           ))}
         </div>
+
+        {/* Opens in place so nothing typed here is lost. */}
+        <button
+          type="button"
+          onClick={() => setShowPrivacy((v) => !v)}
+          aria-expanded={showPrivacy}
+          className="text-chalkdim text-xs hover:text-brass w-fit"
+        >
+          {t('consent.readPrivacy')}
+        </button>
+        {showPrivacy && (
+          <div className="card p-5 max-h-[50vh] overflow-y-auto">
+            <PrivacySections doc={privacyDoc} />
+          </div>
+        )}
 
         {isMinor && (
           <Card className="flex flex-col gap-3">

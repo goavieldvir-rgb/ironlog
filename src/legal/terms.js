@@ -9,7 +9,7 @@
 // clear and calm rather than dramatic. Have an Israeli lawyer review it
 // before relying on it — especially the injury and minors sections.
 
-export const TERMS_VERSION = 1
+export const TERMS_VERSION = 2
 export const TERMS_DOC_KEY = 'training-terms'
 
 export const terms = {
@@ -32,7 +32,7 @@ export const terms = {
         {
           heading: 'What the app stores',
           body:
-            'The workouts you log, the exercises and routines you create, your notes, and your body weight if you choose to record it. Your name and email come from your account. This is kept so you can see your own history and so your coach can follow your progress.',
+            'The workouts you log, the exercises and routines you create, your notes, and your body weight if you choose to record it. Your name and email come from your account. This includes health and fitness information. By accepting, you explicitly agree to it being processed for your training as described in the Privacy notice. It is kept so you can see your own history and so your coach can follow your progress.',
         },
         {
           heading: 'Who can see it',
@@ -42,7 +42,7 @@ export const terms = {
         {
           heading: 'Where it is kept',
           body:
-            'On Supabase, a hosting service, on servers outside Israel. It is kept while your account exists.',
+            'On Supabase, a hosting service, on servers in Japan. It is kept while your account exists. The Privacy notice lists every service involved.',
         },
         {
           heading: 'Your data is yours',
@@ -53,6 +53,20 @@ export const terms = {
           heading: 'Keeping it honest',
           body:
             'Use the app for your own training. Do not share your login. If something looks wrong in your data, tell your coach.',
+        },
+        {
+          heading: 'Limits of responsibility',
+          body:
+            'To the extent the law allows, your coach is not liable for injury or loss that comes from training you choose to do, from incorrect data you enter, or from the app being unavailable. Nothing here limits liability that the law does not allow to be limited, for example in cases of gross negligence.',
+        },
+        {
+          heading: 'Changes and ending',
+          body:
+            'Your coach may update these terms and will ask you to accept again when they do. Either of you can stop at any time, and you can delete your account whenever you like.',
+        },
+        {
+          heading: 'Governing law',
+          body: 'These terms are governed by Israeli law, and the courts in Israel decide any dispute.',
         },
       ],
       accept: 'I have read and accept the above',
@@ -80,12 +94,26 @@ export const terms = {
         {
           heading: 'What the app stores and who sees it',
           body:
-            'The workouts you log, your exercises and routines, your notes, and your body weight if you record it, along with your name and email. You and your coach can see it. Your parent or guardian may ask the coach to see it or to have it deleted at any time. Other trainees cannot see it. It is not sold or used for advertising.',
+            'The workouts you log, your exercises and routines, your notes, and your body weight if you record it, along with your name and email. This includes health and fitness information. By accepting, you and your parent or guardian explicitly agree to it being processed for your training as described in the Privacy notice. It is kept on Supabase servers in Japan, and the Privacy notice lists every service involved. You and your coach can see it. Your parent or guardian may ask the coach to see it or to have it deleted at any time. Other trainees cannot see it. It is not sold or used for advertising.',
         },
         {
           heading: 'Your data is yours',
           body:
             'From the Account page you can download everything you have logged, or delete your account and all of its data permanently. Your parent or guardian can ask the coach to do this for you.',
+        },
+        {
+          heading: 'Limits of responsibility',
+          body:
+            'To the extent the law allows, your coach is not liable for injury or loss that comes from training you choose to do, from incorrect data you enter, or from the app being unavailable. Nothing here limits liability that the law does not allow to be limited, for example in cases of gross negligence.',
+        },
+        {
+          heading: 'Changes and ending',
+          body:
+            'Your coach may update these terms and will ask you and your parent or guardian to accept again when they do. Either side can stop at any time, and you can delete your account whenever you like.',
+        },
+        {
+          heading: 'Governing law',
+          body: 'These terms are governed by Israeli law, and the courts in Israel decide any dispute.',
         },
       ],
       accept: 'My parent or guardian has read this and agrees',
@@ -112,7 +140,7 @@ export const terms = {
         {
           heading: 'מה נשמר באפליקציה',
           body:
-            'האימונים שתיעדתם, התרגילים והתוכניות שיצרתם, ההערות שלכם, ומשקל הגוף אם בחרתם לתעד אותו. השם והאימייל מגיעים מהחשבון שלכם. זה נשמר כדי שתוכלו לראות את ההיסטוריה שלכם וכדי שהמאמן יוכל לעקוב אחרי ההתקדמות.',
+            'האימונים שתיעדתם, התרגילים והתוכניות שיצרתם, ההערות שלכם, ומשקל הגוף אם בחרתם לתעד אותו. השם והאימייל מגיעים מהחשבון שלכם. זה כולל מידע על בריאות וכושר. באישור אתם מסכימים במפורש לעיבוד שלו לצורך האימון שלכם, כמתואר בהודעת הפרטיות. זה נשמר כדי שתוכלו לראות את ההיסטוריה שלכם וכדי שהמאמן יוכל לעקוב אחרי ההתקדמות.',
         },
         {
           heading: 'מי יכול לראות',
@@ -121,7 +149,7 @@ export const terms = {
         },
         {
           heading: 'איפה זה נשמר',
-          body: 'ב-Supabase, שירות אחסון, על שרתים מחוץ לישראל. הנתונים נשמרים כל עוד החשבון קיים.',
+          body: 'ב-Supabase, שירות אחסון, על שרתים ביפן. הנתונים נשמרים כל עוד החשבון קיים. הודעת הפרטיות מפרטת את כל השירותים המעורבים.',
         },
         {
           heading: 'הנתונים שלכם הם שלכם',
@@ -132,6 +160,20 @@ export const terms = {
           heading: 'שימוש הוגן',
           body:
             'השתמשו באפליקציה לאימונים שלכם. אל תשתפו את פרטי ההתחברות. אם משהו נראה לא נכון בנתונים, ספרו למאמן.',
+        },
+        {
+          heading: 'הגבלת אחריות',
+          body:
+            'במידה שהחוק מתיר, המאמן אינו אחראי לפציעה או להפסד שנובעים מאימון שבחרתם לבצע, מנתונים שגויים שהזנתם, או מכך שהאפליקציה אינה זמינה. שום דבר כאן אינו מגביל אחריות שהחוק אינו מתיר להגביל, למשל במקרה של רשלנות רבתי.',
+        },
+        {
+          heading: 'שינויים וסיום',
+          body:
+            'המאמן רשאי לעדכן את התנאים האלה, ויבקש מכם לאשר שוב כשיעשה זאת. כל צד יכול להפסיק בכל עת, ואפשר למחוק את החשבון מתי שרוצים.',
+        },
+        {
+          heading: 'הדין החל',
+          body: 'על התנאים האלה חל הדין הישראלי, ובתי המשפט בישראל מוסמכים לדון בכל מחלוקת.',
         },
       ],
       accept: 'קראתי ואני מאשר/ת את האמור לעיל',
@@ -158,12 +200,26 @@ export const terms = {
         {
           heading: 'מה נשמר ומי רואה',
           body:
-            'האימונים שתיעדתם, התרגילים והתוכניות, ההערות, ומשקל הגוף אם תיעדתם אותו, יחד עם השם והאימייל. אתם והמאמן רואים את זה. ההורה או האפוטרופוס רשאי לבקש מהמאמן לראות את הנתונים או למחוק אותם בכל עת. מתאמנים אחרים לא רואים. הנתונים לא נמכרים ולא משמשים לפרסום.',
+            'האימונים שתיעדתם, התרגילים והתוכניות, ההערות, ומשקל הגוף אם תיעדתם אותו, יחד עם השם והאימייל. זה כולל מידע על בריאות וכושר. באישור אתם וההורה או האפוטרופוס מסכימים במפורש לעיבוד שלו לצורך האימון שלכם, כמתואר בהודעת הפרטיות. הנתונים נשמרים בשרתי Supabase ביפן, והודעת הפרטיות מפרטת את כל השירותים המעורבים. אתם והמאמן רואים את זה. ההורה או האפוטרופוס רשאי לבקש מהמאמן לראות את הנתונים או למחוק אותם בכל עת. מתאמנים אחרים לא רואים. הנתונים לא נמכרים ולא משמשים לפרסום.',
         },
         {
           heading: 'הנתונים שלכם הם שלכם',
           body:
             'בעמוד החשבון אפשר להוריד את כל מה שתיעדתם, או למחוק את החשבון ואת כל הנתונים לצמיתות. ההורה או האפוטרופוס יכול לבקש מהמאמן לעשות זאת עבורכם.',
+        },
+        {
+          heading: 'הגבלת אחריות',
+          body:
+            'במידה שהחוק מתיר, המאמן אינו אחראי לפציעה או להפסד שנובעים מאימון שבחרתם לבצע, מנתונים שגויים שהזנתם, או מכך שהאפליקציה אינה זמינה. שום דבר כאן אינו מגביל אחריות שהחוק אינו מתיר להגביל, למשל במקרה של רשלנות רבתי.',
+        },
+        {
+          heading: 'שינויים וסיום',
+          body:
+            'המאמן רשאי לעדכן את התנאים האלה, ויבקש מכם ומההורה או האפוטרופוס לאשר שוב כשיעשה זאת. כל צד יכול להפסיק בכל עת, ואפשר למחוק את החשבון מתי שרוצים.',
+        },
+        {
+          heading: 'הדין החל',
+          body: 'על התנאים האלה חל הדין הישראלי, ובתי המשפט בישראל מוסמכים לדון בכל מחלוקת.',
         },
       ],
       accept: 'הורה או אפוטרופוס קרא/ה את זה ומסכים/ה',
