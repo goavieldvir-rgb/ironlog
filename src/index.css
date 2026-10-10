@@ -5,9 +5,6 @@
 @layer base {
   html {
     background-color: #14161A;
-    /* The app is dark-only; this makes native parts (the date field's
-       calendar icon, select arrows, scrollbars) render light-on-dark. */
-    color-scheme: dark;
     overscroll-behavior: none;
     touch-action: manipulation;
     overflow-x: clip;
@@ -21,6 +18,14 @@
     font-feature-settings: 'tnum' 1;
     overflow-x: clip;
     width: 100%;
+  }
+  /* The app is dark-only; this makes native control parts (the date
+     field's calendar icon, select arrows) render light-on-dark. Scoped to
+     form controls so embedded videos don't get a white iframe backdrop. */
+  input,
+  select,
+  textarea {
+    color-scheme: dark;
   }
   #root {
     overflow-x: clip;
