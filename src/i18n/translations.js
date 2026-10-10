@@ -577,16 +577,17 @@ The Routines and History cards at the bottom take you to your plans and your pas
 
 If you leave a workout half-finished (your phone locks, or you switch apps), you'll see an "In progress" card at the top when you come back. Tap "Resume" and you pick up exactly where you left off. Nothing is lost.`,
       s3title: 'Exercises — your personal list of movements',
-      s3body: `Before you can log a workout, the exercises you do need to be in your library. Tap "Add exercise" and search the big shared list (squats, bench press, running, stretches and more) and add the ones you do with one tap. Can't find something? Use "Can't find it? Create a custom exercise" at the bottom.
+      s3body: `Before you can log a workout, the exercises you do need to be in your library. Tap "Add exercise" and search the big shared list (squats, bench press, running, stretches and more), then add the ones you do with one tap. Can't find something? Use "Can't find it? Create a custom exercise" at the bottom.
 
 When you add or edit an exercise you'll see "How is weight tracked?":
-— Weight in kg or Weight in lb — normal exercises with a barbell, dumbbell, machine and so on.
+— Weight in kg / Weight in lb — normal exercises with a barbell, dumbbell, machine and so on.
 — Bodyweight — pull-ups, push-ups and similar, where your own body is the weight. You can still note added weight if you strap on extra.
 — Timed hold — plank, wall sit and similar. You log seconds instead of reps.
 
 If the exercise is Cardio (running, cycling, rowing and so on) you choose how to measure effort instead:
 — Effort scale (RPE 1–10) — on a scale of 1 to 10, how hard did that feel? 10 is an all-out sprint, 1 is a gentle stroll.
-— Heart rate zone (1–5) — if you track your heart rate, from 1 (very easy) to 5 (maximum effort). Pick whichever you actually pay attention to. You can also track distance in km or miles.
+— Heart rate zone (1–5) — if you track your heart rate, from 1 (very easy) to 5 (maximum effort).
+Pick whichever you actually pay attention to. You can also track distance in km or miles.
 
 Every exercise has a short demo video.`,
       s4title: 'Routines — your workout plans',
@@ -600,7 +601,7 @@ Didn't find the exercise you wanted? "Can't find it? Create a custom exercise" l
       s5title: 'Logging a workout — the actual training screen',
       s5body: `Start a workout from the Dashboard (tap a day, then a routine), with "Start session" on a routine, or choose "Or log a freestyle session without a routine".
 
-The — and + buttons change weight or reps (or seconds, for timed holds) without typing. Tap the number to type it instead.
+The − and + buttons change weight or reps (or seconds, for timed holds) without typing. Tap the number to type it instead.
 
 Under an exercise name, "Previously:" shows what you did last time. The small clock icon on the first set copies those numbers in. If your last two sessions weren't the same, it asks whether to use "Last set done" or "Top set done" (the heaviest set, or the longest for holds and cardio).
 
@@ -1331,7 +1332,7 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       s5title: 'תיעוד אימון — מסך האימון עצמו',
       s5body: `התחילו אימון מלוח הבקרה (הקישו על יום ואז על תוכנית), דרך "התחלת אימון" על תוכנית, או בחרו "או תיעוד אימון חופשי בלי תוכנית". לכל תרגיל תראו שורה לכל סט.
 
-כפתורי ה- וה+ משנים משקל או חזרות (או שניות, בהחזקות בזמן) בלי להקליד. הקישו על המספר עצמו אם אתם מעדיפים להקליד.
+כפתורי המינוס (−) והפלוס (+) משנים משקל או חזרות (או שניות, בהחזקות בזמן) בלי להקליד. הקישו על המספר עצמו אם אתם מעדיפים להקליד.
 
 מתחת לשם התרגיל, "בפעם הקודמת:" מראה מה עשיתם בפעם האחרונה. סמל השעון בסט הראשון ממלא את המספרים האלה. אם שני האימונים האחרונים לא היו זהים, תקבלו בחירה בין "הסט האחרון שבוצע" ל"הסט הכבד ביותר" (בהחזקות ובקרדיו — הארוך ביותר).
 
