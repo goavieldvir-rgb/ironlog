@@ -299,26 +299,26 @@ function drawPlain(ctx, summary, { rtl, labels }) {
   drawBrand(ctx, x0, 310, { rtl, color: C.brass })
   drawLabel(ctx, labels.eyebrow || '', xEnd, 310, { rtl, size: 26, color: C.dim, spacing: 5, end: true })
 
-  drawName(ctx, summary, x0, 560, { rtl, maxEn: 120, maxHe: 150, min: 64, color: C.chalk })
+  drawName(ctx, summary, x0, 590, { rtl, maxEn: 120, maxHe: 150, min: 64, color: C.chalk })
   ctx.fillStyle = C.brass
-  ctx.fillRect(rtl ? W - M - 64 : M, 600, 64, 6)
+  ctx.fillRect(rtl ? W - M - 64 : M, 630, 64, 6)
 
   // the big number: sized so the value and its unit fit the width together
   const { hero, small, heroKey } = pickStats(summary, labels)
   const heroLabel = heroKey === 'volume' && labels.totalVolume ? labels.totalVolume : hero.label
-  drawLabel(ctx, heroLabel, x0, 860, { rtl, size: 30, color: C.dim, spacing: 6 })
+  drawLabel(ctx, heroLabel, x0, 900, { rtl, size: 30, color: C.dim, spacing: 6 })
   let size = 300
   while (size > 160 && valueWidth(ctx, hero, size, 96, 20, 900) > W - M * 2) size -= 6
-  drawValue(ctx, hero, x0, 1150, { rtl, size, unitPx: 96, gap: 20, valueWeight: 900, color: C.chalk, unitColor: C.brass })
+  drawValue(ctx, hero, x0, 1190, { rtl, size, unitPx: 96, gap: 20, valueWeight: 900, color: C.chalk, unitColor: C.brass })
 
   if (small.length) {
     ctx.fillStyle = C.line
-    ctx.fillRect(M, 1259, W - M * 2, 2)
+    ctx.fillRect(M, 1299, W - M * 2, 2)
     const colW = (W - M * 2) / 2
     small.forEach((st, i) => {
       const x = rtl ? W - M - i * colW : M + i * colW
-      drawLabel(ctx, st.label, x, 1350, { rtl, size: 28, color: C.dim, spacing: 5, maxW: colW - 40 })
-      drawValue(ctx, st, x, 1530, { rtl, size: 170, unitPx: 60, gap: 14, valueWeight: 800, color: C.chalk, unitColor: C.brass })
+      drawLabel(ctx, st.label, x, 1390, { rtl, size: 28, color: C.dim, spacing: 5, maxW: colW - 40 })
+      drawValue(ctx, st, x, 1570, { rtl, size: 170, unitPx: 60, gap: 14, valueWeight: 800, color: C.chalk, unitColor: C.brass })
     })
   }
 }
@@ -348,8 +348,9 @@ export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo
   if (variant === 'photo' && photo) {
     drawPhoto(ctx, photo)
     drawScrims(ctx)
-    setShadow(ctx, 'rgba(0,0,0,0.35)', 10)
-    drawBrand(ctx, rtl ? W - M : M, 310, { rtl, color: C.brass })
+    // white, not brass: the top of a photo is often bright sky or gym lights
+    setShadow(ctx, 'rgba(0,0,0,0.5)', 12)
+    drawBrand(ctx, rtl ? W - M : M, 310, { rtl, color: 'rgba(255,255,255,0.95)' })
     setShadow(ctx, null)
     drawOverlayBlock(ctx, summary, { rtl, labels, top: 1360, shadow: { color: 'rgba(0,0,0,0.35)', blur: 12 }, accent: '#F0CF7A' })
     return canvas
