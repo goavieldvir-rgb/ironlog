@@ -13,10 +13,10 @@
 
 export const PRIVACY_VERSION = 1
 
-// MUST be filled in before merging: the person responsible for the data and
+// The person responsible for the data and
 // how to reach them. These appear in the notice below.
-export const COACH_NAME = '[COACH NAME]'
-export const COACH_CONTACT = '[CONTACT EMAIL]'
+export const COACH_NAME = 'Aviel Dvir'
+export const COACH_CONTACT = 'avieldvir.coaching@gmail.com'
 
 export const privacy = {
   en: {
