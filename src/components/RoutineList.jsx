@@ -7,7 +7,7 @@ import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, deleteRoutine, addRoutine, copyRoutineToUser } from '../lib/db.js'
 import { clearDraft } from '../lib/draft.js'
 import { supabase } from '../supabase.js'
-import { Button, Card, CategoryTag, EmptyState } from './ui.jsx'
+import { Button, Card, CategoryTag, EmptyState, LoadError } from './ui.jsx'
 import { Tabs } from './ExerciseLibrary.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
@@ -16,7 +16,8 @@ export default function RoutineList() {
   const { effectiveUid, isAdmin } = useAdmin()
   const { t } = useLanguage()
   const { confirm, toast } = useFeedback()
-  const [routines, loading, refresh] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
+  const [routines, loading, refresh, loadError] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
+  const loadFailed = !!loadError && routines.length === 0
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [tab, setTab] = useState('all')
   const [copyTarget, setCopyTarget] = useState(null)
@@ -65,7 +66,9 @@ export default function RoutineList() {
 
       <Tabs tab={tab} setTab={setTab} />
 
-      {!loading && filtered.length === 0 && (
+      {!loading && loadFailed && <LoadError onRetry={refresh} />}
+
+      {!loading && !loadFailed && filtered.length === 0 && (
         <EmptyState
           title={t('routines.emptyTitle')}
           body={t('routines.emptyBody')}

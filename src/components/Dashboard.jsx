@@ -9,7 +9,7 @@ import { fmtDate } from '../lib/dates.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection } from '../lib/db.js'
 import { listDrafts, clearDraft } from '../lib/draft.js'
-import { Card } from './ui.jsx'
+import { Card, LoadError } from './ui.jsx'
 import WeeklySchedule from './WeeklySchedule.jsx'
 
 // Was hard-coded English ("5m ago") even with the app in Hebrew.
@@ -26,9 +26,17 @@ export default function Dashboard() {
   const { actingAs, effectiveUid, effectiveName } = useAdmin()
   const { t, lang } = useLanguage()
   const { confirm } = useFeedback()
-  const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
-  const [routines, routinesLoading] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
-  const [sessions, sessionsLoading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const [exercises, exercisesLoading, refreshExercises, exercisesError] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
+  const [routines, routinesLoading, refreshRoutines, routinesError] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
+  const [sessions, sessionsLoading, refreshSessions, sessionsError] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  // A failed load (patchy connection) must not read as "nothing here yet":
+  // no onboarding checklist, no zero counts, just a retry.
+  const loadFailed = !!(exercisesError || routinesError || sessionsError)
+  const retryAll = () => {
+    refreshExercises()
+    refreshRoutines()
+    refreshSessions()
+  }
 
   const steps = useMemo(
     () => [
@@ -55,7 +63,7 @@ export default function Dashboard() {
     [exercises.length, routines, sessions.length, t],
   )
   const allDone = steps.every((s) => s.done)
-  const showChecklist = !sessionsLoading && !allDone
+  const showChecklist = !sessionsLoading && !routinesLoading && !exercisesLoading && !loadFailed && !allDone
 
   // Every unfinished workout, not just the most recent one — a day can
   // hold three routines, and a half-done session shouldn't be hidden
@@ -134,6 +142,8 @@ export default function Dashboard() {
           </div>
         </Card>
       ))}
+
+      {loadFailed && <LoadError onRetry={retryAll} />}
 
       {showChecklist && <OnboardingChecklist steps={steps} t={t} />}
 

@@ -6,7 +6,7 @@ import { useFeedback } from '../context/FeedbackContext.jsx'
 import { normalizeVideoUrl } from '../lib/url.js'
 import ExerciseVideo from './ExerciseVideo.jsx'
 import { useCollection, addExercise, updateExercise, deleteExercise } from '../lib/db.js'
-import { Button, Card, CategoryTag, Badge, EmptyState, Field } from './ui.jsx'
+import { Button, Card, CategoryTag, Badge, EmptyState, LoadError, Field } from './ui.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
@@ -45,7 +45,8 @@ function formatLast(ex, t) {
 export default function ExerciseLibrary() {
   const { effectiveUid } = useAdmin()
   const { t, lang } = useLanguage()
-  const [exercises, loading, refresh] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
+  const [exercises, loading, refresh, loadError] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
+  const loadFailed = !!loadError && exercises.length === 0
   const [sessions] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [routines] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const { confirm, toast } = useFeedback()
@@ -121,7 +122,9 @@ export default function ExerciseLibrary() {
         />
       </div>
 
-      {!loading && filtered.length === 0 && (
+      {!loading && loadFailed && <LoadError onRetry={refresh} />}
+
+      {!loading && !loadFailed && filtered.length === 0 && (
         <EmptyState
           title={t('exercises.emptyTitle')}
           body={t('exercises.emptyBody')}

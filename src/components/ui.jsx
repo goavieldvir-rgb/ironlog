@@ -62,3 +62,17 @@ export function Field({ label, children }) {
     </label>
   )
 }
+
+// Shown instead of the empty state when a load failed and there's nothing
+// cached to show — a bad connection must not look like lost data.
+export function LoadError({ onRetry }) {
+  const { t } = useLanguage()
+  return (
+    <div role="alert" className="card p-8 text-center flex flex-col items-center gap-3">
+      <p className="text-chalk text-sm max-w-sm">{t('common.loadFailedTitle')}</p>
+      <Button type="button" variant="brass" onClick={onRetry}>
+        {t('common.tryAgain')}
+      </Button>
+    </div>
+  )
+}

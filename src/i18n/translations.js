@@ -182,6 +182,8 @@ export const translations = {
       add: 'Add',
       optional: 'optional',
       whatDoesThisMean: 'What does this mean?',
+      loadFailedTitle: "Couldn't load your data. Check your connection.",
+      tryAgain: 'Try again',
     },
     tabs: {
       all: 'All',
@@ -915,6 +917,8 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       add: 'הוספה',
       optional: 'אופציונלי',
       whatDoesThisMean: 'מה זה אומר?',
+      loadFailedTitle: 'לא הצלחנו לטעון את הנתונים. בדקו את החיבור.',
+      tryAgain: 'נסו שוב',
     },
     tabs: {
       all: 'הכל',
