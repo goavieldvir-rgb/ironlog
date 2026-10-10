@@ -81,7 +81,7 @@ export const translations = {
       totalLogged: 'Total logged',
       routinesLabel: 'Routines',
       weeklySchedule: 'This week',
-      weeklyScheduleTip: 'Set which routine belongs on each day of the week — it repeats every week until you or your trainee change it. Tap any day to see what\'s planned, start it (today only) or change it. A tick means you already logged a session that day.',
+      weeklyScheduleTip: "Set which routine belongs on each day of the week — it repeats every week until you or your trainee change it. Tap a day to see what's planned, start a routine, or change the day. A tick means you already logged a workout that day. Starting a different day's workout asks you to confirm, and your weekly plan stays as it is.",
       day0: 'Sunday',
       day1: 'Monday',
       day2: 'Tuesday',
@@ -475,13 +475,13 @@ export const translations = {
       totalVolume: 'Total volume',
       cardioMinutes: 'Cardio minutes',
       personalRecords: 'Personal records',
-      recordsTip: 'Your heaviest weight (or most reps, for bodyweight exercises) on each exercise, and the date you hit it. During a workout you also get a Reps PR when you beat your most reps at the same weight or heavier.',
+      recordsTip: "Your best on each exercise and the date you hit it: heaviest weight, most reps for bodyweight exercises, longest hold for timed ones, and longest interval, farthest distance and best pace for cardio. During a workout you also get a Weight PR or Reps PR badge when you beat your record. Warm-up sets never count.",
       sessionsPerWeek: 'Sessions per week (last 12 weeks)',
       volumePerWeek: 'Total volume per week',
       volumeNote: 'Volume = weight × reps summed across all sets. Treat this as a rough trend line rather than an exact number if you log in mixed units.',
       cardioPerWeek: 'Cardio minutes per week',
       progressByExercise: 'Progress by exercise',
-      progressTip: "Pick any exercise you've logged more than once to see a chart of how it's changed over time — weight for normal exercises, reps for bodyweight ones, duration for cardio.",
+      progressTip: "Pick any exercise you've logged more than once to see how it changed over time, using your top set from each workout — weight for normal exercises, reps for bodyweight ones, seconds for timed holds. Cardio can show time, distance, speed or pace.",
       exercise: 'Exercise',
       chooseExercise: 'Choose an exercise…',
       pickToSee: 'Pick an exercise above to see your progress over time.',
@@ -563,130 +563,84 @@ export const translations = {
       title: 'How Ironlog works',
       subtitle: 'Tap any question below to open it. Written in plain language — no fitness-app experience assumed.',
       s1title: 'What is Ironlog?',
-      s1body: `A place to write down what you did at the gym — which exercises, how
-much weight, how many reps — so you can look back and see whether you're
-actually getting stronger over time, instead of trying to remember it all
-in your head.`,
+      s1body: `A place to write down what you did at the gym — which exercises, how much weight, how many reps — so you can look back and see whether you're actually getting stronger over time, instead of trying to remember it all in your head.`,
       s2title: 'The Dashboard (your home screen)',
-      s2body: `This is what you see when you open the app. The three numbers at
-the top show: how many workouts you've logged this week, how many total,
-and how many routines you have set up.
+      s2body: `This is what you see when you open the app. It shows your week, Sunday to Saturday, with the routine planned for each day. A tick means you already logged a workout that day.
 
-Below that, "Continue training" shows your workout plans — tap the ▶ play
-button on one to start logging that workout right now.
+Tap a day to see what's planned, then tap the play button next to a routine to start it. If you pick a different day's workout, Ironlog asks you to confirm first and saves it as today's workout. Your weekly plan doesn't change.
 
-"Recent activity" shows your last few logged workouts. Tap any of them to
-see the full details.
+Plans changed? On today's panel, tap "Start a different workout today" (or "Train anyway today" on a rest day) and pick any routine.
 
-If you ever leave a workout half-finished (for example your phone locks
-or you switch apps), you'll see an "In progress" card at the very top when
-you come back — tap "Resume" and you'll pick up exactly where you left
-off, nothing is lost.`,
+Tap "Edit week" to choose which routines go on which days. Each day can hold up to three: mobility, strength and cardio.
+
+The Routines and History cards at the bottom take you to your plans and your past workouts.
+
+If you leave a workout half-finished (your phone locks, or you switch apps), you'll see an "In progress" card at the top when you come back. Tap "Resume" and you pick up exactly where you left off. Nothing is lost.`,
       s3title: 'Exercises — your personal list of movements',
-      s3body: `Before you can log a workout, the exercises you do need to exist
-in your library. Tap "Add exercise" and you can search a big shared list
-(squats, bench press, running, stretches — hundreds of common ones) and
-add whichever ones you actually do with one tap. Can't find something?
-There's a "create a custom exercise" option at the bottom for anything
-specific to you.
+      s3body: `Before you can log a workout, the exercises you do need to be in your library. Tap "Add exercise" and search the big shared list (squats, bench press, running, stretches and more) and add the ones you do with one tap. Can't find something? Use "Can't find it? Create a custom exercise" at the bottom.
 
-When adding or editing an exercise, you'll see a "How is weight tracked?"
-choice:
-— Weight in kg or lb — normal exercises with a barbell, dumbbell, machine, etc.
-— Bodyweight — things like pull-ups or push-ups, where your own body is
-  the weight. You can still note "added weight" if you strap on extra
-  weight for these.
+When you add or edit an exercise you'll see "How is weight tracked?":
+— Weight in kg or Weight in lb — normal exercises with a barbell, dumbbell, machine and so on.
+— Bodyweight — pull-ups, push-ups and similar, where your own body is the weight. You can still note added weight if you strap on extra.
+— Timed hold — plank, wall sit and similar. You log seconds instead of reps.
 
-If the exercise is Cardio (running, cycling, rowing, etc.), you'll instead
-pick how you measure effort:
-— RPE — short for "Rate of Perceived Exertion." It just means: on a scale
-  of 1 to 10, how hard did that feel? 10 is an all-out sprint, 1 is a
-  gentle stroll.
-— Heart rate zone — if you track your heart rate, a number from 1 (very
-  easy) to 5 (maximum effort).
-Neither is "more correct" — pick whichever one you actually pay attention
-to while training.`,
+If the exercise is Cardio (running, cycling, rowing and so on) you choose how to measure effort instead:
+— Effort scale (RPE 1–10) — on a scale of 1 to 10, how hard did that feel? 10 is an all-out sprint, 1 is a gentle stroll.
+— Heart rate zone (1–5) — if you track your heart rate, from 1 (very easy) to 5 (maximum effort). Pick whichever you actually pay attention to. You can also track distance in km or miles.
+
+Every exercise has a short demo video.`,
       s4title: 'Routines — your workout plans',
-      s4body: `A routine is just a saved plan — a specific list of exercises you
-do together, like "Push Day" or "Leg Day." You build it once, then reuse
-it every time you do that workout instead of picking exercises from
-scratch each session.
+      s4body: `A routine is a saved plan — a specific list of exercises you do together, like "Push Day" or "Leg Day". You build it once, then reuse it every time instead of picking exercises from scratch.
 
-To build one: give it a name, pick a category (Strength, Mobility, or
-Cardio), then add exercises to it — either from your own list, or tap
-"Browse library" to pull more in from the shared list without leaving the
-page. For each exercise you can set a target — like "3 sets of 10 reps" —
-that's just a goal to aim for, not a strict rule; you can always log
-something different on the day.
+To build one: give it a name, pick a category (Strength, Mobility or Cardio), then add exercises — from your own list, or tap "Add from catalogue" to pull more in from the shared list without leaving the page. For each exercise you can set a target, like "3 sets of 10 reps". That's a goal to aim for, not a strict rule. You can always log something different on the day.
 
-Didn't find the exercise you wanted? "Can't find it? Create a custom
-exercise" lets you add a brand new one without losing the routine you're
-in the middle of building.`,
+Tap "Save routine" and you'll see a green "Routine saved" message.
+
+Didn't find the exercise you wanted? "Can't find it? Create a custom exercise" lets you add a new one without losing the routine you're building.`,
       s5title: 'Logging a workout — the actual training screen',
-      s5body: `Tap "Start session" on a routine (or "log a freestyle session" to
-train without a plan). For each exercise you'll see rows for each set.
+      s5body: `Start a workout from the Dashboard (tap a day, then a routine), with "Start session" on a routine, or choose "Or log a freestyle session without a routine".
 
-The − and + buttons next to each number let you nudge the weight or reps
-up or down without having to type — tap the number itself if you'd rather
-type it directly.
+The — and + buttons change weight or reps (or seconds, for timed holds) without typing. Tap the number to type it instead.
 
-If you see "Previously: 60kg × 8" under an exercise name, that's exactly
-what you did last time you trained it — handy for knowing what to aim to
-beat.
+Under an exercise name, "Previously:" shows what you did last time. The small clock icon on the first set copies those numbers in. If your last two sessions weren't the same, it asks whether to use "Last set done" or "Top set done" (the heaviest set, or the longest for holds and cardio).
 
-The small clock icon on the first set fills in your last numbers for you
-automatically. If your last two sessions weren't identical (say you go
-heavy then light, or light then heavy), tapping it gives you a choice
-between "last set done" and "top set done" — pick whichever matches how
-you train.
+Tap "Example" on an exercise to watch a short demo. It starts muted; tap "Sound on" for audio.
 
-"Add warm-up sets" suggests a few lighter sets to ramp up to your working
-weight. Tap the number at the start of any set to mark it (or unmark it) as
-a warm-up — shown as "W". Warm-ups never count toward your records, volume
-or set totals.
+"Add warm-up sets" suggests a few lighter sets. Tap the number at the start of a set to mark it as a warm-up ("W"). Warm-ups never count toward records or totals.
 
-Open the three-dot menu on an exercise and choose "Add a note for this
-exercise" to jot something down about it that day — "used the other
-machine," "felt off today," whatever's useful to remember later. The note
-shows up the next time you do that exercise. Once you no longer need it,
-open the same menu and choose "Remove saved note".
+The three-dot menu on an exercise lets you move it, swap it for today only, remove it, or choose "Add a note for this exercise". A note shows up the next time you do that exercise. When you no longer need it, choose "Remove saved note".
 
-At the bottom of the screen there's a rest timer — tap 60/90/120/180 to
-start a countdown between sets, it'll beep and buzz your phone when time's
-up.
-
-When you're done, hit "Finish & save session" at the bottom. That's the
-only step that actually saves it permanently — everything before that is
-just a working draft.`,
+The rest timer at the bottom counts down between sets: tap 60, 90, 120 or 180. It sounds when time's up, as long as Ironlog is open.`,
       s6title: "History — everything you've logged",
-      s6body: `Every finished workout lives here, most recent first. Tap one to
-see the full breakdown, set by set. Made a mistake typing a number? Open
-that session and tap "Edit" to fix it — no need to delete and redo the
-whole thing.
+      s6body: `Every finished workout lives here, most recent first. Tap one to see the full breakdown, set by set. Made a mistake typing a number? Open that session and tap "Edit" to fix it — no need to delete and redo the whole thing.
 
-You can search by exercise name, routine name, or anything you wrote in
-your notes, and filter by date range or category (Strength / Mobility /
-Cardio) using the tabs.`,
+You can search by exercise name, routine name, or anything you wrote in your notes, and filter by date range or category (Strength / Mobility / Cardio) using the tabs.`,
       s7title: "Stats — how you're progressing",
-      s7body: `This turns your history into a picture of your progress:
-personal records (your best-ever weight or reps on each exercise),
-progress charts you can pick per exercise, how many weeks in a row you've
-trained, and if you do cardio, your total minutes.`,
+      s7body: `This page turns your history into a picture of your progress: personal records (your best weight or reps on each exercise, the longest hold for timed exercises, and your farthest distance and best pace for cardio), a progress chart you can pick per exercise, how many weeks in a row you've trained, and your total volume.
+
+The progress chart follows your top set from each workout. For cardio you can switch the chart between time, distance, speed and pace. Speed and pace only count intervals where you logged a distance.`,
       s8title: 'Weight — tracking your body weight',
-      s8body: `Separate from exercises — this is just for logging your own
-body weight over time if you want to, with a simple chart. Totally
-optional.`,
+      s8body: `Separate from exercises — this is just for logging your own body weight over time if you want to, with a simple chart. Totally optional.`,
       s9title: 'Summary — exporting your training',
-      s9body: `If you (or your trainer) want a written report of a week, month,
-year, or custom date range, this page builds one you can copy or download.
-There's also a "Download everything" button that backs up literally
-everything you've ever logged into one file, if you ever want a full
-copy for yourself.`,
+      s9body: `If you (or your trainer) want a written report of a week, month, year or custom date range, this page builds one you can copy or download.
+
+For a full copy of everything you've logged, open "Account" from the menu. You can download "Workouts (spreadsheet)" or a "Full backup (JSON)" there. Account is also where you can delete your account.`,
       s10title: 'If something looks wrong or the app gets stuck',
-      s10body: `Try reloading the page first — most odd glitches clear up with a
-simple refresh, and thanks to the autosave, you won't lose an in-progress
-workout by doing this. If something still seems broken, reach out to
-whoever set your account up for you.`,
+      s10body: `Try reloading the page first — most odd glitches clear up with a simple refresh, and thanks to the autosave, you won't lose an in-progress workout by doing this. If something still seems broken, reach out to whoever set your account up for you.`,
+      s11title: 'Finishing, records and sharing',
+      s11body: `When you're done, tap "Finish & save session" at the bottom. That is the only step that saves the workout permanently. Everything before it is a working draft. You'll see a green "Workout saved" message.
+
+Next comes a recap screen with your time, volume, sets, records and streak. From there you can share a picture of your workout to social media or save it.
+
+During a workout you can earn two kinds of record badge: "Weight PR" for the heaviest weight you've lifted on that exercise, and "Reps PR" for more reps at the same weight or heavier. Warm-ups don't count.`,
+      s12title: 'Reminders (notifications)',
+      s12body: `Open "Notifications" from the menu (or the bell icon) to get one reminder a day at the time you choose, in your own time zone. On a training day it reminds you of your workout. On a rest day it sends a short recovery note. If you already trained that day, or you have no weekly plan set up yet, you won't get one.
+
+Tap "Send a test notification" to check it works.
+
+On iPhone, reminders only work for apps on your Home Screen (iOS 16.4 or newer): in Safari tap Share, choose "Add to Home Screen", open Ironlog from the new icon and sign in once there, then turn reminders on from this page.
+
+Rest timer alerts are separate and only work while Ironlog is open.`,
     },
     people: {
       termsAccepted: 'Terms accepted {date}',
@@ -859,7 +813,7 @@ whoever set your account up for you.`,
       totalLogged: 'סה"כ תועדו',
       routinesLabel: 'תוכניות',
       weeklySchedule: 'השבוע',
-      weeklyScheduleTip: 'קבעו איזו תוכנית שייכת לכל יום בשבוע — זה חוזר על עצמו כל שבוע עד שאתם או המתאמן משנים את זה. הקישו על כל יום כדי לראות מה מתוכנן, להתחיל אותו (היום בלבד) או לשנות. סימן וי מציין שכבר תיעדתם אימון באותו יום.',
+      weeklyScheduleTip: "קבעו איזו תוכנית שייכת לכל יום בשבוע — זה חוזר על עצמו כל שבוע עד שאתם או המתאמן משנים את זה. הקישו על יום כדי לראות מה מתוכנן, להתחיל תוכנית או לשנות את היום. סימן וי מציין שכבר תיעדתם אימון באותו יום. התחלת אימון של יום אחר מבקשת אישור, והתוכנית השבועית נשארת כמו שהיא.",
       day0: 'יום ראשון',
       day1: 'יום שני',
       day2: 'יום שלישי',
@@ -1253,13 +1207,13 @@ whoever set your account up for you.`,
       totalVolume: 'נפח כולל',
       cardioMinutes: 'דקות קרדיו',
       personalRecords: 'שיאים אישיים',
-      recordsTip: 'המשקל הכבד ביותר (או מספר החזרות הגבוה ביותר, לתרגילי משקל גוף) שביצעתם בכל תרגיל, והתאריך שבו זה קרה. במהלך אימון תקבלו גם שיא חזרות כשאתם עוברים את מספר החזרות הגבוה ביותר באותו משקל או כבד יותר.',
+      recordsTip: "השיא שלכם בכל תרגיל והתאריך שבו זה קרה: המשקל הכבד ביותר, הכי הרבה חזרות בתרגילי משקל גוף, ההחזקה הארוכה ביותר בתרגילי זמן, ובקרדיו האינטרוול הארוך ביותר, המרחק הרחוק ביותר והקצב הטוב ביותר. במהלך אימון תקבלו תג \"שיא משקל\" או \"שיא חזרות\" כשאתם שוברים שיא. סטים של חימום לא נספרים.",
       sessionsPerWeek: 'אימונים לשבוע (12 השבועות האחרונים)',
       volumePerWeek: 'נפח כולל לשבוע',
       volumeNote: 'נפח = משקל × חזרות, מסוכם על פני כל הסטים. התייחסו לזה כאל מגמה כללית ולא כמספר מדויק אם אתם מתעדים ביחידות מעורבות.',
       cardioPerWeek: 'דקות קרדיו לשבוע',
       progressByExercise: 'התקדמות לפי תרגיל',
-      progressTip: 'בחרו תרגיל שתועד יותר מפעם אחת כדי לראות גרף של איך הוא השתנה לאורך זמן — משקל לתרגילים רגילים, חזרות לתרגילי משקל גוף, משך לתרגילי קרדיו.',
+      progressTip: "בחרו תרגיל שתועד יותר מפעם אחת כדי לראות איך הוא השתנה לאורך זמן, לפי הסט הכבד ביותר בכל אימון — משקל לתרגילים רגילים, חזרות לתרגילי משקל גוף, שניות להחזקות בזמן. בקרדיו אפשר לראות זמן, מרחק, מהירות או קצב.",
       exercise: 'תרגיל',
       chooseExercise: 'בחרו תרגיל…',
       pickToSee: 'בחרו תרגיל למעלה כדי לראות את ההתקדמות שלכם לאורך זמן.',
@@ -1341,58 +1295,83 @@ whoever set your account up for you.`,
       s1title: 'מה זה Ironlog?',
       s1body: `מקום לתעד בו מה עשיתם בחדר הכושר — אילו תרגילים, כמה משקל, כמה חזרות — כדי שתוכלו להסתכל אחורה ולראות אם אתם באמת מתחזקים עם הזמן, במקום לנסות לזכור הכל בראש.`,
       s2title: 'לוח הבקרה (מסך הבית שלכם)',
-      s2body: `זה מה שאתם רואים כשפותחים את האפליקציה. שלושת המספרים למעלה מציגים: כמה אימונים תועדו השבוע, כמה בסך הכל, וכמה תוכניות אימון יש לכם.
+      s2body: `זה מה שאתם רואים כשפותחים את האפליקציה. מוצג השבוע שלכם, מיום ראשון עד שבת, עם התוכנית שמתוכננת לכל יום. סימן וי אומר שכבר תיעדתם אימון באותו יום.
 
-מתחת לזה, "המשך אימון" מציג את תוכניות האימון שלכם — הקישו על כפתור ה-▶ כדי להתחיל לתעד את האימון הזה מיד.
+הקישו על יום כדי לראות מה מתוכנן, ואז על כפתור ה-▶ ליד תוכנית כדי להתחיל אותה. אם תבחרו אימון של יום אחר, Ironlog יבקש אישור לפני, והאימון יישמר כאימון של היום. התוכנית השבועית לא משתנה.
 
-"פעילות אחרונה" מציגה את האימונים האחרונים שתועדו. הקישו על אחד מהם כדי לראות את כל הפרטים.
+התוכניות השתנו? בחלון של היום הקישו "התחלת אימון אחר היום" (או "להתאמן בכל זאת היום" ביום מנוחה) ובחרו כל תוכנית.
 
-אם אי פעם תעזבו אימון באמצע (למשל הטלפון ננעל או עברתם לאפליקציה אחרת), תראו כרטיס "אימון בעיצומו" ממש למעלה כשתחזרו — הקישו "המשך" ותמשיכו בדיוק מהמקום שעצרתם, שום דבר לא הולך לאיבוד.`,
+הקישו "עריכת השבוע" כדי לבחור אילו תוכניות יהיו בכל יום. בכל יום אפשר עד שלוש: מוביליטי, כוח וקרדיו.
+
+הכרטיסים "תוכניות" ו"היסטוריה" בתחתית מובילים לתוכניות שלכם ולאימונים שעשיתם.
+
+אם תעזבו אימון באמצע (הטלפון ננעל או עברתם לאפליקציה אחרת), תראו כרטיס "אימון בעיצומו" למעלה כשתחזרו. הקישו "המשך" ותמשיכו בדיוק מהמקום שעצרתם. שום דבר לא הולך לאיבוד.`,
       s3title: 'תרגילים — הרשימה האישית שלכם',
-      s3body: `לפני שאפשר לתעד אימון, התרגילים שאתם מבצעים צריכים להיות בספרייה שלכם. הקישו "הוספת תרגיל" ותוכלו לחפש ברשימה משותפת גדולה (סקוואטים, לחיצת חזה, ריצה, מתיחות — מאות תרגילים נפוצים) ולהוסיף בלחיצה אחת את אלה שאתם באמת מבצעים. לא מוצאים משהו? יש אפשרות "יצירת תרגיל מותאם אישית" למטה, לכל דבר ספציפי אצלכם.
+      s3body: `לפני שאפשר לתעד אימון, התרגילים שאתם מבצעים צריכים להיות בספרייה שלכם. הקישו "הוספת תרגיל", חפשו ברשימה המשותפת הגדולה (סקוואטים, לחיצת חזה, ריצה, מתיחות — מאות תרגילים נפוצים) והוסיפו בהקשה אחת את אלה שאתם באמת מבצעים. לא מוצאים משהו? "לא מוצאים? יצירת תרגיל מותאם אישית" נמצא למטה.
 
-כשמוסיפים או עורכים תרגיל, תראו בחירה של "איך עוקבים אחרי המשקל?":
-— משקל בק"ג או פאונד — תרגילים רגילים עם מוט, דמבל, מכונה וכו'.
-— משקל גוף — דברים כמו מתח או שכיבות סמיכה, שבהם הגוף שלכם הוא המשקל. עדיין אפשר לציין "משקל נוסף" אם אתם מוסיפים משקל חיצוני לתרגילים האלה.
+כשמוסיפים או עורכים תרגיל, תראו את הבחירה "איך עוקבים אחרי המשקל?":
+— משקל בק"ג או משקל בפאונד — תרגילים רגילים עם מוט, דמבל, מכונה וכו'.
+— משקל גוף — מתח, שכיבות סמיכה ודומיהם, שבהם הגוף שלכם הוא המשקל. עדיין אפשר לציין משקל נוסף אם אתם מוסיפים משקל חיצוני.
+— החזקה בזמן — פלאנק, ישיבת קיר ודומיהם. מתעדים שניות במקום חזרות.
 
-אם התרגיל הוא קרדיו (ריצה, אופניים, חתירה וכו'), במקום זאת תבחרו איך למדוד את העצימות:
-— RPE — קיצור של "דירוג מאמץ נתפס". פשוט אומר: בסולם של 1 עד 10, כמה זה הרגיש קשה? 10 זה ספרינט במאמץ מקסימלי, 1 זו הליכה קלה.
-— אזור דופק — אם אתם עוקבים אחרי הדופק שלכם, מספר בין 1 (קל מאוד) ל-5 (מאמץ מקסימלי).
-אף אחת מהאפשרויות היא לא "נכונה יותר" — בחרו את זו שאתם באמת שמים לב אליה בזמן האימון.`,
+אם התרגיל הוא קרדיו (ריצה, אופניים, חתירה וכו'), במקום זאת תבחרו איך למדוד את המאמץ:
+— סולם מאמץ (RPE 1–10) — בסולם של 1 עד 10, כמה זה הרגיש קשה? 10 זה ספרינט במאמץ מקסימלי, 1 זו הליכה קלה.
+— אזור דופק (1–5) — אם אתם עוקבים אחרי הדופק, מספר בין 1 (קל מאוד) ל-5 (מאמץ מקסימלי).
+אף אחת מהאפשרויות היא לא "נכונה יותר" — בחרו את זו שאתם באמת שמים לב אליה. אפשר גם לבחור ק"מ או מייל אם רוצים לעקוב אחרי מרחק.
+
+לכל תרגיל יש סרטון הדגמה קצר שמראה איך מבצעים אותו.`,
       s4title: 'תוכניות אימון — התוכניות שלכם',
-      s4body: `תוכנית היא פשוט תבנית שמורה — רשימה מסוימת של תרגילים שאתם עושים ביחד, כמו "יום דחיפה" או "יום רגליים". בונים אותה פעם אחת, ואז משתמשים בה שוב בכל פעם שעושים את האימון הזה, במקום לבחור תרגילים מאפס בכל אימון.
+      s4body: `תוכנית היא תבנית שמורה — רשימה מסוימת של תרגילים שאתם עושים ביחד, כמו "יום דחיפה" או "יום רגליים". בונים אותה פעם אחת, ואז משתמשים בה שוב בכל פעם במקום לבחור תרגילים מאפס.
 
-כדי לבנות אחת: תנו לה שם, בחרו קטגוריה (כוח, מוביליטי או קרדיו), ואז הוסיפו לה תרגילים — או מהרשימה שלכם, או הקישו "עיון בספרייה" כדי למשוך עוד תרגילים מהרשימה המשותפת בלי לעזוב את הדף. לכל תרגיל אפשר להגדיר יעד — כמו "3 סטים של 10 חזרות" — זו רק מטרה לשאוף אליה, לא כלל נוקשה; תמיד אפשר לתעד משהו אחר ביום עצמו.
+כדי לבנות אחת: תנו לה שם, בחרו קטגוריה (כוח, מוביליטי או קרדיו), ואז הוסיפו תרגילים — מהרשימה שלכם, או הקישו "הוספה מהקטלוג" כדי למשוך עוד תרגילים מהרשימה המשותפת בלי לעזוב את הדף. לכל תרגיל אפשר להגדיר יעד — כמו "3 סטים של 10 חזרות" — זו מטרה לשאוף אליה, לא כלל נוקשה. תמיד אפשר לתעד משהו אחר ביום עצמו.
 
-לא מצאתם את התרגיל שרציתם? "לא מוצאים? יצירת תרגיל מותאם אישית" מאפשר להוסיף תרגיל חדש לגמרי בלי לאבד את התוכנית שאתם באמצע בנייתה.`,
+הקישו "שמירת תוכנית" ותראו הודעה ירוקה "התוכנית נשמרה".
+
+לא מצאתם את התרגיל שרציתם? "לא מוצאים? יצירת תרגיל מותאם אישית" מאפשר להוסיף תרגיל חדש בלי לאבד את התוכנית שאתם באמצע בנייתה.`,
       s5title: 'תיעוד אימון — מסך האימון עצמו',
-      s5body: `הקישו "התחלת אימון" על תוכנית (או "תיעוד אימון חופשי" כדי להתאמן בלי תוכנית). לכל תרגיל תראו שורות עבור כל סט.
+      s5body: `התחילו אימון מלוח הבקרה (הקישו על יום ואז על תוכנית), דרך "התחלת אימון" על תוכנית, או בחרו "או תיעוד אימון חופשי בלי תוכנית". לכל תרגיל תראו שורה לכל סט.
 
-כפתורי ה־ וה+ ליד כל מספר מאפשרים לזוז במשקל או בחזרות בלי להקליד — הקישו על המספר עצמו אם אתם מעדיפים להקליד ישירות.
+כפתורי ה- וה+ משנים משקל או חזרות (או שניות, בהחזקות בזמן) בלי להקליד. הקישו על המספר עצמו אם אתם מעדיפים להקליד.
 
-אם אתם רואים "בפעם הקודמת: 60 ק"ג × 8" מתחת לשם תרגיל, זה בדיוק מה שביצעתם בפעם האחרונה שתרגלתם אותו — שימושי כדי לדעת למה לשאוף לשבור.
+מתחת לשם התרגיל, "בפעם הקודמת:" מראה מה עשיתם בפעם האחרונה. סמל השעון בסט הראשון ממלא את המספרים האלה. אם שני האימונים האחרונים לא היו זהים, תקבלו בחירה בין "הסט האחרון שבוצע" ל"הסט הכבד ביותר" (בהחזקות ובקרדיו — הארוך ביותר).
 
-סמל השעון הקטן בסט הראשון ממלא עבורכם את המספרים האחרונים אוטומטית. אם שני האימונים האחרונים שלכם לא היו זהים (למשל התחלתם כבד ואז קל, או קל ואז כבד), הקשה עליו תיתן לכם בחירה בין "הסט האחרון שבוצע" ל"הסט הכבד ביותר" — בחרו את מה שמתאים לסגנון האימון שלכם.
+הקישו "הדגמה" על תרגיל כדי לראות סרטון קצר. הוא מתחיל בלי קול — הקישו "הפעלת קול" כדי לשמוע.
 
-"הוספת סטים של חימום" מציעה כמה סטים קלים יותר כדי להתכונן למשקל העבודה. הקישו על המספר בתחילת סט כדי לסמן אותו (או לבטל סימון) כסט חימום — מוצג כ"ח". סטים של חימום לא נספרים בשיאים, בנפח או בסך הסטים.
+"הוספת סטים של חימום" מציעה כמה סטים קלים יותר. הקישו על המספר בתחילת סט כדי לסמן אותו כסט חימום ("ח"). סטים של חימום לא נספרים בשיאים, בנפח או בסך הסטים.
 
-בתפריט שלוש הנקודות של תרגיל בחרו "הוספת הערה לתרגיל הזה" כדי לרשום משהו על התרגיל באותו יום — "השתמשתי במכונה האחרת", "הרגשתי לא במיטבי היום", כל דבר שכדאי לזכור אחר כך. ההערה תופיע בפעם הבאה שתעשו את התרגיל. כשכבר לא צריך אותה, פתחו את אותו תפריט ובחרו "הסרת ההערה השמורה".
+בתפריט שלוש הנקודות של תרגיל אפשר להעביר אותו, להחליף אותו להיום בלבד, להסיר אותו, או לבחור "הוספת הערה לתרגיל הזה". ההערה תופיע בפעם הבאה שתעשו את התרגיל. כשכבר לא צריך אותה, בחרו "הסרת ההערה השמורה".
 
-בתחתית המסך יש טיימר מנוחה — הקישו על 60/90/120/180 כדי להתחיל ספירה לאחור בין סטים, הוא יצפצף ויְרַעֵד את הטלפון כשהזמן נגמר.
-
-כשסיימתם, הקישו "סיום ושמירת האימון" בתחתית. זהו הצעד היחיד ששומר את האימון לצמיתות — כל מה שלפני כן הוא רק טיוטת עבודה.`,
+טיימר המנוחה בתחתית סופר לאחור בין סטים: הקישו 60, 90, 120 או 180. הוא משמיע צליל כשהזמן נגמר, כל עוד Ironlog פתוח.`,
       s6title: 'היסטוריה — כל מה שתועד',
       s6body: `כל אימון שהושלם נמצא כאן, מהאחרון לראשון. הקישו על אחד כדי לראות את הפירוט המלא, סט אחר סט. טעיתם בהקלדת מספר? פתחו את האימון והקישו "עריכה" כדי לתקן — אין צורך למחוק ולתעד הכל מחדש.
 
 אפשר לחפש לפי שם תרגיל, שם תוכנית, או כל דבר שכתבתם בהערות, ולסנן לפי טווח תאריכים או קטגוריה (כוח / מוביליטי / קרדיו) באמצעות הלשוניות.`,
       s7title: 'סטטיסטיקה — איך אתם מתקדמים',
-      s7body: `הדף הזה הופך את ההיסטוריה שלכם לתמונת התקדמות: שיאים אישיים (המשקל או החזרות הכי גבוהים שביצעתם בכל תרגיל), גרפי התקדמות שאפשר לבחור לפי תרגיל, כמה שבועות ברצף התאמנתם, ואם אתם עושים קרדיו — סך הדקות שלכם.`,
+      s7body: `הדף הזה הופך את ההיסטוריה שלכם לתמונת התקדמות: שיאים אישיים (המשקל או החזרות הכי גבוהים בכל תרגיל, ההחזקה הארוכה ביותר בתרגילי זמן, והמרחק הרחוק ביותר והקצב הטוב ביותר בקרדיו), גרף התקדמות שאפשר לבחור לפי תרגיל, כמה שבועות ברצף התאמנתם, והנפח הכולל שלכם.
+
+גרף ההתקדמות מתבסס על הסט הכבד ביותר מכל אימון. בקרדיו אפשר להחליף בין זמן, מרחק, מהירות וקצב. מהירות וקצב נספרים רק באינטרוולים שתועד בהם מרחק.`,
       s8title: 'משקל — מעקב משקל הגוף שלכם',
       s8body: `נפרד מהתרגילים — זה רק לתיעוד המשקל שלכם לאורך זמן אם תרצו, עם גרף פשוט. לגמרי אופציונלי.`,
       s9title: 'סיכום — ייצוא האימונים שלכם',
-      s9body: `אם אתם (או המאמן שלכם) רוצים דוח כתוב של שבוע, חודש, שנה, או טווח תאריכים מותאם אישית, הדף הזה בונה אחד שאפשר להעתיק או להוריד. יש גם כפתור "הורדת הכל" שמגבה ממש הכל שאי פעם תועד, לקובץ אחד, אם תרצו עותק מלא לעצמכם.`,
+      s9body: `אם אתם (או המאמן שלכם) רוצים דוח כתוב של שבוע, חודש, שנה או טווח תאריכים מותאם אישית, הדף הזה בונה אחד שאפשר להעתיק או להוריד.
+
+לעותק מלא של כל מה שתיעדתם, פתחו את "חשבון" מהתפריט. שם אפשר להוריד "אימונים (גיליון)" או "גיבוי מלא (JSON)". בחשבון אפשר גם למחוק את החשבון.`,
       s10title: 'אם משהו נראה לא תקין או האפליקציה נתקעת',
       s10body: `נסו קודם לרענן את הדף — רוב התקלות המוזרות נפתרות ברענון פשוט, ובזכות השמירה האוטומטית לא תאבדו אימון באמצע ביצוע פעולה זו. אם עדיין נראה שמשהו שבור, פנו למי שהגדיר לכם את החשבון.`,
+      s11title: 'סיום, שיאים ושיתוף',
+      s11body: `כשסיימתם, הקישו "סיום ושמירת האימון" בתחתית. זה הצעד היחיד ששומר את האימון לצמיתות — כל מה שלפני כן הוא טיוטת עבודה. תראו הודעה ירוקה "האימון נשמר".
+
+אחר כך מגיע מסך סיכום עם הזמן, הנפח, הסטים, השיאים והרצף שלכם. משם אפשר לשתף תמונה של האימון ברשתות החברתיות או לשמור אותה.
+
+במהלך אימון אפשר לקבל שני סוגי תגי שיא: "שיא משקל" על המשקל הכבד ביותר שהרמתם בתרגיל, ו"שיא חזרות" על יותר חזרות באותו משקל או כבד יותר. סטים של חימום לא נספרים.`,
+      s12title: 'תזכורות (התראות)',
+      s12body: `פתחו את "התראות" מהתפריט (או הקישו על סמל הפעמון) כדי לקבל תזכורת אחת ביום בשעה שתבחרו, לפי אזור הזמן שלכם. ביום אימון היא מזכירה לכם את האימון. ביום מנוחה היא שולחת הערה קצרה על התאוששות. אם כבר התאמנתם באותו יום, או שעוד לא הגדרתם תוכנית שבועית, לא תקבלו תזכורת.
+
+הקישו "שלחו התראת בדיקה" כדי לוודא שזה עובד.
+
+באייפון תזכורות עובדות רק לאפליקציות שנמצאות במסך הבית (iOS 16.4 ומעלה): ב-Safari לחצו על שיתוף, בחרו "הוסף למסך הבית", פתחו את Ironlog מהסמל החדש, התחברו שם פעם אחת, ואז הפעילו תזכורות מהעמוד הזה.
+
+התראות טיימר המנוחה נפרדות ועובדות רק כשהאפליקציה פתוחה.`,
     },
     people: {
       termsAccepted: 'אישר/ה את התנאים ב-{date}',

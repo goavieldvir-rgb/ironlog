@@ -7,7 +7,7 @@ export default function Help() {
   const { t } = useLanguage()
   const [openIndex, setOpenIndex] = useState(0)
 
-  const sections = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => ({
+  const sections = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => ({
     title: t(`help.s${n}title`),
     body: t(`help.s${n}body`),
   }))
