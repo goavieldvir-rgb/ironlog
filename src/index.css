@@ -98,7 +98,9 @@
     }
   }
   /* Grows a control's touch area to 44x44 without changing its layout. */
-  .hit {
+  /* :where() keeps specificity at zero so an explicit absolute/fixed utility on
+     the same element still wins (the ::after hit area only needs a positioned parent). */
+  :where(.hit) {
     position: relative;
   }
   .hit::after {
