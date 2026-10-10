@@ -1,44 +1,101 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { fetchLatestConsent, recordConsent } from '../lib/db.js'
+import { privacy } from '../legal/privacy.js'
 import { terms, termsPlainText, hashText, TERMS_VERSION, TERMS_DOC_KEY } from '../legal/terms.js'
 import { Button, Card, Field } from './ui.jsx'
+import { PrivacySections } from './Privacy.jsx'
+
+const CHECK_TIMEOUT_MS = 8000
+
+// The accepted version is cached per user so a slow or missing connection
+// never locks out someone who has already agreed. localStorage can throw
+// (private windows, blocked site data), so every access is guarded.
+const consentKey = (uid) => `ironlog:consent:${uid}`
+
+function readCachedConsent(uid) {
+  try {
+    return Number(localStorage.getItem(consentKey(uid))) || 0
+  } catch {
+    return 0
+  }
+}
+
+function writeCachedConsent(uid, version) {
+  try {
+    localStorage.setItem(consentKey(uid), String(version))
+  } catch {
+    /* cache is a convenience only */
+  }
+}
+
+function clearCachedConsent(uid) {
+  try {
+    localStorage.removeItem(consentKey(uid))
+  } catch {
+    /* cache is a convenience only */
+  }
+}
 
 // Shown after signing in, before anything else, until the current version
 // of the terms has been accepted. Gating here rather than at signup means
 // it also reaches everyone who already has an account, and asks again
 // whenever the wording changes.
 export default function ConsentGate({ uid, children }) {
+  const { logout } = useAuth()
   const { t, lang } = useLanguage()
   const { toast } = useFeedback()
-  const [state, setState] = useState('checking') // checking | needed | ok
+  const [state, setState] = useState('checking') // checking | needed | ok | error
   const [isMinor, setIsMinor] = useState(false)
   const [guardianName, setGuardianName] = useState('')
   const [guardianContact, setGuardianContact] = useState('')
   const [readToEnd, setReadToEnd] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [showPrivacy, setShowPrivacy] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const scrollRef = useRef(null)
 
   useEffect(() => {
     let cancelled = false
     if (!uid) return
-    setState('checking')
-    fetchLatestConsent(uid, TERMS_DOC_KEY)
+    // An already-accepted trainee must never be blocked by the network:
+    // trust the cached acceptance straight away and re-check quietly.
+    const cachedOk = readCachedConsent(uid) >= TERMS_VERSION
+    setState(cachedOk ? 'ok' : 'checking')
+    const check = fetchLatestConsent(uid, TERMS_DOC_KEY)
+    const answer = cachedOk
+      ? check
+      : Promise.race([
+          check,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Consent check timed out')), CHECK_TIMEOUT_MS)),
+        ])
+    answer
       .then((row) => {
         if (cancelled) return
-        setState(row && row.version >= TERMS_VERSION ? 'ok' : 'needed')
+        if (row && row.version >= TERMS_VERSION) {
+          writeCachedConsent(uid, row.version)
+          setState('ok')
+        } else {
+          clearCachedConsent(uid)
+          setState('needed')
+        }
       })
       .catch((err) => {
         console.error(err)
+        // A failed background refresh changes nothing when the cache said ok.
+        if (cachedOk) return
         // If the check itself fails (offline, or the table isn't there
-        // yet), don't lock someone out of their own training log.
-        if (!cancelled) setState('ok')
+        // yet), don't let anyone in without a recorded acceptance: show a
+        // retry instead. Failing open would let people use the app having
+        // never agreed to the terms.
+        if (!cancelled) setState('error')
       })
     return () => {
       cancelled = true
     }
-  }, [uid])
+  }, [uid, attempt])
 
   // Switching between the adult and under-18 text means a different
   // document, so the "read it" check starts again.
@@ -77,6 +134,7 @@ export default function ConsentGate({ uid, children }) {
         guardianName: guardianName.trim(),
         guardianContact: guardianContact.trim(),
       })
+      writeCachedConsent(uid, TERMS_VERSION)
       setState('ok')
     } catch (err) {
       console.error(err)
@@ -88,6 +146,22 @@ export default function ConsentGate({ uid, children }) {
 
   if (state === 'checking') return null
   if (state === 'ok') return children
+
+  if (state === 'error') {
+    return (
+      <div className="min-h-screen bg-ink px-4 py-8 flex justify-center">
+        <div className="w-full max-w-lg flex flex-col gap-4 items-center text-center">
+          <p className="text-chalkdim text-sm">{t('consent.checkFailed')}</p>
+          <Button onClick={() => setAttempt((n) => n + 1)}>{t('consent.retry')}</Button>
+          <button type="button" onClick={logout} className="text-chalkdim text-xs hover:text-chalk">
+            {t('nav.logout')}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const privacyDoc = privacy[lang] || privacy.en
 
   return (
     <div className="min-h-screen bg-ink px-4 py-8 flex justify-center">
@@ -123,6 +197,21 @@ export default function ConsentGate({ uid, children }) {
             </div>
           ))}
         </div>
+
+        {/* Opens in place so nothing typed here is lost. */}
+        <button
+          type="button"
+          onClick={() => setShowPrivacy((v) => !v)}
+          aria-expanded={showPrivacy}
+          className="text-chalkdim text-xs hover:text-brass w-fit"
+        >
+          {t('consent.readPrivacy')}
+        </button>
+        {showPrivacy && (
+          <div className="card p-5 max-h-[50vh] overflow-y-auto">
+            <PrivacySections doc={privacyDoc} />
+          </div>
+        )}
 
         {isMinor && (
           <Card className="flex flex-col gap-3">

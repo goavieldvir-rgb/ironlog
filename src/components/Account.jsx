@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Download, FileSpreadsheet, Trash2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { applyCurrentTimed } from '../lib/timed.js'
@@ -179,6 +179,10 @@ export default function Account() {
           <p className="text-chalkdim text-sm">{actingAs ? t('account.deleteNotWhileActing') : t('account.deleteAdminBlocked')}</p>
         )}
       </Card>
+
+      <Link to="/privacy" className="text-chalkdim text-sm hover:text-brass w-fit">
+        {t('privacy.link')}
+      </Link>
     </div>
   )
 }

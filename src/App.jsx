@@ -22,6 +22,7 @@ import Notifications from './components/Notifications.jsx'
 import Account from './components/Account.jsx'
 import ResetPassword from './components/ResetPassword.jsx'
 import ConsentGate from './components/ConsentGate.jsx'
+import Privacy from './components/Privacy.jsx'
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -56,6 +57,9 @@ export default function App() {
     )
   }
 
+  // The privacy notice has to be readable before anyone signs in.
+  if (!user && location.pathname === '/privacy') return <Privacy standalone />
+
   if (!user) return <Login resetLinkError={resetLinkError} />
 
   // Setting a new password has to stay reachable — someone arriving from a
@@ -81,6 +85,7 @@ export default function App() {
         <Route path="/help" element={<Help />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/account" element={<Account />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
