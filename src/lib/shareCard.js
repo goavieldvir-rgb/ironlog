@@ -123,8 +123,8 @@ function put(ctx, text, x, y) {
   ctx.save()
   if (FX?.sticker && PASS === 'stroke') {
     ctx.lineJoin = 'round'
-    ctx.lineWidth = Math.max(3, fontPx(ctx) * 0.06)
-    ctx.strokeStyle = 'rgba(0,0,0,0.55)'
+    ctx.lineWidth = Math.max(3, fontPx(ctx) * 0.045)
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)'
     setShadow(ctx, 'rgba(0,0,0,0.45)', 24)
     ctx.strokeText(text, x, y)
   } else {
@@ -139,8 +139,8 @@ function bar(ctx, x, y, w, h, color) {
   ctx.save()
   if (FX?.sticker && PASS === 'stroke') {
     ctx.lineJoin = 'round'
-    ctx.lineWidth = 6
-    ctx.strokeStyle = 'rgba(0,0,0,0.55)'
+    ctx.lineWidth = 5
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)'
     setShadow(ctx, 'rgba(0,0,0,0.45)', 24)
     ctx.strokeRect(x, y, w, h)
   } else {
@@ -273,16 +273,37 @@ function drawValue(ctx, st, x, y, { rtl, size, unitPx, gap, valueWeight, color, 
 // screen's language (Barlow has no Hebrew, Karantina has no Latin
 // lowercase). Long names wrap at spaces onto at most two lines; whatever
 // still doesn't fit on line two is cut with an ellipsis.
+// Do these words fit on two lines of maxW with greedy wrapping?
+function twoLines(ctx, words, maxW) {
+  let lines = 1
+  let cur = ''
+  for (const w of words) {
+    const next = cur ? `${cur} ${w}` : w
+    if (ctx.measureText(next).width <= maxW) cur = next
+    else if (ctx.measureText(w).width > maxW) return false
+    else if (++lines > 2) return false
+    else cur = w
+  }
+  return true
+}
+
 function layoutName(ctx, summary, { maxEn, maxHe }) {
   const heb = isHeb(summary.routineName)
   const text = heb ? summary.routineName : summary.routineName.toUpperCase()
-  const size = heb ? maxHe : maxEn
   const family = heb ? HEB_DISPLAY : NUM
   const weight = heb ? 700 : 800
-  ctx.font = `${weight} ${size}px ${family}`
   ctx.direction = isHeb(text) ? 'rtl' : 'ltr'
   const maxW = W - M * 2
   const words = text.trim().split(/\s+/)
+  // Fixed size, except a name too long for two lines steps down a little
+  // (to 75% at most) before anything gets cut.
+  const top = heb ? maxHe : maxEn
+  let size = top
+  for (; size > top * 0.75; size -= 4) {
+    ctx.font = `${weight} ${size}px ${family}`
+    if (twoLines(ctx, words, maxW)) break
+  }
+  ctx.font = `${weight} ${size}px ${family}`
   let line1 = ''
   let i = 0
   while (i < words.length) {
@@ -419,7 +440,9 @@ function drawPlain(ctx, summary, { rtl, labels }) {
   const smallValueY = smallLabelY + 36 + 119
   const bottom = small.length ? smallValueY : heroValueY
   const blockTop = -Math.round(nm.size * 0.74)
-  const dy = Math.max(Math.round(960 - (blockTop + bottom) / 2), 400 - blockTop)
+  // centred a little below the safe area's middle: the brand row already
+  // weighs on the top
+  const dy = Math.max(Math.round(1010 - (blockTop + bottom) / 2), 400 - blockTop)
 
   drawName(ctx, nm, x0, dy, { rtl, color: C.chalk })
   bar(ctx, rtl ? W - M - 64 : M, ruleY + dy, 64, 6, C.brass)
