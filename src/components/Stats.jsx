@@ -17,7 +17,7 @@ import ExerciseSelect from './ExerciseSelect.jsx'
 import { useCollection } from '../lib/db.js'
 import { toLocalISODate, fmtDate, dateLocale } from '../lib/dates.js'
 import { disambiguateLabels } from '../lib/disambiguate.js'
-import { Card, EmptyState, Field } from './ui.jsx'
+import { Card, EmptyState, LoadError, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { workingSets } from '../lib/warmup.js'
 import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
@@ -50,7 +50,7 @@ function last12Mondays() {
 export default function Stats() {
   const { effectiveUid } = useAdmin()
   const { t, lang } = useLanguage()
-  const [rawSessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const [rawSessions, loading, refreshSessions, loadError] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const sessions = useMemo(() => applyCurrentTimed(rawSessions, exercises), [rawSessions, exercises])
   const [exerciseId, setExerciseId] = useState('')
@@ -246,6 +246,7 @@ export default function Stats() {
     pace: t('stats.metricPace'),
     effort: selectedProgress?.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe'),
   }
+  const loadFailed = !!loadError && rawSessions.length === 0
   const hasData = !loading && sessions.length > 0
 
   return (
@@ -255,7 +256,9 @@ export default function Stats() {
         <h1 className="text-3xl">{t('stats.title')}</h1>
       </div>
 
-      {!loading && sessions.length === 0 && (
+      {!loading && loadFailed && <LoadError onRetry={refreshSessions} />}
+
+      {!loading && !loadFailed && sessions.length === 0 && (
         <EmptyState
           title={t('stats.emptyTitle')}
           body={t('stats.emptyBody')}

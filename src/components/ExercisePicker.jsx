@@ -4,13 +4,14 @@ import { useGlobalExercises } from '../lib/db.js'
 import { disambiguateLabels } from '../lib/disambiguate.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
-import { Button, CategoryTag, Badge } from './ui.jsx'
+import { Button, CategoryTag, Badge, LoadError } from './ui.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 
 export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, onClose, lockCategory }) {
   const { t, lang } = useLanguage()
   const { toast } = useFeedback()
-  const [globalExercises, loading] = useGlobalExercises()
+  const [globalExercises, loading, refreshGlobal, loadError] = useGlobalExercises()
+  const loadFailed = !!loadError && globalExercises.length === 0
   useScrollLock(true)
   const [q, setQ] = useState('')
   const [tab, setTab] = useState(lockCategory || 'all')
@@ -103,7 +104,8 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
 
         <div className="flex-1 overflow-y-auto -mx-2 px-2 flex flex-col gap-1 min-h-[200px]">
           {loading && <p className="text-chalkdim text-sm py-4">{t('common.loading')}</p>}
-          {!loading && filtered.length === 0 && <p className="text-chalkdim text-sm py-4">{t('exercises.noMatches')}</p>}
+          {!loading && loadFailed && <LoadError onRetry={refreshGlobal} />}
+          {!loading && !loadFailed && filtered.length === 0 && <p className="text-chalkdim text-sm py-4">{t('exercises.noMatches')}</p>}
           {filtered.map((g, i) => {
             const already = existingLower.has(displayName(g).toLowerCase()) || existingLower.has(g.name.toLowerCase()) || addedIds.has(g.id)
             return (

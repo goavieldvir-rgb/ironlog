@@ -5,11 +5,11 @@ import { InfoTip } from './InfoTip.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { fmtDate } from '../lib/dates.js'
+import { fmtDate, toLocalISODate } from '../lib/dates.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection } from '../lib/db.js'
 import { listDrafts, clearDraft } from '../lib/draft.js'
-import { Card } from './ui.jsx'
+import { Card, LoadError } from './ui.jsx'
 import WeeklySchedule from './WeeklySchedule.jsx'
 
 // Was hard-coded English ("5m ago") even with the app in Hebrew.
@@ -26,9 +26,19 @@ export default function Dashboard() {
   const { actingAs, effectiveUid, effectiveName } = useAdmin()
   const { t, lang } = useLanguage()
   const { confirm } = useFeedback()
-  const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
-  const [routines, routinesLoading] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
-  const [sessions, sessionsLoading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const [exercises, exercisesLoading, refreshExercises, exercisesError] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
+  const [routines, routinesLoading, refreshRoutines, routinesError] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
+  const [sessions, sessionsLoading, refreshSessions, sessionsError] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const [schedule, scheduleLoading, refreshSchedule, scheduleError] = useCollection(effectiveUid, 'weekly_schedule', 'day_of_week', 'asc')
+  // A failed load (patchy connection) must not read as "nothing here yet":
+  // no onboarding checklist, no zero counts, just a retry.
+  const loadFailed = !!(exercisesError || routinesError || sessionsError || scheduleError)
+  const retryAll = () => {
+    refreshExercises()
+    refreshRoutines()
+    refreshSessions()
+    refreshSchedule()
+  }
 
   const steps = useMemo(
     () => [
@@ -55,7 +65,7 @@ export default function Dashboard() {
     [exercises.length, routines, sessions.length, t],
   )
   const allDone = steps.every((s) => s.done)
-  const showChecklist = !sessionsLoading && !allDone
+  const showChecklist = !sessionsLoading && !routinesLoading && !exercisesLoading && !loadFailed && !allDone
 
   // Every unfinished workout, not just the most recent one — a day can
   // hold three routines, and a half-done session shouldn't be hidden
@@ -88,6 +98,22 @@ export default function Dashboard() {
     clearDraft(effectiveUid, routineKey)
     setDrafts((prev) => prev.filter((d) => d.routineKey !== routineKey))
   }
+
+  // Today's planned routines (slot order) that aren't logged yet and have no
+  // workout in progress — a draft already shows up in the card above.
+  const todayStarts = useMemo(() => {
+    if (scheduleLoading || routinesLoading || sessionsLoading) return []
+    const today = new Date()
+    const todayIso = toLocalISODate(today)
+    return schedule
+      .filter((s) => s.day_of_week === today.getDay() && s.routine_id)
+      .sort((a, b) => a.slot - b.slot)
+      .map((s) => routines.find((r) => r.id === s.routine_id))
+      .filter(Boolean)
+      .filter((r, i, all) => all.indexOf(r) === i)
+      .filter((r) => !sessions.some((x) => x.date === todayIso && x.routine_id === r.id))
+      .filter((r) => !drafts.some((d) => d.routineId === r.id))
+  }, [schedule, scheduleLoading, routines, routinesLoading, sessions, sessionsLoading, drafts])
 
   const firstName = (user.displayName || user.email || '').split(/[\s@]/)[0]
 
@@ -135,9 +161,21 @@ export default function Dashboard() {
         </Card>
       ))}
 
+      {loadFailed && <LoadError onRetry={retryAll} />}
+
+      {todayStarts.length > 0 && <StartToday routines={todayStarts} t={t} />}
+
       {showChecklist && <OnboardingChecklist steps={steps} t={t} />}
 
-      <WeeklySchedule effectiveUid={effectiveUid} routines={routines} routinesLoading={routinesLoading} sessions={sessions} />
+      <WeeklySchedule
+        effectiveUid={effectiveUid}
+        routines={routines}
+        routinesLoading={routinesLoading}
+        sessions={sessions}
+        schedule={schedule}
+        scheduleLoading={scheduleLoading || (!!scheduleError && schedule.length === 0)}
+        refreshSchedule={refreshSchedule}
+      />
 
       <div className="grid grid-cols-2 gap-3">
         <Link to="/routines">
@@ -159,6 +197,39 @@ export default function Dashboard() {
           </Card>
         </Link>
       </div>
+    </div>
+  )
+}
+
+// One tap from the dashboard to today's workout (same route as the play
+// button in the day panel). First pending routine is the big button, any
+// others (a day can hold mobility + strength + cardio) are smaller.
+function StartToday({ routines, t }) {
+  const [first, ...others] = routines
+  return (
+    <div className="flex flex-col gap-2">
+      <Link
+        to={`/workout/${first.id}`}
+        className="press flex items-center justify-between gap-3 rounded-md px-5 py-4 min-h-[64px] bg-brass text-ink hover:bg-brass/90 transition-colors"
+      >
+        <span className="min-w-0">
+          <span className="block text-lg font-medium leading-tight truncate">{t('dashboard.startRoutine', { name: first.name })}</span>
+          <span className="block text-xs opacity-75 mt-0.5">
+            {first.exercises?.length || 0} {t('dashboard.exercisesCount')}
+          </span>
+        </span>
+        <Play size={22} className="shrink-0" />
+      </Link>
+      {others.map((r) => (
+        <Link
+          key={r.id}
+          to={`/workout/${r.id}`}
+          className="press flex items-center justify-between gap-3 rounded-md px-4 py-2.5 min-h-[44px] bg-brasssoft text-brass hover:bg-brasssoft/70 text-sm font-medium transition-colors"
+        >
+          <span className="truncate">{t('dashboard.startRoutine', { name: r.name })}</span>
+          <Play size={15} className="shrink-0" />
+        </Link>
+      ))}
     </div>
   )
 }

@@ -7,7 +7,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { fmtDate } from '../lib/dates.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, deleteSession } from '../lib/db.js'
-import { Card, CategoryTag, EmptyState, Button, Field } from './ui.jsx'
+import { Card, CategoryTag, EmptyState, LoadError, Button, Field } from './ui.jsx'
 import { Tabs } from './ExerciseLibrary.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { workingSets } from '../lib/warmup.js'
@@ -33,7 +33,8 @@ export default function History() {
   const { effectiveUid } = useAdmin()
   const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
-  const [sessions, loading, refresh] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const [sessions, loading, refresh, loadError] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const loadFailed = !!loadError && sessions.length === 0
   const [tab, setTab] = useState('all')
   const [q, setQ] = useState('')
   const [dateFrom, setDateFrom] = useState('')
@@ -114,7 +115,9 @@ export default function History() {
         />
       )}
 
-      {!loading && sessions.length === 0 && (
+      {!loading && loadFailed && <LoadError onRetry={refresh} />}
+
+      {!loading && !loadFailed && sessions.length === 0 && (
         <EmptyState
           title={t('history.emptyTitle')}
           body={t('history.emptyBody')}

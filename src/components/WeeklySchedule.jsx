@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Play, Pencil, CalendarDays, Check } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
-import { useCollection, setScheduleDay } from '../lib/db.js'
+import { setScheduleDay } from '../lib/db.js'
 import { Card, Button, Field } from './ui.jsx'
 import { toLocalISODate } from '../lib/dates.js'
 import { InfoTip } from './InfoTip.jsx'
@@ -16,11 +16,12 @@ const DAYS = [0, 1, 2, 3, 4, 5, 6]
 const SLOTS = [0, 1, 2]
 const SLOT_LABEL_KEYS = ['slotMobility', 'slotStrength', 'slotCardio']
 
-export default function WeeklySchedule({ effectiveUid, routines, routinesLoading = false, sessions = [] }) {
+// `schedule` is loaded by Dashboard (it also drives the "Start today's
+// workout" button), so both always agree and an edit here refreshes both.
+export default function WeeklySchedule({ effectiveUid, routines, routinesLoading = false, sessions = [], schedule, scheduleLoading = false, refreshSchedule }) {
   const { t } = useLanguage()
   const { toast, confirm } = useFeedback()
   const navigate = useNavigate()
-  const [schedule, scheduleLoading, refreshSchedule] = useCollection(effectiveUid, 'weekly_schedule', 'day_of_week', 'asc')
 
   // One panel for a day, in one of two modes. Tapping a day always opens
   // it — nothing starts a workout on its own — and starting is an explicit
@@ -125,7 +126,7 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
       }
       setJustSaved((prev) => ({ ...prev, ...Object.fromEntries(dirtyDays.map((d) => [d, pending[d]])) }))
       setPending({})
-      refreshSchedule()
+      refreshSchedule?.()
       toast(t('feedback.saved'))
       setMode('view')
     } catch (err) {

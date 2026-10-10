@@ -19,7 +19,7 @@ import {
   updateBodyWeightEntry,
   deleteBodyWeightEntry,
 } from '../lib/db.js'
-import { Button, Card, EmptyState, Field } from './ui.jsx'
+import { Button, Card, EmptyState, LoadError, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 
 const COLORS = { iron: '#D64545', chalk: '#EDEDE6', chalkdim: '#9CA0AA', grid: '#31353E' }
@@ -56,7 +56,8 @@ export default function BodyWeight() {
   const { effectiveUid } = useAdmin()
   const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
-  const [entries, loading, refresh] = useCollection(effectiveUid, 'body_weight_logs', 'date', 'asc')
+  const [entries, loading, refresh, loadError] = useCollection(effectiveUid, 'body_weight_logs', 'date', 'asc')
+  const loadFailed = !!loadError && entries.length === 0
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -191,7 +192,9 @@ export default function BodyWeight() {
         </form>
       </Card>
 
-      {!loading && entries.length === 0 && (
+      {!loading && loadFailed && <LoadError onRetry={refresh} />}
+
+      {!loading && !loadFailed && entries.length === 0 && (
         <EmptyState
           title={t('bodyWeight.emptyTitle')}
           body={t('bodyWeight.emptyBody')}
