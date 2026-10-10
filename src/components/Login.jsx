@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { supabase } from '../supabase.js'
@@ -202,6 +203,9 @@ export default function Login({ resetLinkError }) {
         </div>
 
         <p className="text-chalkdim text-xs text-center mt-6">{t('login.footerNote')}</p>
+        <Link to="/privacy" className="block text-chalkdim text-xs hover:text-brass text-center mt-2">
+          {t('privacy.link')}
+        </Link>
       </div>
     </div>
   )
