@@ -3,7 +3,7 @@ import { Share2, Trophy, Check, ImagePlus, Copy, Download } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { Button, Card } from './ui.jsx'
-import { prepareCard, shareFile, loadPhoto, downloadFile, copyImage, canCopyImage, isIOS } from '../lib/shareCard.js'
+import { prepareCard, shareFile, loadPhoto, downloadFile, copyImage, canCopyImage, isIOS, shareFontsReady, shareFontsLoaded } from '../lib/shareCard.js'
 
 const iso = (s) => `⁦${s}⁩`
 
@@ -41,7 +41,9 @@ export default function WorkoutDone({ summary, onDone }) {
     weekUnit: t('share.weekUnit'),
     min: t('share.min'),
   }
-  const fileName = (v) => `ironlog-${summary.date || 'workout'}${v === 'sticker' ? '-sticker' : ''}.png`
+  // the photo version is a JPEG, the others PNG (the sticker needs see-through)
+  const fileName = (v) => `ironlog-${summary.date || 'workout'}${v === 'sticker' ? '-sticker' : ''}.${v === 'photo' ? 'jpg' : 'png'}`
+  const photoRef = useRef(null) // the picked photo, kept so the card can be redrawn
 
   function remember(key, file) {
     const url = URL.createObjectURL(file)
@@ -49,25 +51,40 @@ export default function WorkoutDone({ summary, onDone }) {
     setMade((m) => ({ ...m, [key]: { file, url } }))
   }
 
-  // Plain card and sticker are drawn as soon as the screen opens.
+  // Plain card and sticker are drawn as soon as the screen opens (and the
+  // photo one again, if a photo is already picked and the language changed).
   useEffect(() => {
     let cancelled = false
     setMade({})
     setFailed(false)
-    ;['plain', 'sticker'].forEach((v) => {
-      prepareCard(summary, { rtl: dir === 'rtl', labels, variant: v }, fileName(v))
+    const draw = (v) =>
+      prepareCard(summary, { rtl: dir === 'rtl', labels, variant: v, photo: v === 'photo' ? photoRef.current : null }, fileName(v))
         .then((f) => !cancelled && remember(v, f))
         .catch((err) => {
           console.error(err)
           if (!cancelled && v === 'plain') setFailed(true)
         })
+    const variants = ['plain', 'sticker', ...(photoRef.current ? ['photo'] : [])]
+    Promise.all(variants.map(draw)).then(() => {
+      // Slow connection: the cards were drawn with fallback fonts. Draw them
+      // again in the real ones as soon as those arrive.
+      if (cancelled || shareFontsLoaded()) return
+      shareFontsReady().then((ok) => {
+        if (ok && !cancelled) variants.forEach(draw)
+      })
     })
     return () => {
       cancelled = true
     }
   }, [summary, dir, lang]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), [])
+  useEffect(
+    () => () => {
+      urls.current.forEach((u) => URL.revokeObjectURL(u))
+      photoRef.current?.close?.()
+    },
+    [],
+  )
 
   async function handlePhoto(e) {
     const picked = e.target.files?.[0]
@@ -78,13 +95,23 @@ export default function WorkoutDone({ summary, onDone }) {
     try {
       photo = await loadPhoto(picked)
       const f = await prepareCard(summary, { rtl: dir === 'rtl', labels, variant: 'photo', photo }, fileName('photo'))
+      photoRef.current?.close?.()
+      photoRef.current = photo
       remember('photo', f)
       setVariant('photo')
+      if (!shareFontsLoaded()) {
+        // fonts still arriving: redraw this one when they do
+        shareFontsReady().then((ok) => {
+          if (ok && photoRef.current === photo) {
+            prepareCard(summary, { rtl: dir === 'rtl', labels, variant: 'photo', photo }, fileName('photo')).then((g) => remember('photo', g)).catch(() => {})
+          }
+        })
+      }
     } catch (err) {
       console.error(err)
+      if (photo && photoRef.current !== photo) photo.close?.()
       toast(t('share.photoFailed'), 'error')
     } finally {
-      photo?.close?.()
       setPhotoBusy(false)
     }
   }
@@ -170,6 +197,12 @@ export default function WorkoutDone({ summary, onDone }) {
       {summary.prCount > 0 && (
         <p className="inline-flex items-center gap-2 text-brass text-sm">
           <Trophy size={16} /> {t('share.records')}: <span className="num">{iso(String(summary.prCount))}</span>
+        </p>
+      )}
+
+      {failed && (
+        <p className="text-chalkdim text-sm" role="alert" data-testid="card-failed">
+          {t('share.cardFailed')}
         </p>
       )}
 
