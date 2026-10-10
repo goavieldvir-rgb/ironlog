@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import { Play, Pencil, CalendarDays, Check } from 'lucide-react'
@@ -42,8 +42,11 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
 
   const today = new Date().getDay()
   // Until the plan and routines arrive, every day would read "Rest day" and
-  // then flip — show a quiet placeholder instead.
-  const planLoading = scheduleLoading || routinesLoading
+  // then flip — show a quiet placeholder instead. Only before the first load
+  // finishes: a later refresh (after Save) keeps showing the current plan.
+  const loadedFor = useRef(null)
+  if (!scheduleLoading && !routinesLoading) loadedFor.current = effectiveUid
+  const planLoading = loadedFor.current !== effectiveUid
 
   // The plan and the log stay separate — a plan isn't a claim about what
   // happened — but showing nothing at all meant a day you'd already
