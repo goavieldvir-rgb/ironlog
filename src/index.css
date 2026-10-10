@@ -5,6 +5,9 @@
 @layer base {
   html {
     background-color: #14161A;
+    /* The app is dark-only; this makes native parts (the date field's
+       calendar icon, select arrows, scrollbars) render light-on-dark. */
+    color-scheme: dark;
     overscroll-behavior: none;
     touch-action: manipulation;
     overflow-x: clip;

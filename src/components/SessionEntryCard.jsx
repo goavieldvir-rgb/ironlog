@@ -544,8 +544,10 @@ export default function SessionEntryCard({
                   capitals is wider than this column and ran into the next
                   label, reading as "SETWT (KG)". */}
               <span>#</span>
-              <span className="truncate">
-                {entry.bodyweight ? `+${t('sessionCard.wt')} (${entry.unit}) ${t('sessionCard.opt')}` : `${t('sessionCard.wt')} (${entry.unit})`}
+              {/* The leading "+" already says "extra weight"; spelling out
+                  "optional" too didn't fit at phone width and got cut off. */}
+              <span className="truncate" title={entry.bodyweight ? t('sessionCard.opt') : undefined}>
+                {entry.bodyweight ? `+${t('sessionCard.wt')} (${entry.unit})` : `${t('sessionCard.wt')} (${entry.unit})`}
               </span>
               <span>{isTimed ? t('sessionCard.seconds') : t('sessionCard.reps')}</span>
               {showRir && (
