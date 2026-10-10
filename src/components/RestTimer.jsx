@@ -1,10 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Play, Pause, RotateCcw, Timer, Bell, BellOff } from 'lucide-react'
+import { Play, Pause, RotateCcw, Timer, Bell, BellOff, ChevronUp, ChevronDown } from 'lucide-react'
 import { Button } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 const PRESETS = [60, 90, 120, 180]
+const EXPANDED_KEY = 'ironlog:restTimerExpanded'
+
+// Slim bar by default so the timer doesn't cover the sets; the trainee's
+// last explicit choice is remembered.
+function readExpanded() {
+  try {
+    return localStorage.getItem(EXPANDED_KEY) === '1'
+  } catch {
+    return false
+  }
+}
 
 function beep() {
   try {
@@ -37,6 +48,8 @@ export default function RestTimer() {
   const [lastDuration, setLastDuration] = useState(90)
   const [running, setRunning] = useState(false)
   const [finished, setFinished] = useState(false)
+  const [totalDuration, setTotalDuration] = useState(90)
+  const [expanded, setExpanded] = useState(readExpanded)
   // The actual wall-clock moment the timer should hit zero — not a ticking
   // counter. Mobile browsers throttle or fully pause setInterval while the
   // tab/app is backgrounded, so a counter-based timer silently freezes and
@@ -110,6 +123,7 @@ export default function RestTimer() {
     if (preset != null) setLastDuration(preset)
     endTimeRef.current = Date.now() + duration * 1000
     setSecondsLeft(duration)
+    setTotalDuration(duration)
     setFinished(false)
     setRunning(true)
   }
@@ -125,8 +139,69 @@ export default function RestTimer() {
     start(lastDuration)
   }
 
+  function toggleExpanded() {
+    const next = !expanded
+    setExpanded(next)
+    try {
+      localStorage.setItem(EXPANDED_KEY, next ? '1' : '0')
+    } catch {
+      // Storage unavailable (private mode) — the choice just won't persist.
+    }
+  }
+
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, '0')
   const ss = String(secondsLeft % 60).padStart(2, '0')
+
+  if (!expanded) {
+    const progress = running && totalDuration > 0 ? (secondsLeft / totalDuration) * 100 : 0
+    return (
+      <div
+        className={`sticky bottom-0 z-10 border-t backdrop-blur px-4 transition-colors ${
+          finished ? 'bg-ironsoft border-iron' : 'bg-ink/95 border-line'
+        }`}
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
+        {running && (
+          <div
+            className="absolute top-0 start-0 h-0.5 bg-brass transition-[width] duration-1000 ease-linear"
+            style={{ width: `${progress}%` }}
+            aria-hidden="true"
+          />
+        )}
+        <div className="flex items-center h-14">
+          <button
+            onClick={toggleExpanded}
+            aria-expanded="false"
+            aria-label={t('restTimer.expand')}
+            className="press flex-1 min-h-[44px] h-full flex items-center gap-2 text-start"
+          >
+            <Timer size={16} className={finished ? 'text-irontext' : running ? 'text-brass' : 'text-chalkdim'} />
+            <span className={`num text-2xl leading-none ${finished ? 'text-irontext' : running ? 'text-brass' : 'text-chalk'}`}>
+              {mm}:{ss}
+            </span>
+          </button>
+          {running ? (
+            <Button variant="subtle" onClick={pause} title={t('restTimer.pause')} aria-label={t('restTimer.pause')} className="!px-2.5 !min-w-[44px] !min-h-[44px]">
+              <Pause size={14} />
+            </Button>
+          ) : (
+            <Button variant="subtle" onClick={() => start()} title={t('restTimer.start')} aria-label={t('restTimer.start')} className="!px-2.5 !min-w-[44px] !min-h-[44px]">
+              <Play size={14} />
+            </Button>
+          )}
+          <button
+            onClick={toggleExpanded}
+            aria-expanded="false"
+            title={t('restTimer.expand')}
+            aria-label={t('restTimer.expand')}
+            className="press inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded text-chalkdim hover:text-chalk hover:bg-surface2"
+          >
+            <ChevronUp size={18} />
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div
@@ -147,7 +222,10 @@ export default function RestTimer() {
         {PRESETS.map((p) => (
           <button
             key={p}
-            onClick={() => start(p)}
+            onClick={() => {
+              start(p)
+              setExpanded(false)
+            }}
             className="press px-2.5 min-h-[44px] min-w-[44px] flex-1 min-[560px]:flex-none rounded text-sm num text-chalkdim hover:text-chalk hover:bg-surface2"
           >
             {p}s
@@ -177,6 +255,15 @@ export default function RestTimer() {
         <Button variant="ghost" onClick={restart} title={t('restTimer.restart')} aria-label={t('restTimer.restart')} className="!px-2.5 !min-w-[44px] !min-h-[44px]">
           <RotateCcw size={14} />
         </Button>
+        <button
+          onClick={toggleExpanded}
+          aria-expanded="true"
+          title={t('restTimer.collapse')}
+          aria-label={t('restTimer.collapse')}
+          className="press inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded text-chalkdim hover:text-chalk hover:bg-surface2"
+        >
+          <ChevronDown size={18} />
+        </button>
       </div>
     </div>
   )

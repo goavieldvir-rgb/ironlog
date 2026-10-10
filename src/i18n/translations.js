@@ -442,6 +442,8 @@ export const translations = {
       pause: 'Pause rest timer',
       restart: 'Restart rest timer',
       tip: "A countdown timer for resting between sets. Tap 60/90/120/180 to start it at that many seconds — it'll beep and vibrate your phone when time's up. The restart button reruns whatever duration you last used.",
+      expand: 'Show rest timer controls',
+      collapse: 'Hide rest timer controls',
     },
     history: {
       log: 'Log',
@@ -1196,6 +1198,8 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       pause: 'השהיית טיימר מנוחה',
       restart: 'הפעלה מחדש של טיימר המנוחה',
       tip: 'טיימר מנוחה בין סטים. הקישו על 60/90/120/180 כדי להתחיל ספירה לאחור באותו מספר שניות — הוא יצפצף ויְרַעֵד את הטלפון כשהזמן נגמר. כפתור ההפעלה מחדש מריץ שוב את משך הזמן שהשתמשתם בו לאחרונה.',
+      expand: 'הצגת פקדי טיימר המנוחה',
+      collapse: 'הסתרת פקדי טיימר המנוחה',
     },
     history: {
       log: 'יומן',
