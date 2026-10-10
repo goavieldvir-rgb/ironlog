@@ -5,6 +5,7 @@ import { Play, Pencil, CalendarDays, Check } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, setScheduleDay } from '../lib/db.js'
+import { sessionTitle } from '../lib/names.js'
 import { Card, Button, Field } from './ui.jsx'
 import { toLocalISODate } from '../lib/dates.js'
 import { InfoTip } from './InfoTip.jsx'
@@ -244,7 +245,7 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
                         className="text-sm text-chalk hover:text-brass truncate inline-flex items-center gap-1.5"
                       >
                         <Check size={14} className="text-good shrink-0" />
-                        {s.routine_name}
+                        {sessionTitle(s, t)}
                       </Link>
                     ))}
                   </div>

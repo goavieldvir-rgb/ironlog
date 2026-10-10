@@ -14,6 +14,7 @@ import { formatSeconds } from '../lib/timed.js'
 
 export const emptyExerciseForm = {
   name: '',
+  nameHe: '',
   category: 'strength',
   videoUrl: '',
   notes: '',
@@ -151,7 +152,7 @@ export default function ExerciseLibrary() {
               <div className="flex gap-1 shrink-0">
                 <button
                   className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-surface2 text-chalkdim hover:text-chalk"
-                  onClick={() => setEditing({ ...ex, videoUrl: ex.video_url, intensityType: ex.intensity_type, trackRir: ex.track_rir })}
+                  onClick={() => setEditing({ ...ex, nameHe: ex.name_he || '', videoUrl: ex.video_url, intensityType: ex.intensity_type, trackRir: ex.track_rir })}
                   title={t('common.edit')} aria-label={t('common.edit')}
                 >
                   <Pencil size={15} />
@@ -228,6 +229,7 @@ export default function ExerciseLibrary() {
             setEditing({
               ...emptyExerciseForm,
               name: currentForm.name,
+              nameHe: currentForm.nameHe,
               videoUrl: currentForm.videoUrl,
               notes: currentForm.notes,
               category: currentForm.category,
@@ -339,6 +341,15 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
               required
               autoFocus
             />
+          </Field>
+
+          <Field label={t('exercises.nameHe')}>
+            <input
+              value={form.nameHe || ''}
+              onChange={(e) => setForm({ ...form, nameHe: e.target.value })}
+              dir="rtl"
+            />
+            <p className="text-chalkdim text-xs mt-1">{t('exercises.nameHeHint')}</p>
           </Field>
 
           {locked && (

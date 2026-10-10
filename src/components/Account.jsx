@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { applyCurrentTimed } from '../lib/timed.js'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { supabase } from '../supabase.js'
 import { Button, Card, Field } from './ui.jsx'
@@ -39,7 +40,7 @@ function download(filename, text, type) {
 }
 
 // One row per logged set — opens directly in Excel / Google Sheets.
-function toCsv(sessions) {
+function toCsv(sessions, t, lang, exById) {
   const header = [
     'date', 'routine', 'exercise', 'category', 'set', 'weight', 'unit', 'reps', 'rir',
     'duration_min', 'intensity', 'distance', 'exercise_note', 'session_note', 'workout_minutes', 'warmup', 'seconds',
@@ -56,7 +57,7 @@ function toCsv(sessions) {
         const cardio = e.category === 'cardio'
         rows.push(
           [
-            s.date, s.routine_name, e.name, e.category || 'strength', i + 1,
+            s.date, sessionTitle(s, t), entryName(e, exById, lang), e.category || 'strength', i + 1,
             cardio ? '' : set.weight, e.unit, cardio || e.timed ? '' : set.reps, cardio ? '' : set.rir,
             cardio ? set.duration : '', cardio ? set.intensity : '', cardio ? set.distance : '',
             e.notes, s.notes, s.duration_minutes, set.warmup ? 'yes' : '', e.timed ? set.reps : '',
@@ -73,7 +74,7 @@ function toCsv(sessions) {
 export default function Account() {
   const { user, logout } = useAuth()
   const { actingAs, isAdmin, effectiveUid, effectiveName } = useAdmin()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
   const navigate = useNavigate()
   const [busy, setBusy] = useState(null)
@@ -100,8 +101,8 @@ export default function Account() {
     try {
       const { data, error } = await supabase.from('sessions').select('*').eq('user_id', effectiveUid)
       if (error) throw error
-      const { data: exs } = await supabase.from('exercises').select('id, timed').eq('user_id', effectiveUid)
-      download(`ironlog-workouts-${stamp}.csv`, toCsv(applyCurrentTimed(data || [], exs || [])), 'text/csv;charset=utf-8')
+      const { data: exs } = await supabase.from('exercises').select('id, name, name_he, timed').eq('user_id', effectiveUid)
+      download(`ironlog-workouts-${stamp}.csv`, toCsv(applyCurrentTimed(data || [], exs || []), t, lang, exerciseMap(exs)), 'text/csv;charset=utf-8')
     } catch (err) {
       console.error(err)
       toast(t('account.exportFailed'), 'error')
