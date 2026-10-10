@@ -486,7 +486,7 @@ export const translations = {
       totalVolume: 'Total volume',
       cardioMinutes: 'Cardio minutes',
       personalRecords: 'Personal records',
-      recordsTip: "Your best on each exercise and the date you hit it: heaviest weight, most reps for bodyweight exercises, longest hold for timed ones, and longest interval, farthest distance and best pace for cardio. During a workout you also get a Weight PR or Reps PR badge when you beat your record. Warm-up sets never count.",
+      recordsTip: "Your best on each exercise and the date you hit it: heaviest weight, most reps for bodyweight exercises, longest hold for timed ones, and longest interval, farthest distance and best pace for cardio. During a workout you also get a badge when you beat your record: \"Weight PR\" or \"Reps PR\" on weighted exercises, and a plain \"PR\" on bodyweight, timed and cardio ones. Warm-up sets never count.",
       sessionsPerWeek: 'Sessions per week (last 12 weeks)',
       volumePerWeek: 'Total volume per week',
       volumeNote: 'Volume = weight × reps summed across all sets. Treat this as a rough trend line rather than an exact number if you log in mixed units.',
@@ -586,7 +586,7 @@ Tap "Edit week" to choose which routines go on which days. Each day can hold up 
 
 The Routines and History cards at the bottom take you to your plans and your past workouts.
 
-If you leave a workout half-finished (your phone locks, or you switch apps), you'll see an "In progress" card at the top when you come back. Tap "Resume" and you pick up exactly where you left off. Nothing is lost.`,
+If you leave a workout half-finished (your phone locks, or you switch apps), you'll see an "In progress" card at the top when you come back. Tap "Resume" and you pick up exactly where you left off. Nothing is lost. If you don't want that workout any more, tap "Discard" on the card and confirm.`,
       s3title: 'Exercises — your personal list of movements',
       s3body: `Before you can log a workout, the exercises you do need to be in your library. Tap "Add exercise" and search the big shared list (squats, bench press, running, stretches and more), then add the ones you do with one tap. Can't find something? Use "Can't find it? Create a custom exercise" at the bottom.
 
@@ -600,7 +600,7 @@ If the exercise is Cardio (running, cycling, rowing and so on) you choose how to
 — Heart rate zone (1–5) — if you track your heart rate, from 1 (very easy) to 5 (maximum effort).
 Pick whichever you actually pay attention to. You can also track distance in km or miles.
 
-Every exercise has a short demo video.`,
+Many exercises have a short demo video. When there is one, you'll see an "Example" button on that exercise while you train.`,
       s4title: 'Routines — your workout plans',
       s4body: `A routine is a saved plan — a specific list of exercises you do together, like "Push Day" or "Leg Day". You build it once, then reuse it every time instead of picking exercises from scratch.
 
@@ -612,7 +612,9 @@ Didn't find the exercise you wanted? "Can't find it? Create a custom exercise" l
       s5title: 'Logging a workout — the actual training screen',
       s5body: `Start a workout from the Dashboard (tap a day, then a routine), with "Start session" on a routine, or choose "Or log a freestyle session without a routine".
 
-The − and + buttons change weight or reps (or seconds, for timed holds) without typing. Tap the number to type it instead.
+Tap a number to type your weight and reps (or seconds, for timed holds). With RIR off, − and + buttons sit beside each number too; with RIR on, they only show on wider screens.
+
+RIR means "reps in reserve": how many more reps you could have done before failure (0 means you couldn't do another). When it's on for an exercise, each set has an extra RIR field. Fill it in right after the set, or leave it empty. You turn it on with "Track RIR" when you add or edit an exercise.
 
 Under an exercise name, "Previously:" shows what you did last time. The small clock icon on the first set copies those numbers in. If your last two sessions weren't the same, it asks whether to use "Last set done" or "Top set done" (the heaviest set, or the longest for holds and cardio).
 
@@ -624,9 +626,11 @@ The three-dot menu on an exercise lets you move it, swap it for today only, remo
 
 The rest timer at the bottom counts down between sets: tap 60, 90, 120 or 180. It sounds when time's up, as long as Ironlog is open.`,
       s6title: "History — everything you've logged",
-      s6body: `Every finished workout lives here, most recent first. Tap one to see the full breakdown, set by set. Made a mistake typing a number? Open that session and tap "Edit" to fix it — no need to delete and redo the whole thing.
+      s6body: `Every finished workout lives here, most recent first. Tap one to see the full breakdown, set by set. If your coach left a comment on a workout, you'll see it there under "Trainer feedback". Only your coach can write it. Made a mistake typing a number? Open that session and tap "Edit" to fix it — no need to delete and redo the whole thing.
 
-You can search by exercise name, routine name, or anything you wrote in your notes, and filter by date range or category (Strength / Mobility / Cardio) using the tabs.`,
+You can search by exercise name, routine name, or anything you wrote in your notes, and filter by date range or category (Strength / Mobility / Cardio) using the tabs.
+
+To remove a workout, tap the bin icon on its row and confirm "Delete". It can't be undone.`,
       s7title: "Stats — how you're progressing",
       s7body: `This page turns your history into a picture of your progress: personal records (your best weight or reps on each exercise, the longest hold for timed exercises, and your farthest distance and best pace for cardio), a progress chart you can pick per exercise, how many weeks in a row you've trained, and your total volume.
 
@@ -642,17 +646,23 @@ For a full copy of everything you've logged, open "Account" from the menu. You c
       s11title: 'Finishing, records and sharing',
       s11body: `When you're done, tap "Finish & save session" at the bottom. That is the only step that saves the workout permanently. Everything before it is a working draft. You'll see a green "Workout saved" message.
 
-Next comes a recap screen with your time, volume, sets, records and streak. From there you can share a picture of your workout to social media or save it.
+Next comes a recap screen with your time, volume, sets and records. From there you can share a picture of your workout to social media or save it.
 
-During a workout you can earn two kinds of record badge: "Weight PR" for the heaviest weight you've lifted on that exercise, and "Reps PR" for more reps at the same weight or heavier. Warm-ups don't count.`,
+During a workout you can earn record badges. On weighted exercises, "Weight PR" means the heaviest weight you've lifted on that exercise, and "Reps PR" means more reps at the same weight or heavier. On bodyweight, timed and cardio exercises you get a plain "PR" badge when you beat your best. Warm-ups don't count.
+
+When you save a workout that includes a new record, your coach gets a notification about it.`,
       s12title: 'Reminders (notifications)',
-      s12body: `Open "Notifications" from the menu (or the bell icon) to get one reminder a day at the time you choose, in your own time zone. On a training day it reminds you of your workout. On a rest day it sends a short recovery note. If you already trained that day, or you have no weekly plan set up yet, you won't get one.
+      s12body: `Open "Notifications" from the menu to get one reminder a day at the time you choose, in your own time zone. On a training day it reminds you of your workout. On a rest day it sends a short recovery note. If you already trained that day, or you have no weekly plan set up yet, you won't get one.
 
 Tap "Send a test notification" to check it works.
 
 On iPhone, reminders only work for apps on your Home Screen (iOS 16.4 or newer): in Safari tap Share, choose "Add to Home Screen", open Ironlog from the new icon and sign in once there, then turn reminders on from this page.
 
 Rest timer alerts are separate and only work while Ironlog is open.`,
+      s13title: 'Language, privacy and terms',
+      s13body: `To switch between English and Hebrew, use the Language switch (EN / עב) in the menu, or at the top of the page on a computer. It's also on the log in screen, and Ironlog remembers your choice.
+
+"Privacy & terms" explains how your training data is used and the terms you accepted. You'll find it in "Account", at the bottom of this page, and on the log in screen.`,
     },
     people: {
       termsAccepted: 'Terms accepted {date}',
@@ -1230,7 +1240,7 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       totalVolume: 'נפח כולל',
       cardioMinutes: 'דקות קרדיו',
       personalRecords: 'שיאים אישיים',
-      recordsTip: "השיא שלכם בכל תרגיל והתאריך שבו זה קרה: המשקל הכבד ביותר, הכי הרבה חזרות בתרגילי משקל גוף, ההחזקה הארוכה ביותר בתרגילי זמן, ובקרדיו האינטרוול הארוך ביותר, המרחק הרחוק ביותר והקצב הטוב ביותר. במהלך אימון תקבלו תג \"שיא משקל\" או \"שיא חזרות\" כשאתם שוברים שיא. סטים של חימום לא נספרים.",
+      recordsTip: "השיא שלכם בכל תרגיל והתאריך שבו זה קרה: המשקל הכבד ביותר, הכי הרבה חזרות בתרגילי משקל גוף, ההחזקה הארוכה ביותר בתרגילי זמן, ובקרדיו האינטרוול הארוך ביותר, המרחק הרחוק ביותר והקצב הטוב ביותר. במהלך אימון תקבלו תג כשאתם שוברים שיא: \"שיא משקל\" או \"שיא חזרות\" בתרגילים עם משקל, ו\"שיא\" פשוט בתרגילי משקל גוף, זמן וקרדיו. סטים של חימום לא נספרים.",
       sessionsPerWeek: 'אימונים לשבוע (12 השבועות האחרונים)',
       volumePerWeek: 'נפח כולל לשבוע',
       volumeNote: 'נפח = משקל × חזרות, מסוכם על פני כל הסטים. התייחסו לזה כאל מגמה כללית ולא כמספר מדויק אם אתם מתעדים ביחידות מעורבות.',
@@ -1328,7 +1338,7 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
 
 הכרטיסים "תוכניות" ו"היסטוריה" בתחתית מובילים לתוכניות שלכם ולאימונים שעשיתם.
 
-אם תעזבו אימון באמצע (הטלפון ננעל או עברתם לאפליקציה אחרת), תראו כרטיס "אימון בעיצומו" למעלה כשתחזרו. הקישו "המשך" ותמשיכו בדיוק מהמקום שעצרתם. שום דבר לא הולך לאיבוד.`,
+אם תעזבו אימון באמצע (הטלפון ננעל או עברתם לאפליקציה אחרת), תראו כרטיס "אימון בעיצומו" למעלה כשתחזרו. הקישו "המשך" ותמשיכו בדיוק מהמקום שעצרתם. שום דבר לא הולך לאיבוד. אם אתם לא רוצים את האימון הזה יותר, הקישו "מחיקה" על הכרטיס ואשרו.`,
       s3title: 'תרגילים — הרשימה האישית שלכם',
       s3body: `לפני שאפשר לתעד אימון, התרגילים שאתם מבצעים צריכים להיות בספרייה שלכם. הקישו "הוספת תרגיל", חפשו ברשימה המשותפת הגדולה (סקוואטים, לחיצת חזה, ריצה, מתיחות — מאות תרגילים נפוצים) והוסיפו בהקשה אחת את אלה שאתם באמת מבצעים. לא מוצאים משהו? "לא מוצאים? יצירת תרגיל מותאם אישית" נמצא למטה.
 
@@ -1342,7 +1352,7 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
 — אזור דופק (1–5) — אם אתם עוקבים אחרי הדופק, מספר בין 1 (קל מאוד) ל-5 (מאמץ מקסימלי).
 אף אחת מהאפשרויות היא לא "נכונה יותר" — בחרו את זו שאתם באמת שמים לב אליה. אפשר גם לבחור ק"מ או מייל אם רוצים לעקוב אחרי מרחק.
 
-לכל תרגיל יש סרטון הדגמה קצר שמראה איך מבצעים אותו.`,
+לתרגילים רבים יש סרטון הדגמה קצר. כשיש סרטון, תראו כפתור "הדגמה" על התרגיל בזמן האימון.`,
       s4title: 'תוכניות אימון — התוכניות שלכם',
       s4body: `תוכנית היא תבנית שמורה — רשימה מסוימת של תרגילים שאתם עושים ביחד, כמו "יום דחיפה" או "יום רגליים". בונים אותה פעם אחת, ואז משתמשים בה שוב בכל פעם במקום לבחור תרגילים מאפס.
 
@@ -1354,7 +1364,9 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       s5title: 'תיעוד אימון — מסך האימון עצמו',
       s5body: `התחילו אימון מלוח הבקרה (הקישו על יום ואז על תוכנית), דרך "התחלת אימון" על תוכנית, או בחרו "או תיעוד אימון חופשי בלי תוכנית". לכל תרגיל תראו שורה לכל סט.
 
-כפתורי המינוס (−) והפלוס (+) משנים משקל או חזרות (או שניות, בהחזקות בזמן) בלי להקליד. הקישו על המספר עצמו אם אתם מעדיפים להקליד.
+הקישו על מספר כדי להקליד משקל וחזרות (או שניות, בהחזקות בזמן). כשמעקב RIR כבוי יש גם כפתורי − ו-+ ליד כל מספר; כשהוא פועל הם מופיעים רק במסכים רחבים.
+
+RIR הוא "חזרות בשמורה": כמה חזרות נוספות יכולתם לבצע לפני כשל (0 אומר שלא יכולתם עוד חזרה). כשהוא פעיל בתרגיל, לכל סט יש שדה RIR נוסף. מלאו אותו מיד אחרי הסט, או השאירו ריק. מפעילים אותו ב"מעקב RIR" כשמוסיפים או עורכים תרגיל.
 
 מתחת לשם התרגיל, "בפעם הקודמת:" מראה מה עשיתם בפעם האחרונה. סמל השעון בסט הראשון ממלא את המספרים האלה. אם שני האימונים האחרונים לא היו זהים, תקבלו בחירה בין "הסט האחרון שבוצע" ל"הסט הכבד ביותר" (בהחזקות ובקרדיו — הארוך ביותר).
 
@@ -1366,9 +1378,11 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
 
 טיימר המנוחה בתחתית סופר לאחור בין סטים: הקישו 60, 90, 120 או 180. הוא משמיע צליל כשהזמן נגמר, כל עוד Ironlog פתוח.`,
       s6title: 'היסטוריה — כל מה שתועד',
-      s6body: `כל אימון שהושלם נמצא כאן, מהאחרון לראשון. הקישו על אחד כדי לראות את הפירוט המלא, סט אחר סט. טעיתם בהקלדת מספר? פתחו את האימון והקישו "עריכה" כדי לתקן — אין צורך למחוק ולתעד הכל מחדש.
+      s6body: `כל אימון שהושלם נמצא כאן, מהאחרון לראשון. הקישו על אחד כדי לראות את הפירוט המלא, סט אחר סט. אם המאמן השאיר הערה על אימון, תראו אותה שם תחת "משוב מהמאמן". רק המאמן יכול לכתוב אותה. טעיתם בהקלדת מספר? פתחו את האימון והקישו "עריכה" כדי לתקן — אין צורך למחוק ולתעד הכל מחדש.
 
-אפשר לחפש לפי שם תרגיל, שם תוכנית, או כל דבר שכתבתם בהערות, ולסנן לפי טווח תאריכים או קטגוריה (כוח / מוביליטי / קרדיו) באמצעות הלשוניות.`,
+אפשר לחפש לפי שם תרגיל, שם תוכנית, או כל דבר שכתבתם בהערות, ולסנן לפי טווח תאריכים או קטגוריה (כוח / מוביליטי / קרדיו) באמצעות הלשוניות.
+
+כדי להסיר אימון, הקישו על סמל הפח בשורה שלו ואשרו "מחיקה". אי אפשר לבטל את הפעולה.`,
       s7title: 'סטטיסטיקה — איך אתם מתקדמים',
       s7body: `הדף הזה הופך את ההיסטוריה שלכם לתמונת התקדמות: שיאים אישיים (המשקל או החזרות הכי גבוהים בכל תרגיל, ההחזקה הארוכה ביותר בתרגילי זמן, והמרחק הרחוק ביותר והקצב הטוב ביותר בקרדיו), גרף התקדמות שאפשר לבחור לפי תרגיל, כמה שבועות ברצף התאמנתם, והנפח הכולל שלכם.
 
@@ -1384,17 +1398,23 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       s11title: 'סיום, שיאים ושיתוף',
       s11body: `כשסיימתם, הקישו "סיום ושמירת האימון" בתחתית. זה הצעד היחיד ששומר את האימון לצמיתות — כל מה שלפני כן הוא טיוטת עבודה. תראו הודעה ירוקה "האימון נשמר".
 
-אחר כך מגיע מסך סיכום עם הזמן, הנפח, הסטים, השיאים והרצף שלכם. משם אפשר לשתף תמונה של האימון ברשתות החברתיות או לשמור אותה.
+אחר כך מגיע מסך סיכום עם הזמן, הנפח, הסטים והשיאים שלכם. משם אפשר לשתף תמונה של האימון ברשתות החברתיות או לשמור אותה.
 
-במהלך אימון אפשר לקבל שני סוגי תגי שיא: "שיא משקל" על המשקל הכבד ביותר שהרמתם בתרגיל, ו"שיא חזרות" על יותר חזרות באותו משקל או כבד יותר. סטים של חימום לא נספרים.`,
+במהלך אימון אפשר לקבל תגי שיא. בתרגילים עם משקל, "שיא משקל" הוא המשקל הכבד ביותר שהרמתם בתרגיל, ו"שיא חזרות" הוא יותר חזרות באותו משקל או כבד יותר. בתרגילי משקל גוף, החזקה בזמן וקרדיו תקבלו תג "שיא" פשוט כששוברים את התוצאה הטובה ביותר שלכם. סטים של חימום לא נספרים.
+
+כששומרים אימון שכולל שיא חדש, המאמן מקבל על כך התראה.`,
       s12title: 'תזכורות (התראות)',
-      s12body: `פתחו את "התראות" מהתפריט (או הקישו על סמל הפעמון) כדי לקבל תזכורת אחת ביום בשעה שתבחרו, לפי אזור הזמן שלכם. ביום אימון היא מזכירה לכם את האימון. ביום מנוחה היא שולחת הערה קצרה על התאוששות. אם כבר התאמנתם באותו יום, או שעוד לא הגדרתם תוכנית שבועית, לא תקבלו תזכורת.
+      s12body: `פתחו את "התראות" מהתפריט כדי לקבל תזכורת אחת ביום בשעה שתבחרו, לפי אזור הזמן שלכם. ביום אימון היא מזכירה לכם את האימון. ביום מנוחה היא שולחת הערה קצרה על התאוששות. אם כבר התאמנתם באותו יום, או שעוד לא הגדרתם תוכנית שבועית, לא תקבלו תזכורת.
 
 הקישו "שלחו התראת בדיקה" כדי לוודא שזה עובד.
 
 באייפון תזכורות עובדות רק לאפליקציות שנמצאות במסך הבית (iOS 16.4 ומעלה): ב-Safari לחצו על שיתוף, בחרו "הוסף למסך הבית", פתחו את Ironlog מהסמל החדש, התחברו שם פעם אחת, ואז הפעילו תזכורות מהעמוד הזה.
 
 התראות טיימר המנוחה נפרדות ועובדות רק כשהאפליקציה פתוחה.`,
+      s13title: 'שפה, פרטיות ותנאים',
+      s13body: `כדי לעבור בין עברית לאנגלית, השתמשו במתג השפה (EN / עב) בתפריט, או בראש הדף במחשב. הוא גם במסך ההתחברות, ו-Ironlog זוכר את הבחירה שלכם.
+
+"פרטיות ותנאים" מסביר איך נעשה שימוש בנתוני האימונים שלכם ואת התנאים שאישרתם. תמצאו אותו ב"חשבון", בתחתית הדף הזה ובמסך ההתחברות.`,
     },
     people: {
       termsAccepted: 'אישר/ה את התנאים ב-{date}',
