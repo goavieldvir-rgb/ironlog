@@ -7,6 +7,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { fmtDate } from '../lib/dates.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, deleteSession } from '../lib/db.js'
+import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
 import { Card, CategoryTag, EmptyState, LoadError, Button, Field } from './ui.jsx'
 import { Tabs } from './ExerciseLibrary.jsx'
 import { InfoTip } from './InfoTip.jsx'
@@ -21,12 +22,20 @@ function formatDate(lang, iso) {
 // A session matches a text search if the routine name, any exercise name,
 // or the session notes contain the query — so searching "bench" finds every
 // session where you did a bench press, not just ones named "bench day".
-function matchesQuery(session, q) {
+function matchesQuery(session, q, t, exById, lang) {
   if (!q) return true
   const needle = q.toLowerCase()
+  // Match what is displayed (current language) as well as what was stored.
+  if (sessionTitle(session, t)?.toLowerCase().includes(needle)) return true
   if (session.routine_name?.toLowerCase().includes(needle)) return true
   if (session.notes?.toLowerCase().includes(needle)) return true
-  return (session.entries || []).some((e) => e.name?.toLowerCase().includes(needle))
+  // Exercises match in either language, so "bench" and "לחיצת חזה" both
+  // find the same workouts whichever language they were logged in.
+  return (session.entries || []).some((e) => {
+    const ex = exById[e.exerciseId]
+    return [entryName(e, exById, lang), e.name, e.nameEn, e.nameHe, ex?.name, ex?.name_he]
+      .some((n) => n?.toLowerCase().includes(needle))
+  })
 }
 
 export default function History() {
@@ -35,6 +44,8 @@ export default function History() {
   const { confirm, toast } = useFeedback()
   const [sessions, loading, refresh, loadError] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const loadFailed = !!loadError && sessions.length === 0
+  const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
+  const exById = useMemo(() => exerciseMap(exercises), [exercises])
   const [tab, setTab] = useState('all')
   const [q, setQ] = useState('')
   const [dateFrom, setDateFrom] = useState('')
@@ -46,10 +57,10 @@ export default function History() {
       if (tab !== 'all' && s.category !== tab) return false
       if (dateFrom && s.date < dateFrom) return false
       if (dateTo && s.date > dateTo) return false
-      if (!matchesQuery(s, q)) return false
+      if (!matchesQuery(s, q, t, exById, lang)) return false
       return true
     })
-  }, [sessions, tab, q, dateFrom, dateTo])
+  }, [sessions, tab, q, dateFrom, dateTo, t, exById, lang])
 
   const hasActiveFilters = q || dateFrom || dateTo || tab !== 'all'
 
@@ -137,7 +148,7 @@ export default function History() {
               <Card className="flex items-center justify-between gap-3 hover:border-brass/50 transition-colors">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap min-w-0">
-                    <h2 className="text-lg leading-tight truncate min-w-0">{s.routine_name}</h2>
+                    <h2 className="text-lg leading-tight truncate min-w-0">{sessionTitle(s, t)}</h2>
                     <CategoryTag category={s.category} />
                   </div>
                   <p className="text-chalkdim text-xs mt-1">

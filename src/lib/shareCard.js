@@ -7,76 +7,81 @@
 // duration and the week streak. No exercises or sets, so it's easy to post
 // and doesn't give the training plan away.
 //
-// Three looks, one style: a poster-style Ironlog card, the same stats over
-// the trainee's own photo, and a see-through sticker. Colours come from the
-// app's Tailwind theme. The poster fonts are loaded only when this screen
-// opens, so the rest of the app doesn't get heavier. Cards are a 1080 x 1920
-// Instagram story; the top and bottom ~250px stay empty because Instagram
-// puts its own buttons there. Photos are only ever drawn on this phone.
+// Three looks: a plain Ironlog card, the stats designed into the trainee's
+// own photo, and a see-through sticker (the photo look without the photo).
+// Colours come from the app's Tailwind theme. The poster fonts are our own
+// copies under public/fonts/share, loaded only when the workout screen opens
+// so the rest of the app doesn't get heavier. Cards are a 1080 x 1920
+// Instagram story; everything stays between y=250 and y=1670 because
+// Instagram puts its own buttons at the top and bottom. Photos are only ever
+// drawn on this phone.
 import tailwind from '../../tailwind.config.js'
 
 const W = 1080
 const H = 1920
 const M = 96 // side margin
-const SAFE_TOP = 250
-const SAFE_BOTTOM = 250
 const T = tailwind.theme.extend.colors
 const C = { ink: T.ink, chalk: T.chalk, dim: T.chalkdim, brass: T.brass, line: T.line }
+const GOLD = '#F0CF7A' // lighter than the app's brass so it still reads on pale photos
 
-// Numbers are always the tall condensed face; English words use it too,
-// Hebrew words use Karantina (same proportions, real Hebrew letters).
-const NUM = '"Big Shoulders Display", "Barlow Condensed", sans-serif'
-const HEB_DISPLAY = '"Karantina", "Rubik", sans-serif'
-const LBL_EN = '"Inter", system-ui, sans-serif'
-const LBL_HE = '"Heebo", "Rubik", system-ui, sans-serif'
-const FONT_CSS =
-  'https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800;900&family=Karantina:wght@700&family=Heebo:wght@600;700&display=swap'
-// Everything the card draws with. Hebrew sample text makes the Hebrew pieces
-// of each font download too.
-const FONT_REQUESTS = [
-  `800 100px ${NUM}`,
-  `900 100px ${NUM}`,
-  `700 100px ${HEB_DISPLAY}`,
-  `700 30px ${LBL_EN}`,
-  `600 30px ${LBL_EN}`,
-  `600 30px ${LBL_HE}`,
-  `700 30px ${LBL_HE}`,
+// Numbers are always the tall condensed face (the same Barlow Condensed the
+// app uses for headings); English words use it too, Hebrew words use
+// Karantina (same proportions, real Hebrew letters). The families carry an
+// "IL " prefix so the card never depends on the app's own font stylesheet.
+const NUM = '"IL Barlow Condensed", "Barlow Condensed", sans-serif'
+const HEB_DISPLAY = '"IL Karantina", "Rubik", sans-serif'
+const LBL_EN = '"IL Inter", Inter, system-ui, sans-serif'
+const LBL_HE = '"IL Heebo", Heebo, "Rubik", system-ui, sans-serif'
+
+// Self-hosted woff2 files (Google Fonts latin / hebrew subsets). Heebo and
+// Inter are variable fonts, so one file covers both weights.
+const LATIN = 'U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD'
+const HEBREW = 'U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F'
+const FACES = [
+  ['IL Barlow Condensed', 'barlow-condensed-latin', '800', LATIN],
+  ['IL Karantina', 'karantina-latin', '700', LATIN],
+  ['IL Karantina', 'karantina-hebrew', '700', HEBREW],
+  ['IL Heebo', 'heebo-latin', '600 700', LATIN],
+  ['IL Heebo', 'heebo-hebrew', '600 700', HEBREW],
+  ['IL Inter', 'inter-latin', '600 700', LATIN],
 ]
 
-// The stylesheet is added once, and everyone waits on the same promise. It
-// settles when the stylesheet loads, fails, or 3 seconds pass, so a slow or
-// blocked Google Fonts can never hold up the Share buttons.
+// All the faces load once; everyone waits on the same promise (true when
+// every file arrived). Waiting for it is always capped, so a slow or blocked
+// connection can never hold up the Share buttons - but the load carries on,
+// and shareFontsReady() lets the recap redraw once it finishes.
 const FONT_WAIT_MS = 3000
-let fontSheet = null
-function addFontStylesheet() {
-  if (fontSheet || typeof document === 'undefined') return fontSheet || Promise.resolve()
-  fontSheet = new Promise((resolve) => {
-    const link = document.createElement('link')
-    link.rel = 'stylesheet'
-    link.href = FONT_CSS
-    link.onload = resolve
-    link.onerror = resolve
-    document.head.appendChild(link)
-    setTimeout(resolve, FONT_WAIT_MS)
-  })
-  return fontSheet
+let fontsPromise = null
+let fontsDone = false
+export function shareFontsReady() {
+  if (fontsPromise) return fontsPromise
+  if (typeof document === 'undefined' || typeof FontFace === 'undefined') return (fontsPromise = Promise.resolve(false))
+  fontsPromise = Promise.all(
+    FACES.map(async ([family, file, weight, unicodeRange]) => {
+      try {
+        const url = new URL(`fonts/share/${file}.woff2`, document.baseURI)
+        const face = new FontFace(family, `url("${url.href}") format("woff2")`, { weight, unicodeRange })
+        document.fonts.add(face)
+        await face.load()
+        return true
+      } catch {
+        return false
+      }
+    }),
+  ).then((r) => (fontsDone = r.every(Boolean)))
+  return fontsPromise
 }
+// True once every share font has arrived (so a redraw would change nothing).
+export const shareFontsLoaded = () => fontsDone
 
-// Google splits each font by script, so a font only downloads the part that
-// covers the text it's asked about: ask with the Latin and Hebrew sample
-// text plus whatever the card is about to draw.
-const SAMPLE = 'Aa 0123456789,. אבגדהוזחטיכלמנסעפצקרשת״׳'
-async function loadFonts(extraText = '') {
-  await addFontStylesheet()
-  const text = `${SAMPLE} ${extraText}`
-  const loads = Promise.all(FONT_REQUESTS.map((f) => document.fonts.load(f, text)))
-  await Promise.race([loads, new Promise((resolve) => setTimeout(resolve, FONT_WAIT_MS))])
+async function waitForFonts() {
+  await Promise.race([shareFontsReady(), new Promise((resolve) => setTimeout(resolve, FONT_WAIT_MS))])
 }
 
 // Called when the workout screen opens, so the fonts are already on the phone
 // by the time the workout is finished.
 export function preloadShareFonts() {
-  loadFonts().catch(() => {})
+  shareFontsReady().catch(() => {})
 }
 
 function fit(ctx, text, maxW) {
@@ -86,15 +91,74 @@ function fit(ctx, text, maxW) {
   return `${t}…`
 }
 
-// Largest font size (down to `min`) at which the text fits `maxW`.
-function fitSize(ctx, text, weight, family, max, min, maxW) {
-  let s = max
-  ctx.font = `${weight} ${s}px ${family}`
-  while (s > min && ctx.measureText(text).width > maxW) {
-    s -= 6
-    ctx.font = `${weight} ${s}px ${family}`
+// Like fit(), but drops whole words first, so a cut name ends on a word.
+function fitWords(ctx, text, maxW) {
+  if (ctx.measureText(text).width <= maxW) return text
+  const words = text.split(' ')
+  while (words.length > 1) {
+    words.pop()
+    const t = `${words.join(' ')}…`
+    if (ctx.measureText(t).width <= maxW) return t
   }
-  return s
+  return fit(ctx, text, maxW)
+}
+
+// ---- text painting -------------------------------------------------------
+// Every piece of text goes through put(). Photo and plain cards just fill
+// (photo with a soft shadow). The sticker has to read on ANY background, so
+// each element is painted in two passes: first a tight dark outline plus a
+// wide soft shadow, then the fill with a tight shadow on top.
+let FX = null // { sticker, shadow: { color, blur, y } } for the picture being drawn
+let PASS = 'fill'
+
+const fontPx = (ctx) => parseFloat(/(\d+(?:\.\d+)?)px/.exec(ctx.font)?.[1] || '30')
+
+function setShadow(ctx, color, blur, offsetY = 0) {
+  ctx.shadowColor = color || 'transparent'
+  ctx.shadowBlur = color ? blur : 0
+  ctx.shadowOffsetY = color ? offsetY : 0
+}
+
+function put(ctx, text, x, y) {
+  ctx.save()
+  if (FX?.sticker && PASS === 'stroke') {
+    ctx.lineJoin = 'round'
+    ctx.lineWidth = Math.max(3, fontPx(ctx) * 0.045)
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)'
+    setShadow(ctx, 'rgba(0,0,0,0.45)', 24)
+    ctx.strokeText(text, x, y)
+  } else {
+    if (FX?.shadow) setShadow(ctx, FX.shadow.color, FX.shadow.blur, FX.shadow.y)
+    ctx.fillText(text, x, y)
+  }
+  ctx.restore()
+}
+
+// A filled bar; on the sticker it gets the same dark outline as the text.
+function bar(ctx, x, y, w, h, color) {
+  ctx.save()
+  if (FX?.sticker && PASS === 'stroke') {
+    ctx.lineJoin = 'round'
+    ctx.lineWidth = 5
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)'
+    setShadow(ctx, 'rgba(0,0,0,0.45)', 24)
+    ctx.strokeRect(x, y, w, h)
+  } else {
+    if (FX?.sticker) setShadow(ctx, FX.shadow.color, FX.shadow.blur, FX.shadow.y)
+    ctx.fillStyle = color
+    ctx.fillRect(x, y, w, h)
+  }
+  ctx.restore()
+}
+
+// Runs the drawing once, or twice (outline, then fill) for the sticker.
+function passes(fn) {
+  if (FX?.sticker) {
+    PASS = 'stroke'
+    fn()
+  }
+  PASS = 'fill'
+  fn()
 }
 
 // Letter-spaced text (ctx.letterSpacing isn't in older Safari). Only used
@@ -107,7 +171,7 @@ function tracked(ctx, text, x, y, spacing, align) {
   const prev = ctx.textAlign
   ctx.textAlign = 'left'
   chars.forEach((c, i) => {
-    ctx.fillText(c, cx, y)
+    put(ctx, c, cx, y)
     cx += widths[i] + spacing
   })
   ctx.textAlign = prev
@@ -127,199 +191,386 @@ function pickStats(summary, labels) {
   }
   const heroKey = ['volume', 'distance', 'duration', 'sets'].find((k) => stats[k])
   const small = ['duration', 'streak'].filter((k) => k !== heroKey && stats[k]).map((k) => stats[k])
-  return { hero: stats[heroKey], small }
+  return { hero: stats[heroKey], small, heroKey }
 }
 
-// Vertical positions for the full poster card and for the shorter block that
-// sits over a photo or becomes the sticker. All measured from the block top.
-const FULL = { nameSize: 96, nameY: 110, ruleY: 146, heroMax: 700, heroY: 700, capY: 830, divY: 1030, statY: 1200, labelY: 1258, statSize: 150 }
-const COMPACT = { nameSize: 72, nameY: 70, ruleY: 102, heroMax: 440, heroY: 560, capY: 690, divY: 750, statY: 890, labelY: 944, statSize: 120 }
+const isHeb = (s) => /[֐-׿]/.test(s)
 
-// Draws name, hero number, caption and small stats from y; returns the
-// bottom of the block. `look` sets colours and an optional soft shadow.
-function drawBlock(ctx, summary, { rtl, labels, y, look, layout }) {
-  const L = layout
-  const x0 = rtl ? W - M : M
-  const align = rtl ? 'right' : 'left'
-  const dir = rtl ? 'rtl' : 'ltr'
-  const { hero, small } = pickStats(summary, labels)
-  const lbl = rtl ? LBL_HE : LBL_EN
-  const disp = rtl ? HEB_DISPLAY : NUM
-  const shadow = (on) => {
-    ctx.shadowColor = on ? 'rgba(0,0,0,0.55)' : 'transparent'
-    ctx.shadowBlur = on ? 18 : 0
-    ctx.shadowOffsetY = on ? 4 : 0
-  }
-  shadow(look.shadow)
-  ctx.textBaseline = 'alphabetic'
-  ctx.textAlign = align
+// Letter-spaced width, matching tracked().
+function trackedWidth(ctx, text, spacing) {
+  const chars = [...text]
+  return chars.reduce((a, c) => a + ctx.measureText(c).width, 0) + spacing * Math.max(0, chars.length - 1)
+}
 
-  // workout name
-  ctx.direction = dir
-  ctx.fillStyle = look.text
-  // The name's face follows the letters in it, not the screen's language: a
-  // Hebrew name gets Karantina, an English one gets the English capitals (Big
-  // Shoulders has no Hebrew, Karantina has no Latin lowercase).
-  const hebName = /[\u0590-\u05FF]/.test(summary.routineName)
-  const name = hebName ? summary.routineName : summary.routineName.toUpperCase()
-  const nameFont = hebName ? HEB_DISPLAY : NUM
-  fitSize(ctx, name, hebName ? 700 : 800, nameFont, hebName ? L.nameSize * 1.25 : L.nameSize, 52, W - M * 2)
-  ctx.fillText(fit(ctx, name, W - M * 2), x0, y + L.nameY)
-  ctx.fillStyle = look.accent
-  ctx.fillRect(rtl ? W - M - 72 : M, y + L.ruleY, 72, 8)
-
-  // hero number: long totals shrink to the width instead of being cut
-  ctx.direction = 'ltr'
-  fitSize(ctx, hero.value, 900, NUM, L.heroMax, 200, W - M * 2 + 16)
-  ctx.fillStyle = look.text
-  ctx.textAlign = align
-  ctx.fillText(hero.value, x0 + (rtl ? 8 : -8), y + L.heroY)
-
-  // unit and what it measures, in the accent colour
-  ctx.fillStyle = look.accent
-  ctx.font = `700 40px ${lbl}`
-  ctx.direction = dir
-  const cap = (rtl ? [hero.label, hero.unit] : [hero.unit, hero.label]).filter(Boolean).join(' · ')
+// A small caption in the label font: tracked capitals in English, plain
+// text in Hebrew. `x` is the edge on the reading-start side (or the end side
+// when `end` is set); long captions are cut with an ellipsis to fit `maxW`.
+function drawLabel(ctx, text, x, y, { rtl, size, weight = 600, color, spacing, maxW = W, end = false }) {
+  ctx.fillStyle = color
+  ctx.font = `${weight} ${size}px ${rtl ? LBL_HE : LBL_EN}`
+  ctx.direction = rtl ? 'rtl' : 'ltr'
   if (rtl) {
-    ctx.textAlign = 'right'
-    ctx.fillText(cap, x0, y + L.capY)
-  } else {
-    tracked(ctx, cap.toUpperCase(), x0, y + L.capY, 7, 'left')
+    ctx.textAlign = end ? 'left' : 'right'
+    put(ctx, fit(ctx, text, maxW), x, y)
+    return
   }
-
-  // small stats side by side, the first on the reading-start side
-  let end = y + L.capY
-  if (small.length) {
-    shadow(false)
-    ctx.fillStyle = look.line
-    ctx.fillRect(M, y + L.divY, W - M * 2, 2)
-    shadow(look.shadow)
-    const colW = (W - M * 2) / 2
-    small.forEach((st, i) => {
-      const slot = rtl ? 1 - i : i
-      const sx = rtl ? M + slot * colW + colW : M + slot * colW
-      ctx.direction = 'ltr'
-      ctx.textAlign = align
-      ctx.fillStyle = look.text
-      ctx.font = `800 ${L.statSize}px ${NUM}`
-      ctx.fillText(st.value, sx, y + L.statY)
-      const vw = ctx.measureText(st.value).width
-      ctx.fillStyle = look.accent
-      ctx.font = `${rtl ? 700 : 800} ${Math.round(L.statSize * 0.5)}px ${disp}`
-      const unit = rtl ? st.unit : st.unit.toUpperCase()
-      ctx.fillText(fit(ctx, unit, colW - vw - 40), rtl ? sx - vw - 18 : sx + vw + 18, y + L.statY)
-      ctx.fillStyle = look.dim
-      ctx.font = `600 28px ${lbl}`
-      ctx.direction = dir
-      if (rtl) {
-        ctx.textAlign = 'right'
-        ctx.fillText(fit(ctx, st.label, colW - 24), sx, y + L.labelY)
-      } else {
-        tracked(ctx, fit(ctx, st.label.toUpperCase(), colW - 24), sx, y + L.labelY, 5, 'left')
-      }
-    })
-    end = y + L.labelY
-  }
-  shadow(false)
-  return end
+  let t = text.toUpperCase()
+  while (t.length > 1 && trackedWidth(ctx, t, spacing) > maxW) t = t.slice(0, -2) + '…'
+  tracked(ctx, t, x, y, spacing, end ? 'right' : 'left')
 }
 
-function drawBrand(ctx, y, look) {
+// A stat's unit: Hebrew units use Karantina, everything else the English
+// capitals (Karantina has no Latin lowercase).
+function unitFace(unit) {
+  const heb = isHeb(unit)
+  return { text: heb ? unit : unit.toUpperCase(), font: (px) => `${heb ? 700 : 800} ${px}px ${heb ? HEB_DISPLAY : NUM}` }
+}
+
+// Width of "value + gap + unit" with the value at `size` px.
+function valueWidth(ctx, st, size, unitPx, gap, valueWeight) {
+  ctx.font = `${valueWeight} ${size}px ${NUM}`
+  const vw = ctx.measureText(st.value).width
+  if (!st.unit) return vw
+  const u = unitFace(st.unit)
+  ctx.font = u.font(unitPx)
+  return vw + gap + ctx.measureText(u.text).width
+}
+
+// Biggest size (from `max` down to `min`) at which value + unit fit `maxW`;
+// the unit scales with it. If even the smallest doesn't fit, the number is
+// cut with an ellipsis.
+function fitStat(ctx, st, { max, min, unit, gap, weight, maxW }) {
+  const unitAt = (s) => Math.round((s * unit) / max)
+  let size = max
+  while (size > min && valueWidth(ctx, st, size, unitAt(size), gap, weight) > maxW) size -= 4
+  let out = st
+  if (valueWidth(ctx, st, size, unitAt(size), gap, weight) > maxW) {
+    let v = st.value
+    while (v.length > 1 && valueWidth(ctx, { ...st, value: `${v}…` }, size, unitAt(size), gap, weight) > maxW) v = v.slice(0, -1)
+    out = { ...st, value: `${v}…` }
+  }
+  return { st: out, size, unitPx: unitAt(size), width: valueWidth(ctx, out, size, unitAt(size), gap, weight) }
+}
+
+// Value with its unit right after it (on the end side). Left to right the
+// value starts at x; in Hebrew it starts at x and the unit sits to its left.
+function drawValue(ctx, st, x, y, { rtl, size, unitPx, gap, valueWeight, color, unitColor }) {
   ctx.direction = 'ltr'
-  ctx.fillStyle = look.accent
-  ctx.font = `800 36px ${NUM}`
-  tracked(ctx, 'IRONLOG', W / 2, y, 10, 'center')
+  ctx.textAlign = rtl ? 'right' : 'left'
+  ctx.fillStyle = color
+  ctx.font = `${valueWeight} ${size}px ${NUM}`
+  put(ctx, st.value, x, y)
+  if (!st.unit) return
+  const vw = ctx.measureText(st.value).width
+  const u = unitFace(st.unit)
+  ctx.fillStyle = unitColor
+  ctx.font = u.font(unitPx)
+  ctx.direction = isHeb(st.unit) ? 'rtl' : 'ltr'
+  put(ctx, u.text, rtl ? x - vw - gap : x + vw + gap, y)
 }
 
-// Fill-and-crop a photo to cover the whole story, then darken it with a
-// gradient so white text stays readable on bright photos.
+// Workout name at a fixed size: its face follows the letters in it, not the
+// screen's language (Barlow has no Hebrew, Karantina has no Latin
+// lowercase). Long names wrap at spaces onto at most two lines; whatever
+// still doesn't fit on line two is cut with an ellipsis.
+// Do these words fit on two lines of maxW with greedy wrapping?
+function twoLines(ctx, words, maxW) {
+  let lines = 1
+  let cur = ''
+  for (const w of words) {
+    const next = cur ? `${cur} ${w}` : w
+    if (ctx.measureText(next).width <= maxW) cur = next
+    else if (ctx.measureText(w).width > maxW) return false
+    else if (++lines > 2) return false
+    else cur = w
+  }
+  return true
+}
+
+function layoutName(ctx, summary, { maxEn, maxHe }) {
+  const heb = isHeb(summary.routineName)
+  const text = heb ? summary.routineName : summary.routineName.toUpperCase()
+  const family = heb ? HEB_DISPLAY : NUM
+  const weight = heb ? 700 : 800
+  ctx.direction = isHeb(text) ? 'rtl' : 'ltr'
+  const maxW = W - M * 2
+  const words = text.trim().split(/\s+/)
+  // Fixed size, except a name too long for two lines steps down a little
+  // (to 75% at most) before anything gets cut.
+  const top = heb ? maxHe : maxEn
+  let size = top
+  for (; size > top * 0.75; size -= 4) {
+    ctx.font = `${weight} ${size}px ${family}`
+    if (twoLines(ctx, words, maxW)) break
+  }
+  ctx.font = `${weight} ${size}px ${family}`
+  let line1 = ''
+  let i = 0
+  while (i < words.length) {
+    const next = line1 ? `${line1} ${words[i]}` : words[i]
+    if (ctx.measureText(next).width > maxW && line1) break
+    line1 = next
+    i++
+  }
+  let lines
+  if (ctx.measureText(line1).width > maxW) {
+    // a single word wider than the card: cut it and show the rest below
+    lines = [fit(ctx, line1, maxW)]
+    if (i < words.length) lines.push(fitWords(ctx, words.slice(i).join(' '), maxW))
+  } else {
+    lines = [line1]
+    if (i < words.length) lines.push(fitWords(ctx, words.slice(i).join(' '), maxW))
+  }
+  return { lines, size, family, weight, lh: Math.round(size * (heb ? 1 : 0.96)) }
+}
+
+function drawName(ctx, nm, x, y, { rtl, color }) {
+  ctx.font = `${nm.weight} ${nm.size}px ${nm.family}`
+  ctx.fillStyle = color
+  ctx.direction = rtl ? 'rtl' : 'ltr'
+  ctx.textAlign = rtl ? 'right' : 'left'
+  nm.lines.forEach((ln, i) => put(ctx, ln, x, y + i * nm.lh))
+}
+
+function drawBrand(ctx, x, y, { rtl, color }) {
+  ctx.direction = 'ltr'
+  ctx.fillStyle = color
+  ctx.font = `800 34px ${NUM}`
+  tracked(ctx, 'IRONLOG', x, y, 10, rtl ? 'right' : 'left')
+}
+
+// Name, brass rule, the hero stat on its own line, then time and streak side
+// by side underneath. Used for both the photo picture and the sticker so
+// they are one design. Anchored by the name's first baseline (`top`) or by
+// the bottom of the numbers (`bottom`); a two-line name grows away from the
+// anchor. Returns the baseline of the last row.
+function drawOverlayBlock(ctx, summary, { rtl, labels, top, bottom, accent, labelColor }) {
+  const x0 = rtl ? W - M : M
+  const full = W - M * 2
+  const { hero, small } = pickStats(summary, labels)
+  const nm = layoutName(ctx, summary, { maxEn: 88, maxHe: 110 })
+  const extra = (nm.lines.length - 1) * nm.lh
+  const heroLabelOff = 112
+  const heroValueOff = heroLabelOff + 148
+  const smallLabelOff = heroValueOff + 90
+  const smallValueOff = smallLabelOff + 82
+  const rel = small.length ? smallValueOff : heroValueOff
+  const base = top != null ? top : bottom - rel - extra // first baseline of the name
+  const last = base + extra // last baseline of the name
+
+  const heroFit = fitStat(ctx, hero, { max: 170, min: 110, unit: 60, gap: 14, weight: 800, maxW: full })
+  const half = full / 2
+  const smallFits = small.slice(0, 2).map((st) => fitStat(ctx, st, { max: 90, min: 60, unit: 36, gap: 10, weight: 800, maxW: half - 24 }))
+
+  passes(() => {
+    drawName(ctx, nm, x0, base, { rtl, color: '#FFFFFF' })
+    bar(ctx, rtl ? W - M - 56 : M, last + 32, 56, 5, accent)
+    drawLabel(ctx, hero.label, x0, last + heroLabelOff, { rtl, size: 26, color: labelColor, spacing: 5, maxW: full })
+    drawValue(ctx, heroFit.st, x0, last + heroValueOff, { rtl, size: heroFit.size, unitPx: heroFit.unitPx, gap: 14, valueWeight: 800, color: '#FFFFFF', unitColor: accent })
+    smallFits.forEach((f, i) => {
+      const x = rtl ? W - M - i * half : M + i * half
+      drawLabel(ctx, f.st.label, x, last + smallLabelOff, { rtl, size: 24, color: labelColor, spacing: 4, maxW: half - 24 })
+      drawValue(ctx, f.st, x, last + smallValueOff, { rtl, size: f.size, unitPx: f.unitPx, gap: 10, valueWeight: 800, color: '#FFFFFF', unitColor: accent })
+    })
+  })
+  return last + rel
+}
+
+// Fill-and-crop a photo to cover the whole story.
 function drawPhoto(ctx, photo) {
   const scale = Math.max(W / photo.width, H / photo.height)
   const dw = photo.width * scale
   const dh = photo.height * scale
   ctx.drawImage(photo.source, (W - dw) / 2, (H - dh) / 2, dw, dh)
-  const g = ctx.createLinearGradient(0, 0, 0, H)
-  g.addColorStop(0, 'rgba(20,22,26,0.35)')
-  g.addColorStop(0.3, 'rgba(20,22,26,0.1)')
-  g.addColorStop(0.5, 'rgba(20,22,26,0.55)')
-  g.addColorStop(1, 'rgba(20,22,26,0.94)')
-  ctx.fillStyle = g
-  ctx.fillRect(0, 0, W, H)
 }
 
-// variant: 'plain' (default), 'photo' (needs `photo`) or 'sticker'.
-// labels: { brand, duration, volume, distance, sets, streak, weekUnit, min }
-export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo = null }) {
-  const canvas = document.createElement('canvas')
-  canvas.width = W
-  const ctx = canvas.getContext('2d')
+// Soft darkening at the top and bottom only, so the middle of the photo stays
+// as it was and white text stays readable on bright photos. The bottom one
+// starts higher than the numbers block, which is now taller.
+function drawScrims(ctx) {
+  // Light touch: the photo is the point. A faint top fade for the brand mark,
+  // and a bottom fade that only starts below the middle and eases in, so a
+  // face or body in the frame stays bright. Below ~1670 Instagram covers the
+  // picture with its own controls, so it never needs to go near black.
+  const top = ctx.createLinearGradient(0, 0, 0, 380)
+  top.addColorStop(0, 'rgba(10,11,13,0.32)')
+  top.addColorStop(1, 'rgba(10,11,13,0)')
+  ctx.fillStyle = top
+  ctx.fillRect(0, 0, W, 380)
+  const y0 = 960
+  const bot = ctx.createLinearGradient(0, y0, 0, H)
+  const at = (y, a) => bot.addColorStop((y - y0) / (H - y0), `rgba(10,11,13,${a})`)
+  at(960, 0)
+  at(1100, 0.16)
+  at(1240, 0.4)
+  at(1400, 0.58)
+  at(1700, 0.68)
+  at(H, 0.72)
+  ctx.fillStyle = bot
+  ctx.fillRect(0, y0, W, H - y0)
+}
 
-  if (variant === 'sticker') {
-    // Transparent picture: white text with a soft shadow reads on any photo.
-    canvas.height = 1080
-    // A lighter gold than the app's brass so it still reads on pale photos.
-    const look = { text: '#FFFFFF', dim: 'rgba(255,255,255,0.9)', accent: '#F0CF7A', line: 'rgba(255,255,255,0.5)', shadow: true }
-    const end = drawBlock(ctx, summary, { rtl, labels, y: 20, look, layout: COMPACT })
-    ctx.shadowColor = 'rgba(0,0,0,0.55)'
-    ctx.shadowBlur = 14
-    drawBrand(ctx, end + 90, look)
-    return canvas
-  }
-
-  canvas.height = H
-  if (variant === 'photo' && photo) {
-    drawPhoto(ctx, photo)
-    // Sits low, over the darker part of the gradient, clear of the bottom 250px.
-    const look = { text: '#FFFFFF', dim: 'rgba(255,255,255,0.85)', accent: C.brass, line: 'rgba(255,255,255,0.4)', shadow: true }
-    const top = H - SAFE_BOTTOM - 80 - 960
-    const end = drawBlock(ctx, summary, { rtl, labels, y: top, look, layout: COMPACT })
-    ctx.shadowColor = 'rgba(0,0,0,0.5)'
-    ctx.shadowBlur = 12
-    drawBrand(ctx, end + 70, look)
-    return canvas
-  }
-
-  // plain card: ink background, a faint warm light from the top corner
-  const look = { text: C.chalk, dim: C.dim, accent: C.brass, line: C.line, shadow: false }
+function drawPlain(ctx, summary, { rtl, labels }) {
+  const x0 = rtl ? W - M : M
+  const xEnd = rtl ? M : W - M
   ctx.fillStyle = C.ink
   ctx.fillRect(0, 0, W, H)
-  const glow = ctx.createRadialGradient(W, 0, 0, W, 0, 1300)
+  // a faint warm light from the top end corner
+  const gx = rtl ? 0 : W
+  const glow = ctx.createRadialGradient(gx, 0, 0, gx, 0, 1300)
   glow.addColorStop(0, 'rgba(201,162,75,0.16)')
   glow.addColorStop(1, 'rgba(201,162,75,0)')
   ctx.fillStyle = glow
   ctx.fillRect(0, 0, W, H)
-  drawBlock(ctx, summary, { rtl, labels, y: 250, look, layout: FULL })
-  drawBrand(ctx, H - SAFE_BOTTOM - 30, look)
-  return canvas
+  ctx.textBaseline = 'alphabetic'
+
+  // brand row
+  drawBrand(ctx, x0, 310, { rtl, color: C.brass })
+  drawLabel(ctx, labels.eyebrow || '', xEnd, 310, { rtl, size: 26, color: C.dim, spacing: 5, end: true })
+
+  const { hero, small, heroKey } = pickStats(summary, labels)
+  const heroLabel = heroKey === 'volume' && labels.totalVolume ? labels.totalVolume : hero.label
+  const nm = layoutName(ctx, summary, { maxEn: 120, maxHe: 150 })
+  const full = W - M * 2
+  const half = full / 2
+  // the big number: sized so the value and its unit fit the width together
+  const heroFit = fitStat(ctx, hero, { max: 300, min: 160, unit: 96, gap: 20, weight: 800, maxW: full })
+  const smallFits = small.slice(0, 2).map((st) => fitStat(ctx, st, { max: 170, min: 90, unit: 60, gap: 14, weight: 800, maxW: half - 40 }))
+
+  // Positions relative to the name's first baseline, then the whole block is
+  // centred in the story's safe area (y 250-1670).
+  const last = (nm.lines.length - 1) * nm.lh
+  const ruleY = last + 40
+  const heroLabelY = ruleY + 90
+  const heroValueY = heroLabelY + 38 + Math.round(heroFit.size * 0.7)
+  const divY = heroValueY + 70
+  const smallLabelY = divY + 80
+  const smallValueY = smallLabelY + 36 + 119
+  const bottom = small.length ? smallValueY : heroValueY
+  const blockTop = -Math.round(nm.size * 0.74)
+  // centred a little below the safe area's middle: the brand row already
+  // weighs on the top
+  const dy = Math.max(Math.round(1010 - (blockTop + bottom) / 2), 400 - blockTop)
+
+  drawName(ctx, nm, x0, dy, { rtl, color: C.chalk })
+  bar(ctx, rtl ? W - M - 64 : M, ruleY + dy, 64, 6, C.brass)
+  drawLabel(ctx, heroLabel, x0, heroLabelY + dy, { rtl, size: 30, color: C.dim, spacing: 6, maxW: full })
+  drawValue(ctx, heroFit.st, x0, heroValueY + dy, { rtl, size: heroFit.size, unitPx: heroFit.unitPx, gap: 20, valueWeight: 800, color: C.chalk, unitColor: C.brass })
+
+  if (small.length) {
+    ctx.fillStyle = C.line
+    ctx.fillRect(M, divY + dy, full, 2)
+    smallFits.forEach((f, i) => {
+      const last2 = i === 1 // the second stat hangs off the end margin
+      const x = last2 ? xEnd : rtl ? W - M : M
+      drawLabel(ctx, f.st.label, x, smallLabelY + dy, { rtl, size: 28, color: C.dim, spacing: 5, maxW: half - 40, end: last2 })
+      const vx = last2 ? (rtl ? M + f.width : W - M - f.width) : x
+      drawValue(ctx, f.st, vx, smallValueY + dy, { rtl, size: f.size, unitPx: f.unitPx, gap: 14, valueWeight: 800, color: C.chalk, unitColor: C.brass })
+    })
+  }
 }
 
-const toBlob = (canvas) => new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+// variant: 'plain' (default), 'photo' (needs `photo`) or 'sticker'.
+// labels: { eyebrow, totalVolume, duration, volume, distance, sets, streak, weekUnit, min }
+export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo = null }) {
+  const canvas = document.createElement('canvas')
+  canvas.width = W
+  const ctx = canvas.getContext('2d')
+  ctx.textBaseline = 'alphabetic'
+  try {
+    if (variant === 'sticker') return renderSticker(summary, { rtl, labels })
+    canvas.height = H
+    if (variant === 'photo' && photo) {
+      drawPhoto(ctx, photo)
+      drawScrims(ctx)
+      // white, not brass: the top of a photo is often bright sky or gym lights
+      FX = { shadow: { color: 'rgba(0,0,0,0.5)', blur: 12, y: 0 } }
+      passes(() => drawBrand(ctx, rtl ? W - M : M, 310, { rtl, color: 'rgba(255,255,255,0.95)' }))
+      FX = { shadow: { color: 'rgba(0,0,0,0.35)', blur: 12, y: 2 } }
+      drawOverlayBlock(ctx, summary, { rtl, labels, bottom: 1640, accent: GOLD, labelColor: 'rgba(255,255,255,0.78)' })
+      return canvas
+    }
+    FX = null
+    drawPlain(ctx, summary, { rtl, labels })
+    return canvas
+  } finally {
+    FX = null
+    PASS = 'fill'
+  }
+}
+
+// The sticker is drawn big on a scratch canvas, then cut down to its ink
+// (anything that isn't see-through) plus an even 40px all round.
+function renderSticker(summary, { rtl, labels }) {
+  const PAD = 40
+  const scratch = document.createElement('canvas')
+  scratch.width = W
+  scratch.height = 1100
+  const sctx = scratch.getContext('2d', { willReadFrequently: true })
+  sctx.textBaseline = 'alphabetic'
+  FX = { sticker: true, shadow: { color: 'rgba(0,0,0,0.6)', blur: 4, y: 0 } }
+  const bottom = drawOverlayBlock(sctx, summary, { rtl, labels, top: 200, accent: GOLD, labelColor: '#FFFFFF' })
+  passes(() => drawBrand(sctx, rtl ? W - M : M, bottom + 84, { rtl, color: GOLD }))
+
+  const { data, width, height } = sctx.getImageData(0, 0, scratch.width, scratch.height)
+  let x0 = width
+  let y0 = height
+  let x1 = -1
+  let y1 = -1
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (data[(y * width + x) * 4 + 3] > 8) {
+        if (x < x0) x0 = x
+        if (x > x1) x1 = x
+        if (y < y0) y0 = y
+        if (y > y1) y1 = y
+      }
+    }
+  }
+  if (x1 < 0) return scratch
+  const out = document.createElement('canvas')
+  out.width = x1 - x0 + 1 + PAD * 2
+  out.height = y1 - y0 + 1 + PAD * 2
+  out.getContext('2d').drawImage(scratch, x0, y0, x1 - x0 + 1, y1 - y0 + 1, PAD, PAD, x1 - x0 + 1, y1 - y0 + 1)
+  return out
+}
+
+const toBlob = (canvas, type, quality) => new Promise((resolve) => canvas.toBlob(resolve, type, quality))
 
 // Turns a photo the trainee picked into something drawImage can use, with
 // phone-camera rotation (EXIF) applied so portrait shots aren't sideways.
-// Huge photos are shrunk while decoding so a 50 MP picture can't run the
-// phone out of memory. The file is read here only; it is never uploaded.
+// Huge photos are shrunk while decoding (the size is read first from an
+// <img>, which only parses the header), so a 50 MP picture never becomes a
+// full-size bitmap and can't run the phone out of memory. The file is read
+// here only; it is never uploaded.
 export async function loadPhoto(file) {
   const MAX = 2400
-  if (typeof createImageBitmap === 'function') {
-    try {
-      let bmp = await createImageBitmap(file, { imageOrientation: 'from-image' })
-      if (Math.max(bmp.width, bmp.height) > MAX) {
-        const s = MAX / Math.max(bmp.width, bmp.height)
-        const small = await createImageBitmap(bmp, { resizeWidth: Math.round(bmp.width * s), resizeHeight: Math.round(bmp.height * s), resizeQuality: 'high' })
-        bmp.close?.()
-        bmp = small
-      }
-      return { source: bmp, width: bmp.width, height: bmp.height, close: () => bmp.close?.() }
-    } catch {
-      /* fall through to the <img> route */
-    }
-  }
-  // Older browsers: an <img> applies the camera rotation by itself.
   const url = URL.createObjectURL(file)
   try {
     const img = new Image()
     img.src = url
+    // onload gives the size without a full decode; naturalWidth/Height are
+    // already camera-rotated in current browsers.
+    await new Promise((resolve, reject) => {
+      img.onload = resolve
+      img.onerror = () => reject(new Error('NOT_AN_IMAGE'))
+    })
+    if (typeof createImageBitmap === 'function') {
+      try {
+        const w = img.naturalWidth
+        const h = img.naturalHeight
+        const opts = { imageOrientation: 'from-image' }
+        if (Math.max(w, h) > MAX) {
+          const s = MAX / Math.max(w, h)
+          Object.assign(opts, { resizeWidth: Math.round(w * s), resizeHeight: Math.round(h * s), resizeQuality: 'high' })
+        }
+        const bmp = await createImageBitmap(file, opts)
+        return { source: bmp, width: bmp.width, height: bmp.height, close: () => bmp.close?.() }
+      } catch {
+        /* fall through to the <img> itself */
+      }
+    }
+    // Older browsers: the <img> applies the camera rotation by itself.
     await img.decode()
     return { source: img, width: img.naturalWidth, height: img.naturalHeight, close: () => {} }
   } finally {
@@ -330,18 +581,21 @@ export async function loadPhoto(file) {
 // Waits for fonts, draws the card and turns it into a ready-to-share file.
 // Done ahead of the Share tap: Safari drops the tap's permission to open the
 // share menu if we're still busy making the picture when we ask for it.
+// The photo version is a JPEG (a full-bleed photo as PNG is huge); plain and
+// sticker stay PNG, the sticker needs its see-through background.
 export async function prepareCard(summary, opts, fileName) {
   try {
-    // Canvas won't pull web fonts by itself: ask for the ones the card uses,
-    // with the exact text it draws, and wait (briefly) for them.
-    await loadFonts([summary.routineName, ...Object.values(opts.labels || {})].join(' '))
+    // Canvas won't pull web fonts by itself: wait (briefly) for ours.
+    await waitForFonts()
   } catch {
     /* fonts are optional: the fallback stack still draws a fine card */
   }
   const canvas = renderShareCard(summary, opts)
-  const blob = await toBlob(canvas)
+  const jpeg = opts.variant === 'photo' && opts.photo
+  const type = jpeg ? 'image/jpeg' : 'image/png'
+  const blob = await toBlob(canvas, type, jpeg ? 0.9 : undefined)
   if (!blob) throw new Error('NO_IMAGE')
-  return new File([blob], fileName, { type: 'image/png' })
+  return new File([blob], fileName, { type: blob.type || type })
 }
 
 export function downloadFile(file) {

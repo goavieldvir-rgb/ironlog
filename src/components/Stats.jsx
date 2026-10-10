@@ -15,6 +15,7 @@ import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import ExerciseSelect from './ExerciseSelect.jsx'
 import { useCollection } from '../lib/db.js'
+import { entryName, exerciseMap } from '../lib/names.js'
 import { toLocalISODate, fmtDate, dateLocale } from '../lib/dates.js'
 import { disambiguateLabels } from '../lib/disambiguate.js'
 import { Card, EmptyState, LoadError, Field } from './ui.jsx'
@@ -111,6 +112,7 @@ export default function Stats() {
   // Personal records + per-exercise progress history, derived straight from
   // the sets people logged (no need for a separate exercises fetch).
   const { records, exerciseOptions, progressByExercise } = useMemo(() => {
+    const exById = exerciseMap(exercises)
     const recMap = {}
     const progMap = {}
 
@@ -135,7 +137,7 @@ export default function Stats() {
               // one holds the longest interval.
               farthest: existing?.farthest ?? null,
               bestPace: existing?.bestPace ?? null,
-              name: entry.name,
+              name: entryName(entry, exById, lang),
               category: 'cardio',
               unit: entry.unit,
               intensityType: entry.intensityType,
@@ -150,7 +152,7 @@ export default function Stats() {
           if (sum.distance != null && (r.farthest == null || sum.distance > r.farthest)) r.farthest = sum.distance
           if (sum.pace != null && (r.bestPace == null || sum.pace < r.bestPace)) r.bestPace = sum.pace
           if (!progMap[entry.exerciseId]) {
-            progMap[entry.exerciseId] = { name: entry.name, category: 'cardio', unit: entry.unit, intensityType: entry.intensityType, points: [] }
+            progMap[entry.exerciseId] = { name: entryName(entry, exById, lang), category: 'cardio', unit: entry.unit, intensityType: entry.intensityType, points: [] }
           }
           progMap[entry.exerciseId].points.push({
             date: s.date,
@@ -181,7 +183,7 @@ export default function Stats() {
           : !existing || Number(topSet.weight) > existing.weight
         if (isNewBest) {
           recMap[entry.exerciseId] = {
-            name: entry.name,
+            name: entryName(entry, exById, lang),
             category: entry.category || 'strength',
             unit: entry.unit,
             bodyweight: !!entry.bodyweight,
@@ -193,7 +195,7 @@ export default function Stats() {
         }
 
         if (!progMap[entry.exerciseId]) {
-          progMap[entry.exerciseId] = { name: entry.name, category: entry.category, unit: entry.unit, bodyweight: !!entry.bodyweight, timed: !!entry.timed, points: [] }
+          progMap[entry.exerciseId] = { name: entryName(entry, exById, lang), category: entry.category, unit: entry.unit, bodyweight: !!entry.bodyweight, timed: !!entry.timed, points: [] }
         }
         progMap[entry.exerciseId].points.push({
           date: s.date,
@@ -220,7 +222,7 @@ export default function Stats() {
     }
 
     return { records, exerciseOptions, progressByExercise: progMap }
-  }, [sessions, lang])
+  }, [sessions, exercises, lang])
 
   // If two exercises share a name (possible now that tracking method can
   // differ between "variants" of the same movement), append a short

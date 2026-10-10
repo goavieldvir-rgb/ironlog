@@ -4,6 +4,7 @@ import { BackChevron, ForwardChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useCollection } from '../lib/db.js'
+import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
 import { toLocalISODate, fmtDate, dateLocale } from '../lib/dates.js'
 import { Button, Card, CategoryTag, EmptyState, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
@@ -176,7 +177,7 @@ function computeTotals(sessions) {
   return { totalSets, totalVolume, totalCardioMinutes, totalCardioKm }
 }
 
-function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t, lang }) {
+function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t, lang, exById }) {
   const lines = []
   const modeLabel = {
     week: t('summary.docWeekly'),
@@ -205,10 +206,10 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t, 
   }
 
   for (const s of [...sessions].sort((a, b) => (a.date < b.date ? -1 : 1))) {
-    lines.push(`## ${formatDay(lang, s.date)} — ${s.routine_name} (${s.category})`)
+    lines.push(`## ${formatDay(lang, s.date)} — ${sessionTitle(s, t)} (${s.category})`)
     for (const e of s.entries || []) {
       const setsStr = (e.sets || []).map((set) => (isWarmup(set) ? `${t('sessionCard.warmupShort')} ` : '') + formatSet(e, set, t)).join(', ')
-      lines.push(`- ${e.name}: ${setsStr || t('summary.docNoSetsLogged')}`)
+      lines.push(`- ${entryName(e, exById, lang)}: ${setsStr || t('summary.docNoSetsLogged')}`)
       if (e.notes) lines.push(`  (${e.notes})`)
     }
     if (s.notes) lines.push(`  ${t('summary.docNotes')} ${s.notes}`)
@@ -238,7 +239,7 @@ function Chip({ value, label }) {
 // On-screen version of the export, built from the same data and helpers as
 // buildSummary (which stays the source of the Copy/Download text). Mixed
 // English/Hebrew fragments sit in <bdi> so they keep their own direction.
-function SummaryPreview({ mode, start, end, sessions, bodyWeights, personName, t, lang }) {
+function SummaryPreview({ mode, start, end, sessions, bodyWeights, personName, t, lang, exById }) {
   const modeLabel = {
     week: t('summary.docWeekly'),
     month: t('summary.docMonthly'),
@@ -281,7 +282,7 @@ function SummaryPreview({ mode, start, end, sessions, bodyWeights, personName, t
               <div className="min-w-0">
                 <div className="eyebrow">{formatDay(lang, s.date)}</div>
                 <h3 className="text-lg leading-tight">
-                  <bdi dir="auto">{s.routine_name}</bdi>
+                  <bdi dir="auto">{sessionTitle(s, t)}</bdi>
                 </h3>
               </div>
               <CategoryTag category={s.category} />
@@ -290,7 +291,7 @@ function SummaryPreview({ mode, start, end, sessions, bodyWeights, personName, t
               {(s.entries || []).map((e, i) => (
                 <li key={i} className="py-2 first:pt-0 last:pb-0">
                   <div className="text-sm text-chalk">
-                    <bdi dir="auto">{e.name}</bdi>
+                    <bdi dir="auto">{entryName(e, exById, lang)}</bdi>
                   </div>
                   <div className="text-chalkdim text-sm num">
                     {(e.sets || []).length === 0
@@ -351,6 +352,7 @@ export default function WeeklySummary() {
   const [exercises, exercisesLoading] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const sessions = useMemo(() => applyCurrentTimed(rawSessions, exercises), [rawSessions, exercises])
   const [routines, routinesLoading] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
+  const exById = useMemo(() => exerciseMap(exercises), [exercises])
 
   const [mode, setMode] = useState('week')
   const [offset, setOffset] = useState(0)
@@ -386,8 +388,9 @@ export default function WeeklySummary() {
         personName: actingAs ? effectiveName : null,
         t,
         lang,
+        exById,
       }),
-    [mode, start, end, periodSessions, periodBodyWeights, actingAs, effectiveName, t, lang],
+    [mode, start, end, periodSessions, periodBodyWeights, actingAs, effectiveName, t, lang, exById],
   )
 
   async function handleCopy() {
@@ -517,6 +520,7 @@ export default function WeeklySummary() {
           personName={actingAs ? effectiveName : null}
           t={t}
           lang={lang}
+          exById={exById}
         />
       )}
     </div>

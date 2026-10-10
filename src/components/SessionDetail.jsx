@@ -8,6 +8,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { fmtDate } from '../lib/dates.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, updateTrainerComment } from '../lib/db.js'
+import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
 import { Card, CategoryTag, Badge, Button } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { isWarmup } from '../lib/warmup.js'
@@ -52,6 +53,7 @@ export default function SessionDetail() {
   const [rawSessions, loading, refresh] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const sessions = useMemo(() => applyCurrentTimed(rawSessions, exercises), [rawSessions, exercises])
+  const exById = useMemo(() => exerciseMap(exercises), [exercises])
   const session = sessions.find((s) => s.id === id)
 
   if (!loading && !session) return <p className="text-chalkdim">{t('sessionDetail.notFound')}</p>
@@ -66,7 +68,7 @@ export default function SessionDetail() {
       <div>
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-3xl">{session.routine_name}</h1>
+            <h1 className="text-3xl">{sessionTitle(session, t)}</h1>
             <CategoryTag category={session.category} />
           </div>
           <Link
@@ -92,14 +94,14 @@ export default function SessionDetail() {
         <Card key={i} className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-lg">{entry.name}</h2>
+              <h2 className="text-lg">{entryName(entry, exById, lang)}</h2>
               {entry.category === 'cardio' && <Badge tone="cardio">{t('sessionCard.cardioBadge')}</Badge>}
               {entry.category !== 'cardio' && entry.timed ? <Badge tone="brass">{t('exercises.timedBadge')}</Badge> : entry.category !== 'cardio' && entry.bodyweight && <Badge tone="brass">{t('sessionCard.bodyweightBadge')}</Badge>}
             </div>
             {/* The exercise's current link first (a coach may have set or
                 changed it since), then the one saved with the session. */}
             <ExerciseVideo
-              name={entry.name}
+              name={entryName(entry, exById, lang)}
               matchNames={[exercises.find((x) => x.id === entry.exerciseId)?.name, entry.nameEn]}
               videoUrl={exercises.find((x) => x.id === entry.exerciseId)?.video_url || entry.videoUrl}
               className="text-xs"

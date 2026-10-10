@@ -4,7 +4,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { Button, Card } from './ui.jsx'
 import { dateLocale } from '../lib/dates.js'
-import { prepareCard, shareFile, loadPhoto, downloadFile, copyImage, canCopyImage, isIOS } from '../lib/shareCard.js'
+import { prepareCard, shareFile, loadPhoto, downloadFile, copyImage, canCopyImage, isIOS, shareFontsReady, shareFontsLoaded } from '../lib/shareCard.js'
 
 const iso = (s) => `⁦${s}⁩`
 
@@ -32,7 +32,8 @@ export default function WorkoutDone({ summary, onDone }) {
   const urls = useRef([])
 
   const labels = {
-    brand: 'IRONLOG',
+    eyebrow: t('share.cardEyebrow'),
+    totalVolume: t('share.totalVolume'),
     duration: t('share.duration'),
     volume: t('share.volume'),
     distance: t('share.distance'),
@@ -41,7 +42,9 @@ export default function WorkoutDone({ summary, onDone }) {
     weekUnit: t('share.weekUnit'),
     min: t('share.min'),
   }
-  const fileName = (v) => `ironlog-${summary.date || 'workout'}${v === 'sticker' ? '-sticker' : ''}.png`
+  // the photo version is a JPEG, the others PNG (the sticker needs see-through)
+  const fileName = (v) => `ironlog-${summary.date || 'workout'}${v === 'sticker' ? '-sticker' : ''}.${v === 'photo' ? 'jpg' : 'png'}`
+  const photoRef = useRef(null) // the picked photo, kept so the card can be redrawn
 
   function remember(key, file) {
     const url = URL.createObjectURL(file)
@@ -49,25 +52,40 @@ export default function WorkoutDone({ summary, onDone }) {
     setMade((m) => ({ ...m, [key]: { file, url } }))
   }
 
-  // Plain card and sticker are drawn as soon as the screen opens.
+  // Plain card and sticker are drawn as soon as the screen opens (and the
+  // photo one again, if a photo is already picked and the language changed).
   useEffect(() => {
     let cancelled = false
     setMade({})
     setFailed(false)
-    ;['plain', 'sticker'].forEach((v) => {
-      prepareCard(summary, { rtl: dir === 'rtl', labels, variant: v }, fileName(v))
+    const draw = (v) =>
+      prepareCard(summary, { rtl: dir === 'rtl', labels, variant: v, photo: v === 'photo' ? photoRef.current : null }, fileName(v))
         .then((f) => !cancelled && remember(v, f))
         .catch((err) => {
           console.error(err)
           if (!cancelled && v === 'plain') setFailed(true)
         })
+    const variants = ['plain', 'sticker', ...(photoRef.current ? ['photo'] : [])]
+    Promise.all(variants.map(draw)).then(() => {
+      // Slow connection: the cards were drawn with fallback fonts. Draw them
+      // again in the real ones as soon as those arrive.
+      if (cancelled || shareFontsLoaded()) return
+      shareFontsReady().then((ok) => {
+        if (ok && !cancelled) variants.forEach(draw)
+      })
     })
     return () => {
       cancelled = true
     }
   }, [summary, dir, lang]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), [])
+  useEffect(
+    () => () => {
+      urls.current.forEach((u) => URL.revokeObjectURL(u))
+      photoRef.current?.close?.()
+    },
+    [],
+  )
 
   async function handlePhoto(e) {
     const picked = e.target.files?.[0]
@@ -78,13 +96,23 @@ export default function WorkoutDone({ summary, onDone }) {
     try {
       photo = await loadPhoto(picked)
       const f = await prepareCard(summary, { rtl: dir === 'rtl', labels, variant: 'photo', photo }, fileName('photo'))
+      photoRef.current?.close?.()
+      photoRef.current = photo
       remember('photo', f)
       setVariant('photo')
+      if (!shareFontsLoaded()) {
+        // fonts still arriving: redraw this one when they do
+        shareFontsReady().then((ok) => {
+          if (ok && photoRef.current === photo) {
+            prepareCard(summary, { rtl: dir === 'rtl', labels, variant: 'photo', photo }, fileName('photo')).then((g) => remember('photo', g)).catch(() => {})
+          }
+        })
+      }
     } catch (err) {
       console.error(err)
+      if (photo && photoRef.current !== photo) photo.close?.()
       toast(t('share.photoFailed'), 'error')
     } finally {
-      photo?.close?.()
       setPhotoBusy(false)
     }
   }
@@ -154,7 +182,7 @@ export default function WorkoutDone({ summary, onDone }) {
         </div>
         <h1 className="text-3xl mt-1">{t('share.title')}</h1>
         <p className="text-chalkdim text-sm mt-1">
-          {summary.routineName} · {dateText}
+          <bdi>{summary.routineName}</bdi> · <bdi>{dateText}</bdi>
         </p>
       </div>
 
@@ -173,6 +201,12 @@ export default function WorkoutDone({ summary, onDone }) {
         </p>
       )}
 
+      {failed && (
+        <p className="text-chalkdim text-sm" role="alert" data-testid="card-failed">
+          {t('share.cardFailed')}
+        </p>
+      )}
+
       {!failed && (
         <div className="flex flex-col gap-3" data-testid="share-section">
           <div role="tablist" className="grid grid-cols-3 gap-1 bg-surface2 rounded-lg p-1">
@@ -181,7 +215,11 @@ export default function WorkoutDone({ summary, onDone }) {
                 key={key}
                 role="tab"
                 aria-selected={variant === key}
-                onClick={() => setVariant(key)}
+                onClick={() => {
+                  setVariant(key)
+                  // first visit to the photo tab: go straight to the picker
+                  if (key === 'photo' && !made.photo && !photoBusy) fileInput.current?.click()
+                }}
                 className={`min-h-[44px] rounded-md text-sm font-medium ${variant === key ? 'bg-brass text-ink' : 'text-chalkdim'}`}
               >
                 {label}
@@ -195,7 +233,7 @@ export default function WorkoutDone({ summary, onDone }) {
                 src={current.url}
                 alt=""
                 data-testid={`preview-${variant}`}
-                className={`rounded-lg border border-line max-h-[420px] w-auto ${variant === 'sticker' ? 'bg-[#6b7280]' : ''}`}
+                className={`rounded-xl shadow-lg shadow-black/40 border border-line max-h-[420px] w-auto ${variant === 'sticker' ? 'bg-[#6b7280]' : ''}`}
               />
             ) : variant === 'photo' ? (
               <p className="text-chalkdim text-sm text-center py-6">{t('share.photoHint')}</p>
@@ -204,13 +242,11 @@ export default function WorkoutDone({ summary, onDone }) {
             )}
           </div>
 
-          {variant === 'photo' && (
-            <>
-              <input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={handlePhoto} data-testid="photo-input" />
-              <Button variant="ghost" onClick={() => fileInput.current?.click()} disabled={photoBusy}>
-                <ImagePlus size={16} /> {photoBusy ? t('share.sharing') : current ? t('share.changePhoto') : t('share.choosePhoto')}
-              </Button>
-            </>
+          <input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={handlePhoto} data-testid="photo-input" />
+          {variant === 'photo' && made.photo && (
+            <Button variant="ghost" onClick={() => fileInput.current?.click()} disabled={photoBusy}>
+              <ImagePlus size={16} /> {photoBusy ? t('share.sharing') : t('share.changePhoto')}
+            </Button>
           )}
 
           {variant === 'sticker' && (
@@ -232,9 +268,14 @@ export default function WorkoutDone({ summary, onDone }) {
       )}
 
       <div className="flex gap-3">
-        {!failed && variant !== 'sticker' && (
+        {!failed && variant === 'photo' && !made.photo && (
+          <Button variant="brass" className="flex-1" onClick={() => fileInput.current?.click()} disabled={photoBusy}>
+            <ImagePlus size={16} /> {photoBusy ? t('share.sharing') : t('share.choosePhoto')}
+          </Button>
+        )}
+        {!failed && variant !== 'sticker' && !(variant === 'photo' && !made.photo) && (
           <Button variant="brass" className="flex-1" onClick={handleShare} disabled={busy || !current}>
-            <Share2 size={16} /> {busy || (!current && variant !== 'photo') ? t('share.sharing') : t('share.share')}
+            <Share2 size={16} /> {busy || !current ? t('share.sharing') : t('share.share')}
           </Button>
         )}
         <Button variant="ghost" className="flex-1" onClick={onDone}>
