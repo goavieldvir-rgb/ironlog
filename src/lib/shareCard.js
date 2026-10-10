@@ -388,16 +388,24 @@ function drawPhoto(ctx, photo) {
 // as it was and white text stays readable on bright photos. The bottom one
 // starts higher than the numbers block, which is now taller.
 function drawScrims(ctx) {
-  const top = ctx.createLinearGradient(0, 0, 0, 420)
-  top.addColorStop(0, 'rgba(10,11,13,0.45)')
+  // Light touch: the photo is the point. A faint top fade for the brand mark,
+  // and a bottom fade that only starts below the middle and eases in, so a
+  // face or body in the frame stays bright. Below ~1670 Instagram covers the
+  // picture with its own controls, so it never needs to go near black.
+  const top = ctx.createLinearGradient(0, 0, 0, 380)
+  top.addColorStop(0, 'rgba(10,11,13,0.32)')
   top.addColorStop(1, 'rgba(10,11,13,0)')
   ctx.fillStyle = top
-  ctx.fillRect(0, 0, W, 420)
-  const y0 = 820
+  ctx.fillRect(0, 0, W, 380)
+  const y0 = 960
   const bot = ctx.createLinearGradient(0, y0, 0, H)
-  bot.addColorStop(0, 'rgba(10,11,13,0)')
-  bot.addColorStop(0.4, 'rgba(10,11,13,0.55)') // y = 1288
-  bot.addColorStop(1, 'rgba(10,11,13,0.88)')
+  const at = (y, a) => bot.addColorStop((y - y0) / (H - y0), `rgba(10,11,13,${a})`)
+  at(960, 0)
+  at(1100, 0.16)
+  at(1240, 0.4)
+  at(1400, 0.58)
+  at(1700, 0.68)
+  at(H, 0.72)
   ctx.fillStyle = bot
   ctx.fillRect(0, y0, W, H - y0)
 }
