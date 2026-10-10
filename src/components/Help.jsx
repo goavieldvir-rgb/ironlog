@@ -7,7 +7,9 @@ export default function Help() {
   const { t } = useLanguage()
   const [openIndex, setOpenIndex] = useState(0)
 
-  const sections = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => ({
+  // Finishing (11) follows logging, and reminders (12) sit before the
+  // troubleshooting section so that stays last.
+  const sections = [1, 2, 3, 4, 5, 11, 6, 7, 8, 9, 12, 10].map((n) => ({
     title: t(`help.s${n}title`),
     body: t(`help.s${n}body`),
   }))
