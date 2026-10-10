@@ -10,7 +10,7 @@ import {
   Tooltip,
 } from 'recharts'
 import { useAdmin } from '../context/AdminContext.jsx'
-import { toLocalISODate } from '../lib/dates.js'
+import { toLocalISODate, fmtDate } from '../lib/dates.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import {
@@ -42,19 +42,19 @@ function todayISO() {
   return toLocalISODate()
 }
 
-function shortDate(iso) {
-  return new Date(iso + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+function shortDate(lang, iso) {
+  return fmtDate(lang, new Date(iso + 'T00:00:00'), { month: 'short', day: 'numeric' })
 }
 
-function fullDate(iso) {
-  return new Date(iso + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+function fullDate(lang, iso) {
+  return fmtDate(lang, new Date(iso + 'T00:00:00'), { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 const emptyForm = { date: todayISO(), weight: '', unit: 'kg' }
 
 export default function BodyWeight() {
   const { effectiveUid } = useAdmin()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
   const [entries, loading, refresh] = useCollection(effectiveUid, 'body_weight_logs', 'date', 'asc')
   const [form, setForm] = useState(emptyForm)
@@ -69,8 +69,8 @@ export default function BodyWeight() {
     () =>
       [...entries]
         .sort((a, b) => (a.date > b.date ? 1 : -1))
-        .map((e) => ({ ...e, label: shortDate(e.date), weightDisplay: Math.round(fromKg(toKg(e.weight, e.unit), displayUnit) * 10) / 10 })),
-    [entries, displayUnit],
+        .map((e) => ({ ...e, label: shortDate(lang, e.date), weightDisplay: Math.round(fromKg(toKg(e.weight, e.unit), displayUnit) * 10) / 10 })),
+    [entries, displayUnit, lang],
   )
 
   const first = chartData[0]
@@ -204,7 +204,7 @@ export default function BodyWeight() {
             <div key={e.id} className="flex items-center justify-between py-2.5">
               <div className="flex items-center gap-2">
                 <Scale size={14} className="text-chalkdim" />
-                <span className="text-chalkdim text-sm">{fullDate(e.date)}</span>
+                <span className="text-chalkdim text-sm">{fullDate(lang, e.date)}</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="num text-chalk">
@@ -221,6 +221,7 @@ export default function BodyWeight() {
                     try {
                       await deleteBodyWeightEntry(effectiveUid, e.id)
                       refresh()
+                      toast(t('feedback.deleted'))
                     } catch {
                       toast(t('feedback.deleteFailed'), 'error')
                     }

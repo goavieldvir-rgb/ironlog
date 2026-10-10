@@ -5,6 +5,7 @@ import { Card, Badge } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import OverflowMenu from './OverflowMenu.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { fmtDate } from '../lib/dates.js'
 import { isWarmup, workingSets, suggestWarmups } from '../lib/warmup.js'
 import { formatSeconds } from '../lib/timed.js'
 import { entryPrKind } from '../lib/records.js'
@@ -122,7 +123,7 @@ export default function SessionEntryCard({
   onMoveDown,
   removable = false,
 }) {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const [showNote, setShowNote] = useState(!!entry.notes)
   const [showQuickFill, setShowQuickFill] = useState(false)
   // Index of the set that numbers were just filled into, so it can flash.
@@ -365,7 +366,7 @@ export default function SessionEntryCard({
               <span>
                 {liveExercise.last_note_date && (
                   <span className="text-chalkdim">
-                    {new Date(liveExercise.last_note_date + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                    {fmtDate(lang, new Date(liveExercise.last_note_date + 'T00:00:00'), { day: 'numeric', month: 'short' })}
                     {': '}
                   </span>
                 )}

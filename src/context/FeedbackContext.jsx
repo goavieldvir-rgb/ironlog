@@ -61,13 +61,14 @@ export function FeedbackProvider({ children }) {
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => close(false)}
+                autoFocus={!!dialog.danger}
                 className="rounded-md px-3.5 py-2 min-h-[44px] text-sm font-medium border border-line text-chalk hover:bg-surface2"
               >
                 {dialog.cancelLabel || t('common.cancel')}
               </button>
               <button
                 onClick={() => close(true)}
-                autoFocus
+                autoFocus={!dialog.danger}
                 className={`rounded-md px-3.5 py-2 min-h-[44px] text-sm font-medium ${
                   dialog.danger ? 'bg-ironbtn text-chalk hover:bg-ironbtn/90' : 'bg-brass text-ink hover:bg-brass/90'
                 }`}

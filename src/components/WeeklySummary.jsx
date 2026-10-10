@@ -4,7 +4,7 @@ import { BackChevron, ForwardChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useCollection } from '../lib/db.js'
-import { toLocalISODate } from '../lib/dates.js'
+import { toLocalISODate, fmtDate, dateLocale } from '../lib/dates.js'
 import { Button, Card, EmptyState, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { isWarmup, workingSets } from '../lib/warmup.js'
@@ -57,21 +57,21 @@ function todayStart() {
   return d
 }
 
-function formatRange(start, end, mode) {
+function formatRange(lang, start, end, mode) {
   if (mode === 'year') {
     return start.getFullYear() === end.getFullYear() ? String(start.getFullYear()) : `${start.getFullYear()}–${end.getFullYear()}`
   }
   if (mode === 'month') {
-    return start.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+    return fmtDate(lang, start, { month: 'long', year: 'numeric' })
   }
   const opts = { month: 'short', day: 'numeric' }
-  const startStr = start.toLocaleDateString(undefined, opts)
-  const endStr = end.toLocaleDateString(undefined, { ...opts, year: 'numeric' })
+  const startStr = fmtDate(lang, start, opts)
+  const endStr = fmtDate(lang, end, { ...opts, year: 'numeric' })
   return `${startStr} – ${endStr}`
 }
 
-function formatDay(iso) {
-  return new Date(iso + 'T00:00:00').toLocaleDateString(undefined, {
+function formatDay(lang, iso) {
+  return fmtDate(lang, new Date(iso + 'T00:00:00'), {
     weekday: 'long',
     month: 'short',
     day: 'numeric',
@@ -136,7 +136,7 @@ function computeRange(mode, offset, customStart, customEnd) {
   return { start, end }
 }
 
-function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t }) {
+function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t, lang }) {
   const lines = []
   const modeLabel = {
     week: t('summary.docWeekly'),
@@ -145,7 +145,7 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t }
     custom: t('summary.docCustomRange'),
   }[mode]
   lines.push(`# ${modeLabel} ${t('summary.docTrainingSummary')}`)
-  lines.push(`${formatRange(start, end, mode)}${personName ? ` — ${personName}` : ''}`)
+  lines.push(`${formatRange(lang, start, end, mode)}${personName ? ` — ${personName}` : ''}`)
   lines.push('')
 
   const totalSets = sessions.reduce((n, s) => n + (s.entries || []).reduce((m, e) => m + workingSets(e.sets).length, 0), 0)
@@ -185,7 +185,7 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t }
   const parts = [
     `${sessions.length} ${sessions.length === 1 ? t('summary.docSession') : t('summary.docSessions')}`,
     `${totalSets} ${t('summary.docTotalSets')}`,
-    `~${Math.round(totalVolume).toLocaleString()} ${t('summary.docTotalVolume')}`,
+    `~${Math.round(totalVolume).toLocaleString(dateLocale(lang))} ${t('summary.docTotalVolume')}`,
   ]
   if (totalCardioMinutes > 0) parts.push(`${Math.round(totalCardioMinutes)} ${t('summary.docCardioMinutes')}`)
   if (totalCardioKm > 0) parts.push(`${formatDistance(totalCardioKm)} ${t('summary.docCardioDistance')}`)
@@ -197,7 +197,7 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t }
   }
 
   for (const s of [...sessions].sort((a, b) => (a.date < b.date ? -1 : 1))) {
-    lines.push(`## ${formatDay(s.date)} — ${s.routine_name} (${s.category})`)
+    lines.push(`## ${formatDay(lang, s.date)} — ${s.routine_name} (${s.category})`)
     for (const e of s.entries || []) {
       const setsStr = (e.sets || []).map((set) => (isWarmup(set) ? `${t('sessionCard.warmupShort')} ` : '') + formatSet(e, set, t)).join(', ')
       lines.push(`- ${e.name}: ${setsStr || t('summary.docNoSetsLogged')}`)
@@ -210,7 +210,7 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t }
   if (bodyWeights.length > 0) {
     lines.push(`## ${t('summary.docBodyWeight')}`)
     for (const bw of [...bodyWeights].sort((a, b) => (a.date < b.date ? -1 : 1))) {
-      lines.push(`- ${formatDay(bw.date)}: ${bw.weight}${bw.unit}`)
+      lines.push(`- ${formatDay(lang, bw.date)}: ${bw.weight}${bw.unit}`)
     }
     lines.push('')
   }
@@ -220,7 +220,7 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t }
 
 export default function WeeklySummary() {
   const { effectiveUid, effectiveName, actingAs } = useAdmin()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const MODES = getModes(t)
   const [rawSessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [bodyWeightAll] = useCollection(effectiveUid, 'body_weight_logs', 'date', 'desc')
@@ -261,8 +261,9 @@ export default function WeeklySummary() {
         bodyWeights: periodBodyWeights,
         personName: actingAs ? effectiveName : null,
         t,
+        lang,
       }),
-    [mode, start, end, periodSessions, periodBodyWeights, actingAs, effectiveName, t],
+    [mode, start, end, periodSessions, periodBodyWeights, actingAs, effectiveName, t, lang],
   )
 
   async function handleCopy() {
@@ -323,7 +324,7 @@ export default function WeeklySummary() {
               <button
                 key={m.id}
                 onClick={() => switchMode(m.id)}
-                className={`px-3 py-1.5 rounded transition-colors ${
+                className={`px-3 min-h-11 rounded transition-colors ${
                   mode === m.id ? 'bg-ink text-chalk' : 'text-chalkdim'
                 }`}
               >
@@ -361,7 +362,7 @@ export default function WeeklySummary() {
           >
             <BackChevron size={16} />
           </button>
-          <span className="num text-sm w-44 text-center">{formatRange(start, end, mode)}</span>
+          <span className="num text-sm w-44 text-center">{formatRange(lang, start, end, mode)}</span>
           <button
             onClick={() => setOffset((o) => Math.min(0, o + 1))}
             disabled={offset === 0}

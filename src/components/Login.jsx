@@ -67,10 +67,14 @@ export default function Login({ resetLinkError }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 relative">
+    <div
+      className="min-h-dvh flex items-center justify-center px-4 relative"
+      style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+    >
       <button
         onClick={() => setLang(lang === 'en' ? 'he' : 'en')}
-        className="absolute top-4 end-4 flex rounded-md bg-surface2 p-0.5 text-xs num"
+        className="hit absolute end-4 flex rounded-md bg-surface2 p-0.5 text-xs num"
+        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}
         title={t('layout.language')} aria-label={t('layout.language')}
       >
         <span className={`px-2 py-1 rounded ${lang === 'en' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>EN</span>
@@ -90,14 +94,14 @@ export default function Login({ resetLinkError }) {
               <button
                 type="button"
                 onClick={() => switchMode('login')}
-                className={`flex-1 rounded py-1.5 transition-colors ${mode === 'login' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}
+                className={`flex-1 rounded min-h-11 transition-colors ${mode === 'login' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}
               >
                 {t('login.logIn')}
               </button>
               <button
                 type="button"
                 onClick={() => switchMode('signup')}
-                className={`flex-1 rounded py-1.5 transition-colors ${mode === 'signup' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}
+                className={`flex-1 rounded min-h-11 transition-colors ${mode === 'signup' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}
               >
                 {t('login.createAccount')}
               </button>
@@ -213,5 +217,7 @@ function friendlyError(err, t) {
   if (msg.includes('User already registered')) return t('login.errorAlreadyRegistered')
   if (msg.includes('Password should be')) return t('login.errorWeakPassword')
   if (msg.includes('Unable to validate email')) return t('login.errorBadEmail')
-  return msg || t('login.errorGeneric')
+  if (/rate limit|too many|security purposes/i.test(msg)) return t('login.errorRateLimit')
+  // Never show a raw (English) server message to the user.
+  return t('login.errorGeneric')
 }

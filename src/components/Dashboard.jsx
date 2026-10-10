@@ -5,6 +5,7 @@ import { InfoTip } from './InfoTip.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { fmtDate } from '../lib/dates.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection } from '../lib/db.js'
 import { listDrafts, clearDraft } from '../lib/draft.js'
@@ -23,10 +24,10 @@ function timeAgo(ts, t) {
 export default function Dashboard() {
   const { user } = useAuth()
   const { actingAs, effectiveUid, effectiveName } = useAdmin()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const { confirm } = useFeedback()
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
-  const [routines] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
+  const [routines, routinesLoading] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [sessions, sessionsLoading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
 
   const steps = useMemo(
@@ -94,7 +95,7 @@ export default function Dashboard() {
     <div className="flex flex-col gap-6">
       <div>
         <div className="eyebrow mb-1">
-          {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+          {fmtDate(lang, new Date(), { weekday: 'long', month: 'long', day: 'numeric' })}
         </div>
         <h1 className="text-3xl">
           {actingAs
@@ -119,7 +120,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <button type="button" onClick={() => discardDraft(draft.routineKey)} className="text-chalkdim text-xs hover:text-irontext px-2 py-2">
+            <button type="button" onClick={() => discardDraft(draft.routineKey)} className="text-chalkdim text-xs hover:text-irontext px-3 min-h-11">
               {t('dashboard.discard')}
             </button>
             {/* A link styled as a button, not a button inside a link — the
@@ -136,7 +137,7 @@ export default function Dashboard() {
 
       {showChecklist && <OnboardingChecklist steps={steps} t={t} />}
 
-      <WeeklySchedule effectiveUid={effectiveUid} routines={routines} sessions={sessions} />
+      <WeeklySchedule effectiveUid={effectiveUid} routines={routines} routinesLoading={routinesLoading} sessions={sessions} />
 
       <div className="grid grid-cols-2 gap-3">
         <Link to="/routines">

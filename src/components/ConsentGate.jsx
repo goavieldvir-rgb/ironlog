@@ -90,7 +90,10 @@ export default function ConsentGate({ uid, children }) {
   if (state === 'ok') return children
 
   return (
-    <div className="min-h-screen bg-ink px-4 py-8 flex justify-center">
+    <div
+      className="min-h-dvh bg-ink px-4 pb-8 flex justify-center"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2rem)' }}
+    >
       <div className="w-full max-w-lg flex flex-col gap-4">
         <div>
           <div className="eyebrow mb-1">Ironlog</div>
@@ -114,7 +117,7 @@ export default function ConsentGate({ uid, children }) {
         <div
           ref={scrollRef}
           onScroll={onScroll}
-          className="card p-5 max-h-[50vh] overflow-y-auto flex flex-col gap-4"
+          className="card p-5 max-h-[50dvh] overflow-y-auto flex flex-col gap-4"
         >
           {doc.sections.map((s) => (
             <div key={s.heading}>

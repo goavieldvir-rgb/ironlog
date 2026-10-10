@@ -46,6 +46,8 @@ export const translations = {
       errorWeakPassword: 'Use at least 6 characters for your password.',
       errorBadEmail: 'That email address looks off.',
       errorGeneric: 'Something went wrong. Please try again.',
+      errorRateLimit: 'Too many attempts. Please wait a few minutes and try again.',
+      resetLinkInvalid: 'That reset link is invalid or has expired — request a new one below.',
     },
     dashboard: {
       alreadyLogged: 'Logged this day',
@@ -822,6 +824,8 @@ whoever set your account up for you.`,
       errorWeakPassword: 'הסיסמה צריכה לפחות 6 תווים.',
       errorBadEmail: 'כתובת האימייל לא נראית תקינה.',
       errorGeneric: 'משהו השתבש. נסו שוב.',
+      errorRateLimit: 'יותר מדי ניסיונות. המתינו כמה דקות ונסו שוב.',
+      resetLinkInvalid: 'קישור האיפוס לא תקין או שפג תוקפו — בקשו קישור חדש למטה.',
     },
     dashboard: {
       alreadyLogged: 'תועד ביום הזה',

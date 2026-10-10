@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { Users, ShieldCheck, UserPlus, Copy, Check, AlertTriangle } from 'lucide-react'
 import { ForwardArrow } from './DirectionalIcon.jsx'
 import { supabase } from '../supabase.js'
-import { toLocalISODate } from '../lib/dates.js'
+import { toLocalISODate, fmtDate } from '../lib/dates.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -22,7 +22,7 @@ function startOfWeekISO() {
 export default function People() {
   const { user } = useAuth()
   const { setActingAs } = useAdmin()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const navigate = useNavigate()
   const [people, setPeople] = useState([])
   const [loading, setLoading] = useState(true)
@@ -155,7 +155,7 @@ export default function People() {
                     <p className={`text-xs mt-1 ${stale ? 'text-brass' : 'text-chalkdim'}`}>
                       {stale
                         ? t('people.termsOutdated', { version: cs.version })
-                        : t('people.termsAccepted', { date: new Date(cs.accepted_at).toLocaleDateString() })}
+                        : t('people.termsAccepted', { date: fmtDate(lang, new Date(cs.accepted_at)) })}
                       {cs.variant === 'minor' && cs.guardian_name ? ` · ${t('people.guardian', { name: cs.guardian_name })}` : ''}
                     </p>
                   )

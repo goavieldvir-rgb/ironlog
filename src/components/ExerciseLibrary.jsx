@@ -328,7 +328,7 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
 
   return (
     <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="card p-6 w-full max-w-md max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="card p-6 w-full max-w-md max-h-[85dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-2xl mb-4">{initial.id ? t('exercises.editExercise') : t('exercises.newExercise')}</h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <Field label={t('exercises.name')}>

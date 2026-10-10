@@ -68,7 +68,7 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
 
   return (
     <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="card p-6 w-full max-w-lg max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="card p-6 w-full max-w-lg max-h-[85dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-2xl mb-1">{t('exercises.pickerTitle')}</h2>
         <p className="text-chalkdim text-sm mb-4">
           {lockCategory ? t('exercises.pickerLockedSubtitle')(categoryLabels[lockCategory]) : t('exercises.pickerSubtitle')}

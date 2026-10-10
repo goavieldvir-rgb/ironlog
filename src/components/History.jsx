@@ -4,6 +4,7 @@ import { Trash2, Search, X } from 'lucide-react'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { fmtDate } from '../lib/dates.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, deleteSession } from '../lib/db.js'
 import { Card, CategoryTag, EmptyState, Button, Field } from './ui.jsx'
@@ -11,10 +12,10 @@ import { Tabs } from './ExerciseLibrary.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { workingSets } from '../lib/warmup.js'
 
-function formatDate(iso) {
+function formatDate(lang, iso) {
   if (!iso) return ''
   const d = new Date(iso + 'T00:00:00')
-  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+  return fmtDate(lang, d, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 // A session matches a text search if the routine name, any exercise name,
@@ -30,7 +31,7 @@ function matchesQuery(session, q) {
 
 export default function History() {
   const { effectiveUid } = useAdmin()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
   const [sessions, loading, refresh] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [tab, setTab] = useState('all')
@@ -137,7 +138,7 @@ export default function History() {
                     <CategoryTag category={s.category} />
                   </div>
                   <p className="text-chalkdim text-xs mt-1">
-                    {formatDate(s.date)} · {s.entries?.length || 0} {t('history.exercisesLabel')} · {totalSets} {t('history.setsLabel')}
+                    {formatDate(lang, s.date)} · {s.entries?.length || 0} {t('history.exercisesLabel')} · {totalSets} {t('history.setsLabel')}
                     {s.duration_minutes ? ` · ${t('workout.durationShort', { min: s.duration_minutes })}` : ''}
                   </p>
                 </div>

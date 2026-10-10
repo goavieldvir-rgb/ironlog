@@ -5,6 +5,7 @@ import { Pencil, MessageSquareText, Check } from 'lucide-react'
 import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { fmtDate } from '../lib/dates.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, updateTrainerComment } from '../lib/db.js'
 import { Card, CategoryTag, Badge, Button } from './ui.jsx'
@@ -14,10 +15,10 @@ import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
 import { formatPace } from '../lib/cardio.js'
 import CardioTotals from './CardioTotals.jsx'
 
-function formatDate(iso) {
+function formatDate(lang, iso) {
   if (!iso) return ''
   const d = new Date(iso + 'T00:00:00')
-  return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+  return fmtDate(lang, d, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
 }
 
 function formatSet(entry, s, t) {
@@ -46,7 +47,7 @@ function formatSet(entry, s, t) {
 
 export default function SessionDetail() {
   const { effectiveUid, isAdmin } = useAdmin()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const { id } = useParams()
   const [rawSessions, loading, refresh] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
@@ -76,7 +77,7 @@ export default function SessionDetail() {
           </Link>
         </div>
         <p className="text-chalkdim text-sm mt-1">
-          {formatDate(session.date)}
+          {formatDate(lang, session.date)}
           {session.duration_minutes ? ` · ${t('workout.durationShort', { min: session.duration_minutes })}` : ''}
         </p>
       </div>

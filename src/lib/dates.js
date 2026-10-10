@@ -13,3 +13,14 @@ export function toLocalISODate(date = new Date()) {
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
+
+// Locale used for displaying dates and numbers, following the app language
+// rather than the phone locale (so a Hebrew UI never shows English month
+// names just because the phone is set to English).
+export function dateLocale(lang) {
+  return lang === 'he' ? 'he-IL' : 'en-GB'
+}
+
+export function fmtDate(lang, date, opts) {
+  return date.toLocaleDateString(dateLocale(lang), opts)
+}
