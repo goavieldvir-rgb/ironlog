@@ -31,7 +31,8 @@ export default function WorkoutDone({ summary, onDone }) {
   const urls = useRef([])
 
   const labels = {
-    brand: 'IRONLOG',
+    eyebrow: t('share.cardEyebrow'),
+    totalVolume: t('share.totalVolume'),
     duration: t('share.duration'),
     volume: t('share.volume'),
     distance: t('share.distance'),
@@ -153,7 +154,7 @@ export default function WorkoutDone({ summary, onDone }) {
         </div>
         <h1 className="text-3xl mt-1">{t('share.title')}</h1>
         <p className="text-chalkdim text-sm mt-1">
-          {summary.routineName} · {dateText}
+          <bdi>{summary.routineName}</bdi> · <bdi>{dateText}</bdi>
         </p>
       </div>
 
@@ -180,7 +181,11 @@ export default function WorkoutDone({ summary, onDone }) {
                 key={key}
                 role="tab"
                 aria-selected={variant === key}
-                onClick={() => setVariant(key)}
+                onClick={() => {
+                  setVariant(key)
+                  // first visit to the photo tab: go straight to the picker
+                  if (key === 'photo' && !made.photo && !photoBusy) fileInput.current?.click()
+                }}
                 className={`min-h-[44px] rounded-md text-sm font-medium ${variant === key ? 'bg-brass text-ink' : 'text-chalkdim'}`}
               >
                 {label}
@@ -194,7 +199,7 @@ export default function WorkoutDone({ summary, onDone }) {
                 src={current.url}
                 alt=""
                 data-testid={`preview-${variant}`}
-                className={`rounded-lg border border-line max-h-[420px] w-auto ${variant === 'sticker' ? 'bg-[#6b7280]' : ''}`}
+                className={`rounded-xl shadow-lg shadow-black/40 border border-line max-h-[420px] w-auto ${variant === 'sticker' ? 'bg-[#6b7280]' : ''}`}
               />
             ) : variant === 'photo' ? (
               <p className="text-chalkdim text-sm text-center py-6">{t('share.photoHint')}</p>
@@ -203,13 +208,11 @@ export default function WorkoutDone({ summary, onDone }) {
             )}
           </div>
 
-          {variant === 'photo' && (
-            <>
-              <input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={handlePhoto} data-testid="photo-input" />
-              <Button variant="ghost" onClick={() => fileInput.current?.click()} disabled={photoBusy}>
-                <ImagePlus size={16} /> {photoBusy ? t('share.sharing') : current ? t('share.changePhoto') : t('share.choosePhoto')}
-              </Button>
-            </>
+          <input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={handlePhoto} data-testid="photo-input" />
+          {variant === 'photo' && made.photo && (
+            <Button variant="ghost" onClick={() => fileInput.current?.click()} disabled={photoBusy}>
+              <ImagePlus size={16} /> {photoBusy ? t('share.sharing') : t('share.changePhoto')}
+            </Button>
           )}
 
           {variant === 'sticker' && (
@@ -231,9 +234,14 @@ export default function WorkoutDone({ summary, onDone }) {
       )}
 
       <div className="flex gap-3">
-        {!failed && variant !== 'sticker' && (
+        {!failed && variant === 'photo' && !made.photo && (
+          <Button variant="brass" className="flex-1" onClick={() => fileInput.current?.click()} disabled={photoBusy}>
+            <ImagePlus size={16} /> {photoBusy ? t('share.sharing') : t('share.choosePhoto')}
+          </Button>
+        )}
+        {!failed && variant !== 'sticker' && !(variant === 'photo' && !made.photo) && (
           <Button variant="brass" className="flex-1" onClick={handleShare} disabled={busy || !current}>
-            <Share2 size={16} /> {busy || (!current && variant !== 'photo') ? t('share.sharing') : t('share.share')}
+            <Share2 size={16} /> {busy || !current ? t('share.sharing') : t('share.share')}
           </Button>
         )}
         <Button variant="ghost" className="flex-1" onClick={onDone}>
