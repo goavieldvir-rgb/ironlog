@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { ChevronDown, HelpCircle } from 'lucide-react'
 import { Card } from './ui.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -45,6 +46,10 @@ export default function Help() {
           </Card>
         ))}
       </div>
+
+      <Link to="/privacy" className="text-chalkdim text-sm hover:text-brass w-fit">
+        {t('privacy.link')}
+      </Link>
     </div>
   )
 }

@@ -100,7 +100,7 @@ function VideoModal({ video, name, onClose }) {
           </button>
         </div>
         {/* Same 16:9 frame for every exercise. */}
-        <div className="relative w-full aspect-video rounded-md overflow-hidden bg-black" dir="ltr">
+        <div className="relative w-full aspect-video min-h-[200px] rounded-md overflow-hidden bg-black" dir="ltr">
           {withSound ? (
             <PlainClip video={video} title={title} sound />
           ) : (
