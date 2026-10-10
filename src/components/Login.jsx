@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { supabase } from '../supabase.js'
 import { Button, Field } from './ui.jsx'
+import { friendlyAuthError } from '../lib/authErrors.js'
 
 export default function Login({ resetLinkError }) {
   const { login, signup } = useAuth()
@@ -55,7 +56,7 @@ export default function Login({ resetLinkError }) {
         setResetSent(true)
       }
     } catch (err) {
-      setError(friendlyError(err, t))
+      setError(friendlyAuthError(err, t))
     } finally {
       setBusy(false)
     }
@@ -213,15 +214,4 @@ export default function Login({ resetLinkError }) {
       </div>
     </div>
   )
-}
-
-function friendlyError(err, t) {
-  const msg = err?.message || ''
-  if (msg.includes('Invalid login credentials')) return t('login.errorBadCredentials')
-  if (msg.includes('User already registered')) return t('login.errorAlreadyRegistered')
-  if (msg.includes('Password should be')) return t('login.errorWeakPassword')
-  if (msg.includes('Unable to validate email')) return t('login.errorBadEmail')
-  if (/rate limit|too many|security purposes/i.test(msg)) return t('login.errorRateLimit')
-  // Never show a raw (English) server message to the user.
-  return t('login.errorGeneric')
 }

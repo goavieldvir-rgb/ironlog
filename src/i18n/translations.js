@@ -47,6 +47,8 @@ export const translations = {
       errorBadEmail: 'That email address looks off.',
       errorGeneric: 'Something went wrong. Please try again.',
       errorRateLimit: 'Too many attempts. Please wait a few minutes and try again.',
+      errorEmailNotConfirmed: 'Please confirm your email first — check your inbox for the link.',
+      errorSamePassword: 'Pick a new password that is different from your current one.',
       resetLinkInvalid: 'That reset link is invalid or has expired — request a new one below.',
     },
     dashboard: {
@@ -789,6 +791,8 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       errorBadEmail: 'כתובת האימייל לא נראית תקינה.',
       errorGeneric: 'משהו השתבש. נסו שוב.',
       errorRateLimit: 'יותר מדי ניסיונות. המתינו כמה דקות ונסו שוב.',
+      errorEmailNotConfirmed: 'צריך לאשר קודם את האימייל — חפשו את הקישור בתיבת הדואר.',
+      errorSamePassword: 'בחרו סיסמה חדשה שונה מהסיסמה הנוכחית.',
       resetLinkInvalid: 'קישור האיפוס לא תקין או שפג תוקפו — בקשו קישור חדש למטה.',
     },
     dashboard: {
