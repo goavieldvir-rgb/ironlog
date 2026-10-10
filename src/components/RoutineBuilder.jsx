@@ -314,18 +314,21 @@ export default function RoutineBuilder() {
                   />
                   {it.timed && <span className="text-chalkdim text-xs">s</span>}
                   {category === 'strength' && !it.timed && (
-                    <input
+                    <>
+                      <input
                         type="number"
                         inputMode="numeric"
                         min={0}
                         max={5}
                         value={it.targetRir ?? ''}
                         onChange={(e) => updateItem(i, { targetRir: e.target.value === '' ? '' : Math.min(5, Math.max(0, Number(e.target.value))) })}
-                        className="w-16 text-center num ms-1"
+                        className="w-14 text-center num ms-1"
                         title={t('routines.targetRir')}
                         aria-label={t('routines.targetRir')}
-                        placeholder={t('routines.rirShort')}
+                        placeholder="–"
                       />
+                      <span className="text-chalkdim text-xs">{t('routines.rirShort')}</span>
+                    </>
                   )}
                 </>
               )}
