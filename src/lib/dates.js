@@ -16,9 +16,9 @@ export function toLocalISODate(date = new Date()) {
 
 // Locale used for displaying dates and numbers, following the app language
 // rather than the phone locale (so a Hebrew UI never shows English month
-// names just because the phone is set to English).
+// names just because the phone is set to English). Same choice as WorkoutDone.
 export function dateLocale(lang) {
-  return lang === 'he' ? 'he-IL' : 'en-GB'
+  return lang === 'he' ? 'he-IL' : 'en-US'
 }
 
 export function fmtDate(lang, date, opts) {
