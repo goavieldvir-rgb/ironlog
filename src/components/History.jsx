@@ -28,9 +28,13 @@ function matchesQuery(session, q, t, exById, lang) {
   if (sessionTitle(session, t)?.toLowerCase().includes(needle)) return true
   if (session.routine_name?.toLowerCase().includes(needle)) return true
   if (session.notes?.toLowerCase().includes(needle)) return true
-  return (session.entries || []).some(
-    (e) => entryName(e, exById, lang)?.toLowerCase().includes(needle) || e.name?.toLowerCase().includes(needle),
-  )
+  // Exercises match in either language, so "bench" and "לחיצת חזה" both
+  // find the same workouts whichever language they were logged in.
+  return (session.entries || []).some((e) => {
+    const ex = exById[e.exerciseId]
+    return [entryName(e, exById, lang), e.name, e.nameEn, e.nameHe, ex?.name, ex?.name_he]
+      .some((n) => n?.toLowerCase().includes(needle))
+  })
 }
 
 export default function History() {
