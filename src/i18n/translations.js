@@ -125,6 +125,7 @@ export const translations = {
       hoursAgo: '{n}h ago',
       daysAgo: '{n}d ago',
       inProgressTip: "Everything you log gets saved to your phone instantly, even before you finish the workout. If the app reloads or you switch away mid-session, it's exactly how you left it — nothing is lost.",
+      startRoutine: 'Start {name}',
     },
     account: {
       eyebrow: 'Your data',
@@ -860,6 +861,7 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       hoursAgo: 'לפני {n} שע׳',
       daysAgo: 'לפני {n} ימים',
       inProgressTip: 'כל מה שאתם מתעדים נשמר בטלפון שלכם באופן מיידי, עוד לפני שסיימתם את האימון. אם האפליקציה נטענת מחדש או שאתם עוברים לאפליקציה אחרת באמצע האימון, הכל יישאר בדיוק כפי שהשארתם אותו — שום דבר לא הולך לאיבוד.',
+      startRoutine: 'התחילו {name}',
     },
     account: {
       eyebrow: 'הנתונים שלך',
