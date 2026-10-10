@@ -18,6 +18,7 @@ import RestTimer from './RestTimer.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { isWarmup, workingSets } from '../lib/warmup.js'
 import { buildSummary } from '../lib/shareSummary.js'
+import { entryName, exerciseMap } from '../lib/names.js'
 import { preloadShareFonts } from '../lib/shareCard.js'
 import { weeklyStreak } from '../lib/streak.js'
 import WorkoutDone from './WorkoutDone.jsx'
@@ -41,6 +42,7 @@ export default function WorkoutSession() {
   const [routines, routinesLoading] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [exercises, , refreshExercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [pastSessions, pastLoading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const liveName = (entry) => entryName(entry, exerciseMap(exercises), lang)
 
   // All-time best per exercise, from every session already saved. Same
   // rule the admin PR alert uses — heaviest weight for strength, most
@@ -370,7 +372,7 @@ export default function WorkoutSession() {
     )
     if (hasLogged) {
       const ok = await confirm({
-        title: t('workout.removeEntryTitle', { name: entry.name }),
+        title: t('workout.removeEntryTitle', { name: liveName(entry) }),
         body: t('workout.removeEntryBody'),
         confirmLabel: t('common.remove'),
         danger: true,
@@ -398,7 +400,7 @@ export default function WorkoutSession() {
       let summaryData = null
       try {
         summaryData = buildSummary({
-          entries,
+          entries: entries.map((e) => ({ ...e, name: liveName(e) })),
           personalBests,
           pastSets: pastStrengthSets,
           routineName: isFreestyle ? t('workout.freestyleSession') : routine?.name,
@@ -594,7 +596,7 @@ export default function WorkoutSession() {
           <div className="card p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-2xl mb-2">{t('workout.swapTitle')}</h2>
             <p className="text-chalkdim text-sm mb-4">
-              {t('workout.swapSubtitle', { name: entries[swapIndex]?.name })}
+              {t('workout.swapSubtitle', { name: swapIndex != null ? liveName(entries[swapIndex]) : '' })}
             </p>
             <Field label={t('workout.swapPickLabel')}>
               <ExerciseSelect

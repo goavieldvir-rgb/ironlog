@@ -10,6 +10,7 @@ import { formatSeconds } from '../lib/timed.js'
 import { entryPrKind } from '../lib/records.js'
 import { cardioSummary } from '../lib/cardio.js'
 import CardioTotals from './CardioTotals.jsx'
+import { entryName } from '../lib/names.js'
 
 function Stepper({ value, onChange, step, min = 0, max, label, placeholder, bare }) {
   const holdRef = useRef(null)
@@ -124,7 +125,7 @@ export default function SessionEntryCard({
 }) {
   const { t, lang } = useLanguage()
   // Follow the current language (switching mid-workout updates the name).
-  const displayName = (lang === 'he' && liveExercise?.name_he) || liveExercise?.name || entry.name
+  const displayName = liveExercise ? (lang === 'he' && liveExercise.name_he) || liveExercise.name : entryName(entry, {}, lang)
   const [showNote, setShowNote] = useState(!!entry.notes)
   const [showQuickFill, setShowQuickFill] = useState(false)
   // Index of the set that numbers were just filled into, so it can flash.

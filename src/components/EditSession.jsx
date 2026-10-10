@@ -8,6 +8,7 @@ import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, updateSession } from '../lib/db.js'
 import { Button, Card, CategoryTag, Field } from './ui.jsx'
 import SessionEntryCard from './SessionEntryCard.jsx'
+import { exerciseMap } from '../lib/names.js'
 
 function emptySet(category) {
   return category === 'cardio' ? { duration: '', intensity: '', distance: '' } : { weight: '', reps: '', rir: '' }
@@ -21,6 +22,8 @@ export default function EditSession() {
   const navigate = useNavigate()
   const [sessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const session = sessions.find((s) => s.id === id)
+  const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
+  const exById = exerciseMap(exercises)
 
   const [date, setDate] = useState('')
   const [notes, setNotes] = useState('')
@@ -113,6 +116,7 @@ export default function EditSession() {
         <SessionEntryCard
           key={entry.exerciseId + i}
           entry={entry}
+          liveExercise={exById[entry.exerciseId]}
           onUpdateSet={(setIdx, patch) => updateSet(i, setIdx, patch)}
           onAddSet={() => addSet(i)}
           onAddWarmups={(sets) => addWarmups(i, sets)}

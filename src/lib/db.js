@@ -146,7 +146,7 @@ export async function addExercise(uid, exercise) {
     .insert({
       user_id: uid,
       name: exercise.name,
-      name_he: exercise.nameHe || null,
+      name_he: (exercise.nameHe || '').trim() || null,
       category: exercise.category || 'strength', // 'strength' | 'mobility' | 'cardio'
       video_url: exercise.videoUrl || '',
       notes: exercise.notes || '',
@@ -167,6 +167,7 @@ export async function addExercise(uid, exercise) {
 export async function updateExercise(uid, id, patch) {
   const row = {}
   if (patch.name !== undefined) row.name = patch.name
+  if ('nameHe' in patch) row.name_he = (patch.nameHe || '').trim() || null
   if (patch.category !== undefined) row.category = patch.category
   if (patch.videoUrl !== undefined) row.video_url = patch.videoUrl
   if (patch.notes !== undefined) row.notes = patch.notes
