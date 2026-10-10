@@ -327,7 +327,7 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
   const locked = hasHistory && !!initial.id
 
   return (
-    <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }} onClick={onClose}>
       <div className="card p-6 w-full max-w-md max-h-[85dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-2xl mb-4">{initial.id ? t('exercises.editExercise') : t('exercises.newExercise')}</h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">

@@ -204,7 +204,7 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
       {/* Rendered at the top level of the page so nothing it sits inside
           (a card, a pressed row) can shift or clip the panel. */}
       {openDay != null && createPortal(
-        <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-40 flex items-end sm:items-center justify-center p-4" onClick={backdropClose}>
+        <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-40 flex items-end sm:items-center justify-center p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }} onClick={backdropClose}>
           <div className="card p-6 w-full max-w-sm max-h-[85dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-2 mb-4">
               <h2 className="text-xl inline-flex items-center gap-2">

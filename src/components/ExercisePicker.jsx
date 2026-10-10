@@ -67,7 +67,7 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
   ]
 
   return (
-    <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }} onClick={onClose}>
       <div className="card p-6 w-full max-w-lg max-h-[85dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-2xl mb-1">{t('exercises.pickerTitle')}</h2>
         <p className="text-chalkdim text-sm mb-4">
