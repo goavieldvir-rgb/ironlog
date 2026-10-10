@@ -140,7 +140,7 @@ export default function RoutineList() {
                   <span className="num shrink-0">
                     {r.category === 'cardio'
                       ? `${e.targetSets ?? e.targetDuration ?? ''}${e.targetSets != null ? ' min' : ''}`
-                      : `${e.targetSets}×${e.targetReps}${e.timed ? 's' : ''}`}
+                      : `${e.targetSets}×${e.targetReps}${e.timed ? 's' : ''}${e.targetRir != null ? ` · RIR ${e.targetRir}` : ''}`}
                   </span>
                 </li>
               ))}

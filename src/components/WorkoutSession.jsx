@@ -26,8 +26,30 @@ function todayISO() {
   return toLocalISODate()
 }
 
+// The coach's optional per-exercise extras from the routine: a cue shown on
+// the card, and a link to the next exercise (superset). Only set when present
+// so entries for older routines look exactly as before.
+function coachFields(it) {
+  return {
+    ...(it.coachNote ? { coachNote: it.coachNote } : {}),
+    ...(it.supersetWithNext ? { supersetWithNext: true } : {}),
+  }
+}
+
 function emptySet(category) {
   return category === 'cardio' ? { duration: '', intensity: '', distance: '' } : { weight: '', reps: '', rir: '' }
+}
+
+// Where an entry sits in a superset chain: 'start' / 'mid' / 'end', or null.
+// Derived from each entry's supersetWithNext flag, so moving, swapping or
+// removing exercises can never leave a stale group behind.
+function supersetPos(entries, i) {
+  const next = !!entries[i].supersetWithNext && i < entries.length - 1
+  const prev = i > 0 && !!entries[i - 1].supersetWithNext
+  if (next && prev) return 'mid'
+  if (next) return 'start'
+  if (prev) return 'end'
+  return null
 }
 
 export default function WorkoutSession() {
@@ -175,6 +197,7 @@ export default function WorkoutSession() {
               lastReps: full?.last_reps,
               lastDistance: full?.last_distance,
               lastSets: full?.last_sets || [],
+              ...coachFields(it),
               notes: '',
               sets: [
                 {
@@ -196,6 +219,10 @@ export default function WorkoutSession() {
             lastWeight: full?.last_weight,
             lastReps: full?.last_reps,
             lastSets: full?.last_sets || [],
+            ...coachFields(it),
+            targetSets: it.targetSets || null,
+            targetReps: it.targetReps ?? null,
+            ...(it.targetRir != null && it.targetRir !== '' ? { targetRir: Number(it.targetRir) } : {}),
             notes: '',
             sets: Array.from({ length: it.targetSets || 3 }, () => ({ weight: '', reps: '', rir: '' })),
           }
@@ -280,6 +307,12 @@ export default function WorkoutSession() {
     }
   }
 
+  // A swapped-in exercise keeps its slot in a superset, but not the coach's
+  // cue or target, which were written for the original exercise.
+  function swapped(old, ex, targetSets) {
+    return { ...buildEntryFromExercise(ex, targetSets), ...(old.supersetWithNext ? { supersetWithNext: true } : {}) }
+  }
+
   function addFreestyleExercise() {
     const ex = exercises.find((e) => e.id === pickId)
     if (!ex) return
@@ -293,7 +326,7 @@ export default function WorkoutSession() {
     // Keep whatever number of sets the original exercise had planned —
     // swapping shouldn't also reset how many sets you meant to do.
     const targetSets = workingSets(entries[swapIndex]?.sets).length || 3
-    setEntries((prev) => prev.map((e, i) => (i === swapIndex ? buildEntryFromExercise(ex, targetSets) : e)))
+    setEntries((prev) => prev.map((e, i) => (i === swapIndex ? swapped(e, ex, targetSets) : e)))
     setSwapIndex(null)
     setSwapPickId('')
   }
@@ -305,7 +338,7 @@ export default function WorkoutSession() {
   function applyPickedExercise(ex) {
     if (swapIndex != null) {
       const targetSets = workingSets(entries[swapIndex]?.sets).length || 3
-      setEntries((prev) => prev.map((e, i) => (i === swapIndex ? buildEntryFromExercise(ex, targetSets) : e)))
+      setEntries((prev) => prev.map((e, i) => (i === swapIndex ? swapped(e, ex, targetSets) : e)))
       setSwapIndex(null)
     } else {
       setEntries((prev) => [...prev, buildEntryFromExercise(ex)])
@@ -426,6 +459,8 @@ export default function WorkoutSession() {
           intensityType: e.intensityType,
           videoUrl: e.videoUrl,
           notes: e.notes || '',
+          ...(e.coachNote ? { coachNote: e.coachNote } : {}),
+          ...(e.targetRir != null ? { targetRir: e.targetRir } : {}),
           sets: e.sets,
         })),
       })
@@ -501,6 +536,7 @@ export default function WorkoutSession() {
             personalBest={personalBests[entry.exerciseId]}
             pastSets={pastStrengthSets[entry.exerciseId]}
             removable
+            supersetPos={supersetPos(entries, i)}
             onMoveUp={i > 0 ? () => moveEntry(i, -1) : undefined}
             onMoveDown={i < entries.length - 1 ? () => moveEntry(i, 1) : undefined}
             onUpdateSet={(setIdx, patch) => updateSet(i, setIdx, patch)}
