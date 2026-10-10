@@ -317,6 +317,12 @@ export const translations = {
       copyToPersonTip: "Sends a copy of this exact routine straight into someone else's account, so you don't have to rebuild it from scratch for each trainee.",
       targetFieldsTip: "These are goals to aim for, not a strict rule — you can always log something different on the actual day. They just pre-fill the logging screen so you know what you're working toward.",
       cardActionsTip: 'The icons on each card: the copy icon duplicates the routine for yourself (handy for a variation), the send icon copies it straight into someone else\'s account, the pencil edits it, and the trash deletes it.',
+      addNote: 'Add note',
+      coachNotePlaceholder: 'Cue for the trainee, e.g. "pause 1s at the bottom"',
+      coachNoteLabel: 'Coach note',
+      targetRir: 'Target RIR (reps in reserve)',
+      rirShort: 'RIR',
+      supersetNext: 'Superset with next exercise',
     },
     share: {
       title: 'Nice work!',
@@ -382,6 +388,9 @@ export const translations = {
       swapNote: "Pick from your existing exercises above, or use Add from catalogue to search the full list or add something new.",
       swapConfirm: 'Swap',
       sessionNotesTip: "This is for the whole workout — how it felt overall, energy levels, anything general. If it's about one specific exercise instead, use “Add a note for this exercise” in the three-dot menu on that exercise's card so it stays attached to the right one.",
+      coachLabel: 'Coach:',
+      supersetLabel: 'Superset',
+      targetLine: 'Target',
     },
     sessionCard: {
       prBadge: 'PR',
@@ -606,7 +615,7 @@ Many exercises have a short demo video. When there is one, you'll see an "Exampl
       s4title: 'Routines — your workout plans',
       s4body: `A routine is a saved plan — a specific list of exercises you do together, like "Push Day" or "Leg Day". You build it once, then reuse it every time instead of picking exercises from scratch.
 
-To build one: give it a name, pick a category (Strength, Mobility or Cardio), then add exercises — from your own list, or tap "Add from catalogue" to pull more in from the shared list without leaving the page. For each exercise you can set a target, like "3 sets of 10 reps". That's a goal to aim for, not a strict rule. You can always log something different on the day.
+To build one: give it a name, pick a category (Strength, Mobility or Cardio), then add exercises — from your own list, or tap "Add from catalogue" to pull more in from the shared list without leaving the page. For each exercise you can set a target, like "3 sets of 10 reps". That's a goal to aim for, not a strict rule. You can always log something different on the day. You can also add a coach note (a cue the trainee sees while logging), a target RIR, and link an exercise to the next one as a superset.
 
 Tap "Save routine" and you'll see a green "Routine saved" message.
 
@@ -1073,6 +1082,12 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       copyToPersonTip: 'שולח עותק של התוכנית המדויקת הזו ישירות לחשבון של מישהו אחר, כך שלא צריך לבנות אותה מחדש לכל מתאמן.',
       targetFieldsTip: 'אלה יעדים לשאוף אליהם, לא כלל נוקשה — תמיד אפשר לתעד משהו אחר ביום עצמו. הם רק ממלאים מראש את מסך התיעוד כדי שתדעו למה אתם שואפים.',
       cardActionsTip: 'הסמלים בכל כרטיס: סמל ההעתקה משכפל את התוכנית עבורכם (שימושי לגרסה שונה), סמל השליחה מעתיק אותה ישירות לחשבון של מישהו אחר, העיפרון עורך אותה, והפח מוחק אותה.',
+      addNote: 'הוסיפו הערה',
+      coachNotePlaceholder: 'הערה למתאמן, למשל "עצירה של שנייה בתחתית"',
+      coachNoteLabel: 'הערת מאמן',
+      targetRir: 'RIR יעד (חזרות בשמורה)',
+      rirShort: 'RIR',
+      supersetNext: 'סופר-סט עם התרגיל הבא',
     },
     share: {
       title: 'כל הכבוד!',
@@ -1138,6 +1153,9 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       swapPickLabel: 'להחליף ב',
       swapNote: 'בחרו מתוך התרגילים הקיימים שלכם למעלה, או השתמשו ב"הוספה מהקטלוג" כדי לחפש ברשימה המלאה או להוסיף משהו חדש.',
       swapConfirm: 'החלף',
+      coachLabel: 'מאמן:',
+      supersetLabel: 'סופר-סט',
+      targetLine: 'יעד',
     },
     sessionCard: {
       prBadge: 'שיא',
@@ -1360,7 +1378,7 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       s4title: 'תוכניות אימון — התוכניות שלכם',
       s4body: `תוכנית היא תבנית שמורה — רשימה מסוימת של תרגילים שאתם עושים ביחד, כמו "יום דחיפה" או "יום רגליים". בונים אותה פעם אחת, ואז משתמשים בה שוב בכל פעם במקום לבחור תרגילים מאפס.
 
-כדי לבנות אחת: תנו לה שם, בחרו קטגוריה (כוח, מוביליטי או קרדיו), ואז הוסיפו תרגילים — מהרשימה שלכם, או הקישו "הוספה מהקטלוג" כדי למשוך עוד תרגילים מהרשימה המשותפת בלי לעזוב את הדף. לכל תרגיל אפשר להגדיר יעד — כמו "3 סטים של 10 חזרות" — זו מטרה לשאוף אליה, לא כלל נוקשה. תמיד אפשר לתעד משהו אחר ביום עצמו.
+כדי לבנות אחת: תנו לה שם, בחרו קטגוריה (כוח, מוביליטי או קרדיו), ואז הוסיפו תרגילים — מהרשימה שלכם, או הקישו "הוספה מהקטלוג" כדי למשוך עוד תרגילים מהרשימה המשותפת בלי לעזוב את הדף. לכל תרגיל אפשר להגדיר יעד — כמו "3 סטים של 10 חזרות" — זו מטרה לשאוף אליה, לא כלל נוקשה. תמיד אפשר לתעד משהו אחר ביום עצמו. אפשר גם להוסיף הערת מאמן (רמז שהמתאמן רואה בזמן התיעוד), RIR יעד, ולקשור תרגיל לתרגיל הבא בסופר-סט.
 
 הקישו "שמירת תוכנית" ותראו הודעה ירוקה "התוכנית נשמרה".
 
