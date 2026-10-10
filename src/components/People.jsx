@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { Users, ShieldCheck, UserPlus, Copy, Check, AlertTriangle } from 'lucide-react'
 import { ForwardArrow } from './DirectionalIcon.jsx'
 import { supabase } from '../supabase.js'
-import { toLocalISODate } from '../lib/dates.js'
+import { toLocalISODate, fmtDate } from '../lib/dates.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -22,7 +22,7 @@ function startOfWeekISO() {
 export default function People() {
   const { user } = useAuth()
   const { setActingAs } = useAdmin()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const navigate = useNavigate()
   const [people, setPeople] = useState([])
   const [loading, setLoading] = useState(true)
@@ -155,7 +155,7 @@ export default function People() {
                     <p className={`text-xs mt-1 ${stale ? 'text-brass' : 'text-chalkdim'}`}>
                       {stale
                         ? t('people.termsOutdated', { version: cs.version })
-                        : t('people.termsAccepted', { date: new Date(cs.accepted_at).toLocaleDateString() })}
+                        : t('people.termsAccepted', { date: fmtDate(lang, new Date(cs.accepted_at)) })}
                       {cs.variant === 'minor' && cs.guardian_name ? ` · ${t('people.guardian', { name: cs.guardian_name })}` : ''}
                     </p>
                   )
@@ -210,7 +210,7 @@ function InviteModal({ onClose, t }) {
   const ready = name.trim() && email.trim()
 
   return (
-    <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }} onClick={onClose}>
       <div className="card p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-2xl mb-1">{t('people.inviteModalTitle')}</h2>
         <p className="text-chalkdim text-sm mb-4">{t('people.inviteModalSubtitle')}</p>

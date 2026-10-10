@@ -16,9 +16,9 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import ExerciseSelect from './ExerciseSelect.jsx'
 import { useCollection } from '../lib/db.js'
 import { entryName, exerciseMap } from '../lib/names.js'
-import { toLocalISODate } from '../lib/dates.js'
+import { toLocalISODate, fmtDate, dateLocale } from '../lib/dates.js'
 import { disambiguateLabels } from '../lib/disambiguate.js'
-import { Card, EmptyState, Field } from './ui.jsx'
+import { Card, EmptyState, LoadError, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { workingSets } from '../lib/warmup.js'
 import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
@@ -33,8 +33,8 @@ function mondayOf(dateISO) {
   return toLocalISODate(d)
 }
 
-function shortDate(iso) {
-  return new Date(iso + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+function shortDate(lang, iso) {
+  return fmtDate(lang, new Date(iso + 'T00:00:00'), { month: 'short', day: 'numeric' })
 }
 
 function last12Mondays() {
@@ -51,7 +51,7 @@ function last12Mondays() {
 export default function Stats() {
   const { effectiveUid } = useAdmin()
   const { t, lang } = useLanguage()
-  const [rawSessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const [rawSessions, loading, refreshSessions, loadError] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const sessions = useMemo(() => applyCurrentTimed(rawSessions, exercises), [rawSessions, exercises])
   const [exerciseId, setExerciseId] = useState('')
@@ -83,14 +83,14 @@ export default function Stats() {
       }
       return {
         week: weekStart,
-        label: shortDate(weekStart),
+        label: shortDate(lang, weekStart),
         sessions: inWeek.length,
         volume: Math.round(volume),
         cardioMinutes: Math.round(cardioMinutes),
         cardioKm: Math.round(cardioKm * 10) / 10,
       }
     })
-  }, [sessions, weeks])
+  }, [sessions, weeks, lang])
 
   const streak = useMemo(() => {
     let count = 0
@@ -156,7 +156,7 @@ export default function Stats() {
           }
           progMap[entry.exerciseId].points.push({
             date: s.date,
-            label: shortDate(s.date),
+            label: shortDate(lang, s.date),
             duration: sum.minutes,
             distance: sum.distance,
             speed: sum.speed,
@@ -199,7 +199,7 @@ export default function Stats() {
         }
         progMap[entry.exerciseId].points.push({
           date: s.date,
-          label: shortDate(s.date),
+          label: shortDate(lang, s.date),
           weight: Number(topSet.weight) || 0,
           reps: Number(topSet.reps),
         })
@@ -248,6 +248,7 @@ export default function Stats() {
     pace: t('stats.metricPace'),
     effort: selectedProgress?.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe'),
   }
+  const loadFailed = !!loadError && rawSessions.length === 0
   const hasData = !loading && sessions.length > 0
 
   return (
@@ -257,7 +258,9 @@ export default function Stats() {
         <h1 className="text-3xl">{t('stats.title')}</h1>
       </div>
 
-      {!loading && sessions.length === 0 && (
+      {!loading && loadFailed && <LoadError onRetry={refreshSessions} />}
+
+      {!loading && !loadFailed && sessions.length === 0 && (
         <EmptyState
           title={t('stats.emptyTitle')}
           body={t('stats.emptyBody')}
@@ -269,8 +272,8 @@ export default function Stats() {
           <div className={`grid grid-cols-2 ${totalCardioKm > 0 ? 'sm:grid-cols-6' : hasCardio ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3`}>
             <Stat icon={Flame} label={t('stats.weekStreak')} value={streak} />
             <Stat icon={BarChart3} label={t('stats.sessionsLogged')} value={sessions.length} />
-            <Stat icon={TrendingUp} label={t('stats.totalVolume')} value={totalVolume.toLocaleString()} />
-            {hasCardio && <Stat icon={Heart} label={t('stats.cardioMinutes')} value={totalCardioMinutes.toLocaleString()} />}
+            <Stat icon={TrendingUp} label={t('stats.totalVolume')} value={totalVolume.toLocaleString(dateLocale(lang))} />
+            {hasCardio && <Stat icon={Heart} label={t('stats.cardioMinutes')} value={totalCardioMinutes.toLocaleString(dateLocale(lang))} />}
             {totalCardioKm > 0 && <Stat icon={Heart} label={t('stats.cardioDistance')} value={formatDistance(totalCardioKm)} />}
             <Stat icon={Trophy} label={t('stats.personalRecords')} value={records.length} />
           </div>
@@ -477,7 +480,7 @@ export default function Stats() {
                             ? `${r.weight > 0 ? `+${r.weight}${r.unit} ` : ''}${t('sessionCard.bwShort')} × ${r.reps}`
                             : `${r.weight}${r.unit} × ${r.reps}`}
                       </p>
-                      <p className="text-chalkdim text-xs">{shortDate(r.date)}</p>
+                      <p className="text-chalkdim text-xs">{shortDate(lang, r.date)}</p>
                     </div>
                     {r.category === 'cardio' && (r.farthest != null || r.bestPace != null) && (
                       <p className="num text-chalkdim text-xs basis-full">

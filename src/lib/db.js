@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../supabase.js'
 import { workingSets } from './warmup.js'
 
@@ -8,11 +8,16 @@ import { workingSets } from './warmup.js'
 export function useCollection(uid, table, orderField = 'created_at', direction = 'desc') {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [reload, setReload] = useState(0)
+  // Which query `data` belongs to, so a failed refresh keeps the rows already
+  // loaded for it but never shows another account's rows after a switch.
+  const loadedKey = useRef('')
 
   useEffect(() => {
     if (!uid) return
     let cancelled = false
+    const key = `${uid}|${table}|${orderField}|${direction}`
     setLoading(true)
 
     supabase
@@ -22,8 +27,15 @@ export function useCollection(uid, table, orderField = 'created_at', direction =
       .order(orderField, { ascending: direction === 'asc' })
       .then(({ data, error }) => {
         if (cancelled) return
-        if (error) console.error(error)
-        setData(data || [])
+        if (error) {
+          console.error(error)
+          setError(error)
+          if (loadedKey.current !== key) setData([])
+        } else {
+          setError(null)
+          loadedKey.current = key
+          setData(data || [])
+        }
         setLoading(false)
       })
 
@@ -32,7 +44,9 @@ export function useCollection(uid, table, orderField = 'created_at', direction =
     }
   }, [uid, table, orderField, direction, reload])
 
-  return [data, loading, () => setReload((r) => r + 1)]
+  // 4th element is the last load error (null when fine); data is kept on a
+  // failed refresh so a bad connection doesn't look like lost data.
+  return [data, loading, () => setReload((r) => r + 1), error]
 }
 
 // Reads the shared global_exercises table — no user_id filter, since it's
@@ -40,20 +54,33 @@ export function useCollection(uid, table, orderField = 'created_at', direction =
 export function useGlobalExercises() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [reload, setReload] = useState(0)
 
   useEffect(() => {
+    let cancelled = false
+    setLoading(true)
     supabase
       .from('global_exercises')
       .select('*')
       .order('name', { ascending: true })
       .then(({ data, error }) => {
-        if (error) console.error(error)
-        setData(data || [])
+        if (cancelled) return
+        if (error) {
+          console.error(error)
+          setError(error)
+        } else {
+          setError(null)
+          setData(data || [])
+        }
         setLoading(false)
       })
-  }, [])
+    return () => {
+      cancelled = true
+    }
+  }, [reload])
 
-  return [data, loading]
+  return [data, loading, () => setReload((r) => r + 1), error]
 }
 
 // Fetches a single profile row (for the effective/acted-as user, which

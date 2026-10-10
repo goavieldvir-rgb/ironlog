@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { Plus, Trash2, ArrowUp, ArrowDown, Library, Video } from 'lucide-react'
+import { Plus, Trash2, ArrowUp, ArrowDown, Library, Video, StickyNote, Link2 } from 'lucide-react'
 import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -167,7 +167,20 @@ export default function RoutineBuilder() {
     if (!name.trim() || items.length === 0) return
     setSaving(true)
     try {
-      const payload = { name: name.trim(), category, exercises: items }
+      // Drop the optional coach fields when empty, and a superset link on the
+      // last item (nothing to link to), so routines stay free of dead keys.
+      const cleaned = items.map((it, i) => {
+        const { coachNote, targetRir, supersetWithNext, ...rest } = it
+        const note = (coachNote || '').trim()
+        const rir = targetRir === '' || targetRir == null ? null : Number(targetRir)
+        return {
+          ...rest,
+          ...(note ? { coachNote: note } : {}),
+          ...(rir != null && isFinite(rir) ? { targetRir: Math.min(5, Math.max(0, rir)) } : {}),
+          ...(supersetWithNext && i < items.length - 1 ? { supersetWithNext: true } : {}),
+        }
+      })
+      const payload = { name: name.trim(), category, exercises: cleaned }
       if (id) {
         await updateRoutine(effectiveUid, id, payload)
       } else {
@@ -300,6 +313,23 @@ export default function RoutineBuilder() {
                     placeholder={it.timed ? '30' : '10'}
                   />
                   {it.timed && <span className="text-chalkdim text-xs">s</span>}
+                  {category === 'strength' && !it.timed && (
+                    <>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        max={5}
+                        value={it.targetRir ?? ''}
+                        onChange={(e) => updateItem(i, { targetRir: e.target.value === '' ? '' : Math.min(5, Math.max(0, Number(e.target.value))) })}
+                        className="w-14 text-center num ms-1"
+                        title={t('routines.targetRir')}
+                        aria-label={t('routines.targetRir')}
+                        placeholder="–"
+                      />
+                      <span className="text-chalkdim text-xs">{t('routines.rirShort')}</span>
+                    </>
+                  )}
                 </>
               )}
               <div className="flex items-center ms-auto">
@@ -320,6 +350,39 @@ export default function RoutineBuilder() {
                 </button>
               </div>
               </div>
+              {/* Optional coach extras: a cue shown on the workout screen, and a
+                  link to the next exercise. Collapsed to a link until used. */}
+              {it.coachNote == null ? (
+                <button
+                  type="button"
+                  onClick={() => updateItem(i, { coachNote: '' })}
+                  className="inline-flex items-center gap-1 text-xs text-brass hover:underline w-fit min-h-[32px]"
+                >
+                  <StickyNote size={12} /> {t('routines.addNote')}
+                </button>
+              ) : (
+                <input
+                  value={it.coachNote}
+                  onChange={(e) => updateItem(i, { coachNote: e.target.value })}
+                  maxLength={140}
+                  className="w-full text-sm"
+                  placeholder={t('routines.coachNotePlaceholder')}
+                  aria-label={t('routines.coachNoteLabel')}
+                />
+              )}
+              {i < items.length - 1 && (
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!!it.supersetWithNext}
+                  onClick={() => updateItem(i, { supersetWithNext: !it.supersetWithNext })}
+                  className={`inline-flex items-center gap-1.5 text-xs w-fit min-h-[32px] ${it.supersetWithNext ? 'text-brass' : 'text-chalkdim hover:text-chalk'}`}
+                >
+                  <Link2 size={12} />
+                  <span className={`inline-block w-3.5 h-3.5 rounded-sm border ${it.supersetWithNext ? 'bg-brass border-brass' : 'border-line'}`} aria-hidden="true" />
+                  {t('routines.supersetNext')}
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -347,7 +410,7 @@ export default function RoutineBuilder() {
       </Card>
 
       {videoFor && (
-        <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" onClick={() => setVideoFor(null)}>
+        <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }} onClick={() => setVideoFor(null)}>
           <div className="card p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl mb-1">{t('routines.videoTitle')}</h2>
             <p className="text-chalkdim text-sm mb-4">{t('routines.videoBody')}</p>

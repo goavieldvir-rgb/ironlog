@@ -5,8 +5,8 @@ import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useCollection } from '../lib/db.js'
 import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
-import { toLocalISODate } from '../lib/dates.js'
-import { Button, Card, EmptyState, Field } from './ui.jsx'
+import { toLocalISODate, fmtDate, dateLocale } from '../lib/dates.js'
+import { Button, Card, CategoryTag, EmptyState, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { isWarmup, workingSets } from '../lib/warmup.js'
 import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
@@ -58,21 +58,21 @@ function todayStart() {
   return d
 }
 
-function formatRange(start, end, mode) {
+function formatRange(lang, start, end, mode) {
   if (mode === 'year') {
     return start.getFullYear() === end.getFullYear() ? String(start.getFullYear()) : `${start.getFullYear()}–${end.getFullYear()}`
   }
   if (mode === 'month') {
-    return start.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+    return fmtDate(lang, start, { month: 'long', year: 'numeric' })
   }
   const opts = { month: 'short', day: 'numeric' }
-  const startStr = start.toLocaleDateString(undefined, opts)
-  const endStr = end.toLocaleDateString(undefined, { ...opts, year: 'numeric' })
+  const startStr = fmtDate(lang, start, opts)
+  const endStr = fmtDate(lang, end, { ...opts, year: 'numeric' })
   return `${startStr} – ${endStr}`
 }
 
-function formatDay(iso) {
-  return new Date(iso + 'T00:00:00').toLocaleDateString(undefined, {
+function formatDay(lang, iso) {
+  return fmtDate(lang, new Date(iso + 'T00:00:00'), {
     weekday: 'long',
     month: 'short',
     day: 'numeric',
@@ -80,22 +80,24 @@ function formatDay(iso) {
 }
 
 function formatSet(entry, s, t) {
+  // Older entries can lack a unit — never print "undefined".
+  const unit = entry.unit || ''
   if (entry.category === 'cardio') {
     const intensityLabel = entry.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe')
-    const dist = s.distance !== '' && s.distance != null ? ` · ${s.distance}${entry.unit}` : ''
+    const dist = s.distance !== '' && s.distance != null ? ` · ${s.distance}${unit}` : ''
     const sd = Number(s.distance), sm = Number(s.duration)
-    const pace = sd > 0 && sm > 0 ? `·${formatPace(sm / sd)}/${entry.unit === 'mi' ? 'mi' : 'km'}` : ''
+    const pace = sd > 0 && sm > 0 ? `·${formatPace(sm / sd)}/${unit === 'mi' ? 'mi' : 'km'}` : ''
     return `${s.duration || 0}min·${intensityLabel}${s.intensity || 0}${dist}${pace}`
   }
   if (entry.timed) {
-    const added = Number(s.weight) > 0 ? `+${s.weight}${entry.unit} ` : ''
+    const added = Number(s.weight) > 0 ? `+${s.weight}${unit} ` : ''
     return `${added}${formatSeconds(s.reps) || '0s'}`
   }
   if (entry.bodyweight) {
-    const added = Number(s.weight) > 0 ? `+${s.weight}${entry.unit} ` : ''
+    const added = Number(s.weight) > 0 ? `+${s.weight}${unit} ` : ''
     return `${added}${t('sessionCard.bwShort')}×${s.reps || 0}`
   }
-  return `${s.weight || 0}${entry.unit}×${s.reps || 0}`
+  return `${s.weight || 0}${unit}×${s.reps || 0}`
 }
 
 function getModes(t) {
@@ -137,18 +139,7 @@ function computeRange(mode, offset, customStart, customEnd) {
   return { start, end }
 }
 
-function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t, lang, exById }) {
-  const lines = []
-  const modeLabel = {
-    week: t('summary.docWeekly'),
-    month: t('summary.docMonthly'),
-    year: t('summary.docYearly'),
-    custom: t('summary.docCustomRange'),
-  }[mode]
-  lines.push(`# ${modeLabel} ${t('summary.docTrainingSummary')}`)
-  lines.push(`${formatRange(start, end, mode)}${personName ? ` — ${personName}` : ''}`)
-  lines.push('')
-
+function computeTotals(sessions) {
   const totalSets = sessions.reduce((n, s) => n + (s.entries || []).reduce((m, e) => m + workingSets(e.sets).length, 0), 0)
   const totalVolume = sessions.reduce((sum, s) => {
     const v = (s.entries || []).reduce((eSum, e) => {
@@ -183,10 +174,27 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t, 
     )
   }, 0)
 
+  return { totalSets, totalVolume, totalCardioMinutes, totalCardioKm }
+}
+
+function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t, lang, exById }) {
+  const lines = []
+  const modeLabel = {
+    week: t('summary.docWeekly'),
+    month: t('summary.docMonthly'),
+    year: t('summary.docYearly'),
+    custom: t('summary.docCustomRange'),
+  }[mode]
+  lines.push(`# ${modeLabel} ${t('summary.docTrainingSummary')}`)
+  lines.push(`${formatRange(lang, start, end, mode)}${personName ? ` — ${personName}` : ''}`)
+  lines.push('')
+
+  const { totalSets, totalVolume, totalCardioMinutes, totalCardioKm } = computeTotals(sessions)
+
   const parts = [
     `${sessions.length} ${sessions.length === 1 ? t('summary.docSession') : t('summary.docSessions')}`,
     `${totalSets} ${t('summary.docTotalSets')}`,
-    `~${Math.round(totalVolume).toLocaleString()} ${t('summary.docTotalVolume')}`,
+    `~${Math.round(totalVolume).toLocaleString(dateLocale(lang))} ${t('summary.docTotalVolume')}`,
   ]
   if (totalCardioMinutes > 0) parts.push(`${Math.round(totalCardioMinutes)} ${t('summary.docCardioMinutes')}`)
   if (totalCardioKm > 0) parts.push(`${formatDistance(totalCardioKm)} ${t('summary.docCardioDistance')}`)
@@ -198,7 +206,7 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t, 
   }
 
   for (const s of [...sessions].sort((a, b) => (a.date < b.date ? -1 : 1))) {
-    lines.push(`## ${formatDay(s.date)} — ${sessionTitle(s, t)} (${s.category})`)
+    lines.push(`## ${formatDay(lang, s.date)} — ${sessionTitle(s, t)} (${s.category})`)
     for (const e of s.entries || []) {
       const setsStr = (e.sets || []).map((set) => (isWarmup(set) ? `${t('sessionCard.warmupShort')} ` : '') + formatSet(e, set, t)).join(', ')
       lines.push(`- ${entryName(e, exById, lang)}: ${setsStr || t('summary.docNoSetsLogged')}`)
@@ -211,12 +219,128 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t, 
   if (bodyWeights.length > 0) {
     lines.push(`## ${t('summary.docBodyWeight')}`)
     for (const bw of [...bodyWeights].sort((a, b) => (a.date < b.date ? -1 : 1))) {
-      lines.push(`- ${formatDay(bw.date)}: ${bw.weight}${bw.unit}`)
+      lines.push(`- ${formatDay(lang, bw.date)}: ${bw.weight}${bw.unit || ''}`)
     }
     lines.push('')
   }
 
   return lines.join('\n')
+}
+
+function Chip({ value, label }) {
+  return (
+    <span className="inline-flex items-baseline gap-1.5 rounded-md bg-surface2 px-2.5 py-1.5">
+      <span className="num text-chalk text-sm font-medium">{value}</span>
+      <span className="text-chalkdim text-xs">{label}</span>
+    </span>
+  )
+}
+
+// On-screen version of the export, built from the same data and helpers as
+// buildSummary (which stays the source of the Copy/Download text). Mixed
+// English/Hebrew fragments sit in <bdi> so they keep their own direction.
+function SummaryPreview({ mode, start, end, sessions, bodyWeights, personName, t, lang, exById }) {
+  const modeLabel = {
+    week: t('summary.docWeekly'),
+    month: t('summary.docMonthly'),
+    year: t('summary.docYearly'),
+    custom: t('summary.docCustomRange'),
+  }[mode]
+  const { totalSets, totalVolume, totalCardioMinutes, totalCardioKm } = computeTotals(sessions)
+  const num = (n) => Math.round(n).toLocaleString(dateLocale(lang))
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <h2 className="text-xl">
+          {modeLabel} {t('summary.docTrainingSummary')}
+        </h2>
+        <p className="text-chalkdim text-sm mt-0.5">
+          {formatRange(lang, start, end, mode)}
+          {personName && (
+            <>
+              {' — '}
+              <bdi dir="auto">{personName}</bdi>
+            </>
+          )}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Chip value={sessions.length} label={sessions.length === 1 ? t('summary.docSession') : t('summary.docSessions')} />
+        <Chip value={totalSets} label={t('summary.docTotalSets')} />
+        <Chip value={`~${num(totalVolume)}`} label={t('summary.docTotalVolume')} />
+        {totalCardioMinutes > 0 && <Chip value={num(totalCardioMinutes)} label={t('summary.docCardioMinutes')} />}
+        {totalCardioKm > 0 && <Chip value={formatDistance(totalCardioKm)} label={t('summary.docCardioDistance')} />}
+      </div>
+
+      {[...sessions]
+        .sort((a, b) => (a.date < b.date ? -1 : 1))
+        .map((s) => (
+          <Card key={s.id} className="flex flex-col gap-2.5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="eyebrow">{formatDay(lang, s.date)}</div>
+                <h3 className="text-lg leading-tight">
+                  <bdi dir="auto">{sessionTitle(s, t)}</bdi>
+                </h3>
+              </div>
+              <CategoryTag category={s.category} />
+            </div>
+            <ul className="flex flex-col divide-y divide-line">
+              {(s.entries || []).map((e, i) => (
+                <li key={i} className="py-2 first:pt-0 last:pb-0">
+                  <div className="text-sm text-chalk">
+                    <bdi dir="auto">{entryName(e, exById, lang)}</bdi>
+                  </div>
+                  <div className="text-chalkdim text-sm num">
+                    {(e.sets || []).length === 0
+                      ? t('summary.docNoSetsLogged')
+                      : (e.sets || []).map((set, j) => (
+                          <React.Fragment key={j}>
+                            {j > 0 && ', '}
+                            <bdi dir="auto">{(isWarmup(set) ? `${t('sessionCard.warmupShort')} ` : '') + formatSet(e, set, t)}</bdi>
+                          </React.Fragment>
+                        ))}
+                  </div>
+                  {e.notes && (
+                    <div className="text-chalkdim text-xs italic mt-0.5">
+                      <bdi dir="auto">{e.notes}</bdi>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {s.notes && (
+              <p className="text-chalkdim text-xs border-t border-line pt-2">
+                {t('summary.docNotes')} <bdi dir="auto">{s.notes}</bdi>
+              </p>
+            )}
+          </Card>
+        ))}
+
+      {bodyWeights.length > 0 && (
+        <Card className="flex flex-col gap-2">
+          <h3 className="text-lg leading-tight">{t('summary.docBodyWeight')}</h3>
+          <ul className="flex flex-col divide-y divide-line">
+            {[...bodyWeights]
+              .sort((a, b) => (a.date < b.date ? -1 : 1))
+              .map((bw) => (
+                <li key={bw.id || bw.date} className="flex items-center justify-between gap-2 py-2 first:pt-0 last:pb-0">
+                  <span className="text-chalkdim text-sm">{formatDay(lang, bw.date)}</span>
+                  <span className="num text-chalk text-sm">
+                    <bdi dir="ltr">
+                      {bw.weight}
+                      {bw.unit || ''}
+                    </bdi>
+                  </span>
+                </li>
+              ))}
+          </ul>
+        </Card>
+      )}
+    </div>
+  )
 }
 
 export default function WeeklySummary() {
@@ -228,6 +352,7 @@ export default function WeeklySummary() {
   const [exercises, exercisesLoading] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const sessions = useMemo(() => applyCurrentTimed(rawSessions, exercises), [rawSessions, exercises])
   const [routines, routinesLoading] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
+  const exById = useMemo(() => exerciseMap(exercises), [exercises])
 
   const [mode, setMode] = useState('week')
   const [offset, setOffset] = useState(0)
@@ -263,9 +388,9 @@ export default function WeeklySummary() {
         personName: actingAs ? effectiveName : null,
         t,
         lang,
-        exById: exerciseMap(exercises),
+        exById,
       }),
-    [mode, start, end, periodSessions, periodBodyWeights, actingAs, effectiveName, t, lang, exercises],
+    [mode, start, end, periodSessions, periodBodyWeights, actingAs, effectiveName, t, lang, exById],
   )
 
   async function handleCopy() {
@@ -326,7 +451,7 @@ export default function WeeklySummary() {
               <button
                 key={m.id}
                 onClick={() => switchMode(m.id)}
-                className={`px-3 py-1.5 rounded transition-colors ${
+                className={`px-3 min-h-11 rounded transition-colors ${
                   mode === m.id ? 'bg-ink text-chalk' : 'text-chalkdim'
                 }`}
               >
@@ -364,7 +489,7 @@ export default function WeeklySummary() {
           >
             <BackChevron size={16} />
           </button>
-          <span className="num text-sm w-44 text-center">{formatRange(start, end, mode)}</span>
+          <span className="num text-sm w-44 text-center">{formatRange(lang, start, end, mode)}</span>
           <button
             onClick={() => setOffset((o) => Math.min(0, o + 1))}
             disabled={offset === 0}
@@ -386,9 +511,17 @@ export default function WeeklySummary() {
           body={t('summary.emptyBody')}
         />
       ) : (
-        <Card>
-          <pre className="whitespace-pre-wrap text-sm text-chalk font-mono leading-relaxed">{summaryText}</pre>
-        </Card>
+        <SummaryPreview
+          mode={mode}
+          start={start}
+          end={end}
+          sessions={periodSessions}
+          bodyWeights={periodBodyWeights}
+          personName={actingAs ? effectiveName : null}
+          t={t}
+          lang={lang}
+          exById={exById}
+        />
       )}
     </div>
   )

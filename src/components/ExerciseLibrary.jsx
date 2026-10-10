@@ -6,7 +6,7 @@ import { useFeedback } from '../context/FeedbackContext.jsx'
 import { normalizeVideoUrl } from '../lib/url.js'
 import ExerciseVideo from './ExerciseVideo.jsx'
 import { useCollection, addExercise, updateExercise, deleteExercise } from '../lib/db.js'
-import { Button, Card, CategoryTag, Badge, EmptyState, Field } from './ui.jsx'
+import { Button, Card, CategoryTag, Badge, EmptyState, LoadError, Field } from './ui.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
@@ -46,7 +46,8 @@ function formatLast(ex, t) {
 export default function ExerciseLibrary() {
   const { effectiveUid } = useAdmin()
   const { t, lang } = useLanguage()
-  const [exercises, loading, refresh] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
+  const [exercises, loading, refresh, loadError] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
+  const loadFailed = !!loadError && exercises.length === 0
   const [sessions] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [routines] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const { confirm, toast } = useFeedback()
@@ -122,7 +123,9 @@ export default function ExerciseLibrary() {
         />
       </div>
 
-      {!loading && filtered.length === 0 && (
+      {!loading && loadFailed && <LoadError onRetry={refresh} />}
+
+      {!loading && !loadFailed && filtered.length === 0 && (
         <EmptyState
           title={t('exercises.emptyTitle')}
           body={t('exercises.emptyBody')}
@@ -329,8 +332,8 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
   const locked = hasHistory && !!initial.id
 
   return (
-    <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="card p-6 w-full max-w-md max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }} onClick={onClose}>
+      <div className="card p-6 w-full max-w-md max-h-[85dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-2xl mb-4">{initial.id ? t('exercises.editExercise') : t('exercises.newExercise')}</h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <Field label={t('exercises.name')}>

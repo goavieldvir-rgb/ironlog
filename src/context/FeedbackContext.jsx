@@ -54,20 +54,21 @@ export function FeedbackProvider({ children }) {
       {children}
 
       {dialog && (
-        <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => close(false)}>
+        <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }} onClick={() => close(false)}>
           <div className="card p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()} role="alertdialog" aria-modal="true">
             <h2 className="text-xl mb-2">{dialog.title}</h2>
             {dialog.body && <p className="text-chalkdim text-sm mb-5 whitespace-pre-line">{dialog.body}</p>}
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => close(false)}
+                autoFocus={!!dialog.danger}
                 className="rounded-md px-3.5 py-2 min-h-[44px] text-sm font-medium border border-line text-chalk hover:bg-surface2"
               >
                 {dialog.cancelLabel || t('common.cancel')}
               </button>
               <button
                 onClick={() => close(true)}
-                autoFocus
+                autoFocus={!dialog.danger}
                 className={`rounded-md px-3.5 py-2 min-h-[44px] text-sm font-medium ${
                   dialog.danger ? 'bg-ironbtn text-chalk hover:bg-ironbtn/90' : 'bg-brass text-ink hover:bg-brass/90'
                 }`}

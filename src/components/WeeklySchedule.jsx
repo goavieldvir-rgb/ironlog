@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import { Play, Pencil, CalendarDays, Check } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
-import { useCollection, setScheduleDay } from '../lib/db.js'
+import { setScheduleDay } from '../lib/db.js'
 import { sessionTitle } from '../lib/names.js'
 import { Card, Button, Field } from './ui.jsx'
 import { toLocalISODate } from '../lib/dates.js'
@@ -17,11 +17,12 @@ const DAYS = [0, 1, 2, 3, 4, 5, 6]
 const SLOTS = [0, 1, 2]
 const SLOT_LABEL_KEYS = ['slotMobility', 'slotStrength', 'slotCardio']
 
-export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }) {
+// `schedule` is loaded by Dashboard (it also drives the "Start today's
+// workout" button), so both always agree and an edit here refreshes both.
+export default function WeeklySchedule({ effectiveUid, routines, routinesLoading = false, sessions = [], schedule, scheduleLoading = false, refreshSchedule }) {
   const { t } = useLanguage()
   const { toast, confirm } = useFeedback()
   const navigate = useNavigate()
-  const [schedule, , refreshSchedule] = useCollection(effectiveUid, 'weekly_schedule', 'day_of_week', 'asc')
 
   // One panel for a day, in one of two modes. Tapping a day always opens
   // it — nothing starts a workout on its own — and starting is an explicit
@@ -42,6 +43,12 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
   const [saving, setSaving] = useState(false)
 
   const today = new Date().getDay()
+  // Until the plan and routines arrive, every day would read "Rest day" and
+  // then flip — show a quiet placeholder instead. Only before the first load
+  // finishes: a later refresh (after Save) keeps showing the current plan.
+  const loadedFor = useRef(null)
+  if (!scheduleLoading && !routinesLoading) loadedFor.current = effectiveUid
+  const planLoading = loadedFor.current !== effectiveUid
 
   // The plan and the log stay separate — a plan isn't a claim about what
   // happened — but showing nothing at all meant a day you'd already
@@ -120,7 +127,7 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
       }
       setJustSaved((prev) => ({ ...prev, ...Object.fromEntries(dirtyDays.map((d) => [d, pending[d]])) }))
       setPending({})
-      refreshSchedule()
+      refreshSchedule?.()
       toast(t('feedback.saved'))
       setMode('view')
     } catch (err) {
@@ -184,9 +191,13 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
             </span>
             <span className="flex items-center gap-1.5 min-w-0 max-w-[60%]">
               {loggedOnDay(dow).length > 0 && <Check size={14} className="text-good shrink-0" />}
-              <span className={`text-sm truncate ${dr.length > 0 ? 'text-chalk' : 'text-chalkdim italic'}`}>
-                {dr.length > 0 ? dr.map((r) => r.name).join(' + ') : t('dashboard.restDay')}
-              </span>
+              {planLoading ? (
+                <span className="h-3 w-24 rounded bg-surface2 animate-pulse" aria-hidden="true" />
+              ) : (
+                <span className={`text-sm truncate ${dr.length > 0 ? 'text-chalk' : 'text-chalkdim italic'}`}>
+                  {dr.length > 0 ? dr.map((r) => r.name).join(' + ') : t('dashboard.restDay')}
+                </span>
+              )}
             </span>
           </button>
         )
@@ -195,8 +206,8 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
       {/* Rendered at the top level of the page so nothing it sits inside
           (a card, a pressed row) can shift or clip the panel. */}
       {openDay != null && createPortal(
-        <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-40 flex items-end sm:items-center justify-center p-4" onClick={backdropClose}>
-          <div className="card p-6 w-full max-w-sm max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-40 flex items-end sm:items-center justify-center p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }} onClick={backdropClose}>
+          <div className="card p-6 w-full max-w-sm max-h-[85dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-2 mb-4">
               <h2 className="text-xl inline-flex items-center gap-2">
                 {t(`dashboard.day${openDay}`)}
@@ -206,7 +217,7 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
                 <button
                   type="button"
                   onClick={() => setMode('edit')}
-                  className="text-chalkdim text-xs hover:text-brass inline-flex items-center gap-1 shrink-0"
+                  className="hit text-chalkdim text-xs hover:text-brass inline-flex items-center gap-1 shrink-0"
                 >
                   <Pencil size={12} /> {t('dashboard.editDay')}
                 </button>
@@ -295,13 +306,13 @@ export default function WeeklySchedule({ effectiveUid, routines, sessions = [] }
               <>
                 {/* Day switcher so the whole week can be set up without
                     closing and reopening seven times. */}
-                <div className="flex flex-wrap gap-1 mb-4">
+                <div className="grid grid-cols-7 gap-1 mb-4">
                   {DAYS.map((dow) => (
                     <button
                       key={dow}
                       type="button"
                       onClick={() => switchDay(dow)}
-                      className={`press px-2.5 py-1.5 rounded text-xs ${
+                      className={`press min-h-11 rounded text-xs ${
                         dow === openDay ? 'bg-brass text-ink' : 'bg-surface2 text-chalkdim hover:text-chalk'
                       }`}
                     >

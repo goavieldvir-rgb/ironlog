@@ -3,6 +3,7 @@ import { Share2, Trophy, Check, ImagePlus, Copy, Download } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { Button, Card } from './ui.jsx'
+import { dateLocale } from '../lib/dates.js'
 import { prepareCard, shareFile, loadPhoto, downloadFile, copyImage, canCopyImage, isIOS, shareFontsReady, shareFontsLoaded } from '../lib/shareCard.js'
 
 const iso = (s) => `⁦${s}⁩`
@@ -10,7 +11,7 @@ const iso = (s) => `⁦${s}⁩`
 function formatDate(date, lang) {
   if (!date) return ''
   const d = new Date(date + 'T00:00:00')
-  return d.toLocaleDateString(lang === 'he' ? 'he-IL' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })
+  return d.toLocaleDateString(dateLocale(lang), { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 // Shown right after a workout is saved: a recap only the trainee sees, and

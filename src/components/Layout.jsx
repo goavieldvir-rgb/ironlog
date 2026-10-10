@@ -53,7 +53,7 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-dvh flex flex-col">
       <header
         className="border-b border-line sticky top-0 z-20 bg-ink/95 backdrop-blur"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
@@ -85,7 +85,7 @@ export default function Layout() {
           <div className="hidden md:flex items-center gap-3">
             <button
               onClick={toggleLang}
-              className="flex rounded-md bg-surface2 p-0.5 text-xs num"
+              className="hit flex rounded-md bg-surface2 p-0.5 text-xs num"
               title={t('layout.language')} aria-label={t('layout.language')}
             >
               <span className={`px-2 py-1 rounded ${lang === 'en' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>EN</span>
@@ -101,7 +101,7 @@ export default function Layout() {
             <NavLink
               to="/help"
               className="text-chalkdim hover:text-brass transition-colors p-2 rounded-md hover:bg-surface2"
-              title={t('layout.howItWorks')}
+              title={t('layout.howItWorks')} aria-label={t('layout.howItWorks')}
             >
               <HelpCircle size={18} />
             </NavLink>
@@ -137,7 +137,7 @@ export default function Layout() {
               </span>
               <button
                 onClick={() => setActingAs(null)}
-                className="shrink-0 rounded-md bg-brass text-ink font-medium px-3 py-1.5 text-xs hover:bg-brass/90"
+                className="shrink-0 rounded-md bg-brass text-ink font-medium px-3 min-h-11 text-xs hover:bg-brass/90"
               >
                 {t('layout.backToMyAccount')}
               </button>
@@ -221,7 +221,7 @@ export default function Layout() {
               </NavLink>
               <button
                 onClick={toggleLang}
-                className="flex items-center justify-between gap-2 px-2 py-2.5 rounded-md text-sm text-chalkdim whitespace-nowrap"
+                className="flex items-center justify-between gap-2 px-2 min-h-11 rounded-md text-sm text-chalkdim whitespace-nowrap"
               >
                 <span>{t('layout.language')}</span>
                 <span className="flex rounded-md bg-surface2 p-0.5 text-xs num">
@@ -237,7 +237,7 @@ export default function Layout() {
           document.body,
         )}
 
-      <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-6">
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 pt-6" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)' }}>
         <Outlet />
       </main>
     </div>

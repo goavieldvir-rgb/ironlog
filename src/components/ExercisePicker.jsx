@@ -4,13 +4,14 @@ import { useGlobalExercises } from '../lib/db.js'
 import { disambiguateLabels } from '../lib/disambiguate.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
-import { Button, CategoryTag, Badge } from './ui.jsx'
+import { Button, CategoryTag, Badge, LoadError } from './ui.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 
 export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, onClose, lockCategory }) {
   const { t, lang } = useLanguage()
   const { toast } = useFeedback()
-  const [globalExercises, loading] = useGlobalExercises()
+  const [globalExercises, loading, refreshGlobal, loadError] = useGlobalExercises()
+  const loadFailed = !!loadError && globalExercises.length === 0
   useScrollLock(true)
   const [q, setQ] = useState('')
   const [tab, setTab] = useState(lockCategory || 'all')
@@ -67,8 +68,8 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
   ]
 
   return (
-    <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="card p-6 w-full max-w-lg max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }} onClick={onClose}>
+      <div className="card p-6 w-full max-w-lg max-h-[85dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-2xl mb-1">{t('exercises.pickerTitle')}</h2>
         <p className="text-chalkdim text-sm mb-4">
           {lockCategory ? t('exercises.pickerLockedSubtitle')(categoryLabels[lockCategory]) : t('exercises.pickerSubtitle')}
@@ -103,7 +104,8 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
 
         <div className="flex-1 overflow-y-auto -mx-2 px-2 flex flex-col gap-1 min-h-[200px]">
           {loading && <p className="text-chalkdim text-sm py-4">{t('common.loading')}</p>}
-          {!loading && filtered.length === 0 && <p className="text-chalkdim text-sm py-4">{t('exercises.noMatches')}</p>}
+          {!loading && loadFailed && <LoadError onRetry={refreshGlobal} />}
+          {!loading && !loadFailed && filtered.length === 0 && <p className="text-chalkdim text-sm py-4">{t('exercises.noMatches')}</p>}
           {filtered.map((g, i) => {
             const already = existingLower.has(displayName(g).toLowerCase()) || existingLower.has(g.name.toLowerCase()) || addedIds.has(g.id)
             return (

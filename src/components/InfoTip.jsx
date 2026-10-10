@@ -36,6 +36,7 @@ export function InfoTip({ text }) {
         createPortal(
           <div
             className="fixed inset-0 z-50 bg-ink/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
+            style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}
             onClick={(e) => {
               e.stopPropagation()
               setOpen(false)

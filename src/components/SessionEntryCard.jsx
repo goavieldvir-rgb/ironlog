@@ -1,10 +1,11 @@
 import ExerciseVideo from './ExerciseVideo.jsx'
 import React, { useEffect, useRef, useState } from 'react'
-import { X, Plus, Trash2, Minus, CornerDownLeft, History, StickyNote, Repeat, ArrowUp, ArrowDown, Trophy } from 'lucide-react'
+import { X, Plus, Trash2, Minus, CornerDownLeft, History, StickyNote, Repeat, ArrowUp, ArrowDown, Trophy, Link2 } from 'lucide-react'
 import { Card, Badge } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import OverflowMenu from './OverflowMenu.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { fmtDate } from '../lib/dates.js'
 import { isWarmup, workingSets, suggestWarmups } from '../lib/warmup.js'
 import { formatSeconds } from '../lib/timed.js'
 import { entryPrKind } from '../lib/records.js'
@@ -122,6 +123,8 @@ export default function SessionEntryCard({
   onMoveUp,
   onMoveDown,
   removable = false,
+  // 'start' | 'mid' | 'end' when this card is part of a superset chain.
+  supersetPos = null,
 }) {
   const { t, lang } = useLanguage()
   // Follow the current language (switching mid-workout updates the name).
@@ -312,8 +315,23 @@ export default function SessionEntryCard({
     return `${t('sessionCard.previously')} ${lastWeight}${entry.unit} × ${lastReps}`
   })()
 
+  // Coach-set target for this exercise, e.g. "3×10 · RIR 2". Absent for
+  // freestyle exercises and routines written before targets were shown.
+  const targetLabel = (() => {
+    if (isCardio || !entry.targetSets) return null
+    const reps = entry.targetReps !== '' && entry.targetReps != null ? `×${entry.targetReps}${isTimed ? 's' : ''}` : ''
+    const rir = entry.targetRir != null ? ` · RIR ${entry.targetRir}` : ''
+    return { head: t('workout.targetLine'), body: `${entry.targetSets}${reps}${rir}` }
+  })()
+
+  // Supersets get a brass edge down the start side, with a short connector
+  // bridging the gap to the next card in the chain.
+  const linkNext = supersetPos === 'start' || supersetPos === 'mid'
+  const supersetClass = supersetPos ? 'relative border-s-[3px] border-s-brass' : ''
+
   return (
-    <Card className="flex flex-col gap-2.5 !p-3 min-[560px]:!p-4">
+    <Card className={`flex flex-col gap-2.5 !p-3 min-[560px]:!p-4 ${supersetClass}`}>
+      {linkNext && <span className="absolute -start-[3px] top-full w-[3px] h-5 bg-brass" aria-hidden="true" />}
       <div className="flex items-start justify-between gap-2 -mt-1 -me-2">
         <div className="min-w-0 flex-1 pt-1">
           <div className="flex items-center gap-2 flex-wrap">
@@ -339,6 +357,13 @@ export default function SessionEntryCard({
                 </bdi>
               </span>
             )}
+            {supersetPos && (
+              <Badge tone="brass">
+                <span className="inline-flex items-center gap-1">
+                  <Link2 size={11} /> {t('workout.supersetLabel')}
+                </span>
+              </Badge>
+            )}
             {isCardio && <Badge tone="cardio">{t('sessionCard.cardioBadge')}</Badge>}
             {isTimed && <Badge tone="brass">{t('exercises.timedBadge')}</Badge>}
             {!isCardio && !isTimed && entry.bodyweight && <Badge tone="brass">{t('sessionCard.bodyweightBadge')}</Badge>}
@@ -353,6 +378,19 @@ export default function SessionEntryCard({
               className="text-xs"
             />
           </div>
+          {/* The coach's cue for this exercise, set in the routine. Boxed with
+              a "Coach:" label so it can't be mistaken for the trainee's own
+              saved note below it (plain brass text with a sticky-note icon). */}
+          {entry.coachNote && (
+            <p className="mt-1.5 rounded-md bg-brasssoft border-s-2 border-brass ps-2.5 pe-2 py-1.5 text-sm text-chalk">
+              <span className="font-medium text-brass">{t('workout.coachLabel')}</span> {entry.coachNote}
+            </p>
+          )}
+          {targetLabel && (
+            <p className="num text-chalk text-sm mt-1">
+              {targetLabel.head} <bdi dir="ltr">{targetLabel.body}</bdi>
+            </p>
+          )}
           {prevLabel && (
             <p className="num text-chalkdim text-sm mt-0.5 inline-flex items-center gap-1 flex-wrap">
               {prevLabel}
@@ -368,7 +406,7 @@ export default function SessionEntryCard({
               <span>
                 {liveExercise.last_note_date && (
                   <span className="text-chalkdim">
-                    {new Date(liveExercise.last_note_date + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                    {fmtDate(lang, new Date(liveExercise.last_note_date + 'T00:00:00'), { day: 'numeric', month: 'short' })}
                     {': '}
                   </span>
                 )}

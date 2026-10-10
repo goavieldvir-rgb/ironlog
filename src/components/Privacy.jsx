@@ -62,7 +62,7 @@ export default function Privacy({ standalone = false }) {
   if (!standalone) return page
 
   return (
-    <div className="min-h-screen bg-ink px-4 py-8 flex justify-center">
+    <div className="min-h-dvh bg-ink px-4 pb-8 flex justify-center" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2rem)' }}>
       <div className="w-full max-w-2xl flex flex-col gap-4">
         <Link to="/" className="text-chalkdim text-xs hover:text-chalk w-fit">
           {t('privacy.back')}

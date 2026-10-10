@@ -51,7 +51,7 @@ class ErrorBoundaryInner extends React.Component {
     if (this.state.hasError) {
       const { t } = this.props
       return (
-        <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="min-h-dvh flex items-center justify-center px-4" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
           <div className="max-w-sm text-center flex flex-col gap-4">
             <div className="eyebrow">Ironlog</div>
             <h1 className="text-3xl">{t('errorBoundary.title')}</h1>

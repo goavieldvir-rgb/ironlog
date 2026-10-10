@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext.jsx'
+import { useLanguage } from './context/LanguageContext.jsx'
 import { supabase } from './supabase.js'
 import Login from './components/Login.jsx'
 import Layout from './components/Layout.jsx'
@@ -26,10 +27,11 @@ import Privacy from './components/Privacy.jsx'
 
 export default function App() {
   const { user, loading } = useAuth()
+  const { t } = useLanguage()
   const navigate = useNavigate()
   const location = useLocation()
   const [pendingReset, setPendingReset] = useState(false)
-  const [resetLinkError, setResetLinkError] = useState('')
+  const [resetLinkError, setResetLinkError] = useState(false)
 
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get('code')
@@ -37,7 +39,7 @@ export default function App() {
     window.history.replaceState({}, '', window.location.pathname + window.location.hash)
     supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
       if (!error) setPendingReset(true)
-      else setResetLinkError("That reset link is invalid or has expired — request a new one below.")
+      else setResetLinkError(true)
     })
   }, [])
 
@@ -51,8 +53,8 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="eyebrow animate-pulse">Loading…</p>
+      <div className="min-h-dvh flex items-center justify-center" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <p className="eyebrow animate-pulse">{t('common.loading')}</p>
       </div>
     )
   }
@@ -60,7 +62,7 @@ export default function App() {
   // The privacy notice has to be readable before anyone signs in.
   if (!user && location.pathname === '/privacy') return <Privacy standalone />
 
-  if (!user) return <Login resetLinkError={resetLinkError} />
+  if (!user) return <Login resetLinkError={resetLinkError ? t('login.resetLinkInvalid') : ''} />
 
   // Setting a new password has to stay reachable — someone arriving from a
   // reset link shouldn't be asked to accept terms before they can even get

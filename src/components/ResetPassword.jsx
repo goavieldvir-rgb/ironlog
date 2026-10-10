@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { friendlyAuthError } from '../lib/authErrors.js'
 import { Button, Card, Field } from './ui.jsx'
 
 export default function ResetPassword() {
@@ -30,7 +31,7 @@ export default function ResetPassword() {
       if (error) throw error
       setDone(true)
     } catch (err) {
-      setError(err.message || t('resetPassword.genericError'))
+      setError(friendlyAuthError(err, t, 'resetPassword.genericError'))
     } finally {
       setSaving(false)
     }

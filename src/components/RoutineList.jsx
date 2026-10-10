@@ -7,7 +7,7 @@ import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, deleteRoutine, addRoutine, copyRoutineToUser } from '../lib/db.js'
 import { clearDraft } from '../lib/draft.js'
 import { supabase } from '../supabase.js'
-import { Button, Card, CategoryTag, EmptyState } from './ui.jsx'
+import { Button, Card, CategoryTag, EmptyState, LoadError } from './ui.jsx'
 import { Tabs } from './ExerciseLibrary.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
@@ -16,7 +16,8 @@ export default function RoutineList() {
   const { effectiveUid, isAdmin } = useAdmin()
   const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
-  const [routines, loading, refresh] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
+  const [routines, loading, refresh, loadError] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
+  const loadFailed = !!loadError && routines.length === 0
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [tab, setTab] = useState('all')
   const [copyTarget, setCopyTarget] = useState(null)
@@ -65,7 +66,9 @@ export default function RoutineList() {
 
       <Tabs tab={tab} setTab={setTab} />
 
-      {!loading && filtered.length === 0 && (
+      {!loading && loadFailed && <LoadError onRetry={refresh} />}
+
+      {!loading && !loadFailed && filtered.length === 0 && (
         <EmptyState
           title={t('routines.emptyTitle')}
           body={t('routines.emptyBody')}
@@ -140,7 +143,7 @@ export default function RoutineList() {
                   <span className="num shrink-0">
                     {r.category === 'cardio'
                       ? `${e.targetSets ?? e.targetDuration ?? ''}${e.targetSets != null ? ' min' : ''}`
-                      : `${e.targetSets}×${e.targetReps}${e.timed ? 's' : ''}`}
+                      : `${e.targetSets}${e.targetReps !== '' && e.targetReps != null ? `×${e.targetReps}${e.timed ? 's' : ''}` : ''}${e.targetRir != null ? ` · RIR ${e.targetRir}` : ''}`}
                   </span>
                 </li>
               ))}
@@ -196,7 +199,7 @@ function CopyToPersonModal({ routine, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }} onClick={onClose}>
       <div className="card p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-xl mb-1">{t('routines.copyModalTitle')(routine.name)}</h2>
         <p className="text-chalkdim text-sm mb-4">{t('routines.copyModalSubtitle')}</p>

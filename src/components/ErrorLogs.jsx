@@ -6,9 +6,10 @@ import { supabase } from '../supabase.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { Card, EmptyState, Button } from './ui.jsx'
+import { dateLocale } from '../lib/dates.js'
 
-function formatDate(iso) {
-  return new Date(iso).toLocaleString(undefined, {
+function formatDate(lang, iso) {
+  return new Date(iso).toLocaleString(dateLocale(lang), {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -17,7 +18,7 @@ function formatDate(iso) {
 }
 
 export default function ErrorLogs() {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const { confirm } = useFeedback()
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
@@ -79,7 +80,7 @@ export default function ErrorLogs() {
                 <AlertTriangle size={16} className="text-irontext shrink-0 mt-0.5" />
                 <div className="min-w-0">
                   <p className="truncate">{log.message}</p>
-                  <p className="text-chalkdim text-xs mt-0.5">{formatDate(log.created_at)}</p>
+                  <p className="text-chalkdim text-xs mt-0.5">{formatDate(lang, log.created_at)}</p>
                 </div>
               </div>
             </button>
