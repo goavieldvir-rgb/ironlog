@@ -4,6 +4,7 @@ import { BackChevron, ForwardChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useCollection } from '../lib/db.js'
+import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
 import { toLocalISODate } from '../lib/dates.js'
 import { Button, Card, EmptyState, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
@@ -136,7 +137,7 @@ function computeRange(mode, offset, customStart, customEnd) {
   return { start, end }
 }
 
-function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t }) {
+function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t, lang, exById }) {
   const lines = []
   const modeLabel = {
     week: t('summary.docWeekly'),
@@ -197,10 +198,10 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t }
   }
 
   for (const s of [...sessions].sort((a, b) => (a.date < b.date ? -1 : 1))) {
-    lines.push(`## ${formatDay(s.date)} — ${s.routine_name} (${s.category})`)
+    lines.push(`## ${formatDay(s.date)} — ${sessionTitle(s, t)} (${s.category})`)
     for (const e of s.entries || []) {
       const setsStr = (e.sets || []).map((set) => (isWarmup(set) ? `${t('sessionCard.warmupShort')} ` : '') + formatSet(e, set, t)).join(', ')
-      lines.push(`- ${e.name}: ${setsStr || t('summary.docNoSetsLogged')}`)
+      lines.push(`- ${entryName(e, exById, lang)}: ${setsStr || t('summary.docNoSetsLogged')}`)
       if (e.notes) lines.push(`  (${e.notes})`)
     }
     if (s.notes) lines.push(`  ${t('summary.docNotes')} ${s.notes}`)
@@ -220,7 +221,7 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t }
 
 export default function WeeklySummary() {
   const { effectiveUid, effectiveName, actingAs } = useAdmin()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const MODES = getModes(t)
   const [rawSessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [bodyWeightAll] = useCollection(effectiveUid, 'body_weight_logs', 'date', 'desc')
@@ -261,8 +262,10 @@ export default function WeeklySummary() {
         bodyWeights: periodBodyWeights,
         personName: actingAs ? effectiveName : null,
         t,
+        lang,
+        exById: exerciseMap(exercises),
       }),
-    [mode, start, end, periodSessions, periodBodyWeights, actingAs, effectiveName, t],
+    [mode, start, end, periodSessions, periodBodyWeights, actingAs, effectiveName, t, lang, exercises],
   )
 
   async function handleCopy() {

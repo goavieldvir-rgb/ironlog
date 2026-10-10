@@ -7,6 +7,7 @@ import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection } from '../lib/db.js'
+import { isFreestyleSession } from '../lib/names.js'
 import { listDrafts, clearDraft } from '../lib/draft.js'
 import { Card } from './ui.jsx'
 import WeeklySchedule from './WeeklySchedule.jsx'
@@ -112,7 +113,7 @@ export default function Dashboard() {
                 {t('dashboard.inProgress')}
                 <InfoTip text={t('dashboard.inProgressTip')} />
               </div>
-              <p className="text-lg leading-tight">{draft.routineName}</p>
+              <p className="text-lg leading-tight">{isFreestyleSession(draft) ? t('workout.freestyleSession') : draft.routineName}</p>
               <p className="text-chalkdim text-xs mt-0.5">
                 {timeAgo(draft.savedAt, t)} · {draft.entries?.length || 0} {t('dashboard.exerciseLoggedSoFar')}
               </p>

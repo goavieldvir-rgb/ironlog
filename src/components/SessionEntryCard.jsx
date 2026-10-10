@@ -122,7 +122,9 @@ export default function SessionEntryCard({
   onMoveDown,
   removable = false,
 }) {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
+  // Follow the current language (switching mid-workout updates the name).
+  const displayName = (lang === 'he' && liveExercise?.name_he) || liveExercise?.name || entry.name
   const [showNote, setShowNote] = useState(!!entry.notes)
   const [showQuickFill, setShowQuickFill] = useState(false)
   // Index of the set that numbers were just filled into, so it can flash.
@@ -314,7 +316,7 @@ export default function SessionEntryCard({
       <div className="flex items-start justify-between gap-2 -mt-1 -me-2">
         <div className="min-w-0 flex-1 pt-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-lg">{entry.name}</h2>
+            <h2 className="text-lg">{displayName}</h2>
             {weightPr != null && (
               <span
                 className="pr-pop inline-flex items-center gap-1 rounded-full bg-brasssoft text-brass px-2 py-0.5 text-xs font-medium"
@@ -344,7 +346,7 @@ export default function SessionEntryCard({
                 "Previously" and the last note were squeezed into a narrow
                 column, a word or two per line. */}
             <ExerciseVideo
-              name={entry.name}
+              name={displayName}
               matchNames={[liveExercise?.name, entry.nameEn]}
               videoUrl={entry.videoUrl}
               className="text-xs"

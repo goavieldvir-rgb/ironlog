@@ -14,7 +14,7 @@ import { useScrollLock } from '../lib/scrollLock.js'
 
 export default function RoutineList() {
   const { effectiveUid, isAdmin } = useAdmin()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
   const [routines, loading, refresh] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
@@ -22,8 +22,8 @@ export default function RoutineList() {
   const [copyTarget, setCopyTarget] = useState(null)
 
   const exerciseNameById = useMemo(
-    () => Object.fromEntries(exercises.map((e) => [e.id, e.name])),
-    [exercises],
+    () => Object.fromEntries(exercises.map((e) => [e.id, (lang === 'he' && e.name_he) || e.name])),
+    [exercises, lang],
   )
 
   const filtered = useMemo(

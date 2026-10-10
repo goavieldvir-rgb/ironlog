@@ -167,6 +167,7 @@ export default function WorkoutSession() {
               exerciseId: it.exerciseId,
               name: (lang === 'he' && full?.name_he) || full?.name || it.name,
               nameEn: full?.name || it.name,
+              nameHe: full?.name_he || null,
               unit: it.unit,
               category: 'cardio',
               intensityType: it.intensityType || full?.intensity_type || 'rpe',
@@ -189,6 +190,7 @@ export default function WorkoutSession() {
             exerciseId: it.exerciseId,
             name: (lang === 'he' && full?.name_he) || full?.name || it.name,
             nameEn: full?.name || it.name,
+            nameHe: full?.name_he || null,
             unit: it.unit,
             bodyweight: it.bodyweight ?? full?.bodyweight ?? false,
             timed: full?.timed ?? it.timed ?? false,
@@ -215,7 +217,9 @@ export default function WorkoutSession() {
     if (!ready || entries.length === 0) return
     saveDraft(effectiveUid, draftKey, {
       routineId: isFreestyle ? null : routine?.id || null,
-      routineName: isFreestyle ? t('workout.freestyleSession') : routine?.name,
+      // Canonical name; the UI shows the translated label at display time.
+      routineName: isFreestyle ? 'Freestyle' : routine?.name,
+      freestyle: isFreestyle || undefined,
       category,
       date,
       notes,
@@ -252,6 +256,7 @@ export default function WorkoutSession() {
         exerciseId: ex.id,
         name: (lang === 'he' && ex.name_he) || ex.name,
         nameEn: ex.name,
+        nameHe: ex.name_he || null,
         unit: ex.unit,
         category: 'cardio',
         intensityType: ex.intensity_type || 'rpe',
@@ -268,6 +273,7 @@ export default function WorkoutSession() {
       exerciseId: ex.id,
       name: (lang === 'he' && ex.name_he) || ex.name,
       nameEn: ex.name,
+      nameHe: ex.name_he || null,
       unit: ex.unit,
       bodyweight: !!ex.bodyweight,
       timed: !!ex.timed,
@@ -409,7 +415,7 @@ export default function WorkoutSession() {
       }
       await logSession(effectiveUid, {
         routineId: isFreestyle ? null : routine?.id,
-        routineName: isFreestyle ? t('workout.freestyleSession') : routine?.name,
+        routineName: isFreestyle ? 'Freestyle' : routine?.name,
         category,
         date,
         notes,
@@ -419,6 +425,7 @@ export default function WorkoutSession() {
           exerciseId: e.exerciseId,
           name: e.name,
           nameEn: e.nameEn,
+          nameHe: e.nameHe || null,
           unit: e.unit,
           category: e.category || 'strength',
           bodyweight: e.bodyweight,
