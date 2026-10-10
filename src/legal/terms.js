@@ -37,7 +37,7 @@ export const terms = {
         {
           heading: 'Who can see it',
           body:
-            'You and your coach. Your coach can open your account to build routines, review sessions and leave feedback, and is notified when you set a personal record or go a while without training. Other trainees cannot see your data. It is not sold, and it is not used for advertising.',
+            'You and your coach. Your coach can open your account to build routines, review sessions and leave feedback, and is automatically alerted by email and phone notification when you set a personal record or have not trained for a while. Those alerts include your name and the exercise or record. Other trainees cannot see your data. It is not sold, and it is not used for advertising.',
         },
         {
           heading: 'Where it is kept',
@@ -47,7 +47,7 @@ export const terms = {
         {
           heading: 'Your data is yours',
           body:
-            'From the Account page you can download everything you have logged at any time, and delete your account and all its data permanently. You can also ask your coach to do either for you.',
+            'From the Account page you can download everything you have logged at any time, and delete your account. Deleting it permanently removes your data, including the record that you accepted these terms; error reports are kept without your name for up to 90 days. Backups are cleared by the host on its normal cycle. You can also ask your coach to do either for you.',
         },
         {
           heading: 'Keeping it honest',
@@ -94,12 +94,12 @@ export const terms = {
         {
           heading: 'What the app stores and who sees it',
           body:
-            'The workouts you log, your exercises and routines, your notes, and your body weight if you record it, along with your name and email. This includes health and fitness information. By accepting, you and your parent or guardian explicitly agree to it being processed for your training as described in the Privacy notice. It is kept on Supabase servers in Japan, and the Privacy notice lists every service involved. You and your coach can see it. Your parent or guardian may ask the coach to see it or to have it deleted at any time. Other trainees cannot see it. It is not sold or used for advertising.',
+            'The workouts you log, your exercises and routines, your notes, and your body weight if you record it, along with your name and email. This includes health and fitness information. By accepting, you and your parent or guardian explicitly agree to it being processed for your training as described in the Privacy notice. It is kept on Supabase servers in Japan, and the Privacy notice lists every service involved. You and your coach can see it, and your coach is automatically alerted by email and phone notification, including your name and the exercise or record, when you set a personal record or have not trained for a while. Your parent or guardian may ask the coach to see it or to have it deleted at any time. Other trainees cannot see it. It is not sold or used for advertising.',
         },
         {
           heading: 'Your data is yours',
           body:
-            'From the Account page you can download everything you have logged, or delete your account and all of its data permanently. Your parent or guardian can ask the coach to do this for you.',
+            'From the Account page you can download everything you have logged, or delete your account. Deleting it permanently removes your data, including the record that you accepted these terms; error reports are kept without your name for up to 90 days. Backups are cleared by the host on its normal cycle. Your parent or guardian can ask the coach to do this for you.',
         },
         {
           heading: 'Limits of responsibility',
@@ -130,12 +130,12 @@ export const terms = {
         {
           heading: 'באימון יש סיכון',
           body:
-            'הרמת משקולות ואימון גופני כרוכים בסיכון לפציעה. ההשתתפות היא על אחריותכם, ואתם אחראים להתאמן בהתאם ליכולת שלכם, להשתמש בציוד כראוי ולעצור כשמשהו כואב. אם יש לכם פציעה, מצב רפואי, אם אתן בהיריון, או אם לא התאמנתם תקופה ארוכה — היוועצו ברופא לפני שמתחילים.',
+            'הרמת משקולות ואימון גופני כרוכים בסיכון לפציעה. ההשתתפות היא על אחריותכם, ואתם אחראים להתאמן בהתאם ליכולת שלכם, להשתמש בציוד כראוי ולעצור כשמשהו כואב. אם יש לכם פציעה או מצב רפואי, אם אתם בהריון, או אם לא התאמנתם תקופה ארוכה, היוועצו ברופא לפני שמתחילים.',
         },
         {
           heading: 'זה אימון, לא ייעוץ רפואי',
           body:
-            'המאמן בונה ובוחן את התוכנית שלכם. שום דבר כאן אינו ייעוץ רפואי, אבחון או טיפול, והוא אינו מחליף רופא או פיזיותרפיסט. ספרו למאמן על פציעות, כאבים או מצבים רפואיים שמשפיעים על האימון, ופעלו לפי הנחיות רפואיות לפני כל דבר באפליקציה.',
+            'המאמן בונה ובוחן את התוכנית שלכם. שום דבר כאן אינו ייעוץ רפואי, אבחון או טיפול, והוא אינו מחליף רופא או פיזיותרפיסט. ספרו למאמן על פציעות, כאבים או מצבים רפואיים שמשפיעים על האימון, ובכל מקרה של סתירה פעלו לפי ההנחיות הרפואיות ולא לפי האפליקציה.',
         },
         {
           heading: 'מה נשמר באפליקציה',
@@ -145,7 +145,7 @@ export const terms = {
         {
           heading: 'מי יכול לראות',
           body:
-            'אתם והמאמן. המאמן יכול להיכנס לחשבון שלכם כדי לבנות תוכניות, לעבור על אימונים ולהשאיר משוב, ומקבל התראה כששברתם שיא אישי או כשלא התאמנתם זמן מה. מתאמנים אחרים לא רואים את הנתונים שלכם. הנתונים לא נמכרים ולא משמשים לפרסום.',
+            'אתם והמאמן. המאמן יכול להיכנס לחשבון שלכם כדי לבנות תוכניות, לעבור על אימונים ולהשאיר משוב, והוא מקבל התראה אוטומטית באימייל ובהודעה לטלפון כשקבעתם שיא אישי או כשלא התאמנתם זמן מה. ההתראות כוללות את שמכם ואת התרגיל או השיא. מתאמנים אחרים אינם רואים את הנתונים שלכם. הנתונים לא נמכרים ולא משמשים לפרסום.',
         },
         {
           heading: 'איפה זה נשמר',
@@ -154,12 +154,12 @@ export const terms = {
         {
           heading: 'הנתונים שלכם הם שלכם',
           body:
-            'בעמוד החשבון אפשר להוריד בכל רגע את כל מה שתיעדתם, ולמחוק את החשבון ואת כל הנתונים לצמיתות. אפשר גם לבקש מהמאמן לעשות זאת עבורכם.',
+            'בעמוד החשבון אפשר להוריד בכל רגע את כל מה שתיעדתם, ולמחוק את החשבון. המחיקה מסירה לצמיתות את הנתונים שלכם, כולל הרישום על כך שאישרתם את התנאים; דוחות שגיאה נשמרים בלי שמכם עד 90 יום. הגיבויים מתנקים אצל המארח במחזור הרגיל שלו. אפשר גם לבקש מהמאמן לעשות זאת עבורכם.',
         },
         {
-          heading: 'שימוש הוגן',
+          heading: 'שמירה על אמינות',
           body:
-            'השתמשו באפליקציה לאימונים שלכם. אל תשתפו את פרטי ההתחברות. אם משהו נראה לא נכון בנתונים, ספרו למאמן.',
+            'השתמשו באפליקציה לאימונים שלכם בלבד ואל תשתפו את פרטי ההתחברות. אם משהו בנתונים נראה לא נכון, ספרו למאמן.',
         },
         {
           heading: 'הגבלת אחריות',
@@ -169,7 +169,7 @@ export const terms = {
         {
           heading: 'שינויים וסיום',
           body:
-            'המאמן רשאי לעדכן את התנאים האלה, ויבקש מכם לאשר שוב כשיעשה זאת. כל צד יכול להפסיק בכל עת, ואפשר למחוק את החשבון מתי שרוצים.',
+            'המאמן רשאי לעדכן את התנאים, ובמקרה כזה תתבקשו לאשר אותם שוב. כל צד רשאי להפסיק בכל עת, ואפשר למחוק את החשבון בכל עת.',
         },
         {
           heading: 'הדין החל',
@@ -185,12 +185,12 @@ export const terms = {
         {
           heading: 'צריך אישור של הורה או אפוטרופוס',
           body:
-            'מכיוון שאתם מתחת לגיל 18, הורה או אפוטרופוס צריך להסכים לכך שתתאמנו עם המאמן ושנתוני האימון יישמרו כאן. מלאו למטה את שמו ואיך אפשר ליצור איתו קשר. המאמן ייצור איתו קשר לאישור לפני שתתחילו או זמן קצר אחרי.',
+            'מכיוון שאתם מתחת לגיל 18, נדרשת הסכמה של הורה או אפוטרופוס לכך שתתאמנו עם המאמן ושנתוני האימון יישמרו כאן. מלאו למטה את שם ההורה או האפוטרופוס ואת דרך יצירת הקשר איתם. המאמן ייצור איתם קשר לאישור לפני שתתחילו או זמן קצר אחרי.',
         },
         {
           heading: 'באימון יש סיכון',
           body:
-            'הרמת משקולות ואימון גופני כרוכים בסיכון לפציעה. התאמנו בהתאם ליכולת שלכם, השתמשו בציוד כפי שהודרכתם, ועצרו אם משהו כואב. אם יש פציעה או מצב רפואי, רופא צריך לאשר לפני שמתחילים.',
+            'הרמת משקולות ואימון גופני כרוכים בסיכון לפציעה. התאמנו בהתאם ליכולת שלכם, השתמשו בציוד כפי שהודרכתם, ועצרו אם משהו כואב. אם יש פציעה או מצב רפואי, יש לקבל אישור מרופא לפני שמתחילים.',
         },
         {
           heading: 'זה אימון, לא ייעוץ רפואי',
@@ -200,12 +200,12 @@ export const terms = {
         {
           heading: 'מה נשמר ומי רואה',
           body:
-            'האימונים שתיעדתם, התרגילים והתוכניות, ההערות, ומשקל הגוף אם תיעדתם אותו, יחד עם השם והאימייל. זה כולל מידע על בריאות וכושר. באישור אתם וההורה או האפוטרופוס מסכימים במפורש לעיבוד שלו לצורך האימון שלכם, כמתואר בהודעת הפרטיות. הנתונים נשמרים בשרתי Supabase ביפן, והודעת הפרטיות מפרטת את כל השירותים המעורבים. אתם והמאמן רואים את זה. ההורה או האפוטרופוס רשאי לבקש מהמאמן לראות את הנתונים או למחוק אותם בכל עת. מתאמנים אחרים לא רואים. הנתונים לא נמכרים ולא משמשים לפרסום.',
+            'האימונים שתיעדתם, התרגילים והתוכניות, ההערות, ומשקל הגוף אם תיעדתם אותו, יחד עם השם והאימייל. זה כולל מידע על בריאות וכושר. באישור אתם וההורה או האפוטרופוס מסכימים במפורש לעיבוד שלו לצורך האימון שלכם, כמתואר בהודעת הפרטיות. הנתונים נשמרים בשרתי Supabase ביפן, והודעת הפרטיות מפרטת את כל השירותים המעורבים. אתם והמאמן רואים אותם, והמאמן מקבל התראה אוטומטית באימייל ובהודעה לטלפון, הכוללת את שמכם ואת התרגיל או השיא, כשקבעתם שיא אישי או כשלא התאמנתם זמן מה. הורה או אפוטרופוס רשאים לבקש מהמאמן לראות את הנתונים או למחוק אותם בכל עת. מתאמנים אחרים אינם רואים אותם. הנתונים לא נמכרים ולא משמשים לפרסום.',
         },
         {
           heading: 'הנתונים שלכם הם שלכם',
           body:
-            'בעמוד החשבון אפשר להוריד את כל מה שתיעדתם, או למחוק את החשבון ואת כל הנתונים לצמיתות. ההורה או האפוטרופוס יכול לבקש מהמאמן לעשות זאת עבורכם.',
+            'בעמוד החשבון אפשר להוריד את כל מה שתיעדתם, או למחוק את החשבון. המחיקה מסירה לצמיתות את הנתונים שלכם, כולל הרישום על כך שאישרתם את התנאים; דוחות שגיאה נשמרים בלי שמכם עד 90 יום. הגיבויים מתנקים אצל המארח במחזור הרגיל שלו. הורה או אפוטרופוס יכולים לבקש מהמאמן לעשות זאת עבורכם.',
         },
         {
           heading: 'הגבלת אחריות',
@@ -215,7 +215,7 @@ export const terms = {
         {
           heading: 'שינויים וסיום',
           body:
-            'המאמן רשאי לעדכן את התנאים האלה, ויבקש מכם ומההורה או האפוטרופוס לאשר שוב כשיעשה זאת. כל צד יכול להפסיק בכל עת, ואפשר למחוק את החשבון מתי שרוצים.',
+            'המאמן רשאי לעדכן את התנאים, ובמקרה כזה תתבקשו אתם וההורה או האפוטרופוס לאשר אותם שוב. כל צד רשאי להפסיק בכל עת, ואפשר למחוק את החשבון בכל עת.',
         },
         {
           heading: 'הדין החל',
@@ -224,7 +224,7 @@ export const terms = {
       ],
       accept: 'הורה או אפוטרופוס קרא/ה את זה ומסכים/ה',
       guardianName: 'שם ההורה או האפוטרופוס',
-      guardianContact: 'טלפון או אימייל שלו/ה',
+      guardianContact: 'טלפון או אימייל ליצירת קשר',
     },
   },
 }

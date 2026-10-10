@@ -40,12 +40,12 @@ export const privacy = {
       {
         heading: 'Who can see it',
         body:
-          'You and your coach. Other trainees cannot see it. It is not sold, not used for advertising, and there is no analytics or tracking in the app.',
+          'You and your coach. Your coach is automatically alerted by email and phone notification when you set a personal record or haven\'t trained for a while, and those alerts include your name and the exercise or record. Other trainees cannot see it. It is not sold, not used for advertising, and there is no analytics or tracking in the app.',
       },
       {
         heading: 'Services the app relies on',
         body:
-          'Supabase stores the database and handles sign-in. Its servers are in Japan (the Tokyo region).\n\nGitHub Pages hosts the app files. Like any website, it sees your IP address when you open the app.\n\nGoogle Fonts supplies the fonts. They load from Google, which sees your IP address.\n\nYouTube shows the exercise demo videos through the YouTube player. The player loads from YouTube only when you open a video. YouTube\'s Terms of Service (https://www.youtube.com/t/terms) and Google\'s Privacy Policy (https://policies.google.com/privacy) apply to it.\n\nThe push services of your phone or browser maker (Apple, Google, Mozilla, Microsoft) deliver reminders. They only see the encrypted message.',
+          'Supabase stores the database and handles sign-in. Its servers are in Japan (the Tokyo region).\n\nGitHub Pages hosts the app files. Like any website, it sees your IP address when you open the app.\n\nGoogle Fonts supplies the fonts. They load from Google, which sees your IP address.\n\nYouTube shows the exercise demo videos through the YouTube player. The player loads from YouTube only when you open a video. YouTube\'s Terms of Service (https://www.youtube.com/t/terms) and Google\'s Privacy Policy (https://policies.google.com/privacy) apply to it.\n\nThe push services of your phone or browser maker (Apple, Google, Mozilla, Microsoft) deliver reminders. They only see the encrypted message.\n\nResend sends the coach email alerts (your name and the alert text).\n\nntfy.sh delivers alerts to the coach\'s phone (your name and the alert text).',
       },
       {
         heading: 'Storage on your device',
@@ -55,12 +55,12 @@ export const privacy = {
       {
         heading: 'How long it is kept',
         body:
-          'While your account exists. Error reports are deleted after 90 days. A record that you accepted the terms is kept as proof of consent. When data is deleted, the host removes it from backups within its normal cycle.',
+          'While your account exists. Deleting your account removes your data, including the record that you accepted the terms. Error reports are deleted after 90 days; if you delete your account sooner, they stay until then without your name. Backups are cleared by the host on its normal cycle.',
       },
       {
         heading: 'Your rights',
         body:
-          `You can see, download, correct and delete your information from the Account page, or by asking your coach at ${COACH_CONTACT}. You can turn reminders off at any time. You can complain to Israel's Privacy Protection Authority, and if you are in the EU, to your local data protection authority.`,
+          `You can download your information and delete your account from the Account page. To correct something, edit it in the app where it was logged, or ask your coach at ${COACH_CONTACT}. You can turn reminders off at any time. You can complain to Israel's Privacy Protection Authority, and if you are in the EU, to your local data protection authority.`,
       },
       {
         heading: 'Under 18',
@@ -94,12 +94,12 @@ export const privacy = {
       {
         heading: 'מי יכול לראות',
         body:
-          'אתם והמאמן. מתאמנים אחרים לא רואים. המידע לא נמכר, לא משמש לפרסום, ואין באפליקציה ניתוח נתונים או מעקב.',
+          'אתם והמאמן. המאמן מקבל התראה אוטומטית באימייל ובהודעה לטלפון כשקבעתם שיא אישי או כשלא התאמנתם זמן מה, וההתראות כוללות את שמכם ואת התרגיל או השיא. מתאמנים אחרים אינם רואים. המידע לא נמכר, לא משמש לפרסום, ואין באפליקציה ניתוח נתונים או מעקב.',
       },
       {
         heading: 'שירותים שהאפליקציה נשענת עליהם',
         body:
-          'Supabase מאחסן את מסד הנתונים ומטפל בכניסה לחשבון. השרתים שלו ביפן (אזור טוקיו).\n\nGitHub Pages מארח את קבצי האפליקציה. כמו בכל אתר, הוא רואה את כתובת ה-IP שלכם כשאתם פותחים את האפליקציה.\n\nGoogle Fonts מספק את הגופנים. הם נטענים מ-Google, שרואה את כתובת ה-IP שלכם.\n\nYouTube מציג את סרטוני ההדגמה של התרגילים דרך נגן YouTube. הנגן נטען מ-YouTube רק כשאתם פותחים סרטון. עליו חלים תנאי השימוש של YouTube (https://www.youtube.com/t/terms) ומדיניות הפרטיות של Google (https://policies.google.com/privacy).\n\nשירותי ההודעות של יצרן הטלפון או הדפדפן (Apple, Google, Mozilla, Microsoft) מעבירים את התזכורות. הם רואים רק הודעה מוצפנת.',
+          'Supabase מאחסן את מסד הנתונים ומטפל בכניסה לחשבון. השרתים שלו ביפן (אזור טוקיו).\n\nGitHub Pages מארח את קבצי האפליקציה. כמו בכל אתר, הוא רואה את כתובת ה-IP שלכם כשאתם פותחים את האפליקציה.\n\nGoogle Fonts מספק את הגופנים. הם נטענים מ-Google, שרואה את כתובת ה-IP שלכם.\n\nYouTube מציג את סרטוני ההדגמה של התרגילים דרך נגן YouTube. הנגן נטען מ-YouTube רק כשאתם פותחים סרטון. עליו חלים תנאי השימוש של YouTube (https://www.youtube.com/t/terms) ומדיניות הפרטיות של Google (https://policies.google.com/privacy).\n\nשירותי ההודעות של יצרן הטלפון או הדפדפן (Apple, Google, Mozilla, Microsoft) מעבירים את התזכורות. הם רואים רק הודעה מוצפנת.\n\nResend שולח למאמן התראות באימייל (שמכם וטקסט ההתראה).\n\nntfy.sh מעביר התראות לטלפון של המאמן (שמכם וטקסט ההתראה).',
       },
       {
         heading: 'אחסון במכשיר שלכם',
@@ -109,16 +109,16 @@ export const privacy = {
       {
         heading: 'כמה זמן זה נשמר',
         body:
-          'כל עוד החשבון קיים. דוחות שגיאה נמחקים אחרי 90 יום. הרישום על כך שאישרתם את התנאים נשמר כהוכחה להסכמה. כשמידע נמחק, המארח מסיר אותו מהגיבויים במחזור הרגיל שלו.',
+          'כל עוד החשבון קיים. מחיקת החשבון מסירה את הנתונים שלכם, כולל הרישום על כך שאישרתם את התנאים. דוחות שגיאה נמחקים אחרי 90 יום; אם תמחקו את החשבון לפני כן, הם יישארו עד אז בלי שמכם. הגיבויים מתנקים אצל המארח במחזור הרגיל שלו.',
       },
       {
         heading: 'הזכויות שלכם',
         body:
-          `אפשר לראות, להוריד, לתקן ולמחוק את המידע שלכם מעמוד החשבון, או לבקש זאת מהמאמן בכתובת ${COACH_CONTACT}. אפשר לכבות תזכורות בכל עת. אפשר להגיש תלונה לרשות להגנת הפרטיות בישראל, ומי שנמצא באיחוד האירופי יכול לפנות גם לרשות להגנת מידע המקומית שלו.`,
+          `אפשר להוריד את המידע שלכם ולמחוק את החשבון מעמוד החשבון. כדי לתקן משהו, ערכו אותו באפליקציה במקום שבו תועד, או פנו למאמן בכתובת ${COACH_CONTACT}. אפשר לכבות תזכורות בכל עת. אפשר להגיש תלונה לרשות להגנת הפרטיות בישראל, ומי שנמצא באיחוד האירופי יכול לפנות גם לרשות להגנת מידע המקומית שלו.`,
       },
       {
         heading: 'מתחת לגיל 18',
-        body: 'אם אתם מתחת לגיל 18, צריך הסכמה של הורה או אפוטרופוס לפני השימוש באפליקציה.',
+        body: 'אם אתם מתחת לגיל 18, נדרשת הסכמה של הורה או אפוטרופוס לפני השימוש באפליקציה.',
       },
       {
         heading: 'שינויים',

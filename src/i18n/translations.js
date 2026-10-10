@@ -149,6 +149,7 @@ export const translations = {
     privacy: {
       link: 'Privacy & terms',
       termsHeading: 'The terms you accepted',
+      minorTermsHeading: 'If you are under 18',
       back: 'Back',
     },
     consent: {
@@ -933,11 +934,12 @@ whoever set your account up for you.`,
     privacy: {
       link: 'פרטיות ותנאים',
       termsHeading: 'התנאים שאישרתם',
+      minorTermsHeading: 'למתאמנים מתחת לגיל 18',
       back: 'חזרה',
     },
     consent: {
       under18: 'אתם מתחת לגיל 18?',
-      guardianNote: 'המאמן ייצור איתו/ה קשר לאישור לפני שתתחילו להתאמן או זמן קצר אחרי.',
+      guardianNote: 'המאמן ייצור קשר עם ההורה או האפוטרופוס לאישור לפני שתתחילו להתאמן או זמן קצר אחרי.',
       scrollHint: 'גללו עד הסוף כדי להמשיך',
       saving: 'שומר…',
       recordNote: 'האישור נרשם יחד עם התאריך והנוסח המדויק שקראתם.',

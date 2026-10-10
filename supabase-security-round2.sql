@@ -6,11 +6,15 @@
 --  2. check_for_new_prs() and check_inactive_trainees() recreated with the
 --     email body escaped. Subjects, push text and admin_notifications are
 --     plain text and are left as they were. Both keep security definer.
---  3. push_subscriptions: users can no longer edit last_test_at /
---     last_sent_date, so they can't reset the test-notification cooldown.
---     The edge function uses the service role and is unaffected.
---  4. error_logs: automatic purge of entries older than 90 days, matching
---     the privacy notice.
+--  3. error_logs: automatic purge of entries older than 90 days, matching
+--     the privacy notice. Its first run deletes every error report older than
+--     90 days and that cannot be undone (there are currently none).
+--  4. send_admin_email / send_admin_push: execute revoked from the public API
+--     (already done live; this keeps the repo in step).
+--
+-- Accepted low risk, deliberately not changed: the test-notification cooldown
+-- on push_subscriptions can be reset by the user, which only lets them spam
+-- their own phone.
 --
 -- Run the verification queries at the bottom afterwards.
 
@@ -27,6 +31,11 @@ $$;
 -- Not for the public API. The security-definer functions below are owned by
 -- postgres and can still call it.
 revoke execute on function public.html_escape(text) from public, anon, authenticated;
+
+-- The admin senders are never called from the API either (already revoked
+-- live; repeated here so the repo matches).
+revoke execute on function public.send_admin_email(text, text) from public, anon, authenticated;
+revoke execute on function public.send_admin_push(text, text) from public, anon, authenticated;
 
 -- ---------- 2a. PR alert (same as supabase-reps-pr-alert.sql, email body escaped) ----------
 create or replace function public.check_for_new_prs()
@@ -242,7 +251,7 @@ begin
       select max(date) into last_date from sessions where user_id = r.id;
       if last_date is null then continue; end if;
       days_since := current_date - last_date;
-      if days_since < r.inactivity_alert_days then continue; end if;
+      if days_since < coalesce(r.inactivity_alert_days, 5) then continue; end if;
       select exists (
         select 1 from admin_notifications
         where type = 'inactivity' and trainee_id = r.id and sent_at::date > last_date
@@ -263,15 +272,7 @@ $function$;
 
 revoke execute on function public.check_inactive_trainees() from public, anon, authenticated;
 
--- ---------- 3. Test-notification cooldown can't be reset ----------
--- Column privileges: signed-in users may update only the columns the app's
--- upsert in src/lib/push.js writes. last_test_at and last_sent_date stay
--- writable by the server (service role / postgres) only.
-revoke update on public.push_subscriptions from authenticated;
-grant update (endpoint, p256dh, auth, remind_time, tz, lang, updated_at, user_id)
-  on public.push_subscriptions to authenticated;
-
--- ---------- 4. Error log retention: delete after 90 days ----------
+-- ---------- 3. Error log retention: delete after 90 days ----------
 do $$
 begin
   if exists (select 1 from cron.job where jobname = 'purge-old-error-logs') then
@@ -285,7 +286,7 @@ begin
 end $$;
 
 -- ---------- Verification (read-only) ----------
--- html_escape: all three should be false
+-- html_escape and check_inactive_trainees: all four should be false
 select has_function_privilege('anon', 'public.html_escape(text)', 'execute') as anon_can_escape,
        has_function_privilege('authenticated', 'public.html_escape(text)', 'execute') as authed_can_escape,
        has_function_privilege('anon', 'public.check_inactive_trainees()', 'execute') as anon_can_inactive,
@@ -294,12 +295,11 @@ select has_function_privilege('anon', 'public.html_escape(text)', 'execute') as 
 -- Escaping works: expect &lt;a href=&quot;x&quot;&gt;hi&lt;/a&gt; &amp; co
 select public.html_escape('<a href="x">hi</a> & co');
 
--- Column update rights for signed-in users: last_test_at / last_sent_date should be false
-select column_name,
-       has_column_privilege('authenticated', 'public.push_subscriptions', column_name, 'update') as authed_can_update
-from information_schema.columns
-where table_schema = 'public' and table_name = 'push_subscriptions'
-order by ordinal_position;
+-- Admin senders: all four should be false
+select has_function_privilege('anon', 'public.send_admin_email(text, text)', 'execute') as anon_can_email,
+       has_function_privilege('authenticated', 'public.send_admin_email(text, text)', 'execute') as authed_can_email,
+       has_function_privilege('anon', 'public.send_admin_push(text, text)', 'execute') as anon_can_push,
+       has_function_privilege('authenticated', 'public.send_admin_push(text, text)', 'execute') as authed_can_push;
 
 -- Both alert functions should show html_escape in their source
 select proname, prosrc like '%html_escape%' as escapes_html

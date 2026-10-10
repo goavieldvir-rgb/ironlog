@@ -24,7 +24,9 @@ export function PrivacySections({ doc }) {
 export default function Privacy({ standalone = false }) {
   const { t, lang } = useLanguage()
   const doc = privacy[lang] || privacy.en
-  const termsDoc = (terms[lang] || terms.en).adult
+  const termsDocs = terms[lang] || terms.en
+  const termsDoc = termsDocs.adult
+  const minorDoc = termsDocs.minor
 
   const page = (
     <div className="flex flex-col gap-5 max-w-2xl">
@@ -38,12 +40,21 @@ export default function Privacy({ standalone = false }) {
       </Card>
 
       <div>
-        <h1 className="text-3xl">{t('privacy.termsHeading')}</h1>
+        <h2 className="text-3xl">{t('privacy.termsHeading')}</h2>
         <p className="text-chalkdim text-sm mt-1">{termsDoc.intro}</p>
       </div>
 
       <Card>
         <PrivacySections doc={termsDoc} />
+      </Card>
+
+      <div>
+        <h3 className="text-xl">{t('privacy.minorTermsHeading')}</h3>
+        <p className="text-chalkdim text-sm mt-1">{minorDoc.intro}</p>
+      </div>
+
+      <Card>
+        <PrivacySections doc={minorDoc} />
       </Card>
     </div>
   )
