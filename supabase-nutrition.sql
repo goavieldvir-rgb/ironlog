@@ -1,5 +1,6 @@
 -- Nutrition beta: food diary tables.
--- Run once in the Supabase SQL Editor. Safe to re-run.
+-- Run once in the Supabase SQL Editor. Safe to re-run. supabase/schema.sql
+-- carries the same tables, policies and functions.
 --
 -- Visibility: only admins can use nutrition until a trainee's
 -- profiles.nutrition_enabled is switched on (by an admin). Every table below
@@ -37,6 +38,11 @@ begin
 end;
 $$;
 
+drop trigger if exists protect_admin_flag_trg on profiles;
+create trigger protect_admin_flag_trg
+  before insert or update on profiles
+  for each row execute function protect_admin_flag();
+
 -- "May the current user use nutrition?" for policies.
 create or replace function nutrition_allowed()
 returns boolean
@@ -47,6 +53,10 @@ set search_path = public
 as $$
   select coalesce((select is_admin or nutrition_enabled from profiles where id = auth.uid()), false);
 $$;
+
+-- New security definer functions are callable by anyone by default.
+revoke all on function nutrition_allowed() from public, anon;
+grant execute on function nutrition_allowed() to authenticated;
 
 -- Foods: one shared table that learns. Values are per 100 g (or 100 ml).
 --   source 'moh'   Ministry of Health (Tzameret) generic foods, imported
@@ -83,25 +93,27 @@ create index if not exists foods_search_trgm on foods using gin (search_text gin
 alter table foods enable row level security;
 
 drop policy if exists "foods readable" on foods;
-create policy "foods readable" on foods for select using (
+create policy "foods readable" on foods for select to authenticated using (
   nutrition_allowed() and (verified or source in ('moh', 'off') or created_by = auth.uid() or is_admin())
 );
 
--- Anyone allowed may add a cached OFF product or a label they typed; only the
--- coach can add verified or coach/moh rows.
+-- A trainee may only add a label they typed (private until verified). Only
+-- the coach adds shared rows: the OFF cache, coach and moh foods. A trainee's
+-- scan still works when its OFF cache insert is refused; the log just has no
+-- food_id. This stops a trainee planting fake macros under a real barcode.
 drop policy if exists "foods insert" on foods;
-create policy "foods insert" on foods for insert with check (
+create policy "foods insert" on foods for insert to authenticated with check (
   nutrition_allowed() and created_by = auth.uid()
-  and (is_admin() or (source in ('off', 'user') and not verified))
+  and (is_admin() or (source = 'user' and not verified))
 );
 
 drop policy if exists "foods update" on foods;
-create policy "foods update" on foods for update
+create policy "foods update" on foods for update to authenticated
   using (is_admin() or (created_by = auth.uid() and not verified and source = 'user'))
   with check (is_admin() or (created_by = auth.uid() and not verified and source = 'user'));
 
 drop policy if exists "foods delete" on foods;
-create policy "foods delete" on foods for delete
+create policy "foods delete" on foods for delete to authenticated
   using (is_admin() or (created_by = auth.uid() and not verified and source = 'user'));
 
 -- Diary entries. Name and macros are copied in at log time so later edits to
@@ -128,7 +140,7 @@ create index if not exists food_logs_user_date on food_logs (user_id, date);
 alter table food_logs enable row level security;
 
 drop policy if exists "own food logs or admin" on food_logs;
-create policy "own food logs or admin" on food_logs for all
+create policy "own food logs or admin" on food_logs for all to authenticated
   using ((auth.uid() = user_id and nutrition_allowed()) or is_admin())
   with check ((auth.uid() = user_id and nutrition_allowed()) or is_admin());
 
@@ -144,7 +156,7 @@ create table if not exists saved_meals (
 alter table saved_meals enable row level security;
 
 drop policy if exists "own saved meals or admin" on saved_meals;
-create policy "own saved meals or admin" on saved_meals for all
+create policy "own saved meals or admin" on saved_meals for all to authenticated
   using ((auth.uid() = user_id and nutrition_allowed()) or is_admin())
   with check ((auth.uid() = user_id and nutrition_allowed()) or is_admin());
 
@@ -161,11 +173,11 @@ create table if not exists nutrition_targets (
 alter table nutrition_targets enable row level security;
 
 drop policy if exists "read own targets or admin" on nutrition_targets;
-create policy "read own targets or admin" on nutrition_targets for select
+create policy "read own targets or admin" on nutrition_targets for select to authenticated
   using ((auth.uid() = user_id and nutrition_allowed()) or is_admin());
 
 drop policy if exists "admin writes targets" on nutrition_targets;
-create policy "admin writes targets" on nutrition_targets for all
+create policy "admin writes targets" on nutrition_targets for all to authenticated
   using (is_admin()) with check (is_admin());
 
 -- Account deletion also removes nutrition data and the trainee's unverified
