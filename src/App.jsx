@@ -24,6 +24,7 @@ import Account from './components/Account.jsx'
 import ResetPassword from './components/ResetPassword.jsx'
 import ConsentGate from './components/ConsentGate.jsx'
 import Privacy from './components/Privacy.jsx'
+import Nutrition from './components/Nutrition.jsx'
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -81,6 +82,7 @@ export default function App() {
         <Route path="/history/:id/edit" element={<EditSession />} />
         <Route path="/people" element={<People />} />
         <Route path="/errors" element={<ErrorLogs />} />
+        <Route path="/nutrition" element={<Nutrition />} />
         <Route path="/stats" element={<Stats />} />
         <Route path="/weight" element={<BodyWeight />} />
         <Route path="/summary" element={<WeeklySummary />} />

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom'
-import { Dumbbell, LayoutDashboard, ListChecks, History, Library, LogOut, Menu, X, Users, UserCheck, BarChart3, Scale, FileText, HelpCircle, CircleUser, Bell } from 'lucide-react'
+import { Dumbbell, LayoutDashboard, ListChecks, History, Library, LogOut, Menu, X, Users, UserCheck, BarChart3, Scale, FileText, HelpCircle, CircleUser, Bell, Apple } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -46,7 +46,13 @@ export default function Layout() {
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
 
-  const navLinks = isAdmin ? [...links, { to: '/people', labelKey: 'nav.people', icon: Users }] : links
+  const navLinks = isAdmin
+    ? [
+        ...links,
+        { to: '/people', labelKey: 'nav.people', icon: Users },
+        { to: '/nutrition', labelKey: 'nav.nutrition', icon: Apple },
+      ]
+    : links
 
   function toggleLang() {
     setLang(lang === 'en' ? 'he' : 'en')
