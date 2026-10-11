@@ -95,8 +95,9 @@ export default function Scanner({ uid, meal, setMeal, onClose, onNotFound, onAdd
         if (seq !== lookupSeq.current || !mountedRef.current) return
         if (res.status === 'found') setResult({ status: 'found', code, food: res.food, image: res.image })
         else {
+          console.info('barcode lookup', code, res.status)
           stopCamera()
-          onNotFound(code)
+          onNotFound(code, res.status === 'incomplete' ? { status: 'incomplete', name: res.name, brand: res.brand, servingG: res.servingG } : { status: 'notfound' })
         }
       } catch (err) {
         if (seq !== lookupSeq.current) return
@@ -397,8 +398,19 @@ export default function Scanner({ uid, meal, setMeal, onClose, onNotFound, onAdd
                     </Button>
                   )}
                   {result.status === 'error' && (
-                    <Button variant="subtle" onClick={() => lookup(result.code)}>
+                    <Button variant="brass" onClick={() => lookup(result.code)}>
                       <RefreshCw size={16} /> {t('nutrition.retry')}
+                    </Button>
+                  )}
+                  {result.status === 'error' && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        stopCamera()
+                        onNotFound(result.code, { status: 'notfound' })
+                      }}
+                    >
+                      <Plus size={16} /> {t('nutrition.addFromLabelBtn')}
                     </Button>
                   )}
                   {result.status !== 'decoder' && (
