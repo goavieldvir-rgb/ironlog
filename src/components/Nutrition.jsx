@@ -15,6 +15,13 @@ import { Button, Card } from './ui.jsx'
 const OFF_FIELDS =
   'code,product_name,product_name_he,product_name_en,brands,quantity,serving_size,nutriments,image_front_small_url'
 const SCAN_INTERVAL_MS = 200
+const LOOKUP_TIMEOUT_MS = 10000
+
+// Loads the decoder chunk and its wasm. Fails after a deploy in a tab that
+// still references the old chunk names; callers show a reload prompt.
+function loadDecoder() {
+  return import('../lib/barcodeDecoder.js').then((m) => m.getDetector().then((d) => ({ m, engine: d.engine })))
+}
 
 // 8 (EAN-8), 12 (UPC-A) and 13 (EAN-13) digits, with a valid check digit.
 function validateBarcode(raw) {
@@ -133,9 +140,12 @@ function NutritionPage() {
     const seq = ++lookupSeq.current
     lastLookedUp.current = code
     setResult({ status: 'loading', code })
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), LOOKUP_TIMEOUT_MS)
     try {
       const res = await fetch(
         `https://world.openfoodfacts.org/api/v2/product/${code}?fields=${OFF_FIELDS}`,
+        { signal: ctrl.signal },
       )
       if (seq !== lookupSeq.current) return
       if (res.status === 404) {
@@ -151,7 +161,16 @@ function NutritionPage() {
       if (seq !== lookupSeq.current) return
       console.warn('Open Food Facts lookup failed', err)
       setResult({ status: 'error', code })
+    } finally {
+      clearTimeout(timer)
     }
+  }, [])
+
+  const decoderFailed = useCallback((err) => {
+    console.warn('barcode decoder failed to load', err)
+    activeRef.current = false
+    setScanning(false)
+    setResult({ status: 'decoder' })
   }, [])
 
   function noteFirstDecode(source) {
@@ -171,8 +190,13 @@ function NutritionPage() {
       if (!video || video.readyState < 2 || !video.videoWidth) return
       lastTickRef.current = now
       busyRef.current = true
-      import('../lib/barcodeDecoder.js')
-        .then((m) => m.detectFrom(video))
+      loadDecoder()
+        .catch((err) => {
+          stopCamera()
+          decoderFailed(err)
+          return null
+        })
+        .then((loaded) => loaded && loaded.m.detectFrom(video))
         .then((value) => {
           // Misreads fail the check digit; keep scanning instead of showing an error.
           if (!value || !activeRef.current || !validateBarcode(value)) return
@@ -187,7 +211,7 @@ function NutritionPage() {
         })
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lookup, stopCamera],
+    [lookup, stopCamera, decoderFailed],
   )
 
   async function startCamera() {
@@ -233,10 +257,12 @@ function NutritionPage() {
       lastTickRef.current = 0
       rafRef.current = requestAnimationFrame(tick)
       // Warm the decoder while the user lines up the barcode.
-      import('../lib/barcodeDecoder.js')
-        .then((m) => m.getDetector())
+      loadDecoder()
         .then((d) => setDiag((x) => ({ ...x, engine: d.engine })))
-        .catch(() => {})
+        .catch((err) => {
+          stopCamera()
+          decoderFailed(err)
+        })
     } catch (err) {
       console.warn('camera start failed', err)
       refreshPerm()
@@ -287,9 +313,15 @@ function NutritionPage() {
     setResult(null)
     startedAtRef.current = performance.now()
     firstLoggedRef.current = false
+    let mod, engine
     try {
-      const mod = await import('../lib/barcodeDecoder.js')
-      const { engine } = await mod.getDetector()
+      ;({ m: mod, engine } = await loadDecoder())
+    } catch (err) {
+      decoderFailed(err)
+      setPhotoBusy(false)
+      return
+    }
+    try {
       setDiag((d) => ({ ...d, engine, firstMs: null, firstSource: '' }))
       const bitmap = await createImageBitmap(file)
       let value
@@ -565,6 +597,7 @@ function ResultView({ result, lang, onRetry, onScanAnother }) {
     notfound: ['nutrition.notFound', false],
     error: ['nutrition.networkError', true],
     nophoto: ['nutrition.noBarcodeInPhoto', false],
+    decoder: ['nutrition.decoderError', false],
   }
   const [key, canRetry] = messages[status] || []
   if (!key) return null
@@ -580,6 +613,11 @@ function ResultView({ result, lang, onRetry, onScanAnother }) {
         )}
       </p>
       <div className="flex gap-2 flex-wrap">
+        {status === 'decoder' && (
+          <Button variant="subtle" onClick={() => window.location.reload()}>
+            <RefreshCw size={16} /> {t('nutrition.reload')}
+          </Button>
+        )}
         {canRetry && (
           <Button variant="subtle" onClick={onRetry}>
             <RefreshCw size={16} /> {t('nutrition.retry')}
