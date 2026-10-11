@@ -101,6 +101,7 @@ create table if not exists public.profiles (
   created_at timestamp with time zone default now() not null,
   inactivity_alert_days integer default 5 not null,
   dashboard_style text default 'cards'::text not null,
+  nutrition_enabled boolean default false not null,
   constraint profiles_pkey PRIMARY KEY (id),
   constraint profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
@@ -173,6 +174,69 @@ create table if not exists public.weekly_schedule (
 
 create index if not exists consents_user_idx on public.consents using btree (user_id, doc_key, version desc);
 
+-- Nutrition beta (supabase-nutrition.sql). Values in foods are per 100 g.
+create extension if not exists pg_trgm;
+alter table public.profiles add column if not exists nutrition_enabled boolean not null default false;
+create table if not exists public.foods (
+  id uuid primary key default gen_random_uuid(),
+  source text not null check (source in ('moh', 'off', 'user', 'coach')),
+  source_ref text,                -- Tzameret code or OFF barcode
+  barcode text check (barcode ~ '^[0-9]{8,14}$'),
+  name_he text,
+  name_en text,
+  brand text,
+  kcal numeric not null check (kcal >= 0 and kcal <= 900),
+  protein numeric not null default 0 check (protein >= 0 and protein <= 100),
+  carbs numeric not null default 0 check (carbs >= 0 and carbs <= 100),
+  fat numeric not null default 0 check (fat >= 0 and fat <= 100),
+  fiber numeric check (fiber >= 0 and fiber <= 100),
+  -- household units, e.g. [{"he":"פרוסה בינונית","en":"medium slice","g":34}]
+  units jsonb not null default '[]'::jsonb,
+  search_text text not null default '', -- normalised he+en+brand, filled by the app
+  verified boolean not null default false,
+  label_photo_path text,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  check (coalesce(name_he, name_en) is not null)
+);
+
+create unique index if not exists foods_source_ref_uniq on public.foods (source, source_ref) where source_ref is not null;
+create index if not exists foods_barcode_idx on public.foods (barcode) where barcode is not null;
+create index if not exists foods_search_trgm on public.foods using gin (search_text gin_trgm_ops);
+create table if not exists public.food_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  date date not null,
+  meal text not null check (meal in ('breakfast', 'lunch', 'dinner', 'snack')),
+  food_id uuid references public.foods(id) on delete set null,
+  name text not null,
+  grams numeric check (grams > 0),
+  unit_label text,               -- e.g. "פרוסה בינונית"
+  unit_qty numeric,              -- e.g. 2
+  kcal numeric not null check (kcal >= 0),
+  protein numeric not null default 0 check (protein >= 0),
+  carbs numeric not null default 0 check (carbs >= 0),
+  fat numeric not null default 0 check (fat >= 0),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists food_logs_user_date on public.food_logs (user_id, date);
+create table if not exists public.saved_meals (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  items jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now()
+);
+create table if not exists public.nutrition_targets (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  kcal integer check (kcal > 0),
+  protein integer check (protein >= 0),
+  carbs integer check (carbs >= 0),
+  fat integer check (fat >= 0),
+  updated_at timestamptz not null default now()
+);
+
 -- ===== 2. Functions (before the policies that call is_admin()) =====
 CREATE OR REPLACE FUNCTION public.is_admin()
  RETURNS boolean
@@ -204,16 +268,33 @@ CREATE OR REPLACE FUNCTION public.protect_admin_flag()
  SET search_path TO 'public'
 AS $function$
 begin
+  -- Only requests that come through the app's public API (signed in or not)
+  -- are checked. The SQL Editor and server-side jobs have no such role.
   if coalesce(auth.jwt() ->> 'role', '') not in ('anon', 'authenticated') then
     return new;
   end if;
   if tg_op = 'INSERT' then
     new.is_admin := false;
-  elsif new.is_admin is distinct from old.is_admin and not public.is_admin() then
-    raise exception 'ADMIN_FLAG_PROTECTED';
+    new.nutrition_enabled := false;
+  elsif not public.is_admin() then
+    if new.is_admin is distinct from old.is_admin then
+      raise exception 'ADMIN_FLAG_PROTECTED';
+    end if;
+    if new.nutrition_enabled is distinct from old.nutrition_enabled then
+      raise exception 'NUTRITION_FLAG_PROTECTED';
+    end if;
   end if;
   return new;
 end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.nutrition_allowed()
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select coalesce((select is_admin or nutrition_enabled from profiles where id = auth.uid()), false);
 $function$;
 
 CREATE OR REPLACE FUNCTION public.delete_my_account()
@@ -232,6 +313,10 @@ begin
     raise exception 'ADMIN_CANNOT_SELF_DELETE';
   end if;
 
+  delete from food_logs where user_id = uid;
+  delete from saved_meals where user_id = uid;
+  delete from nutrition_targets where user_id = uid;
+  delete from foods where created_by = uid and source = 'user' and not verified;
   delete from weekly_schedule where user_id = uid;
   delete from sessions where user_id = uid;
   delete from routines where user_id = uid;
@@ -597,6 +682,8 @@ revoke execute on function public.html_escape(text) from public, anon, authentic
 revoke execute on function public.check_inactive_trainees() from public, anon, authenticated;
 revoke execute on function public.delete_my_account() from public, anon;
 grant execute on function public.delete_my_account() to authenticated;
+revoke execute on function public.nutrition_allowed() from public, anon;
+grant execute on function public.nutrition_allowed() to authenticated;
 
 -- ===== 3. Row level security =====
 alter table public.admin_notifications enable row level security;
@@ -781,6 +868,57 @@ create policy "own or admin can update schedule" on public.weekly_schedule
   for update
   using ((auth.uid() = user_id) OR is_admin());
 
+-- Nutrition beta: usable only by admins and trainees with profiles.nutrition_enabled.
+alter table public.foods enable row level security;
+
+drop policy if exists "foods readable" on public.foods;
+create policy "foods readable" on public.foods for select to authenticated using (
+  nutrition_allowed() and (verified or source in ('moh', 'off') or created_by = auth.uid() or is_admin())
+);
+
+-- A trainee may only add a label they typed (private until verified). Only
+-- the coach adds shared rows: the OFF cache, coach and moh foods. A trainee's
+-- scan still works when its OFF cache insert is refused; the log just has no
+-- food_id. This stops a trainee planting fake macros under a real barcode.
+drop policy if exists "foods insert" on public.foods;
+create policy "foods insert" on public.foods for insert to authenticated with check (
+  nutrition_allowed() and created_by = auth.uid()
+  and (is_admin() or (source = 'user' and not verified))
+);
+
+drop policy if exists "foods update" on public.foods;
+create policy "foods update" on public.foods for update to authenticated
+  using (is_admin() or (created_by = auth.uid() and not verified and source = 'user'))
+  with check (is_admin() or (created_by = auth.uid() and not verified and source = 'user'));
+
+drop policy if exists "foods delete" on public.foods;
+create policy "foods delete" on public.foods for delete to authenticated
+  using (is_admin() or (created_by = auth.uid() and not verified and source = 'user'));
+
+alter table public.food_logs enable row level security;
+
+drop policy if exists "own food logs or admin" on public.food_logs;
+create policy "own food logs or admin" on public.food_logs for all to authenticated
+  using ((auth.uid() = user_id and nutrition_allowed()) or is_admin())
+  with check ((auth.uid() = user_id and nutrition_allowed()) or is_admin());
+
+alter table public.saved_meals enable row level security;
+
+drop policy if exists "own saved meals or admin" on public.saved_meals;
+create policy "own saved meals or admin" on public.saved_meals for all to authenticated
+  using ((auth.uid() = user_id and nutrition_allowed()) or is_admin())
+  with check ((auth.uid() = user_id and nutrition_allowed()) or is_admin());
+
+alter table public.nutrition_targets enable row level security;
+
+drop policy if exists "read own targets or admin" on public.nutrition_targets;
+create policy "read own targets or admin" on public.nutrition_targets for select to authenticated
+  using ((auth.uid() = user_id and nutrition_allowed()) or is_admin());
+
+drop policy if exists "admin writes targets" on public.nutrition_targets;
+create policy "admin writes targets" on public.nutrition_targets for all to authenticated
+  using (is_admin()) with check (is_admin());
+
 -- ===== 4. Grants =====
 -- push_config: no API access at all.
 revoke all on public.push_config from anon, authenticated;
@@ -829,7 +967,7 @@ begin
 end $$;
 
 -- ===== 7. Verification (read-only) =====
--- RLS must be enabled on all 12 tables (rowsecurity = true on every row).
+-- RLS must be enabled on all 16 tables (rowsecurity = true on every row).
 select tablename, rowsecurity
 from pg_tables
 where schemaname = 'public'

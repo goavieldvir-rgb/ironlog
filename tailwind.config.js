@@ -31,6 +31,12 @@ export default {
       letterSpacing: {
         widest2: '.18em',
       },
+      keyframes: {
+        sheet: { from: { transform: 'translateY(16px)', opacity: '0' }, to: { transform: 'none', opacity: '1' } },
+      },
+      animation: {
+        sheet: 'sheet 320ms cubic-bezier(0.16, 1, 0.3, 1)',
+      },
     },
   },
   plugins: [],

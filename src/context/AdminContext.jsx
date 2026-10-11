@@ -34,6 +34,9 @@ export function AdminProvider({ children }) {
   }, [user?.uid])
 
   const isAdmin = !!profile?.is_admin
+  // Nutrition is a beta: admins, plus trainees an admin switched on. The
+  // column may not exist before the migration, which reads as off.
+  const nutritionAllowed = isAdmin || profile?.nutrition_enabled === true
 
   function setActingAs(uid, name, email) {
     setActingAsState(uid ? { uid, name, email } : null)
@@ -42,6 +45,7 @@ export function AdminProvider({ children }) {
   const value = {
     profile,
     isAdmin,
+    nutritionAllowed,
     loadingProfile,
     actingAs,
     setActingAs,

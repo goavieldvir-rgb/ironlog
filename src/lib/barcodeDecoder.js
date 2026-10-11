@@ -24,9 +24,14 @@ async function createDetector() {
       // fall through to the ponyfill
     }
   }
-  const { BarcodeDetector, setZXingModuleOverrides } = await import('barcode-detector/ponyfill')
-  setZXingModuleOverrides({
-    locateFile: (path, prefix) => (path.endsWith('.wasm') ? new URL(wasmUrl, document.baseURI).href : prefix + path),
+  const { BarcodeDetector, prepareZXingModule } = await import('barcode-detector/ponyfill')
+  // Download and compile the wasm now (not on the first frame), so a load
+  // failure surfaces here and the first scan doesn't wait for it.
+  await prepareZXingModule({
+    overrides: {
+      locateFile: (path, prefix) => (path.endsWith('.wasm') ? new URL(wasmUrl, document.baseURI).href : prefix + path),
+    },
+    fireImmediately: true,
   })
   return { engine: 'wasm', detector: new BarcodeDetector({ formats: FORMATS }) }
 }
