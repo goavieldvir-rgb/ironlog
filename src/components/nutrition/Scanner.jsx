@@ -331,7 +331,7 @@ export default function Scanner({ uid, meal, setMeal, onClose, onNotFound, onAdd
         {cam === 'ended' && !result && (
           <div className="flex flex-col items-center gap-3 text-center">
             <p className="text-chalk text-sm max-w-xs">{t('nutrition.cameraEnded')}</p>
-            <Button onClick={startCamera} variant="brass" className="min-h-[52px]">
+            <Button onClick={startCamera} variant="ghost" className="min-h-[52px]">
               <RefreshCw size={18} /> {t('nutrition.restartCamera')}
             </Button>
           </div>

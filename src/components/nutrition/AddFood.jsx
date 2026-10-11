@@ -267,7 +267,7 @@ export default function AddFood({ meal, setMeal, uid, date, onClose, onScan, onP
                   <button type="button" onClick={() => onPick(r)} className="w-full flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
                     <div className="min-w-0 flex-1">
                       <Name className="font-medium">{foodName(r, lang)}</Name>
-                      <Stats protein={r.protein} kcal={r.kcal} extra={r.brand ? <bdi>{r.brand}</bdi> : null} source={<>· <SourceLabel food={r} /></>} />
+                      <Stats protein={r.protein} kcal={r.kcal} source={<>{r.brand && <>· <bdi>{r.brand}</bdi></>} · <SourceLabel food={r} /></>} />
                     </div>
                     <Forward size={20} className="text-chalkdim shrink-0" />
                   </button>

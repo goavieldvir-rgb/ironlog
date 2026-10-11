@@ -89,7 +89,7 @@ export default function LabelForm({ barcode: initialBarcode = '', uid, isAdmin, 
               <p className="text-sm font-medium">{t('nutrition.existsTitle')}</p>
               <Name>{foodName(existing, lang)}</Name>
               <SourceLabel food={existing} showVerifiedText className="text-xs" />
-              <Button type="button" variant="brass" onClick={() => onUseExisting(existing)}>
+              <Button type="button" variant="ghost" onClick={() => onUseExisting(existing)}>
                 {t('nutrition.existsUse')}
               </Button>
             </div>
