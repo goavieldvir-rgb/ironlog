@@ -1,661 +1,565 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { Navigate } from 'react-router-dom'
-import { ScanBarcode, Search, Camera, X, RefreshCw, ImagePlus } from 'lucide-react'
+import { Bookmark, ChevronLeft, ChevronRight, Copy, Pencil, Plus, ScanBarcode } from 'lucide-react'
+import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { useScrollLock } from '../lib/scrollLock.js'
-import { Button, Card } from './ui.jsx'
+import { useFeedback } from '../context/FeedbackContext.jsx'
+import { fmtDate, toLocalISODate } from '../lib/dates.js'
+import {
+  MEALS,
+  MEAL_KEY,
+  buildUnitOptions,
+  cloneLogs,
+  defaultMeal,
+  deleteLogs,
+  fmt,
+  foodLogRow,
+  friendlyError,
+  getLogs,
+  getTargets,
+  insertLogs,
+  isNotSetUp,
+  saveMeal,
+  saveTargets,
+  sumLogs,
+  updateLog,
+} from '../lib/nutrition.js'
+import { Button, Card, LoadError } from './ui.jsx'
+import { AmountText, N, Name, Sheet, Track, UndoToast } from './nutrition/parts.jsx'
+import AddFood from './nutrition/AddFood.jsx'
+import FoodDetail from './nutrition/FoodDetail.jsx'
+import LabelForm from './nutrition/LabelForm.jsx'
+import Scanner from './nutrition/Scanner.jsx'
+import { EditLog, MyMealsView, SaveMealView, TargetsView } from './nutrition/Views.jsx'
 
-// Admin-only barcode scanner test screen (nutrition beta, milestone 1).
-// The scanner is an overlay inside this page on purpose: changing the URL
-// hash while the camera is open makes iOS WebKit ask for camera permission
-// again (WebKit bug 215884), so scanning never navigates.
-
-const OFF_FIELDS =
-  'code,product_name,product_name_he,product_name_en,brands,quantity,serving_size,nutriments,image_front_small_url'
-const SCAN_INTERVAL_MS = 120
-// Decode only the middle of the frame (where the guide box is), scaled down:
-// far less work per frame than the full camera picture, so codes read sooner.
-const CROP_W = 0.9
-const CROP_H = 0.5
-const MAX_DECODE_W = 960
-const LOOKUP_TIMEOUT_MS = 10000
-
-// Loads the decoder chunk and its wasm. Fails after a deploy in a tab that
-// still references the old chunk names; callers show a reload prompt.
-function cropFrame(video, canvas) {
-  const sw = Math.round(video.videoWidth * CROP_W)
-  const sh = Math.round(video.videoHeight * CROP_H)
-  const sx = Math.round((video.videoWidth - sw) / 2)
-  const sy = Math.round((video.videoHeight - sh) / 2)
-  const scale = Math.min(1, MAX_DECODE_W / sw)
-  canvas.width = Math.round(sw * scale)
-  canvas.height = Math.round(sh * scale)
-  canvas.getContext('2d', { willReadFrequently: true }).drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height)
-  return canvas
-}
-
-function loadDecoder() {
-  return import('../lib/barcodeDecoder.js').then((m) => m.getDetector().then((d) => ({ m, engine: d.engine })))
-}
-
-// 8 (EAN-8), 12 (UPC-A) and 13 (EAN-13) digits, with a valid check digit.
-function validateBarcode(raw) {
-  const code = String(raw || '').trim()
-  if (!/^\d+$/.test(code) || ![8, 12, 13].includes(code.length)) return false
-  const digits = code.split('').map(Number)
-  const check = digits.pop()
-  let sum = 0
-  for (let i = digits.length - 1, w = 3; i >= 0; i--, w = w === 3 ? 1 : 3) sum += digits[i] * w
-  return (10 - (sum % 10)) % 10 === check
-}
-
-function num(v, digits = 1) {
-  if (v == null || v === '' || Number.isNaN(Number(v))) return '—'
-  const n = Number(v)
-  return String(Math.round(n * 10 ** digits) / 10 ** digits)
-}
-
-function displayMode() {
-  try {
-    if (window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) return 'standalone'
-  } catch {
-    // ignore
-  }
-  return 'browser'
-}
-
-function shortUA() {
-  const ua = navigator.userAgent || ''
-  const os = (ua.match(/(iPhone OS|CPU OS|Android|Windows NT|Mac OS X|Linux)[ _]?([\d._]*)/) || [])
-  const browser = ua.match(/(Edg|Chrome|CriOS|FxiOS|Firefox|Version)\/([\d.]+)/)
-  const osText = os[1] ? `${os[1]} ${(os[2] || '').replace(/_/g, '.')}`.trim() : ''
-  const brText = browser ? `${browser[1]} ${browser[2].split('.')[0]}` : ''
-  return [osText, brText].filter(Boolean).join(' · ') || ua.slice(0, 60)
-}
-
-function productName(p, lang) {
-  const order = lang === 'he' ? ['product_name_he', 'product_name'] : ['product_name_en', 'product_name']
-  for (const k of [...order, 'product_name', 'product_name_en', 'product_name_he']) {
-    if (p[k] && String(p[k]).trim()) return String(p[k]).trim()
-  }
-  return null
-}
+// Nutrition diary (beta). Scanner and sheets are overlays inside this page on
+// purpose: changing the URL hash while the camera is open makes iOS WebKit ask
+// for camera permission again (WebKit bug 215884).
 
 export default function Nutrition() {
-  const { isAdmin, loadingProfile } = useAdmin()
+  const { nutritionAllowed, loadingProfile } = useAdmin()
   if (loadingProfile) return null
-  if (!isAdmin) return <Navigate to="/" replace />
-  return <NutritionPage />
+  if (!nutritionAllowed) return <Navigate to="/" replace />
+  return <Diary />
 }
 
-function NutritionPage() {
+const shiftDay = (iso, n) => {
+  const d = new Date(iso + 'T00:00:00')
+  d.setDate(d.getDate() + n)
+  return toLocalISODate(d)
+}
+
+function Diary() {
   const { t, lang } = useLanguage()
-  const [manual, setManual] = useState('')
-  // result: { status: 'loading'|'found'|'notfound'|'error'|'invalid'|'weighed'|'nophoto', code, product }
-  const [result, setResult] = useState(null)
-  const [scanning, setScanning] = useState(false)
-  // 'starting' | 'live' | 'ended' | 'error'
-  const [cam, setCam] = useState('starting')
-  const [camError, setCamError] = useState('')
-  const [diag, setDiag] = useState({ engine: '—', firstMs: null, firstSource: '', perm: '—' })
-  const [photoBusy, setPhotoBusy] = useState(false)
+  const { user } = useAuth()
+  const { isAdmin, effectiveUid, actingAs } = useAdmin()
+  const { confirm, toast } = useFeedback()
+  const uid = effectiveUid
+  const today = toLocalISODate()
+  const [date, setDate] = useState(today)
+  const [logs, setLogs] = useState([])
+  const [prevLogs, setPrevLogs] = useState([])
+  const [targets, setTargets] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
+  const [reloadN, setReloadN] = useState(0)
+  const [stack, setStack] = useState([])
+  const [scanner, setScanner] = useState(false)
+  const [meal, setMeal] = useState(() => defaultMeal())
+  const [undoToast, setUndoToast] = useState(null)
+  const toastTimer = useRef(0)
+  const loadedFor = useRef('')
 
-  const videoRef = useRef(null)
-  const streamRef = useRef(null)
-  const activeRef = useRef(false) // decode loop should run
-  const busyRef = useRef(false)
-  const rafRef = useRef(0)
-  const lastTickRef = useRef(0)
-  const startedAtRef = useRef(0)
-  const firstLoggedRef = useRef(false)
-  const lookupSeq = useRef(0)
-  const lastLookedUp = useRef('')
-  const canvasRef = useRef(null)
-
-  useScrollLock(scanning)
-
-  const stopCamera = useCallback(() => {
-    activeRef.current = false
-    cancelAnimationFrame(rafRef.current)
-    const stream = streamRef.current
-    streamRef.current = null
-    if (stream) stream.getTracks().forEach((tr) => tr.stop())
-    if (videoRef.current) videoRef.current.srcObject = null
-  }, [])
-
-  useEffect(() => () => stopCamera(), [stopCamera])
-
-  // Camera permission, where the browser can tell us (Safari can't).
-  const refreshPerm = useCallback(async () => {
-    try {
-      if (!navigator.permissions?.query) throw new Error('unsupported')
-      const status = await navigator.permissions.query({ name: 'camera' })
-      setDiag((d) => ({ ...d, perm: status.state }))
-    } catch {
-      setDiag((d) => ({ ...d, perm: t('nutrition.diagUnknown') }))
-    }
-  }, [t])
-
-  // Fetch and compile the decoder while the page is idle, so the first scan
-  // doesn't wait for the ~1 MB download.
+  // Load the day, the day before it (for "copy"), and the targets.
   useEffect(() => {
-    loadDecoder()
-      .then((d) => setDiag((x) => ({ ...x, engine: d.engine })))
-      .catch(() => {}) // retried, with a visible error, when scanning starts
-  }, [])
-
-  useEffect(() => {
-    refreshPerm()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Look-up -----------------------------------------------------------------
-
-  const lookup = useCallback(async (raw) => {
-    const code = String(raw || '').trim()
-    if (!validateBarcode(code)) {
-      setResult({ status: 'invalid', code })
-      return
-    }
-    if (code.length === 13 && code[0] === '2') {
-      setResult({ status: 'weighed', code })
-      return
-    }
-    const seq = ++lookupSeq.current
-    lastLookedUp.current = code
-    setResult({ status: 'loading', code })
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), LOOKUP_TIMEOUT_MS)
-    try {
-      const res = await fetch(
-        `https://world.openfoodfacts.org/api/v2/product/${code}?fields=${OFF_FIELDS}`,
-        { signal: ctrl.signal },
-      )
-      if (seq !== lookupSeq.current) return
-      if (res.status === 404) {
-        setResult({ status: 'notfound', code })
-        return
-      }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
-      if (seq !== lookupSeq.current) return
-      if (data.status === 1 && data.product) setResult({ status: 'found', code, product: data.product })
-      else setResult({ status: 'notfound', code })
-    } catch (err) {
-      if (seq !== lookupSeq.current) return
-      console.warn('Open Food Facts lookup failed', err)
-      setResult({ status: 'error', code })
-    } finally {
-      clearTimeout(timer)
-    }
-  }, [])
-
-  const decoderFailed = useCallback((err) => {
-    console.warn('barcode decoder failed to load', err)
-    activeRef.current = false
-    setScanning(false)
-    setResult({ status: 'decoder' })
-  }, [])
-
-  function noteFirstDecode(source) {
-    if (firstLoggedRef.current) return
-    firstLoggedRef.current = true
-    setDiag((d) => ({ ...d, firstMs: Math.round(performance.now() - startedAtRef.current), firstSource: source }))
-  }
-
-  // Camera ------------------------------------------------------------------
-
-  const tick = useCallback(
-    (now) => {
-      if (!activeRef.current) return
-      rafRef.current = requestAnimationFrame(tick)
-      const video = videoRef.current
-      if (busyRef.current || now - lastTickRef.current < SCAN_INTERVAL_MS) return
-      if (!video || video.readyState < 2 || !video.videoWidth) return
-      lastTickRef.current = now
-      busyRef.current = true
-      loadDecoder()
-        .catch((err) => {
-          stopCamera()
-          decoderFailed(err)
-          return null
-        })
-        .then((loaded) => {
-          if (!loaded) return null
-          if (!canvasRef.current) canvasRef.current = document.createElement('canvas')
-          return loaded.m.detectFrom(cropFrame(video, canvasRef.current))
-        })
-        .then((value) => {
-          // Misreads fail the check digit; keep scanning instead of showing an error.
-          if (!value || !activeRef.current || !validateBarcode(value)) return
-          noteFirstDecode('camera')
-          stopCamera()
-          setScanning(false)
-          lookup(value)
-        })
-        .catch((err) => console.warn('decode failed', err))
-        .finally(() => {
-          busyRef.current = false
-        })
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lookup, stopCamera, decoderFailed],
-  )
-
-  async function startCamera() {
-    stopCamera()
-    setCam('starting')
-    setCamError('')
-    setScanning(true)
-    startedAtRef.current = performance.now()
-    firstLoggedRef.current = false
-    setDiag((d) => ({ ...d, firstMs: null, firstSource: '' }))
-    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
-      setCam('error')
-      setCamError(t('nutrition.errInsecure'))
-      return
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: false,
+    if (!uid) return
+    let off = false
+    const key = `${uid}|${date}`
+    if (loadedFor.current !== key) setLoading(true)
+    Promise.all([getLogs(uid, date), getLogs(uid, shiftDay(date, -1)), getTargets(uid)])
+      .then(([day, prev, tg]) => {
+        if (off) return
+        loadedFor.current = key
+        setLogs(day || [])
+        setPrevLogs(prev || [])
+        setTargets(tg || null)
+        setLoadError(null)
+        setLoading(false)
       })
-      streamRef.current = stream
-      stream.getVideoTracks().forEach((track) => {
-        track.addEventListener('ended', () => {
-          if (streamRef.current !== stream) return
-          activeRef.current = false
-          cancelAnimationFrame(rafRef.current)
-          setCam('ended')
-        })
+      .catch((err) => {
+        if (off) return
+        console.error(err)
+        setLoadError(err)
+        setLoading(false)
       })
-      // The overlay is rendered by the time the permission prompt is answered,
-      // but wait a few frames in case it is not.
-      for (let i = 0; i < 20 && !videoRef.current; i++) await new Promise((r) => requestAnimationFrame(r))
-      const video = videoRef.current
-      if (!video || streamRef.current !== stream) {
-        stream.getTracks().forEach((tr) => tr.stop())
-        return
-      }
-      video.srcObject = stream
-      await video.play()
-      setCam('live')
-      refreshPerm()
-      activeRef.current = true
-      lastTickRef.current = 0
-      rafRef.current = requestAnimationFrame(tick)
-      // Warm the decoder while the user lines up the barcode.
-      loadDecoder()
-        .then((d) => setDiag((x) => ({ ...x, engine: d.engine })))
-        .catch((err) => {
-          stopCamera()
-          decoderFailed(err)
-        })
-    } catch (err) {
-      console.warn('camera start failed', err)
-      refreshPerm()
-      setCam('error')
-      const name = err?.name
-      if (name === 'NotAllowedError' || name === 'SecurityError') setCamError(t('nutrition.errDenied'))
-      else if (name === 'NotFoundError' || name === 'OverconstrainedError' || name === 'DevicesNotFoundError')
-        setCamError(t('nutrition.errNoCamera'))
-      else setCamError(t('nutrition.errGeneric'))
+    return () => {
+      off = true
     }
+  }, [uid, date, reloadN])
+
+  useEffect(() => () => clearTimeout(toastTimer.current), [])
+
+  const reload = useCallback(() => setReloadN((n) => n + 1), [])
+
+  function showToast(message, ids) {
+    clearTimeout(toastTimer.current)
+    setUndoToast({ message, ids })
+    toastTimer.current = setTimeout(() => setUndoToast(null), ids?.length ? 7000 : 2800)
   }
 
-  function closeScanner() {
-    stopCamera()
-    setScanning(false)
-  }
-
-  // iOS can stop the camera when the app is backgrounded; check on return.
-  useEffect(() => {
-    if (!scanning) return
-    const onVisible = () => {
-      if (document.visibilityState !== 'visible' || !streamRef.current) return
-      const live = streamRef.current.getVideoTracks().some((tr) => tr.readyState === 'live')
-      if (!live) {
-        activeRef.current = false
-        setCam('ended')
-      }
-    }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [scanning])
-
-  useEffect(() => {
-    if (!scanning) return
-    const onKey = (e) => e.key === 'Escape' && closeScanner()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scanning])
-
-  // Photo -------------------------------------------------------------------
-
-  async function onPhoto(e) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    setPhotoBusy(true)
-    setResult(null)
-    startedAtRef.current = performance.now()
-    firstLoggedRef.current = false
-    let mod, engine
+  async function undo() {
+    const ids = undoToast?.ids || []
+    clearTimeout(toastTimer.current)
+    setUndoToast(null)
     try {
-      ;({ m: mod, engine } = await loadDecoder())
+      await deleteLogs(ids)
     } catch (err) {
-      decoderFailed(err)
-      setPhotoBusy(false)
-      return
+      console.error(err)
+      toast(friendlyError(err, t), 'error')
     }
+    reload()
+  }
+
+  // Inserts rows into the diary and offers undo. Resolves true on success.
+  async function addLogs(rows, message) {
     try {
-      setDiag((d) => ({ ...d, engine, firstMs: null, firstSource: '' }))
-      const bitmap = await createImageBitmap(file)
-      let value
-      try {
-        value = await mod.detectFrom(bitmap)
-      } finally {
-        bitmap.close?.()
-      }
-      if (!value) {
-        setResult({ status: 'nophoto' })
-        return
-      }
-      noteFirstDecode('photo')
-      lookup(value)
+      const inserted = await insertLogs(rows)
+      showToast(message, inserted.map((r) => r.id))
+      reload()
+      return true
     } catch (err) {
-      console.warn('photo decode failed', err)
-      setResult({ status: 'nophoto' })
-    } finally {
-      setPhotoBusy(false)
+      console.error(err)
+      toast(friendlyError(err, t), 'error')
+      return false
     }
   }
 
-  function submitManual(e) {
-    e.preventDefault()
-    const code = manual.replace(/\s+/g, '')
-    if (!code) return
-    lookup(code)
+  // ----- sheet stack
+  const push = (view) => setStack((s) => [...s, view])
+  const pop = useCallback(() => setStack((s) => s.slice(0, -1)), [])
+  const closeAll = useCallback(() => setStack([]), [])
+  const openAdd = (m) => {
+    if (m) setMeal(m)
+    setStack([{ type: 'add' }])
+  }
+  const openScanner = (m) => {
+    if (m) setMeal(m)
+    setScanner(true)
   }
 
-  function scanAnother() {
-    setResult(null)
-    setManual('')
-    lastLookedUp.current = ''
-    startCamera()
+  async function logFood(food, option, qty, m) {
+    const row = foodLogRow({ uid, date, meal: m, food, lang, option, qty })
+    if (await addLogs([row], t('nutrition.added', { name: row.name }))) {
+      setScanner(false)
+      closeAll()
+    }
   }
 
-  const busy = result?.status === 'loading'
+  async function onLabelSaved(food) {
+    const options = buildUnitOptions(food, lang, t)
+    const option = options.find((o) => o.kind === 'unit') || options.find((o) => o.kind === '100g')
+    const row = foodLogRow({ uid, date, meal, food, lang, option, qty: 1 })
+    if (await addLogs([row], t('nutrition.added', { name: row.name }))) closeAll()
+  }
+
+  async function copyPrevious() {
+    const rows = cloneLogs(prevLogs, { uid, date })
+    await addLogs(rows, t('nutrition.copied', { n: rows.length }))
+  }
+
+  async function onSaveTargets(values) {
+    try {
+      const saved = await saveTargets(uid, values)
+      setTargets(saved)
+      showToast(t('nutrition.targetsSaved'))
+      pop()
+    } catch (err) {
+      console.error(err)
+      toast(friendlyError(err, t), 'error')
+    }
+  }
+
+  async function onSaveEdit(id, patch) {
+    try {
+      await updateLog(id, patch)
+      reload()
+      closeAll()
+    } catch (err) {
+      console.error(err)
+      toast(friendlyError(err, t), 'error')
+    }
+  }
+
+  async function onDeleteLog(id) {
+    if (!(await confirm({ title: t('nutrition.deleteTitle'), body: t('nutrition.deleteBody'), confirmLabel: t('nutrition.delete'), danger: true }))) return
+    try {
+      await deleteLogs([id])
+      reload()
+      closeAll()
+    } catch (err) {
+      console.error(err)
+      toast(friendlyError(err, t), 'error')
+    }
+  }
+
+  async function onSaveMeal(m, name) {
+    try {
+      await saveMeal(uid, name, logs.filter((r) => r.meal === m))
+      showToast(t('nutrition.mealSaved'))
+      pop()
+    } catch (err) {
+      console.error(err)
+      toast(friendlyError(err, t), 'error')
+    }
+  }
+
+  // ----- derived
+  const totals = sumLogs(logs)
+  const prevTotals = sumLogs(prevLogs)
+  const isToday = date === today
+  const dateObj = new Date(date + 'T00:00:00')
+  const dayLabel = isToday ? t('nutrition.today') : date === shiftDay(today, -1) ? t('nutrition.yesterday') : fmtDate(lang, dateObj, { weekday: 'long' })
+  const dateLine = fmtDate(lang, dateObj, { weekday: 'short', day: 'numeric', month: 'long' })
+  const g = t('nutrition.g')
+  const k = t('nutrition.kcalUnit')
+  const notSetUp = loadError && isNotSetUp(loadError)
+
+  const topView = stack[stack.length - 1]
+  const targetsKnown = !loading && !loadError
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <div className="eyebrow mb-1">{t('nutrition.betaTag')}</div>
-        <h1 className="text-3xl">{t('nutrition.title')}</h1>
-        <p className="text-chalkdim text-sm mt-2">{t('nutrition.betaNote')}</p>
-      </div>
-
-      <Card className="flex flex-col gap-4">
-        <Button onClick={startCamera} className="w-full min-h-[56px] text-base" disabled={busy}>
-          <ScanBarcode size={22} /> {t('nutrition.scanButton')}
-        </Button>
-
-        <form onSubmit={submitManual} className="flex flex-col gap-1.5">
-          <label htmlFor="nutrition-manual" className="eyebrow">
-            {t('nutrition.manualLabel')}
-          </label>
-          <div className="flex gap-2">
-            <input
-              id="nutrition-manual"
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              autoComplete="off"
-              dir="ltr"
-              className="flex-1 min-w-0 num"
-              value={manual}
-              onChange={(e) => setManual(e.target.value.replace(/[^\d\s]/g, ''))}
-              placeholder="7290004127329"
-            />
-            <Button type="submit" variant="subtle" disabled={busy || !manual.trim()}>
-              <Search size={16} /> {t('nutrition.lookup')}
-            </Button>
-          </div>
-        </form>
-
-        <div className="flex flex-col gap-1.5">
-          <span className="eyebrow">{t('nutrition.photoLabel')}</span>
-          <label className="inline-flex items-center justify-center gap-1.5 rounded-md px-3.5 py-2 min-h-[44px] text-sm font-medium border border-line text-chalk hover:bg-surface2 cursor-pointer press has-[:disabled]:opacity-40">
-            <ImagePlus size={16} />
-            {photoBusy ? t('nutrition.photoBusy') : t('nutrition.photoButton')}
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="sr-only"
-              onChange={onPhoto}
-              disabled={photoBusy || busy}
-              aria-label={t('nutrition.photoButton')}
-            />
-          </label>
-          <p className="text-chalkdim text-xs">{t('nutrition.photoHint')}</p>
+    <div className="flex flex-col gap-5 max-w-xl mx-auto w-full pb-6">
+      <div className="flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <div className="eyebrow mb-1">{actingAs ? <bdi>{actingAs.name || actingAs.email}</bdi> : t('nutrition.title')}</div>
+          <h1 className="text-3xl truncate">{dayLabel}</h1>
+          <p className="text-chalkdim text-sm mt-1 font-body"><bdi>{dateLine}</bdi></p>
         </div>
-      </Card>
-
-      <ResultView result={result} lang={lang} onRetry={() => result?.code && lookup(result.code)} onScanAnother={scanAnother} />
-
-      <Card>
-        <h2 className="eyebrow mb-3">{t('nutrition.diagTitle')}</h2>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-          <Diag label={t('nutrition.diagEngine')} value={diag.engine === 'native' ? t('nutrition.engineNative') : diag.engine === 'wasm' ? t('nutrition.engineWasm') : '—'} />
-          <Diag
-            label={t('nutrition.diagFirst')}
-            value={diag.firstMs != null ? `${diag.firstMs} ms (${diag.firstSource === 'photo' ? t('nutrition.diagPhoto') : t('nutrition.diagCamera')})` : '—'}
-          />
-          <Diag label={t('nutrition.diagPerm')} value={diag.perm} />
-          <Diag label={t('nutrition.diagDisplay')} value={displayMode() === 'standalone' ? t('nutrition.displayStandalone') : t('nutrition.displayBrowser')} />
-          <Diag label={t('nutrition.diagUA')} value={shortUA()} />
-        </dl>
-      </Card>
-
-      <p className="text-chalkdim text-xs">
-        {t('nutrition.attrBefore')}
-        <a className="underline hover:text-chalk whitespace-nowrap" href="https://world.openfoodfacts.org" target="_blank" rel="noopener noreferrer">
-          Open Food Facts
-        </a>
-        {t('nutrition.attrMid')}
-        <a className="underline hover:text-chalk whitespace-nowrap" href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener noreferrer">
-          Open Database License
-        </a>
-        {t('nutrition.attrAfter')}
-      </p>
-
-      {scanning &&
-        createPortal(
-          <ScannerOverlay videoRef={videoRef} cam={cam} camError={camError} onClose={closeScanner} onRestart={startCamera} />,
-          document.body,
-        )}
-    </div>
-  )
-}
-
-function Diag({ label, value }) {
-  return (
-    <>
-      <dt className="text-chalkdim">{label}</dt>
-      <dd className="num break-words min-w-0 text-end">
-        <bdi>{value}</bdi>
-      </dd>
-    </>
-  )
-}
-
-function ScannerOverlay({ videoRef, cam, camError, onClose, onRestart }) {
-  const { t } = useLanguage()
-  return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col" role="dialog" aria-modal="true" aria-label={t('nutrition.scanButton')}>
-      <video
-        ref={videoRef}
-        playsInline
-        muted
-        autoPlay
-        className={`absolute inset-0 w-full h-full object-cover ${cam === 'live' ? '' : 'invisible'}`}
-      />
-
-      <div
-        className="relative z-10 flex items-center justify-between px-4 pb-3"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
-      >
-        <span className="text-sm text-chalk bg-black/60 rounded-md px-3 py-1.5">{t('nutrition.scanTitle')}</span>
-        <button
-          className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-full bg-black/60 text-chalk"
-          aria-label={t('nutrition.closeScanner')}
-          onClick={onClose}
-        >
-          <X size={22} />
-        </button>
-      </div>
-
-      <div className="relative z-10 flex-1 flex items-center justify-center px-6">
-        {cam === 'live' && (
-          <div
-            className="w-full max-w-sm aspect-[5/3] rounded-xl border-2 border-brass"
-            style={{ boxShadow: '0 0 0 100vmax rgba(0,0,0,0.45)' }}
-            aria-hidden="true"
-          />
-        )}
-        {cam === 'starting' && <p className="text-chalk text-sm animate-pulse">{t('nutrition.starting')}</p>}
-        {cam === 'ended' && (
-          <div className="flex flex-col items-center gap-3 text-center">
-            <p className="text-chalk text-sm max-w-xs">{t('nutrition.cameraEnded')}</p>
-            <Button onClick={onRestart} className="min-h-[52px]">
-              <RefreshCw size={18} /> {t('nutrition.restartCamera')}
-            </Button>
-          </div>
-        )}
-        {cam === 'error' && (
-          <div className="flex flex-col items-center gap-3 text-center">
-            <Camera size={28} className="text-chalkdim" />
-            <p className="text-chalk text-sm max-w-xs" role="alert">
-              {camError}
-            </p>
-            <Button variant="subtle" onClick={onClose}>
-              {t('nutrition.enterManually')}
-            </Button>
-          </div>
-        )}
-      </div>
-
-      <div
-        className="relative z-10 px-6 pt-3 text-center"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 24px)' }}
-      >
-        {cam === 'live' && <p className="text-chalk text-sm bg-black/60 rounded-md px-3 py-1.5 inline-block">{t('nutrition.scanHint')}</p>}
-      </div>
-    </div>
-  )
-}
-
-function ResultView({ result, lang, onRetry, onScanAnother }) {
-  const { t } = useLanguage()
-  if (!result) return null
-  const { status, code } = result
-
-  if (status === 'loading') {
-    return (
-      <Card>
-        <p className="text-chalkdim text-sm animate-pulse" role="status">
-          {t('nutrition.lookingUp')} <span className="num" dir="ltr">{code}</span>
-        </p>
-      </Card>
-    )
-  }
-
-  if (status === 'found') {
-    const p = result.product
-    const n = p.nutriments || {}
-    const name = productName(p, lang) || t('nutrition.unnamed')
-    const rows = [
-      [t('nutrition.kcal'), num(n['energy-kcal_100g'], 0), 'kcal'],
-      [t('nutrition.protein'), num(n.proteins_100g), 'g'],
-      [t('nutrition.carbs'), num(n.carbohydrates_100g), 'g'],
-      [t('nutrition.fat'), num(n.fat_100g), 'g'],
-      [t('nutrition.fiber'), num(n.fiber_100g), 'g'],
-    ]
-    return (
-      <Card className="flex flex-col gap-4">
-        <div className="flex gap-3 items-start">
-          {p.image_front_small_url ? (
-            <img src={p.image_front_small_url} alt="" className="w-20 h-20 rounded-md object-contain bg-white shrink-0" />
-          ) : (
-            <div className="w-20 h-20 rounded-md bg-surface2 shrink-0" aria-hidden="true" />
+        <div className="flex items-center gap-1 shrink-0">
+          {!isToday && (
+            <button type="button" onClick={() => setDate(today)} className="min-h-[44px] px-3 rounded-md text-sm text-chalk border border-line hover:bg-surface2">
+              {t('nutrition.today')}
+            </button>
           )}
-          <div className="min-w-0">
-            <h2 className="text-xl leading-tight break-words"><bdi>{name}</bdi></h2>
-            {p.brands && <p className="text-chalkdim text-sm mt-1 break-words"><bdi>{p.brands}</bdi></p>}
-            {p.quantity && <p className="text-chalkdim text-sm break-words"><bdi>{p.quantity}</bdi></p>}
-            <p className="text-chalkdim text-xs num mt-1" dir="ltr">{code}</p>
-          </div>
+          <button type="button" onClick={() => setDate(shiftDay(date, -1))} aria-label={t('nutrition.prevDay')} className="w-11 h-11 inline-flex items-center justify-center rounded-md hover:bg-surface2 press">
+            <span className="rtl:hidden"><ChevronLeft size={22} /></span>
+            <span className="ltr:hidden"><ChevronRight size={22} /></span>
+          </button>
+          <button type="button" disabled={isToday} onClick={() => setDate(shiftDay(date, 1))} aria-label={t('nutrition.nextDay')} className="w-11 h-11 inline-flex items-center justify-center rounded-md hover:bg-surface2 press disabled:opacity-30 disabled:pointer-events-none">
+            <span className="rtl:hidden"><ChevronRight size={22} /></span>
+            <span className="ltr:hidden"><ChevronLeft size={22} /></span>
+          </button>
         </div>
-        <div>
-          <div className="eyebrow mb-2">{t('nutrition.per100')}</div>
-          <dl className="flex flex-col divide-y divide-line">
-            {rows.map(([label, value, unit]) => (
-              <div key={label} className="flex items-center justify-between py-2 text-sm">
-                <dt className="text-chalkdim">{label}</dt>
-                <dd className="num" dir="ltr">
-                  {value}
-                  {value !== '—' && <span className="text-chalkdim"> {unit}</span>}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-        <Button variant="subtle" onClick={onScanAnother}>
-          <ScanBarcode size={16} /> {t('nutrition.scanAnother')}
-        </Button>
-      </Card>
-    )
-  }
+      </div>
 
-  const messages = {
-    invalid: ['nutrition.invalid', false],
-    weighed: ['nutrition.weighed', false],
-    notfound: ['nutrition.notFound', false],
-    error: ['nutrition.networkError', true],
-    nophoto: ['nutrition.noBarcodeInPhoto', false],
-    decoder: ['nutrition.decoderError', false],
-  }
-  const [key, canRetry] = messages[status] || []
-  if (!key) return null
+      {loading && <p className="eyebrow animate-pulse">{t('common.loading')}</p>}
+      {loadError && notSetUp && (
+        <div className="card p-4" role="alert">
+          <p className="text-sm">{t('nutrition.notSetUp')}</p>
+        </div>
+      )}
+      {loadError && !notSetUp && (
+        <div>
+          <LoadError onRetry={reload} />
+        </div>
+      )}
+
+      {targetsKnown && (
+        <>
+          <Summary totals={totals} targets={targets} isAdmin={isAdmin} onEdit={() => push({ type: 'targets' })} />
+          {!targets && (
+            <Card className="flex flex-col gap-2">
+              {isAdmin ? (
+                <>
+                  <h2 className="text-lg">{t('nutrition.noTargetsTitle')}</h2>
+                  <p className="text-chalkdim text-sm">{t('nutrition.noTargetsBody')}</p>
+                  <div>
+                    <Button variant="ghost" onClick={() => push({ type: 'targets' })}>
+                      {t('nutrition.setTargets')}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-chalkdim">{t('nutrition.coachWillSet')}</p>
+              )}
+            </Card>
+          )}
+
+          <div className="flex gap-2">
+            <Button variant="brass" className="flex-1 min-h-[56px] text-base" onClick={() => openAdd(defaultMeal())}>
+              <Plus size={20} /> {t('nutrition.addFood')}
+            </Button>
+            <Button variant="subtle" className="min-h-[56px] px-5 text-base" onClick={() => openScanner(defaultMeal())}>
+              <ScanBarcode size={20} /> {t('nutrition.scan')}
+            </Button>
+          </div>
+
+          {prevLogs.length > 0 && (
+            <Card className="flex items-center justify-between gap-3 !py-3">
+              <div className="min-w-0">
+                <div className="eyebrow">{date === today ? t('nutrition.yesterday') : t('nutrition.previousDayLabel')}</div>
+                <p className="text-sm mt-0.5 whitespace-nowrap">
+                  <N mono>{fmt(prevTotals.protein, 1)}</N> {g} {t('nutrition.proteinWord')}
+                </p>
+                <p className="text-chalkdim text-xs whitespace-nowrap">
+                  <N mono>{fmt(prevTotals.kcal, 0)}</N> {k}
+                </p>
+              </div>
+              <Button variant="ghost" className="shrink-0 whitespace-nowrap" onClick={copyPrevious}>
+                <Copy size={16} /> {date === today ? t('nutrition.copyYesterday') : t('nutrition.copyPrevious')}
+              </Button>
+            </Card>
+          )}
+
+          {MEALS.map((m) => {
+            const rows = logs.filter((r) => r.meal === m)
+            const mk = sumLogs(rows).kcal
+            return (
+              <section key={m} aria-labelledby={`meal-${m}`}>
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <h2 id={`meal-${m}`} className="text-xl flex items-baseline gap-2.5 min-w-0">
+                    <span className="truncate">{t(MEAL_KEY[m])}</span>
+                    {mk > 0 && (
+                      <span className="text-chalkdim text-sm whitespace-nowrap">
+                        <N mono>{fmt(mk, 0)}</N> {k}
+                      </span>
+                    )}
+                  </h2>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {rows.length > 0 && (
+                      <button type="button" onClick={() => push({ type: 'saveMeal', meal: m })} aria-label={`${t('nutrition.saveAsMeal')}: ${t(MEAL_KEY[m])}`} title={t('nutrition.saveAsMeal')} className="w-11 h-11 inline-flex items-center justify-center rounded-md text-chalkdim hover:text-chalk hover:bg-surface2">
+                        <Bookmark size={19} />
+                      </button>
+                    )}
+                    <button type="button" onClick={() => openAdd(m)} aria-label={t('nutrition.addToMealLabel', { meal: t(MEAL_KEY[m]) })} className="w-11 h-11 inline-flex items-center justify-center rounded-md border border-line bg-surface2 hover:border-chalk press">
+                      <Plus size={20} />
+                    </button>
+                  </div>
+                </div>
+                {rows.length === 0 ? (
+                  <p className="text-chalkdim text-sm px-1 pb-1">{t('nutrition.nothingLogged')}</p>
+                ) : (
+                  <ul className="card divide-y divide-line overflow-hidden">
+                    {rows.map((r) => (
+                      <li key={r.id}>
+                        <button type="button" onClick={() => push({ type: 'edit', row: r })} className="w-full flex items-center justify-between gap-3 px-4 py-3 min-h-[60px] text-start hover:bg-surface2 press-row">
+                          <div className="min-w-0 flex-1">
+                            <Name className="font-medium">{r.name}</Name>
+                            {r.grams != null && (
+                              <span className="block text-chalkdim text-xs whitespace-nowrap truncate mt-0.5">
+                                <AmountText row={r} />
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-end shrink-0">
+                            <div className="whitespace-nowrap">
+                              <N mono className="text-base">{fmt(r.protein, 1)}</N> <span className="text-chalkdim text-xs">{g} {t('nutrition.proteinWord')}</span>
+                            </div>
+                            <div className="text-chalkdim text-xs whitespace-nowrap mt-0.5">
+                              <N mono>{fmt(r.kcal, 0)}</N> {k}
+                            </div>
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            )
+          })}
+        </>
+      )}
+
+      {stack.length > 0 && (
+        <Sheet onClose={closeAll} label={t('nutrition.title')}>
+          {stack.map((v, i) => {
+            const isTop = i === stack.length - 1
+            const common = { onClose: closeAll, onBack: i > 0 ? pop : undefined }
+            let body = null
+            switch (v.type) {
+              case 'add':
+                body = (
+                  <AddFood
+                    meal={meal}
+                    setMeal={setMeal}
+                    uid={uid}
+                    date={date}
+                    onClose={closeAll}
+                    onScan={() => setScanner(true)}
+                    onPick={(food) => push({ type: 'detail', food })}
+                    onLabel={() => push({ type: 'label', barcode: '' })}
+                    onLog={addLogs}
+                    onManageMeals={() => push({ type: 'meals' })}
+                  />
+                )
+                break
+              case 'detail':
+                body = <FoodDetail {...common} food={v.food} meal={meal} setMeal={setMeal} targets={targets} totals={totals} favUid={uid} isAdmin={isAdmin} onLog={logFood} />
+                break
+              case 'label':
+                body = (
+                  <LabelForm
+                    {...common}
+                    barcode={v.barcode}
+                    uid={user.uid}
+                    isAdmin={isAdmin}
+                    onSaved={onLabelSaved}
+                    onUseExisting={(food) => setStack((s) => [...s.slice(0, -1), { type: 'detail', food }])}
+                  />
+                )
+                break
+              case 'edit':
+                body = <EditLog {...common} row={v.row} onSave={onSaveEdit} onDelete={onDeleteLog} />
+                break
+              case 'targets':
+                body = <TargetsView {...common} targets={targets} onSave={onSaveTargets} />
+                break
+              case 'saveMeal':
+                body = (
+                  <SaveMealView
+                    {...common}
+                    defaultName={t(MEAL_KEY[v.meal])}
+                    count={logs.filter((r) => r.meal === v.meal).length}
+                    onSave={(name) => onSaveMeal(v.meal, name)}
+                  />
+                )
+                break
+              case 'meals':
+                body = <MyMealsView {...common} uid={uid} date={date} meal={meal} setMeal={setMeal} onLog={addLogs} />
+                break
+              default:
+                break
+            }
+            return (
+              <div key={i} className={`${isTop ? 'flex' : 'hidden'} flex-col flex-1 min-h-0`}>
+                {body}
+              </div>
+            )
+          })}
+        </Sheet>
+      )}
+
+      {scanner && (
+        <Scanner
+          uid={user.uid}
+          meal={meal}
+          setMeal={setMeal}
+          onClose={() => setScanner(false)}
+          onNotFound={(code) => {
+            setScanner(false)
+            setStack((s) => (s.length ? [...s, { type: 'label', barcode: code }] : [{ type: 'label', barcode: code }]))
+          }}
+          onAdd={logFood}
+        />
+      )}
+
+      <UndoToast toast={undoToast} onUndo={undo} />
+    </div>
+  )
+}
+
+function Summary({ totals, targets, isAdmin, onEdit }) {
+  const { t } = useLanguage()
+  const g = t('nutrition.g')
+  const k = t('nutrition.kcalUnit')
+  const p = totals.protein
+  const pLeft = targets?.protein != null ? targets.protein - p : null
+  const kLeft = targets?.kcal != null ? targets.kcal - totals.kcal : null
   return (
-    <Card className="flex flex-col gap-3">
-      <p className="text-sm" role="alert">
-        {t(key)}
-        {code && status !== 'weighed' && (
-          <>
-            {' '}
-            <span className="num text-chalkdim" dir="ltr">{code}</span>
-          </>
+    <Card className="flex flex-col gap-4">
+      <div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="eyebrow">{t('nutrition.protein')}</span>
+          <span className="flex items-center gap-1">
+            {pLeft != null && (
+              <span className="text-chalkdim text-sm whitespace-nowrap">
+                {pLeft > 0 ? (
+                  <>
+                    <N mono className="text-chalk">{fmt(pLeft, 0)}</N> {g} {t('nutrition.left')}
+                  </>
+                ) : (
+                  t('nutrition.targetReached')
+                )}
+              </span>
+            )}
+            {isAdmin && targets && (
+              <button type="button" onClick={onEdit} aria-label={t('nutrition.editTargets')} className="w-11 h-11 -my-2 -me-2 inline-flex items-center justify-center rounded-md text-chalkdim hover:text-chalk hover:bg-surface2">
+                <Pencil size={16} />
+              </button>
+            )}
+          </span>
+        </div>
+        <div className="flex items-baseline gap-2 mt-1">
+          <N mono className="text-3xl leading-none">{fmt(p, 0)}</N>
+          {targets?.protein != null && (
+            <span className="text-chalkdim text-sm whitespace-nowrap">
+              {t('nutrition.of')} <N mono>{fmt(targets.protein, 0)}</N> {g}
+            </span>
+          )}
+          {targets?.protein == null && <span className="text-chalkdim text-sm">{g}</span>}
+        </div>
+        {targets?.protein > 0 && (
+          <div className="mt-3">
+            <Track value={p} max={targets.protein} />
+          </div>
         )}
-      </p>
-      <div className="flex gap-2 flex-wrap">
-        {status === 'decoder' && (
-          <Button variant="subtle" onClick={() => window.location.reload()}>
-            <RefreshCw size={16} /> {t('nutrition.reload')}
-          </Button>
+      </div>
+
+      <div className="border-t border-line pt-4">
+        <div className="flex items-center justify-between gap-2">
+          <span className="eyebrow">{t('nutrition.calories')}</span>
+          {kLeft != null && (
+            <span className="text-chalkdim text-sm whitespace-nowrap">
+              <N mono className="text-chalk">{fmt(Math.abs(kLeft), 0)}</N> {kLeft >= 0 ? t('nutrition.left') : t('nutrition.overTarget')}
+            </span>
+          )}
+        </div>
+        <div className="flex items-baseline gap-2 mt-1">
+          <N mono className="text-xl leading-none">{fmt(totals.kcal, 0)}</N>
+          <span className="text-chalkdim text-sm whitespace-nowrap">
+            {targets?.kcal != null ? (
+              <>
+                {t('nutrition.of')} <N mono>{fmt(targets.kcal, 0)}</N> {k}
+              </>
+            ) : (
+              k
+            )}
+          </span>
+        </div>
+        {targets?.kcal > 0 && (
+          <div className="mt-2.5">
+            <Track value={totals.kcal} max={targets.kcal} />
+          </div>
         )}
-        {canRetry && (
-          <Button variant="subtle" onClick={onRetry}>
-            <RefreshCw size={16} /> {t('nutrition.retry')}
-          </Button>
-        )}
-        <Button variant="ghost" onClick={onScanAnother}>
-          <ScanBarcode size={16} /> {t('nutrition.scanAnother')}
-        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 border-t border-line pt-4">
+        {[
+          [t('nutrition.carbs'), totals.carbs, targets?.carbs],
+          [t('nutrition.fat'), totals.fat, targets?.fat],
+        ].map(([label, v, target]) => (
+          <div key={label}>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="eyebrow">{label}</span>
+              <span className="text-chalkdim text-sm whitespace-nowrap">
+                <N mono className="text-chalk">{fmt(v, 0)}</N>
+                {target != null && (
+                  <>
+                    {' / '}
+                    <N mono>{fmt(target, 0)}</N>
+                  </>
+                )}{' '}
+                {g}
+              </span>
+            </div>
+            {target > 0 && (
+              <div className="mt-2">
+                <Track value={v} max={target} size="sm" />
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </Card>
   )

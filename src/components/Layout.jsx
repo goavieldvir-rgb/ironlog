@@ -19,7 +19,7 @@ const links = [
 
 export default function Layout() {
   const { user, logout } = useAuth()
-  const { isAdmin, actingAs, setActingAs } = useAdmin()
+  const { isAdmin, nutritionAllowed, actingAs, setActingAs } = useAdmin()
   const { t, lang, setLang } = useLanguage()
   const [open, setOpen] = useState(false)
   useScrollLock(open)
@@ -46,13 +46,11 @@ export default function Layout() {
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
 
-  const navLinks = isAdmin
-    ? [
-        ...links,
-        { to: '/people', labelKey: 'nav.people', icon: Users },
-        { to: '/nutrition', labelKey: 'nav.nutrition', icon: Apple },
-      ]
-    : links
+  const navLinks = [
+    ...links,
+    ...(isAdmin ? [{ to: '/people', labelKey: 'nav.people', icon: Users }] : []),
+    ...(nutritionAllowed ? [{ to: '/nutrition', labelKey: 'nav.nutrition', icon: Apple }] : []),
+  ]
 
   function toggleLang() {
     setLang(lang === 'en' ? 'he' : 'en')
