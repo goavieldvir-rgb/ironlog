@@ -402,6 +402,7 @@ function Diary() {
                   <LabelForm
                     {...common}
                     barcode={v.barcode}
+                    prefill={v.prefill}
                     uid={user.uid}
                     isAdmin={isAdmin}
                     onSaved={onLabelSaved}
@@ -446,9 +447,10 @@ function Diary() {
           meal={meal}
           setMeal={setMeal}
           onClose={() => setScanner(false)}
-          onNotFound={(code) => {
+          onNotFound={(code, prefill) => {
             setScanner(false)
-            setStack((s) => (s.length ? [...s, { type: 'label', barcode: code }] : [{ type: 'label', barcode: code }]))
+            const view = { type: 'label', barcode: code, prefill }
+            setStack((s) => (s.length ? [...s, view] : [view]))
           }}
           onAdd={logFood}
         />

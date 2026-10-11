@@ -389,9 +389,22 @@ function numOrNull(v) {
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n))
 
 // Open Food Facts product -> foods row (or null when it has no usable energy).
+// Energy per 100 g in kcal. Many Israeli OFF products carry only kJ.
+function offKcal(p) {
+  const n = p.nutriments || {}
+  const direct = numOrNull(n['energy-kcal_100g'])
+  if (direct != null) return direct
+  if (p.nutrition_data_per === '100g') {
+    const plain = numOrNull(n['energy-kcal'])
+    if (plain != null) return plain
+  }
+  const kj = numOrNull(n['energy-kj_100g']) ?? numOrNull(n.energy_100g) // energy_100g is kJ
+  return kj == null ? null : kj / 4.184
+}
+
 export function offToFood(p, code, uid) {
   const n = p.nutriments || {}
-  const kcal = numOrNull(n['energy-kcal_100g'])
+  const kcal = offKcal(p)
   if (kcal == null || kcal < 0 || kcal > 900) return null
   const pick = (...keys) => keys.map((k) => (p[k] && String(p[k]).trim()) || null).find(Boolean) || null
   const nameHe = pick('product_name_he')
@@ -458,7 +471,8 @@ export async function cacheOffFood(row) {
 
 // Barcode -> food. Known foods first, then Open Food Facts (cached into
 // `foods` on the first scan). Returns
-//   { status: 'found', food, image } | { status: 'notfound' }
+//   { status: 'found', food, image } | { status: 'notfound' } |
+//   { status: 'incomplete', code, name, brand, servingG, image } (OFF has it, no energy)
 // and throws on a network/database failure (err.offFailure for the former).
 export async function resolveBarcode(code, uid) {
   const local = await findFoodsByBarcode(code)
@@ -466,7 +480,19 @@ export async function resolveBarcode(code, uid) {
   const product = await fetchOff(code)
   if (!product) return { status: 'notfound' }
   const row = offToFood(product, code, uid)
-  if (!row) return { status: 'notfound' }
+  if (!row) {
+    // OFF knows the product but has no usable energy value: hand its details to the label form.
+    const pick = (...keys) => keys.map((k) => (product[k] && String(product[k]).trim()) || null).find(Boolean) || null
+    const servingG = numOrNull(product.serving_quantity) ?? parseGrams(product.serving_size)
+    return {
+      status: 'incomplete',
+      code,
+      name: pick('product_name_he', 'product_name_en', 'product_name'),
+      brand: product.brands ? String(product.brands).split(',')[0].trim() || null : null,
+      servingG: servingG > 0 ? round1(servingG) : null,
+      image: product.image_front_small_url || null,
+    }
+  }
   const food = await cacheOffFood(row)
   return { status: 'found', food, image: product.image_front_small_url || null }
 }

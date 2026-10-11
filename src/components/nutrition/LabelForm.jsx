@@ -6,10 +6,19 @@ import { createLabelFood, findFoodsByBarcode, foodName, friendlyError, parseNum,
 import { Name, SheetHeader, SourceLabel } from './parts.jsx'
 
 // Add a product from its label ("new product"). Values are per 100 g.
-export default function LabelForm({ barcode: initialBarcode = '', uid, isAdmin, onBack, onClose, onSaved, onUseExisting }) {
+export default function LabelForm({ barcode: initialBarcode = '', prefill, uid, isAdmin, onBack, onClose, onSaved, onUseExisting }) {
   const { t, lang } = useLanguage()
   const scanned = !!initialBarcode
-  const [f, setF] = useState({ name: '', barcode: initialBarcode, kcal: '', protein: '', carbs: '', fat: '', serving: '' })
+  const incomplete = scanned && prefill?.status === 'incomplete'
+  const [f, setF] = useState({
+    name: (incomplete && (prefill.name || prefill.brand)) || '',
+    barcode: initialBarcode,
+    kcal: '',
+    protein: '',
+    carbs: '',
+    fat: '',
+    serving: incomplete && prefill.servingG > 0 ? String(prefill.servingG) : '',
+  })
   const [error, setError] = useState('')
   const [existing, setExisting] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -69,8 +78,14 @@ export default function LabelForm({ barcode: initialBarcode = '', uid, isAdmin, 
             <div className="rounded-lg border border-line bg-ink p-3 flex gap-2.5 text-sm text-chalkdim">
               <AlertCircle size={18} className="shrink-0 mt-0.5" aria-hidden="true" />
               <div>
-                <p className="text-chalk font-medium">{t('nutrition.barcodeNotFoundTitle')}</p>
-                <p>{t('nutrition.barcodeNotFoundBody')}</p>
+                {incomplete ? (
+                  <p className="text-chalk font-medium">{t('nutrition.barcodeIncomplete', { name: prefill.name || prefill.brand || initialBarcode })}</p>
+                ) : (
+                  <>
+                    <p className="text-chalk font-medium">{t('nutrition.barcodeNotFoundTitle')}</p>
+                    <p>{t(isAdmin ? 'nutrition.barcodeNotFoundBodyAdmin' : 'nutrition.barcodeNotFoundBody')}</p>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -127,10 +142,13 @@ export default function LabelForm({ barcode: initialBarcode = '', uid, isAdmin, 
             </span>
             <input inputMode="decimal" dir="ltr" className="num w-full text-center" value={f.serving} onChange={set('serving')} placeholder={g} />
           </label>
-          <p className="flex gap-2.5 items-start text-sm text-chalkdim">
-            <SourceLabel food={{ source: isAdmin ? 'coach' : 'user', verified: !!isAdmin }} className="text-xs mt-0.5" />
-            <span>{isAdmin ? t('nutrition.unverifiedNoteAdmin') : t('nutrition.unverifiedNote')}</span>
-          </p>
+          {/* the not-found banner already says who the product is saved for */}
+          {!(scanned && !incomplete) && (
+            <p className="flex gap-2.5 items-start text-sm text-chalkdim">
+              <SourceLabel food={{ source: isAdmin ? 'coach' : 'user', verified: !!isAdmin }} className="text-xs mt-0.5" />
+              <span>{isAdmin ? t('nutrition.unverifiedNoteAdmin') : t('nutrition.unverifiedNote')}</span>
+            </p>
+          )}
           {error && (
             <p className="text-sm text-irontext" role="alert">
               {error}
