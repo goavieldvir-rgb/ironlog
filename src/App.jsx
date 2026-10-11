@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { Suspense, lazy, useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext.jsx'
 import { useLanguage } from './context/LanguageContext.jsx'
@@ -24,6 +24,8 @@ import Account from './components/Account.jsx'
 import ResetPassword from './components/ResetPassword.jsx'
 import ConsentGate from './components/ConsentGate.jsx'
 import Privacy from './components/Privacy.jsx'
+// Admin-only beta screen: loaded on demand so trainees never download it.
+const Nutrition = lazy(() => import('./components/Nutrition.jsx'))
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -81,6 +83,7 @@ export default function App() {
         <Route path="/history/:id/edit" element={<EditSession />} />
         <Route path="/people" element={<People />} />
         <Route path="/errors" element={<ErrorLogs />} />
+        <Route path="/nutrition" element={<Suspense fallback={null}><Nutrition /></Suspense>} />
         <Route path="/stats" element={<Stats />} />
         <Route path="/weight" element={<BodyWeight />} />
         <Route path="/summary" element={<WeeklySummary />} />
