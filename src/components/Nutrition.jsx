@@ -14,11 +14,28 @@ import { Button, Card } from './ui.jsx'
 
 const OFF_FIELDS =
   'code,product_name,product_name_he,product_name_en,brands,quantity,serving_size,nutriments,image_front_small_url'
-const SCAN_INTERVAL_MS = 200
+const SCAN_INTERVAL_MS = 120
+// Decode only the middle of the frame (where the guide box is), scaled down:
+// far less work per frame than the full camera picture, so codes read sooner.
+const CROP_W = 0.9
+const CROP_H = 0.5
+const MAX_DECODE_W = 960
 const LOOKUP_TIMEOUT_MS = 10000
 
 // Loads the decoder chunk and its wasm. Fails after a deploy in a tab that
 // still references the old chunk names; callers show a reload prompt.
+function cropFrame(video, canvas) {
+  const sw = Math.round(video.videoWidth * CROP_W)
+  const sh = Math.round(video.videoHeight * CROP_H)
+  const sx = Math.round((video.videoWidth - sw) / 2)
+  const sy = Math.round((video.videoHeight - sh) / 2)
+  const scale = Math.min(1, MAX_DECODE_W / sw)
+  canvas.width = Math.round(sw * scale)
+  canvas.height = Math.round(sh * scale)
+  canvas.getContext('2d', { willReadFrequently: true }).drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height)
+  return canvas
+}
+
 function loadDecoder() {
   return import('../lib/barcodeDecoder.js').then((m) => m.getDetector().then((d) => ({ m, engine: d.engine })))
 }
@@ -95,6 +112,7 @@ function NutritionPage() {
   const firstLoggedRef = useRef(false)
   const lookupSeq = useRef(0)
   const lastLookedUp = useRef('')
+  const canvasRef = useRef(null)
 
   useScrollLock(scanning)
 
@@ -119,6 +137,14 @@ function NutritionPage() {
       setDiag((d) => ({ ...d, perm: t('nutrition.diagUnknown') }))
     }
   }, [t])
+
+  // Fetch and compile the decoder while the page is idle, so the first scan
+  // doesn't wait for the ~1 MB download.
+  useEffect(() => {
+    loadDecoder()
+      .then((d) => setDiag((x) => ({ ...x, engine: d.engine })))
+      .catch(() => {}) // retried, with a visible error, when scanning starts
+  }, [])
 
   useEffect(() => {
     refreshPerm()
@@ -196,7 +222,11 @@ function NutritionPage() {
           decoderFailed(err)
           return null
         })
-        .then((loaded) => loaded && loaded.m.detectFrom(video))
+        .then((loaded) => {
+          if (!loaded) return null
+          if (!canvasRef.current) canvasRef.current = document.createElement('canvas')
+          return loaded.m.detectFrom(cropFrame(video, canvasRef.current))
+        })
         .then((value) => {
           // Misreads fail the check digit; keep scanning instead of showing an error.
           if (!value || !activeRef.current || !validateBarcode(value)) return
@@ -229,7 +259,7 @@ function NutritionPage() {
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: false,
       })
       streamRef.current = stream
