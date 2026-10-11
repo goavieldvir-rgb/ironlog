@@ -137,7 +137,7 @@ export default function LabelForm({ barcode: initialBarcode = '', uid, isAdmin, 
             </p>
           )}
         </div>
-        <div className="p-4 border-t border-line shrink-0">
+        <div className="p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] border-t border-line shrink-0">
           <Button type="submit" variant="brass" className="w-full min-h-[52px] text-base" disabled={busy}>
             <Check size={20} /> {t('nutrition.saveAndAdd')}
           </Button>

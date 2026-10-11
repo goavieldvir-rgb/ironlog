@@ -153,7 +153,7 @@ export function EditLog({ row, onBack, onClose, onSave, onDelete }) {
           </div>
         )}
       </div>
-      <div className="p-4 border-t border-line shrink-0 flex gap-2">
+      <div className="p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] border-t border-line shrink-0 flex gap-2">
         <Button variant="danger" onClick={() => onDelete(row.id)} aria-label={t('nutrition.delete')} className="min-h-[52px] px-4">
           <Trash2 size={18} /> {t('nutrition.delete')}
         </Button>
@@ -215,7 +215,7 @@ export function TargetsView({ targets, onBack, onClose, onSave }) {
             </p>
           )}
         </div>
-        <div className="p-4 border-t border-line shrink-0">
+        <div className="p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] border-t border-line shrink-0">
           <Button type="submit" variant="brass" className="w-full min-h-[52px] text-base" disabled={busy}>
             <Check size={20} /> {t('nutrition.save')}
           </Button>
@@ -252,7 +252,7 @@ export function SaveMealView({ defaultName, count, onBack, onClose, onSave }) {
           </label>
           <p className="text-chalkdim text-sm">{count === 1 ? t('nutrition.itemsOne') : t('nutrition.itemsMany', { n: count })}</p>
         </div>
-        <div className="p-4 border-t border-line shrink-0">
+        <div className="p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] border-t border-line shrink-0">
           <Button type="submit" variant="brass" className="w-full min-h-[52px] text-base" disabled={!name.trim() || busy}>
             <Check size={20} /> {t('nutrition.save')}
           </Button>
@@ -299,7 +299,7 @@ export function MyMealsView({ uid, date, meal, setMeal, onBack, onClose, onLog }
       <div className="px-4 pt-2 shrink-0">
         <MealSelect value={meal} onChange={setMeal} />
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-6 pt-3 flex flex-col gap-3">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] pt-3 flex flex-col gap-3">
         {error && <p className="text-sm" role="alert">{error}</p>}
         {meals && meals.length === 0 && !error && <p className="text-chalkdim text-sm">{t('nutrition.noSavedMeals')}</p>}
         {(meals || []).map((m) => {

@@ -440,6 +440,22 @@ async function fetchOff(code) {
   }
 }
 
+// Cache an Open Food Facts row into `foods` (shared by scans and online
+// search picks). Always resolves to a usable food: the stored row, the row
+// someone else cached first, or the in-memory row when we may not insert
+// (rights, offline) - then the log just has no food_id.
+export async function cacheOffFood(row) {
+  try {
+    return await insertFood(row)
+  } catch (err) {
+    if (err?.code === '23505') {
+      const { data } = await supabase.from('foods').select('*').eq('source', 'off').eq('source_ref', row.source_ref).limit(1)
+      if (data?.[0]) return data[0]
+    }
+    return row
+  }
+}
+
 // Barcode -> food. Known foods first, then Open Food Facts (cached into
 // `foods` on the first scan). Returns
 //   { status: 'found', food, image } | { status: 'notfound' }
@@ -451,19 +467,83 @@ export async function resolveBarcode(code, uid) {
   if (!product) return { status: 'notfound' }
   const row = offToFood(product, code, uid)
   if (!row) return { status: 'notfound' }
-  let food
-  try {
-    food = await insertFood(row)
-  } catch (err) {
-    if (err?.code === '23505') {
-      const { data } = await supabase.from('foods').select('*').eq('source', 'off').eq('source_ref', code).limit(1)
-      food = data?.[0]
-    }
-    // Could not cache it (rights, offline): the scan still works, just
-    // without a food_id on the log.
-    if (!food) food = row
-  }
+  const food = await cacheOffFood(row)
   return { status: 'found', food, image: product.image_front_small_url || null }
+}
+
+// ---------------------------------------------------------------- online search
+
+const SEARCH_MIN_FRESH = 5
+const SEARCH_LIMIT = 8 // OFF allows ~10 searches/min/IP; stay under it
+const SEARCH_WINDOW_MS = 60000
+const searchCalls = []
+const searchCache = new Map()
+
+export const normalizeQuery = (q) => String(q || '').trim().toLowerCase().replace(/\s+/g, ' ')
+
+function takeSearchSlot() {
+  const now = Date.now()
+  while (searchCalls.length && now - searchCalls[0] > SEARCH_WINDOW_MS) searchCalls.shift()
+  if (searchCalls.length >= SEARCH_LIMIT) return false
+  searchCalls.push(now)
+  return true
+}
+
+async function fetchOffSearch(query, israelOnly, signal) {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), LOOKUP_TIMEOUT_MS)
+  const onAbort = () => ctrl.abort()
+  if (signal?.aborted) ctrl.abort()
+  else signal?.addEventListener('abort', onAbort)
+  try {
+    let url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=20&fields=${OFF_FIELDS}`
+    if (israelOnly) url += '&tagtype_0=countries&tag_contains_0=contains&tag_0=israel'
+    const res = await fetch(url, { signal: ctrl.signal })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = await res.json()
+    return Array.isArray(data.products) ? data.products : []
+  } catch (err) {
+    if (!signal?.aborted) err.offFailure = true
+    throw err
+  } finally {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', onAbort)
+  }
+}
+
+// Product name -> foods-shaped rows from Open Food Facts (not stored).
+// Israeli products first; widens to the world when that gives few. Throws
+// err.rateLimited when over the client-side limit, AbortError when cancelled.
+export async function searchOff(query, { signal, uid } = {}) {
+  const key = normalizeQuery(query)
+  if (searchCache.has(key)) return searchCache.get(key)
+  if (!takeSearchSlot()) {
+    const err = new Error('rate limited')
+    err.rateLimited = true
+    throw err
+  }
+  const seen = new Set()
+  const out = []
+  const add = (products) => {
+    for (const p of products) {
+      const code = p?.code ? String(p.code) : ''
+      if (!code || seen.has(code)) continue
+      seen.add(code)
+      const row = offToFood(p, code, uid)
+      if (row) out.push(row)
+    }
+  }
+  add(await fetchOffSearch(query.trim(), true, signal))
+  if (out.length < SEARCH_MIN_FRESH && takeSearchSlot()) {
+    try {
+      add(await fetchOffSearch(query.trim(), false, signal))
+    } catch (err) {
+      if (signal?.aborted) throw err
+      if (!out.length) throw err // the Israeli results still stand otherwise
+    }
+  }
+  searchCache.set(key, out)
+  return out
 }
 
 // ---------------------------------------------------------------- favorites (per device)
