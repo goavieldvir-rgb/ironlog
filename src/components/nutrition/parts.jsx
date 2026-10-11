@@ -143,7 +143,7 @@ export function Sheet({ onClose, children, label }) {
   }, [onClose])
   return createPortal(
     <div
-      className="fixed inset-0 z-40 bg-ink/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-40 bg-ink/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 pt-[calc(env(safe-area-inset-top,0px)+0.625rem)] sm:p-4"
       onClick={onClose}
     >
       <div
@@ -151,8 +151,7 @@ export function Sheet({ onClose, children, label }) {
         aria-modal="true"
         aria-label={label}
         onClick={(e) => e.stopPropagation()}
-        className="card relative w-full max-w-lg h-[calc(100dvh-1rem)] sm:h-[min(44rem,calc(100dvh-2rem))] rounded-b-none sm:rounded-b-xl flex flex-col overflow-hidden"
-        style={{ marginTop: 'env(safe-area-inset-top, 0px)' }}
+        className="card relative w-full max-w-lg h-full sm:h-[min(44rem,calc(100dvh-2rem))] rounded-b-none sm:rounded-b-xl flex flex-col overflow-hidden"
       >
         {children}
       </div>

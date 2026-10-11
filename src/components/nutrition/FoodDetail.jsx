@@ -152,7 +152,7 @@ export default function FoodDetail({ food: initial, meal, setMeal, targets, tota
         </p>
         {food.source === 'off' && <OffAttribution />}
       </div>
-      <div className="p-4 border-t border-line shrink-0">
+      <div className="p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] border-t border-line shrink-0">
         <Button variant="brass" className="w-full min-h-[52px] text-base justify-between" onClick={add} disabled={!a.valid || busy}>
           <span className="inline-flex items-center gap-2">
             <Plus size={20} />

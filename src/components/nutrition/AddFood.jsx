@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Check, Plus, ScanBarcode, Search, X, Zap } from 'lucide-react'
+import { Check, Loader2, Plus, ScanBarcode, Search, X, Zap } from 'lucide-react'
 import { useLanguage } from '../../context/LanguageContext.jsx'
 import { Button } from '../ui.jsx'
 import {
+  cacheOffFood,
   cloneLogs,
   fmt,
   foodName,
@@ -12,6 +13,7 @@ import {
   loadFavorites,
   parseNum,
   searchFoods,
+  searchOff,
   sumLogs,
 } from '../../lib/nutrition.js'
 import { AmountText, Forward, MealSelect, N, Name, OffAttribution, SheetHeader, SourceLabel, mealLabel } from './parts.jsx'
@@ -47,6 +49,11 @@ export default function AddFood({ meal, setMeal, uid, date, onClose, onScan, onP
   const [meals, setMeals] = useState(null)
   const [favs, setFavs] = useState(() => loadFavorites(uid))
   const [done, setDone] = useState({})
+  const [online, setOnline] = useState([])
+  const [onlineBusy, setOnlineBusy] = useState(false)
+  const [onlineErr, setOnlineErr] = useState('')
+  const [retryN, setRetryN] = useState(0)
+  const [picking, setPicking] = useState(false)
   const seq = useRef(0)
   const q = query.trim()
 
@@ -77,6 +84,47 @@ export default function AddFood({ meal, setMeal, uid, date, onClose, onScan, onP
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q])
+
+  // Online search (Open Food Facts allows few requests per minute): wait for
+  // the typing to stop, and drop the request when the query changes.
+  useEffect(() => {
+    setOnline([])
+    setOnlineErr('')
+    if (q.length < 2) {
+      setOnlineBusy(false)
+      return
+    }
+    setOnlineBusy(true)
+    const ctrl = new AbortController()
+    const timer = setTimeout(async () => {
+      try {
+        const rows = await searchOff(q, { signal: ctrl.signal, uid })
+        if (ctrl.signal.aborted) return
+        setOnline(rows)
+      } catch (err) {
+        if (ctrl.signal.aborted) return
+        if (!err.rateLimited) console.error(err)
+        setOnlineErr(err.rateLimited ? t('nutrition.onlineRate') : t('nutrition.onlineFailed'))
+      } finally {
+        if (!ctrl.signal.aborted) setOnlineBusy(false)
+      }
+    }, 700)
+    return () => {
+      clearTimeout(timer)
+      ctrl.abort()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, retryN])
+
+  async function pickOnline(row) {
+    if (picking) return
+    setPicking(true)
+    try {
+      onPick(await cacheOffFood(row))
+    } finally {
+      setPicking(false)
+    }
+  }
 
   const [listErr, setListErr] = useState('')
   useEffect(() => {
@@ -150,6 +198,8 @@ export default function AddFood({ meal, setMeal, uid, date, onClose, onScan, onP
     }
   }
 
+  const localCodes = new Set((results || []).map((r) => r.barcode).filter(Boolean))
+  const shownOnline = online.filter((r) => !localCodes.has(r.barcode))
   const g = t('nutrition.g')
   const tabs = [
     ['recent', t('nutrition.tabRecent')],
@@ -250,7 +300,7 @@ export default function AddFood({ meal, setMeal, uid, date, onClose, onScan, onP
         </>
       )}
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-6">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
         {searchErr && (
           <p className="text-sm py-4" role="alert">
             {searchErr}
@@ -258,9 +308,11 @@ export default function AddFood({ meal, setMeal, uid, date, onClose, onScan, onP
         )}
         {results !== null && !searchErr && (
           <>
-            <p className="text-chalkdim text-xs py-3" role="status">
-              {searching ? t('nutrition.searching') : `${results.length === 1 ? t('nutrition.resultsOne') : t('nutrition.resultsCount', { n: results.length })} · ${t('nutrition.valuesPer100')}`}
-            </p>
+            {(results.length > 0 || searching || (!onlineBusy && !onlineErr && shownOnline.length === 0)) && (
+              <p className="text-chalkdim text-xs py-3" role="status">
+                {searching ? t('nutrition.searching') : `${results.length === 1 ? t('nutrition.resultsOne') : t('nutrition.resultsCount', { n: results.length })} · ${t('nutrition.valuesPer100')}`}
+              </p>
+            )}
             <ul className="divide-y divide-line">
               {results.map((r) => (
                 <li key={r.id}>
@@ -274,8 +326,46 @@ export default function AddFood({ meal, setMeal, uid, date, onClose, onScan, onP
                 </li>
               ))}
             </ul>
-            {!searching && results.length === 0 && <p className="text-chalkdim text-sm py-3">{t('nutrition.noResults', { q })}</p>}
-            {results.some((r) => r.source === 'off') && <OffAttribution className="mt-3" />}
+            {(onlineBusy || onlineErr || shownOnline.length > 0) && (
+              <h3 className="text-chalkdim text-xs pt-4 pb-1">{t('nutrition.fromOff')}</h3>
+            )}
+            {onlineBusy && (
+              <p className="flex items-center gap-2 text-chalkdim text-sm py-3" role="status">
+                <Loader2 size={16} className="animate-spin" aria-hidden="true" /> {t('nutrition.searchingOnline')}
+              </p>
+            )}
+            {onlineErr && !onlineBusy && (
+              <div className="flex items-center justify-between gap-2 py-2">
+                <p className="text-chalkdim text-sm" role="status">{onlineErr}</p>
+                <button type="button" onClick={() => setRetryN((n) => n + 1)} className="text-sm text-chalk underline underline-offset-2 min-h-[44px] px-1 shrink-0">
+                  {t('nutrition.retry')}
+                </button>
+              </div>
+            )}
+            {shownOnline.length > 0 && (
+              <>
+                <ul className="divide-y divide-line">
+                  {shownOnline.map((r) => (
+                    <li key={r.source_ref}>
+                      <button type="button" disabled={picking} onClick={() => pickOnline(r)} className="w-full flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
+                        <div className="min-w-0 flex-1">
+                          <Name className="font-medium">{foodName(r, lang)}</Name>
+                          <Stats protein={r.protein} kcal={r.kcal} source={<>{r.brand && <>· <bdi>{r.brand}</bdi></>} · <SourceLabel food={r} /></>} />
+                        </div>
+                        <Forward size={20} className="text-chalkdim shrink-0" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <OffAttribution className="mt-3" />
+              </>
+            )}
+            {!searching && !onlineBusy && !onlineErr && results.length === 0 && shownOnline.length === 0 && (
+              <p className="text-chalkdim text-sm py-3">
+                {t('nutrition.noResults', { q })} {t('nutrition.noResultsHint')}
+              </p>
+            )}
+            {shownOnline.length === 0 && results.some((r) => r.source === 'off') && <OffAttribution className="mt-3" />}
             <Button variant="ghost" className="w-full mt-4 min-h-[48px]" onClick={() => onLabel()}>
               <Plus size={18} /> {t('nutrition.addFromLabel')}
             </Button>
