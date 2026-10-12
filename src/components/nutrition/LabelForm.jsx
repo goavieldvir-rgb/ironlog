@@ -3,7 +3,7 @@ import { AlertCircle, AlertTriangle, Check } from 'lucide-react'
 import { useLanguage } from '../../context/LanguageContext.jsx'
 import { Button } from '../ui.jsx'
 import { createLabelFood, findFoodsByBarcode, foodName, friendlyError, parseNum, sanityCheck, fmt } from '../../lib/nutrition.js'
-import { Name, SheetHeader, SourceLabel } from './parts.jsx'
+import { Name, SheetHeader, SourceLabel, useDirtyForm } from './parts.jsx'
 
 // Add a product from its label ("new product"). Values are per 100 g.
 export default function LabelForm({ barcode: initialBarcode = '', prefill, uid, isAdmin, onBack, onClose, onSaved, onUseExisting }) {
@@ -23,6 +23,8 @@ export default function LabelForm({ barcode: initialBarcode = '', prefill, uid, 
   const [existing, setExisting] = useState(null)
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }))
+  const [initial] = useState(f)
+  useDirtyForm(Object.keys(f).some((k) => f[k] !== initial[k]))
 
   const num = (k) => parseNum(f[k])
   const filled = ['kcal', 'protein', 'carbs', 'fat'].every((k) => f[k] !== '' && Number.isFinite(num(k)))

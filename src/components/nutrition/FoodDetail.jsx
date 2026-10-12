@@ -1,9 +1,9 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { BadgeCheck, Plus, Star } from 'lucide-react'
 import { useLanguage } from '../../context/LanguageContext.jsx'
 import { useFeedback } from '../../context/FeedbackContext.jsx'
 import { Button } from '../ui.jsx'
-import { approveFood, fmt, foodName, friendlyError, isFavorite, toggleFavorite } from '../../lib/nutrition.js'
+import { approveFood, fmt, foodName, friendlyError, isFavorite, setFavorite } from '../../lib/nutrition.js'
 import { useAmount } from './useAmount.js'
 import { MealSelect, N, OffAttribution, SheetHeader, SourceLabel, Stepper, TONE, ToneLabel, Track, mealLabel } from './parts.jsx'
 
@@ -13,7 +13,28 @@ export default function FoodDetail({ food: initial, meal, setMeal, targets, tota
   const { toast } = useFeedback()
   const [food, setFood] = useState(initial)
   const a = useAmount(food)
-  const [fav, setFav] = useState(() => isFavorite(favUid, food))
+  const [fav, setFav] = useState(false)
+  useEffect(() => {
+    let off = false
+    isFavorite(favUid, food)
+      .then((v) => !off && setFav(v))
+      .catch(() => {})
+    return () => {
+      off = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [favUid, food.id])
+  async function toggleFav() {
+    const next = !fav
+    setFav(next)
+    try {
+      await setFavorite(favUid, food, next)
+    } catch (err) {
+      console.error(err)
+      setFav(!next)
+      toast(friendlyError(err, t), 'error')
+    }
+  }
   const [busy, setBusy] = useState(false)
   const name = foodName(food, lang) || t('nutrition.unnamed')
   const g = t('nutrition.g')
@@ -55,10 +76,10 @@ export default function FoodDetail({ food: initial, meal, setMeal, targets, tota
               type="button"
               aria-pressed={fav}
               aria-label={t('nutrition.favorite')}
-              onClick={() => setFav(toggleFavorite(favUid, food))}
+              onClick={toggleFav}
               className="w-11 h-11 inline-flex items-center justify-center rounded-md hover:bg-surface2"
             >
-              <Star size={22} className={fav ? 'text-chalk' : 'text-chalkdim'} fill={fav ? 'currentColor' : 'none'} />
+              <Star size={22} className={fav ? 'text-brass' : 'text-chalkdim'} fill={fav ? 'currentColor' : 'none'} />
             </button>
           ) : null
         }

@@ -13,7 +13,7 @@ import {
   round1,
   sumLogs,
 } from '../../lib/nutrition.js'
-import { AmountText, MealSelect, N, Name, SheetHeader, Stepper, mealLabel } from './parts.jsx'
+import { AmountText, MealSelect, N, Name, SheetHeader, Stepper, mealLabel, useDirtyForm } from './parts.jsx'
 
 const round2 = (n) => Math.round(n * 100) / 100
 
@@ -40,6 +40,8 @@ export function EditLog({ row, onBack, onClose, onSave, onDelete }) {
     fat: String(row.fat),
   })
   const [busy, setBusy] = useState(false)
+  const [start] = useState(() => JSON.stringify({ qty, meal, vals }))
+  useDirtyForm(JSON.stringify({ qty, meal, vals }) !== start)
   const opt = options[oi]
   const q = parseNum(qty)
   const newGrams = hasGrams && q > 0 ? round1(q * opt.g) : 0
@@ -175,6 +177,8 @@ export function TargetsView({ targets, onBack, onClose, onSave }) {
     carbs: targets?.carbs != null ? String(targets.carbs) : '',
     fat: targets?.fat != null ? String(targets.fat) : '',
   })
+  const [start] = useState(v)
+  useDirtyForm(Object.keys(v).some((k) => v[k] !== start[k]))
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const int = (s) => {

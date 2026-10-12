@@ -672,76 +672,62 @@ export async function searchOff(query, { signal, uid } = {}) {
   return out
 }
 
-// ---------------------------------------------------------------- favorites (per device)
+// ---------------------------------------------------------------- favorites
 
-const favKey = (uid) => `ironlog:fav-foods:${uid}`
+// Saved per account in food_favorites. Older builds kept them in this
+// browser's localStorage; those are moved to the account on first load.
 export const FAV_EVENT = 'ironlog:favorites'
-const FAV_MAX = 200
+const legacyKey = (uid) => `ironlog:fav-foods:${uid}`
 
-export function loadFavorites(uid) {
+async function migrateLocalFavorites(uid) {
+  let ids
   try {
-    const raw = localStorage.getItem(favKey(uid))
-    const list = raw ? JSON.parse(raw) : []
-    return Array.isArray(list) ? list : []
+    const list = JSON.parse(localStorage.getItem(legacyKey(uid)) || '[]')
+    ids = Array.isArray(list) ? list.map((f) => f?.id).filter(Boolean) : []
   } catch {
-    return []
+    return
+  }
+  if (!ids.length) return
+  // Only foods that still exist (and this user can see) can be referenced.
+  const alive = check(await supabase.from('foods').select('id').in('id', ids)).map((r) => r.id)
+  if (alive.length) {
+    const now = Date.now()
+    const rows = alive.map((id, i) => ({ user_id: uid, food_id: id, created_at: new Date(now - i * 1000).toISOString() }))
+    check(await supabase.from('food_favorites').upsert(rows, { onConflict: 'user_id,food_id', ignoreDuplicates: true }))
+  }
+  try {
+    localStorage.removeItem(legacyKey(uid))
+  } catch {
+    // ignore
   }
 }
 
-function storeFavorites(uid, list) {
+// Newest first, as foods rows.
+export async function getFavorites(uid) {
   try {
-    localStorage.setItem(favKey(uid), JSON.stringify(list))
-  } catch {
-    // storage unavailable: favorites just don't persist
+    await migrateLocalFavorites(uid)
+  } catch (err) {
+    console.error(err) // keep the local copy and try again next time
   }
+  const rows = check(
+    await supabase.from('food_favorites').select('created_at, food:foods(*)').eq('user_id', uid).order('created_at', { ascending: false }),
+  )
+  return rows.map((r) => r.food).filter(Boolean)
 }
 
-const favSnapshot = (f) => ({
-  id: f.id,
-  source: f.source,
-  verified: !!f.verified,
-  barcode: f.barcode ?? null,
-  name_he: f.name_he ?? null,
-  name_en: f.name_en ?? null,
-  brand: f.brand ?? null,
-  kcal: f.kcal,
-  protein: f.protein,
-  carbs: f.carbs,
-  fat: f.fat,
-  fiber: f.fiber ?? null,
-  units: f.units || [],
-  search_text: f.search_text || '',
-})
-
-export function isFavorite(uid, food) {
-  return !!food.id && loadFavorites(uid).some((f) => f.id === food.id)
+export async function isFavorite(uid, food) {
+  if (!food?.id) return false
+  const rows = check(await supabase.from('food_favorites').select('food_id').eq('user_id', uid).eq('food_id', food.id).limit(1))
+  return rows.length > 0
 }
 
-// Returns the new starred state.
-export function toggleFavorite(uid, food) {
-  if (!food.id) return false
-  const list = loadFavorites(uid)
-  const has = list.some((f) => f.id === food.id)
-  storeFavorites(uid, has ? list.filter((f) => f.id !== food.id) : [favSnapshot(food), ...list].slice(0, FAV_MAX))
+export async function setFavorite(uid, food, on) {
+  if (on) {
+    check(await supabase.from('food_favorites').upsert({ user_id: uid, food_id: food.id }, { onConflict: 'user_id,food_id', ignoreDuplicates: true }))
+  } else {
+    check(await supabase.from('food_favorites').delete().eq('user_id', uid).eq('food_id', food.id))
+  }
   window.dispatchEvent(new Event(FAV_EVENT))
-  return !has
-}
-
-// Favorites are snapshots; bring them up to date with the foods table
-// (values corrected, food approved, food deleted) and return the fresh list.
-// Offline or on an error the stored list stands.
-export async function refreshFavorites(uid) {
-  const list = loadFavorites(uid)
-  if (!list.length) return list
-  try {
-    const rows = check(await supabase.from('foods').select('*').in('id', list.map((f) => f.id)))
-    const byId = new Map(rows.map((r) => [r.id, r]))
-    const fresh = list.filter((f) => byId.has(f.id)).map((f) => favSnapshot(byId.get(f.id)))
-    storeFavorites(uid, fresh)
-    return fresh
-  } catch {
-    return list
-  }
 }
 
 export function defaultMeal(now = new Date()) {

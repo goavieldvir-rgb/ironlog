@@ -252,6 +252,12 @@ create table if not exists public.water_goals (
   ml integer not null check (ml >= 500 and ml <= 10000),
   updated_at timestamptz not null default now()
 );
+create table if not exists public.food_favorites (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  food_id uuid not null references public.foods(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, food_id)
+);
 
 -- ===== 2. Functions (before the policies that call is_admin()) =====
 CREATE OR REPLACE FUNCTION public.is_admin()
@@ -947,6 +953,13 @@ alter table public.water_goals enable row level security;
 
 drop policy if exists "own water goal or admin" on public.water_goals;
 create policy "own water goal or admin" on public.water_goals for all to authenticated
+  using ((auth.uid() = user_id and nutrition_allowed()) or is_admin())
+  with check ((auth.uid() = user_id and nutrition_allowed()) or is_admin());
+
+alter table public.food_favorites enable row level security;
+
+drop policy if exists "own favorites or admin" on public.food_favorites;
+create policy "own favorites or admin" on public.food_favorites for all to authenticated
   using ((auth.uid() = user_id and nutrition_allowed()) or is_admin())
   with check ((auth.uid() = user_id and nutrition_allowed()) or is_admin());
 
