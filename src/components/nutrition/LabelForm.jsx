@@ -3,7 +3,7 @@ import { AlertCircle, AlertTriangle, Check } from 'lucide-react'
 import { useLanguage } from '../../context/LanguageContext.jsx'
 import { Button } from '../ui.jsx'
 import { createLabelFood, findFoodsByBarcode, foodName, friendlyError, parseNum, sanityCheck, fmt } from '../../lib/nutrition.js'
-import { Name, SheetHeader, SourceLabel, useDirtyForm } from './parts.jsx'
+import { MacroInputs, Name, SheetHeader, SourceLabel, useDirtyForm } from './parts.jsx'
 
 // Add a product from its label ("new product"). Values are per 100 g.
 export default function LabelForm({ barcode: initialBarcode = '', prefill, uid, isAdmin, onBack, onClose, onSaved, onUseExisting }) {
@@ -64,13 +64,6 @@ export default function LabelForm({ barcode: initialBarcode = '', prefill, uid, 
   }
 
   const g = t('nutrition.g')
-  const field = (k, label, unit) => (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs text-chalkdim">{label} ({unit})</span>
-      <input inputMode="decimal" dir="ltr" className="num w-full text-center !text-lg" value={f[k]} onChange={set(k)} placeholder="0" />
-    </label>
-  )
-
   return (
     <>
       <SheetHeader title={t('nutrition.newProduct')} onBack={onBack} onClose={onClose} />
@@ -92,12 +85,12 @@ export default function LabelForm({ barcode: initialBarcode = '', prefill, uid, 
             </div>
           )}
           <label className="flex flex-col gap-1.5">
-            <span className="eyebrow">{t('nutrition.productName')}</span>
+            <span className="text-sm text-chalkdim">{t('nutrition.productName')}</span>
             <input dir="auto" value={f.name} onChange={set('name')} autoFocus={!scanned} />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="eyebrow">
-              {t('nutrition.barcode')} {!scanned && <span className="normal-case tracking-normal">({t('nutrition.barcodeOptional')})</span>}
+            <span className="text-sm text-chalkdim">
+              {t('nutrition.barcode')} {!scanned && <>({t('nutrition.barcodeOptional')})</>}
             </span>
             <input inputMode="numeric" dir="ltr" className="num" value={f.barcode} onChange={(e) => setF((s) => ({ ...s, barcode: e.target.value.replace(/[^\d]/g, '') }))} readOnly={scanned} />
           </label>
@@ -116,11 +109,8 @@ export default function LabelForm({ barcode: initialBarcode = '', prefill, uid, 
               <h3 className="text-lg">{t('nutrition.valuesPer100Title')}</h3>
               <span className="text-xs text-chalkdim">{t('nutrition.fromLabel')}</span>
             </div>
-            <div className="grid grid-cols-2 gap-2.5 mt-2.5">
-              {field('protein', t('nutrition.protein'), g)}
-              {field('kcal', t('nutrition.calories'), t('nutrition.kcalUnit'))}
-              {field('carbs', t('nutrition.carbs'), g)}
-              {field('fat', t('nutrition.fat'), g)}
+            <div className="mt-3">
+              <MacroInputs values={f} onChange={(k, v) => setF((s) => ({ ...s, [k]: v }))} />
             </div>
             {filled &&
               (sanity ? (
@@ -139,10 +129,10 @@ export default function LabelForm({ barcode: initialBarcode = '', prefill, uid, 
               ))}
           </div>
           <label className="flex flex-col gap-1.5">
-            <span className="eyebrow">
-              {t('nutrition.servingSize')} <span className="normal-case tracking-normal">({t('nutrition.servingOptional')})</span>
+            <span className="text-sm text-chalkdim">
+              {t('nutrition.servingSize')} ({t('nutrition.servingOptional')})
             </span>
-            <input inputMode="decimal" dir="ltr" className="num w-full text-center" value={f.serving} onChange={set('serving')} placeholder={g} />
+            <input inputMode="decimal" dir="ltr" className="num w-full !text-lg" value={f.serving} onChange={set('serving')} placeholder={g} />
           </label>
           {/* the not-found banner already says who the product is saved for */}
           {!(scanned && !incomplete) && (

@@ -17,7 +17,7 @@ import {
   searchOff,
   sumLogs,
 } from '../../lib/nutrition.js'
-import { AmountText, Forward, MealSelect, MohAttribution, N, Name, OffAttribution, SheetHeader, SourceLabel, mealLabel, useDirtyForm } from './parts.jsx'
+import { AmountText, Forward, MacroInputs, MealTabs, MohAttribution, N, Name, OffAttribution, SheetHeader, SourceLabel, mealLabel, useDirtyForm } from './parts.jsx'
 
 // Two-line row: name, then protein first, then kcal (quieter), then source.
 function Stats({ protein, kcal, extra, source }) {
@@ -252,7 +252,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
     <>
       <SheetHeader title={t('nutrition.addSheetTitle', { meal: mealLabel(t, meal) })} onClose={onClose} />
       <div className="px-4 pt-2 shrink-0">
-        <MealSelect value={meal} onChange={setMeal} />
+        <MealTabs value={meal} onChange={setMeal} />
       </div>
       <div className="relative mx-4 mt-3 shrink-0">
         <Search size={18} className="absolute start-3 top-1/2 -translate-y-1/2 text-chalkdim pointer-events-none" aria-hidden="true" />
@@ -283,20 +283,12 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
             </Button>
           </div>
           {quickOpen && (
-            <form onSubmit={submitQuick} className="mx-4 mt-3 p-3 rounded-lg border border-line bg-ink grid grid-cols-2 gap-2.5 shrink-0">
-              {[
-                ['protein', 'quickProtein', 'decimal'],
-                ['kcal', 'quickKcal', 'decimal'],
-                ['carbs', 'quickCarbs', 'decimal'],
-                ['fat', 'quickFat', 'decimal'],
-              ].map(([k, label, mode]) => (
-                <label key={k} className="flex flex-col gap-1">
-                  <span className="text-xs text-chalkdim">{t(`nutrition.${label}`)}</span>
-                  <input inputMode={mode} dir="ltr" placeholder="0" className="num text-center" {...f(k)} />
-                </label>
-              ))}
-              <label className="col-span-2 flex flex-col gap-1">
-                <span className="text-xs text-chalkdim">{t('nutrition.quickName')}</span>
+            <form onSubmit={submitQuick} className="mx-4 mt-3 p-4 rounded-xl bg-surface2/60 grid grid-cols-2 gap-3 shrink-0">
+              <div className="col-span-2">
+                <MacroInputs values={quick} onChange={(k, v) => setQuick((s) => ({ ...s, [k]: v }))} />
+              </div>
+              <label className="col-span-2 flex flex-col gap-1.5">
+                <span className="text-sm text-chalkdim">{t('nutrition.quickName')}</span>
                 <input dir="auto" {...f('name')} />
               </label>
               {quickErr && (

@@ -13,7 +13,7 @@ import {
   round1,
   sumLogs,
 } from '../../lib/nutrition.js'
-import { AmountText, MealSelect, N, Name, SheetHeader, Stepper, mealLabel, useDirtyForm } from './parts.jsx'
+import { AmountControl, AmountText, MacroInputs, MacroPanel, MealTabs, N, Name, SheetHeader, UnitChips, mealLabel, useDirtyForm } from './parts.jsx'
 
 const round2 = (n) => Math.round(n * 100) / 100
 
@@ -92,66 +92,32 @@ export function EditLog({ row, onBack, onClose, onSave, onDelete }) {
   return (
     <>
       <SheetHeader title={t('nutrition.editItem')} onBack={onBack} onClose={onClose} />
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 flex flex-col gap-4">
-        <h3 className="text-xl leading-tight line-clamp-2 break-words">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 flex flex-col gap-5">
+        <h3 className="text-2xl leading-tight line-clamp-2 break-words">
           <bdi>{row.name}</bdi>
         </h3>
-        <div>
-          <label className="eyebrow block mb-1.5">{t('nutrition.meal')}</label>
-          <MealSelect value={meal} onChange={setMeal} />
-        </div>
+        <MealTabs value={meal} onChange={setMeal} />
         {hasGrams ? (
-          <div className="flex flex-col gap-3">
-            <div className="eyebrow">{t('nutrition.amount')}</div>
-            <Stepper
-              value={qty}
-              unit={opt.label}
-              onChange={setQty}
-              onStep={(d) => setQty(String(Math.max(0, round2((Number.isFinite(q) ? q : 0) + d * opt.step))))}
-            />
-            {options.length > 1 && (
-              <div className="flex gap-2" role="group" aria-label={t('nutrition.unit')}>
-                {options.map((o, i) => (
-                  <button
-                    key={o.key}
-                    type="button"
-                    aria-pressed={i === oi}
-                    onClick={() => pickUnit(i)}
-                    className={`min-h-[44px] px-3 rounded-md border text-sm press ${i === oi ? 'border-chalk bg-surface2 text-chalk' : 'border-line text-chalkdim'}`}
-                  >
-                    <bdi>{o.label}</bdi>
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="card p-4">
-              <div className="eyebrow">{t('nutrition.protein')}</div>
-              <div className="flex items-baseline gap-1.5 mt-1">
-                <N mono className="text-3xl leading-none">{fmt(shown.protein, 1)}</N>
-                <span className="text-chalkdim text-sm">{g}</span>
-              </div>
-              <p className="text-chalkdim text-sm mt-2">
-                <N mono>{fmt(shown.kcal, 0)}</N> {t('nutrition.kcalUnit')} · <N mono>{fmt(shown.carbs, 1)}</N> {g} {t('nutrition.carbs')} · <N mono>{fmt(shown.fat, 1)}</N> {g} {t('nutrition.fat')}
-              </p>
+          <>
+            <div className="flex flex-col gap-4 py-1">
+              <AmountControl
+                value={qty}
+                unit={opt.label}
+                grams={opt.key === 'u' ? newGrams : 0}
+                onChange={setQty}
+                onStep={(d) => setQty(String(Math.max(0, round2((Number.isFinite(q) ? q : 0) + d * opt.step))))}
+              />
+              {options.length > 1 && <UnitChips options={options} value={oi} onChange={pickUnit} />}
             </div>
-          </div>
+            <MacroPanel macros={shown} />
+          </>
         ) : (
-          <div className="grid grid-cols-2 gap-2.5">
-            <label className="col-span-2 flex flex-col gap-1">
-              <span className="text-xs text-chalkdim">{t('nutrition.productName')}</span>
+          <div className="flex flex-col gap-4">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm text-chalkdim">{t('nutrition.productName')}</span>
               <input dir="auto" value={vals.name} onChange={(e) => setVals((s) => ({ ...s, name: e.target.value }))} />
             </label>
-            {[
-              ['protein', 'quickProtein'],
-              ['kcal', 'quickKcal'],
-              ['carbs', 'quickCarbs'],
-              ['fat', 'quickFat'],
-            ].map(([k, label]) => (
-              <label key={k} className="flex flex-col gap-1">
-                <span className="text-xs text-chalkdim">{t(`nutrition.${label}`)}</span>
-                <input inputMode="decimal" dir="ltr" className="num text-center" value={vals[k]} onChange={(e) => setVals((s) => ({ ...s, [k]: e.target.value }))} />
-              </label>
-            ))}
+            <MacroInputs values={vals} onChange={(k, v) => setVals((s) => ({ ...s, [k]: v }))} />
           </div>
         )}
       </div>
@@ -302,7 +268,7 @@ export function MyMealsView({ uid, date, meal, setMeal, onBack, onClose, onLog }
     <>
       <SheetHeader title={t('nutrition.myMealsTitle')} onBack={onBack} onClose={onClose} />
       <div className="px-4 pt-2 shrink-0">
-        <MealSelect value={meal} onChange={setMeal} />
+        <MealTabs value={meal} onChange={setMeal} />
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] pt-3 flex flex-col gap-3">
         {error && <p className="text-sm" role="alert">{error}</p>}
