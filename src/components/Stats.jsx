@@ -4,11 +4,13 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  Cell,
   LineChart,
   Line,
   XAxis,
   YAxis,
   CartesianGrid,
+  ReferenceLine,
   Tooltip,
 } from 'recharts'
 import { useAdmin } from '../context/AdminContext.jsx'
@@ -23,8 +25,7 @@ import { InfoTip } from './InfoTip.jsx'
 import { workingSets } from '../lib/warmup.js'
 import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
 import { cardioSummary, formatPace, formatSpeed, formatDistance, toKm } from '../lib/cardio.js'
-
-const COLORS = { iron: '#D64545', brass: '#C9A24B', cardio: '#4C8CC9', chalk: '#EDEDE6', chalkdim: '#9CA0AA', grid: '#31353E' }
+import { CHART, axisProps, tooltipProps } from '../lib/chartTheme.js'
 
 
 function shortDate(lang, iso) {
@@ -242,6 +243,24 @@ export default function Stats() {
     pace: t('stats.metricPace'),
     effort: selectedProgress?.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe'),
   }
+  const progressKey = isCardioSel ? metric : selectedProgress?.bodyweight ? 'reps' : 'weight'
+  // [value as text, what it is], for the tooltip and the latest/first line.
+  const progressValue = (value) => {
+    if (isCardioSel) {
+      if (metric === 'distance') return [`${formatDistance(value)} ${distUnit}`, metricLabel.distance]
+      if (metric === 'speed') return [`${formatSpeed(value)} ${distUnit === 'mi' ? 'mph' : 'km/h'}`, metricLabel.speed]
+      if (metric === 'pace') return [`${formatPace(value)} /${distUnit}`, metricLabel.pace]
+      if (metric === 'effort') return [Math.round(value * 10) / 10, metricLabel.effort]
+      return [`${formatDistance(value)} min`, t('stats.duration')]
+    }
+    if (selectedProgress.timed) return [formatSeconds(value), t('stats.longestHold')]
+    if (selectedProgress.bodyweight) return [`${value} reps`, t('stats.topSet')]
+    return [`${value}${selectedProgress.unit}`, t('stats.topSet')]
+  }
+  const plotted = selectedProgress ? selectedProgress.points.filter((p) => p[progressKey] != null) : []
+  const latest = plotted[plotted.length - 1]
+  const firstPoint = plotted.length > 1 ? plotted[0] : null
+  const lineColor = isCardioSel ? CHART.cardio : CHART.iron
   const loadFailed = !!loadError && rawSessions.length === 0
   const hasData = !loading && sessions.length > 0
 
@@ -263,95 +282,21 @@ export default function Stats() {
 
       {hasData && (
         <>
-          <div className={`grid grid-cols-2 ${totalCardioKm > 0 ? 'sm:grid-cols-6' : hasCardio ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3`}>
-            <Stat icon={Flame} label={t('stats.weekStreak')} value={streak} />
-            <Stat icon={BarChart3} label={t('stats.sessionsLogged')} value={sessions.length} />
-            <Stat icon={TrendingUp} label={t('stats.totalVolume')} value={totalVolume.toLocaleString(dateLocale(lang))} />
-            {hasCardio && <Stat icon={Heart} label={t('stats.cardioMinutes')} value={totalCardioMinutes.toLocaleString(dateLocale(lang))} />}
-            {totalCardioKm > 0 && <Stat icon={Heart} label={t('stats.cardioDistance')} value={formatDistance(totalCardioKm)} />}
-            <Stat icon={Trophy} label={t('stats.personalRecords')} value={records.length} />
-          </div>
+          <Summary
+            items={[
+              [Flame, t('stats.weekStreak'), streak],
+              [BarChart3, t('stats.sessionsLogged'), sessions.length],
+              [TrendingUp, t('stats.totalVolume'), totalVolume.toLocaleString(dateLocale(lang))],
+              hasCardio && [Heart, t('stats.cardioMinutes'), totalCardioMinutes.toLocaleString(dateLocale(lang))],
+              totalCardioKm > 0 && [Heart, t('stats.cardioDistance'), formatDistance(totalCardioKm)],
+              [Trophy, t('stats.personalRecords'), records.length],
+            ].filter(Boolean)}
+          />
 
-          <Card>
-            <h2 className="eyebrow mb-4">{t('stats.sessionsPerWeek')}</h2>
-            <div dir="ltr">
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={weeklyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
-                  <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke={COLORS.chalkdim} fontSize={12} allowDecimals={false} tickLine={false} axisLine={false} width={28} />
-                  <Tooltip
-                    contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
-                    labelStyle={{ color: COLORS.chalk }}
-                  />
-                  <Bar dataKey="sessions" fill={COLORS.iron} radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-
-          <Card>
-            <h2 className="eyebrow mb-4">{t('stats.volumePerWeek')}</h2>
-            <div dir="ltr">
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={weeklyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
-                  <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} width={40} />
-                  <Tooltip
-                    contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
-                    labelStyle={{ color: COLORS.chalk }}
-                  />
-                  <Bar dataKey="volume" fill={COLORS.brass} radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <p className="text-chalkdim text-xs mt-2">
-              {t('stats.volumeNote')}
-            </p>
-          </Card>
-
-          {hasCardio && (
-            <Card>
-              <h2 className="eyebrow mb-4">{t('stats.cardioPerWeek')}</h2>
-              <div dir="ltr">
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={weeklyData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
-                    <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} width={32} />
-                    <Tooltip
-                      contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
-                      labelStyle={{ color: COLORS.chalk }}
-                      formatter={(value) => [`${value} min`, t('stats.cardioTooltipLabel')]}
-                    />
-                    <Bar dataKey="cardioMinutes" fill={COLORS.cardio} radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-          )}
-
-          {totalCardioKm > 0 && (
-            <Card>
-              <h2 className="eyebrow mb-4">{t('stats.cardioDistancePerWeek')}</h2>
-              <div dir="ltr">
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={weeklyData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
-                    <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} width={32} />
-                    <Tooltip
-                      contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
-                      labelStyle={{ color: COLORS.chalk }}
-                      formatter={(value) => [`${value} km`, t('stats.cardioTooltipLabel')]}
-                    />
-                    <Bar dataKey="cardioKm" fill={COLORS.cardio} radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-          )}
+          <WeeklyChart title={t('stats.sessionsPerWeek')} data={weeklyData} dataKey="sessions" color={CHART.iron} />
+          <WeeklyChart title={t('stats.volumePerWeek')} data={weeklyData} dataKey="volume" color={CHART.brass} note={t('stats.volumeNote')} />
+          {hasCardio && <WeeklyChart title={t('stats.cardioPerWeek')} data={weeklyData} dataKey="cardioMinutes" color={CHART.cardio} unit={t('sessionCard.minUnit')} />}
+          {totalCardioKm > 0 && <WeeklyChart title={t('stats.cardioDistancePerWeek')} data={weeklyData} dataKey="cardioKm" color={CHART.cardio} unit="km" digits={1} />}
 
           <Card className="flex flex-col gap-3">
             <h2 className="eyebrow flex items-center gap-1.5 flex-wrap">
@@ -376,7 +321,7 @@ export default function Stats() {
                     type="button"
                     onClick={() => setCardioMetric(k)}
                     aria-pressed={metric === k}
-                    className={`min-h-[44px] px-3 rounded-md border text-sm ${metric === k ? 'border-brass text-brass bg-brasssoft' : 'border-line text-chalkdim hover:text-chalk'}`}
+                    className={`min-h-[44px] px-3 rounded-md border text-sm press ${metric === k ? 'border-brass text-brass bg-brasssoft' : 'border-line text-chalkdim hover:text-chalk'}`}
                   >
                     {metricLabel[k]}
                   </button>
@@ -384,17 +329,36 @@ export default function Stats() {
               </div>
             )}
 
+            {latest && (
+              <div className="flex items-end justify-between gap-3 flex-wrap">
+                <div>
+                  <p className="text-chalkdim text-xs">
+                    {progressValue(latest[progressKey])[1]} · {shortDate(lang, latest.date)}
+                  </p>
+                  <p className="num text-3xl text-chalk leading-none mt-1.5">
+                    <bdi dir="ltr">{progressValue(latest[progressKey])[0]}</bdi>
+                  </p>
+                </div>
+                {firstPoint && (
+                  <p className="text-chalkdim text-xs text-end">
+                    {t('stats.firstLogged')}{' '}
+                    <bdi dir="ltr" className="num text-chalk">
+                      {progressValue(firstPoint[progressKey])[0]}
+                    </bdi>{' '}
+                    · {shortDate(lang, firstPoint.date)}
+                  </p>
+                )}
+              </div>
+            )}
+
             {selectedProgress && selectedProgress.points.length > 0 ? (
               <div dir="ltr">
                 <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={selectedProgress.points}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
-                    <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={CHART.line} vertical={false} />
+                    <XAxis dataKey="label" {...axisProps} minTickGap={12} />
                     <YAxis
-                      stroke={COLORS.chalkdim}
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
+                      {...axisProps}
                       width={36}
                       reversed={isCardioSel && metric === 'pace'}
                       tickFormatter={isCardioSel && metric === 'pace' ? formatPace : undefined}
@@ -411,28 +375,18 @@ export default function Stats() {
                       }
                     />
                     <Tooltip
-                      contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
-                      labelStyle={{ color: COLORS.chalk }}
-                      formatter={(value) => {
-                        if (isCardioSel) {
-                          if (metric === 'distance') return [`${formatDistance(value)} ${distUnit}`, metricLabel.distance]
-                          if (metric === 'speed') return [`${formatSpeed(value)} ${distUnit === 'mi' ? 'mph' : 'km/h'}`, metricLabel.speed]
-                          if (metric === 'pace') return [`${formatPace(value)} /${distUnit}`, metricLabel.pace]
-                          if (metric === 'effort') return [Math.round(value * 10) / 10, metricLabel.effort]
-                          return [`${formatDistance(value)} min`, t('stats.duration')]
-                        }
-                        if (selectedProgress.timed) return [formatSeconds(value), t('stats.longestHold')]
-                        if (selectedProgress.bodyweight) return [`${value} reps`, t('stats.topSet')]
-                        return [`${value}${selectedProgress.unit}`, t('stats.topSet')]
-                      }}
+                      {...tooltipProps}
+                      cursor={{ stroke: CHART.line }}
+                      formatter={progressValue}
                     />
                     <Line
                       type="monotone"
                       connectNulls
-                      dataKey={isCardioSel ? metric : selectedProgress.bodyweight ? 'reps' : 'weight'}
-                      stroke={selectedProgress.category === 'cardio' ? COLORS.cardio : COLORS.iron}
+                      dataKey={progressKey}
+                      stroke={lineColor}
                       strokeWidth={2.5}
-                      dot={{ fill: selectedProgress.category === 'cardio' ? COLORS.cardio : COLORS.iron, r: 3 }}
+                      dot={{ fill: lineColor, stroke: CHART.surface, strokeWidth: 2, r: 4 }}
+                      activeDot={{ fill: lineColor, stroke: CHART.chalk, strokeWidth: 2, r: 5 }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -502,12 +456,75 @@ export default function Stats() {
   )
 }
 
-function Stat({ icon: Icon, label, value }) {
+// The headline numbers as one panel, split by hairlines rather than a grid
+// of separate boxes.
+function Summary({ items }) {
+  const odd = items.length % 2 === 1
   return (
-    <Card className="flex flex-col items-center justify-center py-5 gap-1.5 text-center">
-      <Icon size={18} className="text-brass" />
-      <span className="num text-3xl text-chalk leading-none">{value}</span>
-      <span className="text-chalkdim text-xs">{label}</span>
+    <div className={`grid grid-cols-2 ${['', '', '', 'sm:grid-cols-3', 'sm:grid-cols-4', 'sm:grid-cols-5', 'sm:grid-cols-6'][items.length]} gap-px bg-line border border-line rounded-xl overflow-hidden`}>
+      {items.map(([Icon, label, value], i) => (
+        <div key={label} className={`bg-surface px-4 py-4 flex flex-col gap-2.5 min-w-0 ${odd && i === items.length - 1 ? 'col-span-2 sm:col-span-1' : ''}`}>
+          <span className="flex items-center gap-1.5 text-chalkdim text-xs min-w-0">
+            <Icon size={14} className="text-brass shrink-0" aria-hidden="true" />
+            <span className="truncate">{label}</span>
+          </span>
+          <span className="num text-3xl text-chalk leading-none">{value}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// A 12-week bar chart that leads with this week's number and the weekly
+// average. This week's bar is solid; earlier weeks are dimmed so it stands out.
+function WeeklyChart({ title, data, dataKey, color, unit = '', digits = 0, note }) {
+  const { t, lang } = useLanguage()
+  const fmtN = (v) => Number(v).toLocaleString(dateLocale(lang), { maximumFractionDigits: digits })
+  const compact = (v) => Number(v).toLocaleString(dateLocale(lang), { notation: 'compact', maximumFractionDigits: 1 })
+  const now = data[data.length - 1]?.[dataKey] ?? 0
+  const avg = data.reduce((s, w) => s + w[dataKey], 0) / (data.length || 1)
+  const last = data.length - 1
+  return (
+    <Card>
+      <h2 className="eyebrow">{title}</h2>
+      <div className="flex items-end justify-between gap-3 mt-3 mb-4">
+        <div className="min-w-0">
+          <span className="num text-3xl text-chalk leading-none">
+            <bdi dir="ltr">{fmtN(now)}</bdi>
+          </span>
+          <span className="text-chalkdim text-sm ms-1.5">
+            {unit && `${unit} `}
+            {t('stats.thisWeek')}
+          </span>
+        </div>
+        <div className="text-end shrink-0">
+          <div className="num text-chalk text-sm">
+            <bdi dir="ltr">{fmtN(Math.round(avg * 10 ** digits) / 10 ** digits)}</bdi>
+          </div>
+          <div className="text-chalkdim text-xs">{t('stats.weeklyAverage')}</div>
+        </div>
+      </div>
+      <div dir="ltr">
+        <ResponsiveContainer width="100%" height={170}>
+          <BarChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+            <CartesianGrid stroke={CHART.line} strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="label" {...axisProps} minTickGap={16} />
+            <YAxis {...axisProps} width={34} allowDecimals={digits > 0} tickCount={4} tickFormatter={compact} />
+            <Tooltip {...tooltipProps} formatter={(v) => [`${fmtN(v)}${unit ? ` ${unit}` : ''}`, title]} />
+            {avg > 0 && <ReferenceLine y={avg} stroke={CHART.chalkdim} strokeDasharray="4 4" />}
+            <Bar dataKey={dataKey} radius={[4, 4, 0, 0]} maxBarSize={28}>
+              {data.map((w, i) => (
+                <Cell key={w.week} fill={color} fillOpacity={i === last ? 1 : 0.45} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="text-chalkdim text-xs mt-3 flex items-center gap-1.5">
+        <span className="w-4 border-t border-dashed border-chalkdim shrink-0" aria-hidden="true" />
+        {t('stats.averageLine')}
+      </p>
+      {note && <p className="text-chalkdim text-xs mt-2">{note}</p>}
     </Card>
   )
 }
