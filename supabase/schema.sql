@@ -237,6 +237,22 @@ create table if not exists public.nutrition_targets (
   updated_at timestamptz not null default now()
 );
 
+-- Water tracker (supabase-water.sql). Amounts in ml.
+create table if not exists public.water_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  date date not null,
+  ml integer not null check (ml > 0 and ml <= 5000),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists water_logs_user_date on public.water_logs (user_id, date);
+create table if not exists public.water_goals (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  ml integer not null check (ml >= 500 and ml <= 10000),
+  updated_at timestamptz not null default now()
+);
+
 -- ===== 2. Functions (before the policies that call is_admin()) =====
 CREATE OR REPLACE FUNCTION public.is_admin()
  RETURNS boolean
@@ -919,6 +935,21 @@ drop policy if exists "admin writes targets" on public.nutrition_targets;
 create policy "admin writes targets" on public.nutrition_targets for all to authenticated
   using (is_admin()) with check (is_admin());
 
+-- Water tracker: same visibility as the food diary. The trainee or the coach sets the goal.
+alter table public.water_logs enable row level security;
+
+drop policy if exists "own water logs or admin" on public.water_logs;
+create policy "own water logs or admin" on public.water_logs for all to authenticated
+  using ((auth.uid() = user_id and nutrition_allowed()) or is_admin())
+  with check ((auth.uid() = user_id and nutrition_allowed()) or is_admin());
+
+alter table public.water_goals enable row level security;
+
+drop policy if exists "own water goal or admin" on public.water_goals;
+create policy "own water goal or admin" on public.water_goals for all to authenticated
+  using ((auth.uid() = user_id and nutrition_allowed()) or is_admin())
+  with check ((auth.uid() = user_id and nutrition_allowed()) or is_admin());
+
 -- ===== 4. Grants =====
 -- push_config: no API access at all.
 revoke all on public.push_config from anon, authenticated;
@@ -967,7 +998,7 @@ begin
 end $$;
 
 -- ===== 7. Verification (read-only) =====
--- RLS must be enabled on all 16 tables (rowsecurity = true on every row).
+-- RLS must be enabled on all 18 tables (rowsecurity = true on every row).
 select tablename, rowsecurity
 from pg_tables
 where schemaname = 'public'
