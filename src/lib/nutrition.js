@@ -157,7 +157,7 @@ export function foodLogRow({ uid, date, meal, food, lang, option, qty }) {
 export function amountText(row, gLabel) {
   if (row.grams == null) return ''
   const g = `${fmt(row.grams, row.grams % 1 ? 1 : 0)} ${gLabel}`
-  if (row.unit_label && row.unit_qty != null) return `${fmt(row.unit_qty, 1)} ${row.unit_label} · ${g}`
+  if (row.unit_label && row.unit_qty != null) return `${fmt(row.unit_qty, 2)} ${row.unit_label} · ${g}`
   return g
 }
 
@@ -295,7 +295,12 @@ const FETCH_LIMIT = 200
 const RESULT_LIMIT = 30
 // Processed/derived variants lose ties against the plain food ("ביצה שלמה"
 // before "ביצה חלמון מיובש", "אורז לבן" before "קמח אורז").
-const DERIVED = new Set(['מיובש', 'מיובשת', 'מטוגן', 'מטוגנת', 'קפוא', 'חביתה', 'קמח', 'פודינג', 'עוגה', 'עוגת', 'חלבון', 'חלמון', 'תרנגול', 'שניצל', 'סלט', 'נקניק', 'פסטרמה', 'מרק', 'פאי', 'במילוי', 'shnitzel', 'salad', 'pastrami', 'soup', 'pie', 'ציפס', 'טוגנים', 'בבלילה', 'chips', 'coated', 'dried', 'fried', 'frozen', 'omelet', 'omelette', 'flour', 'pudding', 'cake', 'yolk', 'white'])
+// Tokens are compared after normalizeHe, so the set is normalized too
+// (final letters folded). "white" is left out: Tzameret names plain foods
+// "Rice, white, cooked".
+const DERIVED = new Set(
+  ['מיובש', 'מיובשת', 'מטוגן', 'מטוגנת', 'קפוא', 'חביתה', 'קמח', 'פודינג', 'עוגה', 'עוגת', 'חלבון', 'חלמון', 'תרנגול', 'שניצל', 'סלט', 'נקניק', 'פסטרמה', 'מרק', 'פאי', 'במילוי', 'shnitzel', 'salad', 'pastrami', 'soup', 'pie', 'ציפס', 'טוגנים', 'בבלילה', 'chips', 'coated', 'dried', 'fried', 'frozen', 'omelet', 'omelette', 'flour', 'pudding', 'cake', 'yolk'].map(normalizeHe),
+)
 const TOKEN_SPLIT = /[\s,;:.()/\\\-+%*]+/
 
 const stripPrefix = (w) => (w.length > 3 && HE_PREFIXES.includes(w[0]) ? w.slice(1) : w)
@@ -345,7 +350,11 @@ export function rankFoods(foods, query, limit = RESULT_LIMIT) {
       len: best.length,
     }
   })
-  scored.sort((a, b) => a.tier - b.tier || a.derived - b.derived || a.words - b.words || a.rank - b.rank || a.len - b.len)
+  // "Starts with the query" and "a word starts with it near the front" are
+  // one band, so a plain Ministry food ("גבינת קוטג' 5%") is not beaten by a
+  // branded product whose name happens to start with the word.
+  const band = (tier) => (tier === 2 ? 1 : tier)
+  scored.sort((a, b) => band(a.tier) - band(b.tier) || a.derived - b.derived || a.words - b.words || a.rank - b.rank || a.len - b.len)
   return scored.slice(0, limit).map((x) => x.f)
 }
 
@@ -354,7 +363,22 @@ export async function searchFoods(query) {
   if (!terms.length) return []
   let q = supabase.from('foods').select('*')
   for (const alts of terms) q = q.or(alts.map((a) => `search_text.ilike.%${a}%`).join(','))
-  const rows = check(await q.order('verified', { ascending: false }).order('source', { ascending: true }).limit(FETCH_LIMIT))
+  // The wide query can match a thousand rows ("שמן", "עוף") and is cut at
+  // FETCH_LIMIT before ranking, so also fetch the names that start with the
+  // query or have a word that does; those are the best matches.
+  const head = terms.map((alts) => alts[0]).join(' ')
+  const raw = String(query).trim().replace(/[,()%_*"\\:]/g, '')
+  const [wide, starts] = await Promise.all([
+    q.order('verified', { ascending: false }).order('source', { ascending: true }).limit(FETCH_LIMIT),
+    supabase
+      .from('foods')
+      .select('*')
+      .or(`search_text.ilike."${head}%",search_text.ilike."% ${head}%",name_en.ilike."${raw}%"`)
+      .limit(FETCH_LIMIT),
+  ])
+  const rows = check(wide)
+  const ids = new Set(rows.map((r) => r.id))
+  for (const r of check(starts)) if (!ids.has(r.id)) rows.push(r)
   return rankFoods(rows, query)
 }
 
@@ -416,11 +440,11 @@ export function isWeighedLabel(code) {
 
 // "250 g" / "1.5 kg" / "500 ml" / "1 l" -> grams (ml treated as g)
 export function parseGrams(text) {
-  const m = String(text ?? '').replace(',', '.').match(/(\d+(?:\.\d+)?)\s*(kg|gr|g|ml|l|ליטר|גרם)(?![a-z])/i)
+  const m = String(text ?? '').replace(',', '.').match(/(\d+(?:\.\d+)?)\s*(kg|gr|g|ml|l|ליטר|גרם|ק"ג|מ"ל|מל|גר|ג)(?![a-zא-ת])/i)
   if (!m) return null
   const n = parseFloat(m[1])
   const u = m[2].toLowerCase()
-  const g = u === 'kg' || u === 'l' || u === 'ליטר' ? n * 1000 : n
+  const g = ['kg', 'l', 'ליטר', 'ק"ג'].includes(u) ? n * 1000 : n
   return g > 0 && g <= 20000 ? Math.round(g * 10) / 10 : null
 }
 
@@ -450,6 +474,9 @@ export function offToFood(p, code, uid) {
   const n = p.nutriments || {}
   const kcal = offKcal(p)
   if (kcal == null || kcal < 0 || kcal > 900) return null
+  // Energy alone would be logged as 0 g protein, carbs and fat: treat it as
+  // incomplete so the label form asks for the numbers.
+  if (['proteins_100g', 'carbohydrates_100g', 'fat_100g'].every((k) => numOrNull(n[k]) == null)) return null
   const pick = (...keys) => keys.map((k) => (p[k] && String(p[k]).trim()) || null).find(Boolean) || null
   const nameHe = pick('product_name_he')
   const nameEn = pick('product_name_en', 'product_name')
@@ -504,10 +531,14 @@ async function fetchOff(code) {
 export async function cacheOffFood(row) {
   try {
     return await insertFood(row)
-  } catch (err) {
-    if (err?.code === '23505') {
+  } catch {
+    // Already cached (23505), or a trainee may not insert (RLS): either way
+    // use the stored row when there is one, so the log keeps its food_id.
+    try {
       const { data } = await supabase.from('foods').select('*').eq('source', 'off').eq('source_ref', row.source_ref).limit(1)
       if (data?.[0]) return data[0]
+    } catch {
+      // offline: fall through to the in-memory row
     }
     return row
   }
@@ -544,7 +575,7 @@ export async function resolveBarcode(code, uid) {
 // ---------------------------------------------------------------- online search
 
 const SEARCH_MIN_FRESH = 5
-const SEARCH_LIMIT = 8 // OFF allows ~10 searches/min/IP; stay under it
+const SEARCH_LIMIT = 16 // per minute; each search uses one or two calls
 const SEARCH_WINDOW_MS = 60000
 const searchCalls = []
 const searchCache = new Map()
@@ -559,25 +590,45 @@ function takeSearchSlot() {
   return true
 }
 
-async function fetchOffSearch(query, israelOnly, signal) {
+// Full-text search goes to Search-a-licious (search.openfoodfacts.org). The
+// legacy cgi/search.pl answers 503 to anonymous callers most of the time, so
+// it is only a fallback for when the new service can't be reached.
+async function fetchOffJson(url, signal) {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), LOOKUP_TIMEOUT_MS)
   const onAbort = () => ctrl.abort()
   if (signal?.aborted) ctrl.abort()
   else signal?.addEventListener('abort', onAbort)
   try {
-    let url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=20&fields=${OFF_FIELDS}`
-    if (israelOnly) url += '&tagtype_0=countries&tag_contains_0=contains&tag_0=israel'
     const res = await fetch(url, { signal: ctrl.signal })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = await res.json()
-    return Array.isArray(data.products) ? data.products : []
-  } catch (err) {
-    if (!signal?.aborted) err.offFailure = true
-    throw err
+    return await res.json()
   } finally {
     clearTimeout(timer)
     signal?.removeEventListener('abort', onAbort)
+  }
+}
+
+async function fetchOffSearch(query, israelOnly, signal) {
+  try {
+    try {
+      const q = israelOnly ? `${query} countries_tags:"en:israel"` : query
+      const data = await fetchOffJson(
+        `https://search.openfoodfacts.org/search?q=${encodeURIComponent(q)}&page_size=20&fields=${OFF_FIELDS}`,
+        signal,
+      )
+      if (Array.isArray(data.hits)) return data.hits
+      throw new Error('bad response')
+    } catch (err) {
+      if (signal?.aborted) throw err
+      let url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=20&fields=${OFF_FIELDS}`
+      if (israelOnly) url += '&tagtype_0=countries&tag_contains_0=contains&tag_0=israel'
+      const data = await fetchOffJson(url, signal)
+      return Array.isArray(data.products) ? data.products : []
+    }
+  } catch (err) {
+    if (!signal?.aborted) err.offFailure = true
+    throw err
   }
 }
 
@@ -604,21 +655,28 @@ export async function searchOff(query, { signal, uid } = {}) {
     }
   }
   add(await fetchOffSearch(query.trim(), true, signal))
-  if (out.length < SEARCH_MIN_FRESH && takeSearchSlot()) {
-    try {
-      add(await fetchOffSearch(query.trim(), false, signal))
-    } catch (err) {
-      if (signal?.aborted) throw err
-      if (!out.length) throw err // the Israeli results still stand otherwise
-    }
+  let complete = true
+  if (out.length < SEARCH_MIN_FRESH) {
+    if (takeSearchSlot()) {
+      try {
+        add(await fetchOffSearch(query.trim(), false, signal))
+      } catch (err) {
+        if (signal?.aborted) throw err
+        if (!out.length) throw err // the Israeli results still stand otherwise
+        complete = false
+      }
+    } else complete = false
   }
-  searchCache.set(key, out)
+  // Only remember full answers, so a later search can still widen.
+  if (complete) searchCache.set(key, out)
   return out
 }
 
 // ---------------------------------------------------------------- favorites (per device)
 
 const favKey = (uid) => `ironlog:fav-foods:${uid}`
+export const FAV_EVENT = 'ironlog:favorites'
+const FAV_MAX = 200
 
 export function loadFavorites(uid) {
   try {
@@ -664,8 +722,26 @@ export function toggleFavorite(uid, food) {
   if (!food.id) return false
   const list = loadFavorites(uid)
   const has = list.some((f) => f.id === food.id)
-  storeFavorites(uid, has ? list.filter((f) => f.id !== food.id) : [favSnapshot(food), ...list])
+  storeFavorites(uid, has ? list.filter((f) => f.id !== food.id) : [favSnapshot(food), ...list].slice(0, FAV_MAX))
+  window.dispatchEvent(new Event(FAV_EVENT))
   return !has
+}
+
+// Favorites are snapshots; bring them up to date with the foods table
+// (values corrected, food approved, food deleted) and return the fresh list.
+// Offline or on an error the stored list stands.
+export async function refreshFavorites(uid) {
+  const list = loadFavorites(uid)
+  if (!list.length) return list
+  try {
+    const rows = check(await supabase.from('foods').select('*').in('id', list.map((f) => f.id)))
+    const byId = new Map(rows.map((r) => [r.id, r]))
+    const fresh = list.filter((f) => byId.has(f.id)).map((f) => favSnapshot(byId.get(f.id)))
+    storeFavorites(uid, fresh)
+    return fresh
+  } catch {
+    return list
+  }
 }
 
 export function defaultMeal(now = new Date()) {

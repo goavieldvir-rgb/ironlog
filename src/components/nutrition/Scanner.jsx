@@ -275,7 +275,7 @@ export default function Scanner({ uid, meal, setMeal, onClose, onNotFound, onAdd
   const scanning = !result && cam === 'live'
 
   return createPortal(
-    <div className="fixed inset-0 z-50 bg-black flex flex-col" role="dialog" aria-modal="true" aria-label={t('nutrition.scanTitle')}>
+    <div className="nutrition-page fixed inset-0 z-50 bg-black flex flex-col" role="dialog" aria-modal="true" aria-label={t('nutrition.scanTitle')}>
       <video
         ref={videoRef}
         playsInline
@@ -477,7 +477,7 @@ function FoundCard({ result, lang, meal, setMeal, onAgain, onAdd }) {
         <div className="flex items-baseline justify-between gap-2 text-sm text-chalkdim">
           <span className="truncate">{t('nutrition.forThisAmount')}</span>
           <span className="whitespace-nowrap">
-            <N mono className="text-chalk text-xl">{fmt(a.macros.protein, 1)}</N> {g} {t('nutrition.proteinWord')} · <N mono>{fmt(a.macros.kcal, 0)}</N> {t('nutrition.kcalUnit')}
+            <N mono className="text-irontext text-xl">{fmt(a.macros.protein, 1)}</N> {g} {t('nutrition.proteinWord')} · <N mono>{fmt(a.macros.kcal, 0)}</N> {t('nutrition.kcalUnit')}
           </span>
         </div>
         <Button variant="brass" className="w-full min-h-[52px] text-base" disabled={!a.valid} onClick={() => onAdd(food, a.option, a.q, meal)}>

@@ -133,6 +133,12 @@
   [dir='rtl'] .eyebrow {
     letter-spacing: normal;
   }
+  /* Plex Mono has no Hebrew, and its wide word space splits two-word
+     labels ("שם  המוצר"); on the nutrition screens Hebrew eyebrows use the
+     body face. */
+  [dir='rtl'] .nutrition-page .eyebrow {
+    @apply font-body text-xs;
+  }
   .num {
     @apply font-mono tabular-nums;
   }

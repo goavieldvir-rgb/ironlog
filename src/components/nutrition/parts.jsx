@@ -71,18 +71,39 @@ export function MohAttribution({ className = '' }) {
   return <p className={`text-chalkdim text-xs ${className}`}>{t('nutrition.attrMoh')}</p>
 }
 
-// Neutral chalk bar; only an over-target bar turns brass.
-export function Track({ value, max, size = 'md' }) {
+// Each measure keeps one colour everywhere it appears (bar, legend dot):
+// protein iron, calories brass, carbs cardio blue, fat chalk, water cardio
+// blue. A protein or water bar that reaches its target turns green.
+export const TONE = {
+  protein: { bar: 'bg-iron', dot: 'bg-iron', text: 'text-irontext' },
+  kcal: { bar: 'bg-brass', dot: 'bg-brass', text: 'text-brass' },
+  carbs: { bar: 'bg-cardio', dot: 'bg-cardio', text: 'text-cardiotext' },
+  fat: { bar: 'bg-chalk', dot: 'bg-chalk', text: 'text-chalk' },
+  water: { bar: 'bg-cardio', dot: 'bg-cardio', text: 'text-cardiotext' },
+}
+const GOAL_TONES = ['protein', 'water']
+
+export function Track({ value, max, size = 'md', tone = 'fat' }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0
-  const over = max > 0 && value > max
+  const met = GOAL_TONES.includes(tone) && max > 0 && value >= max
   const h = size === 'sm' ? 'h-1.5' : 'h-2'
   return (
     <div className={`${h} rounded-full bg-surface2 overflow-hidden`} aria-hidden="true">
       <div
-        className={`${over ? 'bg-brass' : 'bg-chalk'} h-full rounded-full transition-[width] duration-500 motion-reduce:transition-none`}
+        className={`${met ? 'bg-good' : (TONE[tone] || TONE.fat).bar} h-full rounded-full transition-[width] duration-500 motion-reduce:transition-none`}
         style={{ width: `${pct}%` }}
       />
     </div>
+  )
+}
+
+// Eyebrow with the measure's colour dot, the legend for its bar.
+export function ToneLabel({ tone, children }) {
+  return (
+    <span className="eyebrow inline-flex items-center gap-1.5">
+      <span className={`w-2 h-2 rounded-full shrink-0 ${(TONE[tone] || TONE.fat).dot}`} aria-hidden="true" />
+      {children}
+    </span>
   )
 }
 
@@ -149,7 +170,7 @@ export function Sheet({ onClose, children, label }) {
   }, [onClose])
   return createPortal(
     <div
-      className="fixed inset-0 z-40 bg-ink/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 pt-[calc(env(safe-area-inset-top,0px)+0.625rem)] sm:p-4"
+      className="nutrition-page fixed inset-0 z-40 bg-ink/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 pt-[calc(env(safe-area-inset-top,0px)+0.625rem)] sm:p-4"
       onClick={onClose}
     >
       <div
@@ -224,7 +245,7 @@ export function AmountText({ row }) {
     <>
       {row.unit_label && row.unit_qty != null && (
         <>
-          <N>{fmt(row.unit_qty, 1)}</N> <bdi>{row.unit_label}</bdi> ·{' '}
+          <N>{fmt(row.unit_qty, 2)}</N> <bdi>{row.unit_label}</bdi> ·{' '}
         </>
       )}
       <N>{fmt(row.grams, 1)}</N> {g}
