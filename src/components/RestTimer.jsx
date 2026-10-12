@@ -57,13 +57,18 @@ export default function RestTimer() {
   // time from a real timestamp means it's always correct the moment you
   // come back, even if not a single tick fired while you were gone.
   const endTimeRef = useRef(null)
+  // Whether this run already alerted. The timer keeps going past zero and
+  // shows how long you've rested beyond the set time, so the beep must
+  // fire once at zero rather than on every overtime tick.
+  const alertedRef = useRef(false)
 
   function tick() {
     if (!endTimeRef.current) return
-    const remaining = Math.max(0, Math.ceil((endTimeRef.current - Date.now()) / 1000))
+    // Goes negative once time's up: -12 means 12 seconds over.
+    const remaining = Math.ceil((endTimeRef.current - Date.now()) / 1000)
     setSecondsLeft(remaining)
-    if (remaining <= 0) {
-      setRunning(false)
+    if (remaining <= 0 && !alertedRef.current) {
+      alertedRef.current = true
       setFinished(true)
       beep()
       if (navigator.vibrate) navigator.vibrate([200, 100, 200])
@@ -119,12 +124,15 @@ export default function RestTimer() {
   }
 
   function start(preset) {
-    const duration = preset ?? secondsLeft
+    // Resuming a timer paused in overtime starts a fresh rest rather than
+    // "resuming" from a negative time.
+    const duration = preset ?? (secondsLeft > 0 ? secondsLeft : lastDuration)
     if (preset != null) setLastDuration(preset)
     endTimeRef.current = Date.now() + duration * 1000
     setSecondsLeft(duration)
     setTotalDuration(duration)
     setFinished(false)
+    alertedRef.current = false
     setRunning(true)
   }
 
@@ -149,11 +157,21 @@ export default function RestTimer() {
     }
   }
 
-  const mm = String(Math.floor(secondsLeft / 60)).padStart(2, '0')
-  const ss = String(secondsLeft % 60).padStart(2, '0')
+  const overtime = secondsLeft < 0
+  const shown = Math.abs(secondsLeft)
+  const mm = String(Math.floor(shown / 60)).padStart(2, '0')
+  const ss = String(shown % 60).padStart(2, '0')
+  // Always "+01:23", left to right, in Hebrew too — the plus sign would
+  // otherwise jump to the far side of the digits.
+  const clock = (
+    <span dir="ltr">
+      {overtime ? '+' : ''}
+      {mm}:{ss}
+    </span>
+  )
 
   if (!expanded) {
-    const progress = running && totalDuration > 0 ? (secondsLeft / totalDuration) * 100 : 0
+    const progress = running && totalDuration > 0 ? (Math.max(0, secondsLeft) / totalDuration) * 100 : 0
     return (
       <div
         className={`sticky bottom-0 z-10 border-t backdrop-blur px-4 transition-colors ${
@@ -161,7 +179,7 @@ export default function RestTimer() {
         }`}
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
-        {running && (
+        {running && !overtime && (
           <div
             className="absolute top-0 start-0 h-0.5 bg-brass transition-[width] duration-1000 ease-linear"
             style={{ width: `${progress}%` }}
@@ -177,7 +195,7 @@ export default function RestTimer() {
           >
             <Timer size={16} className={finished ? 'text-irontext' : running ? 'text-brass' : 'text-chalkdim'} />
             <span className={`num text-2xl leading-none ${finished ? 'text-irontext' : running ? 'text-brass' : 'text-chalk'}`}>
-              {mm}:{ss}
+              {clock}
             </span>
           </button>
           {running ? (
@@ -213,7 +231,7 @@ export default function RestTimer() {
       <div className="flex items-center gap-1.5">
         <Timer size={16} className={finished ? 'text-irontext' : 'text-chalkdim'} />
         <span className={`num text-2xl leading-none ${finished ? 'text-irontext' : 'text-chalk'}`}>
-          {mm}:{ss}
+          {clock}
         </span>
         <InfoTip text={t('restTimer.tip')} />
       </div>
