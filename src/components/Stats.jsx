@@ -16,7 +16,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import ExerciseSelect from './ExerciseSelect.jsx'
 import { useCollection } from '../lib/db.js'
 import { entryName, exerciseMap } from '../lib/names.js'
-import { toLocalISODate, fmtDate, dateLocale } from '../lib/dates.js'
+import { toLocalISODate, fmtDate, dateLocale, weekStartOf } from '../lib/dates.js'
 import { disambiguateLabels } from '../lib/disambiguate.js'
 import { Card, EmptyState, LoadError, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
@@ -26,22 +26,16 @@ import { cardioSummary, formatPace, formatSpeed, formatDistance, toKm } from '..
 
 const COLORS = { iron: '#D64545', brass: '#C9A24B', cardio: '#4C8CC9', chalk: '#EDEDE6', chalkdim: '#9CA0AA', grid: '#31353E' }
 
-function mondayOf(dateISO) {
-  const d = new Date(dateISO + 'T00:00:00')
-  const day = d.getDay() === 0 ? 6 : d.getDay() - 1
-  d.setDate(d.getDate() - day)
-  return toLocalISODate(d)
-}
 
 function shortDate(lang, iso) {
   return fmtDate(lang, new Date(iso + 'T00:00:00'), { month: 'short', day: 'numeric' })
 }
 
-function last12Mondays() {
-  const thisMonday = mondayOf(toLocalISODate())
+function last12WeekStarts() {
+  const thisWeekStart = weekStartOf(toLocalISODate())
   const weeks = []
   for (let i = 11; i >= 0; i--) {
-    const d = new Date(thisMonday + 'T00:00:00')
+    const d = new Date(thisWeekStart + 'T00:00:00')
     d.setDate(d.getDate() - i * 7)
     weeks.push(toLocalISODate(d))
   }
@@ -57,11 +51,11 @@ export default function Stats() {
   const [exerciseId, setExerciseId] = useState('')
   const [cardioMetric, setCardioMetric] = useState('duration')
 
-  const weeks = useMemo(() => last12Mondays(), [])
+  const weeks = useMemo(() => last12WeekStarts(), [])
 
   const weeklyData = useMemo(() => {
     return weeks.map((weekStart) => {
-      const inWeek = sessions.filter((s) => mondayOf(s.date) === weekStart)
+      const inWeek = sessions.filter((s) => weekStartOf(s.date) === weekStart)
       let volume = 0
       let cardioMinutes = 0
       let cardioKm = 0

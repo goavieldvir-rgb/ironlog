@@ -17,7 +17,7 @@ export default function Trends({ uid, today, targets, onBack, onClose }) {
   const { t, lang } = useLanguage()
   const [kind, setKind] = useState('week')
   // Opens on the period holding yesterday, the last finished day, so a
-  // Monday (or the 1st) shows the week (or month) that just ended.
+  // Sunday (or the 1st) shows the week (or month) that just ended.
   const yesterday = shiftDay(today, -1)
   const [anchor, setAnchor] = useState(yesterday)
   const [metric, setMetric] = useState('kcal')

@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { Users, ShieldCheck, UserPlus, Copy, Check, AlertTriangle } from 'lucide-react'
 import { ForwardArrow } from './DirectionalIcon.jsx'
 import { supabase } from '../supabase.js'
-import { toLocalISODate, fmtDate } from '../lib/dates.js'
+import { toLocalISODate, fmtDate, weekStartDate } from '../lib/dates.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -13,10 +13,7 @@ import { InfoTip } from './InfoTip.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 
 function startOfWeekISO() {
-  const d = new Date()
-  const day = d.getDay() === 0 ? 6 : d.getDay() - 1
-  d.setDate(d.getDate() - day)
-  return toLocalISODate(d)
+  return toLocalISODate(weekStartDate(new Date()))
 }
 
 export default function People() {

@@ -5,20 +5,13 @@ import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useCollection } from '../lib/db.js'
 import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
-import { toLocalISODate, fmtDate, dateLocale } from '../lib/dates.js'
+import { toLocalISODate, fmtDate, dateLocale, weekStartDate } from '../lib/dates.js'
 import { Button, Card, CategoryTag, EmptyState, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { isWarmup, workingSets } from '../lib/warmup.js'
 import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
 import { cardioSummary, formatPace, formatDistance, toKm } from '../lib/cardio.js'
 
-function mondayOf(d) {
-  const date = new Date(d)
-  const day = date.getDay() === 0 ? 6 : date.getDay() - 1
-  date.setDate(date.getDate() - day)
-  date.setHours(0, 0, 0, 0)
-  return date
-}
 
 function startOfMonth(d) {
   const x = new Date(d)
@@ -113,7 +106,7 @@ function computeRange(mode, offset, customStart, customEnd) {
   const today = todayStart()
 
   if (mode === 'week') {
-    const start = mondayOf(today)
+    const start = weekStartDate(today)
     start.setDate(start.getDate() + offset * 7)
     const end = new Date(start)
     end.setDate(end.getDate() + 6)
@@ -356,7 +349,7 @@ export default function WeeklySummary() {
 
   const [mode, setMode] = useState('week')
   const [offset, setOffset] = useState(0)
-  const [customStart, setCustomStart] = useState(toISO(mondayOf(todayStart())))
+  const [customStart, setCustomStart] = useState(toISO(weekStartDate(todayStart())))
   const [customEnd, setCustomEnd] = useState(toISO(todayStart()))
   const [copied, setCopied] = useState(false)
 

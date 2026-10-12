@@ -1,5 +1,5 @@
 import { supabase } from '../supabase.js'
-import { toLocalISODate } from './dates.js'
+import { toLocalISODate, weekStartOf } from './dates.js'
 
 // Week and month averages for the nutrition diary. Only finished days count:
 // today is still being eaten and later days are planned, so both stay out of
@@ -14,7 +14,7 @@ export const shiftDay = (iso, n) => {
   return toLocalISODate(d)
 }
 
-// Same week start as the Stats page (Monday).
+// Same week start as the Stats page (Sunday).
 export function periodRange(kind, anchor) {
   const d = new Date(anchor + 'T00:00:00')
   if (kind === 'month') {
@@ -22,8 +22,7 @@ export function periodRange(kind, anchor) {
     const to = new Date(d.getFullYear(), d.getMonth() + 1, 0)
     return { from: toLocalISODate(from), to: toLocalISODate(to) }
   }
-  d.setDate(d.getDate() - (d.getDay() === 0 ? 6 : d.getDay() - 1))
-  const from = toLocalISODate(d)
+  const from = weekStartOf(anchor)
   return { from, to: shiftDay(from, 6) }
 }
 
