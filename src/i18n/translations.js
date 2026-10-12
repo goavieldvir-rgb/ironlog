@@ -127,7 +127,7 @@ export const translations = {
       minutesAgo: '{n}m ago',
       hoursAgo: '{n}h ago',
       daysAgo: '{n}d ago',
-      inProgressTip: "Everything you log gets saved to your phone instantly, even before you finish the workout. If the app reloads or you switch away mid-session, it's exactly how you left it — nothing is lost.",
+      inProgressTip: "Everything you log is kept on this phone instantly, so if the app reloads or you switch away mid-session, it's exactly how you left it. It isn't in your history, and your coach can't see it, until you tap Resume and then “Finish & save session”.",
       startRoutine: 'Start {name}',
     },
     account: {
@@ -1109,7 +1109,7 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       minutesAgo: 'לפני {n} דק׳',
       hoursAgo: 'לפני {n} שע׳',
       daysAgo: 'לפני {n} ימים',
-      inProgressTip: 'כל מה שאתם מתעדים נשמר בטלפון שלכם באופן מיידי, עוד לפני שסיימתם את האימון. אם האפליקציה נטענת מחדש או שאתם עוברים לאפליקציה אחרת באמצע האימון, הכל יישאר בדיוק כפי שהשארתם אותו — שום דבר לא הולך לאיבוד.',
+      inProgressTip: 'כל מה שאתם מתעדים נשמר מיד בטלפון הזה, כך שאם האפליקציה נטענת מחדש או שאתם עוברים לאפליקציה אחרת באמצע האימון, הכל יישאר כפי שהשארתם. האימון לא יופיע בהיסטוריה והמאמן לא יראה אותו עד שתלחצו על "המשך" ואז על "סיום ושמירת האימון".',
       startRoutine: 'התחילו {name}',
     },
     account: {
