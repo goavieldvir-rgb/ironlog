@@ -4,7 +4,7 @@ import { BadgeCheck, CheckCircle2, ChevronLeft, ChevronRight, Minus, Plus, X } f
 import { useLanguage } from '../../context/LanguageContext.jsx'
 import { useFeedback } from '../../context/FeedbackContext.jsx'
 import { useScrollLock } from '../../lib/scrollLock.js'
-import { badgeKind, fmt, MEALS, MEAL_KEY } from '../../lib/nutrition.js'
+import { badgeKind, fmt, logUnit, MEALS, MEAL_KEY } from '../../lib/nutrition.js'
 
 // Number that never gets reordered inside Hebrew text.
 export function N({ children, mono = false, className = '' }) {
@@ -480,14 +480,14 @@ export const mealLabel = (t, m) => t(MEAL_KEY[m])
 // "2 medium slices · 68 g" with every number and name isolated, so a Hebrew
 // unit name inside an English page (or the reverse) keeps its order.
 export function AmountText({ row }) {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   if (row.grams == null) return null
   const g = t('nutrition.g')
   return (
     <>
       {row.unit_label && row.unit_qty != null && (
         <>
-          <N>{fmt(row.unit_qty, 2)}</N> <bdi>{row.unit_label}</bdi> ·{' '}
+          <N>{fmt(row.unit_qty, 2)}</N> <bdi>{logUnit(row, lang)}</bdi> ·{' '}
         </>
       )}
       <N>{fmt(row.grams, 1)}</N> {g}

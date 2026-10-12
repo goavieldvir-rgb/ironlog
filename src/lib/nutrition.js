@@ -56,6 +56,26 @@ export function unitLabel(u, lang) {
   return (lang === 'he' ? u.he || u.en : u.en || u.he) || ''
 }
 
+// A logged row keeps the name and unit it was logged with. When its food is
+// still in the list (row.food, embedded by LOG_SELECT), show them in the
+// current language instead, so switching language changes the diary too.
+export function logName(row, lang) {
+  return (row.food && foodName(row.food, lang)) || row.name
+}
+export function logUnit(row, lang) {
+  const units = Array.isArray(row.food?.units) ? row.food.units : []
+  const u = row.unit_label && units.find((x) => x.he === row.unit_label || x.en === row.unit_label)
+  return u ? unitLabel(u, lang) || row.unit_label : row.unit_label
+}
+
+// The language a search was typed in: Hebrew letters mean Hebrew, Latin
+// letters mean English, anything else (digits, a barcode) the app's language.
+export function queryLang(query, lang) {
+  if (/[\u0590-\u05FF]/.test(query)) return 'he'
+  if (/[A-Za-z]/.test(query)) return 'en'
+  return lang
+}
+
 // 'coach' = brass "verified" badge, 'moh', 'off' or 'user' (unverified)
 export function badgeKind(food) {
   if (food.source === 'moh') return 'moh'
@@ -191,19 +211,21 @@ function check({ data, error }) {
 
 // ---------------------------------------------------------------- diary
 
+const LOG_SELECT = '*, food:foods(name_he,name_en,units)'
+
 export async function getLogs(uid, date) {
   return check(
-    await supabase.from('food_logs').select('*').eq('user_id', uid).eq('date', date).order('created_at', { ascending: true }),
+    await supabase.from('food_logs').select(LOG_SELECT).eq('user_id', uid).eq('date', date).order('created_at', { ascending: true }),
   )
 }
 
 export async function insertLogs(rows) {
   if (!rows.length) return []
-  return check(await supabase.from('food_logs').insert(rows).select())
+  return check(await supabase.from('food_logs').insert(rows).select(LOG_SELECT))
 }
 
 export async function updateLog(id, patch) {
-  return check(await supabase.from('food_logs').update(patch).eq('id', id).select().single())
+  return check(await supabase.from('food_logs').update(patch).eq('id', id).select(LOG_SELECT).single())
 }
 
 export async function deleteLogs(ids) {
@@ -214,7 +236,7 @@ export async function deleteLogs(ids) {
 // Distinct recent foods (by food_id, or name for quick adds), newest first.
 export async function getRecentLogs(uid, limit = 20) {
   const rows = check(
-    await supabase.from('food_logs').select('*').eq('user_id', uid).order('created_at', { ascending: false }).limit(200),
+    await supabase.from('food_logs').select(LOG_SELECT).eq('user_id', uid).order('created_at', { ascending: false }).limit(200),
   )
   const seen = new Set()
   const out = []

@@ -12,6 +12,8 @@ import {
   parseNum,
   round1,
   sumLogs,
+  logName,
+  logUnit,
 } from '../../lib/nutrition.js'
 import { AmountControl, AmountText, MacroInputs, MacroPanel, MealTabs, N, Name, SheetHeader, UnitChips, mealLabel, useDirtyForm } from './parts.jsx'
 
@@ -20,13 +22,13 @@ const round2 = (n) => Math.round(n * 100) / 100
 // ------------------------------------------------------------ edit a log row
 
 export function EditLog({ row, onBack, onClose, onSave, onDelete }) {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const g = t('nutrition.g')
   const hasGrams = row.grams != null
   // Units this row can be edited in: its own household unit, and grams.
   const unitG = row.unit_label && row.unit_qty ? Number(row.grams) / Number(row.unit_qty) : null
   const options = [
-    ...(unitG ? [{ key: 'u', label: row.unit_label, g: unitG, step: 0.5 }] : []),
+    ...(unitG ? [{ key: 'u', label: logUnit(row, lang), g: unitG, step: 0.5 }] : []),
     { key: 'g', label: g, g: 1, step: 10 },
   ]
   const [oi, setOi] = useState(0)
@@ -94,7 +96,7 @@ export function EditLog({ row, onBack, onClose, onSave, onDelete }) {
       <SheetHeader title={t('nutrition.editItem')} onBack={onBack} onClose={onClose} />
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 flex flex-col gap-5">
         <h3 className="text-2xl leading-tight line-clamp-2 break-words">
-          <bdi>{row.name}</bdi>
+          <bdi>{logName(row, lang)}</bdi>
         </h3>
         <MealTabs value={meal} onChange={setMeal} />
         {hasGrams ? (

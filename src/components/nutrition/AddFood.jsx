@@ -16,6 +16,8 @@ import {
   searchFoods,
   searchOff,
   sumLogs,
+  logName,
+  queryLang,
 } from '../../lib/nutrition.js'
 import { AmountText, Forward, MacroInputs, MealTabs, MohAttribution, N, Name, OffAttribution, SheetHeader, SourceLabel, mealLabel, useDirtyForm } from './parts.jsx'
 
@@ -223,6 +225,8 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
     }
   }
 
+  // Results show names in the language the search was typed in.
+  const qLang = queryLang(query, lang)
   const localCodes = new Set((results || []).map((r) => r.barcode).filter(Boolean))
   const shownOnline = online.filter((r) => !localCodes.has(r.barcode))
   const g = t('nutrition.g')
@@ -335,7 +339,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
                 <li key={r.id}>
                   <button type="button" onClick={() => onPick(r)} className="w-full flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
                     <div className="min-w-0 flex-1">
-                      <Name className="font-medium">{foodName(r, lang)}</Name>
+                      <Name className="font-medium">{foodName(r, qLang)}</Name>
                       <Stats protein={r.protein} kcal={r.kcal} source={<>{r.brand && <>· <bdi>{r.brand}</bdi></>} · <SourceLabel food={r} /></>} />
                     </div>
                     <Forward size={20} className="text-chalkdim shrink-0" />
@@ -367,7 +371,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
                     <li key={r.source_ref}>
                       <button type="button" disabled={picking} onClick={() => pickOnline(r)} className="w-full flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
                         <div className="min-w-0 flex-1">
-                          <Name className="font-medium">{foodName(r, lang)}</Name>
+                          <Name className="font-medium">{foodName(r, qLang)}</Name>
                           <Stats protein={r.protein} kcal={r.kcal} source={<>{r.brand && <>· <bdi>{r.brand}</bdi></>} · <SourceLabel food={r} /></>} />
                         </div>
                         <Forward size={20} className="text-chalkdim shrink-0" />
@@ -408,7 +412,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
                   {(recent || []).map((r) => (
                     <li key={r.id} className="flex items-center gap-3 py-2.5">
                       <div className="min-w-0 flex-1">
-                        <Name className="font-medium">{r.name}</Name>
+                        <Name className="font-medium">{logName(r, lang)}</Name>
                         <Stats protein={r.protein} kcal={r.kcal} extra={r.grams != null ? <AmountText row={r} /> : null} />
                       </div>
                       {addBtn(r.id, t('nutrition.add'), () => logRecent(r))}
