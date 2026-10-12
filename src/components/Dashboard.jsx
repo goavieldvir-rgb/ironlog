@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Play, Plus, Check, Circle, Clock, Dumbbell, History as HistoryIcon } from 'lucide-react'
+import { Play, Plus, Check, Circle, Clock, Dumbbell, Apple, History as HistoryIcon } from 'lucide-react'
 import { InfoTip } from './InfoTip.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
@@ -24,7 +24,7 @@ function timeAgo(ts, t) {
 
 export default function Dashboard() {
   const { user } = useAuth()
-  const { actingAs, effectiveUid, effectiveName } = useAdmin()
+  const { actingAs, effectiveUid, effectiveName, nutritionAllowed } = useAdmin()
   const { t, lang } = useLanguage()
   const { confirm } = useFeedback()
   const [exercises, exercisesLoading, refreshExercises, exercisesError] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
@@ -178,7 +178,7 @@ export default function Dashboard() {
         refreshSchedule={refreshSchedule}
       />
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className={`grid gap-3 ${nutritionAllowed ? 'grid-cols-3' : 'grid-cols-2'}`}>
         <Link to="/routines">
           <Card className="press-row flex flex-col items-center justify-center py-6 gap-2 text-center hover:bg-surface2 transition-colors">
             <Dumbbell size={22} className="text-irontext" />
@@ -197,6 +197,15 @@ export default function Dashboard() {
             </span>
           </Card>
         </Link>
+        {nutritionAllowed && (
+          <Link to="/nutrition">
+            <Card className="press-row flex flex-col items-center justify-center py-6 gap-2 text-center hover:bg-surface2 transition-colors">
+              <Apple size={22} className="text-irontext" />
+              <span className="text-sm">{t('dashboard.navNutrition')}</span>
+              <span className="text-chalkdim text-xs">{t('dashboard.nutritionSub')}</span>
+            </Card>
+          </Link>
+        )}
       </div>
     </div>
   )
