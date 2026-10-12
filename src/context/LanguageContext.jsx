@@ -10,7 +10,8 @@ function getInitialLang() {
   } catch {
     // ignore — storage might be unavailable
   }
-  return 'en'
+  // First visit: follow the phone's language.
+  return /^he|^iw/i.test(navigator.language || '') ? 'he' : 'en'
 }
 
 export function LanguageProvider({ children }) {

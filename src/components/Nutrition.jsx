@@ -24,6 +24,7 @@ import {
   saveTargets,
   sumLogs,
   updateLog,
+  logName,
 } from '../lib/nutrition.js'
 import { Button, Card, LoadError } from './ui.jsx'
 import { AmountText, DirtyScope, N, Name, Sheet, ToneLabel, Track, UndoToast, useDiscardGuard } from './nutrition/parts.jsx'
@@ -384,7 +385,7 @@ function Diary() {
                       <li key={r.id}>
                         <button type="button" onClick={() => push({ type: 'edit', row: r })} className="w-full flex items-center justify-between gap-3 px-4 py-3 min-h-[60px] text-start hover:bg-surface2 press-row">
                           <div className="min-w-0 flex-1">
-                            <Name className="font-medium">{r.name}</Name>
+                            <Name className="font-medium">{logName(r, lang)}</Name>
                             {r.grams != null && (
                               <span className="block text-chalkdim text-xs whitespace-nowrap truncate mt-0.5">
                                 <AmountText row={r} />

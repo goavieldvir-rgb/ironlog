@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Camera, Flashlight, Keyboard, Plus, RefreshCw, Search, X } from 'lucide-react'
+import { Camera, Flashlight, Keyboard, Plus, RefreshCw, ScanBarcode, Search, X } from 'lucide-react'
 import { useLanguage } from '../../context/LanguageContext.jsx'
 import { useScrollLock } from '../../lib/scrollLock.js'
 import { Button } from '../ui.jsx'
-import { fmt, foodName, isWeighedLabel, resolveBarcode, validateBarcode } from '../../lib/nutrition.js'
+import { foodName, isWeighedLabel, resolveBarcode, validateBarcode } from '../../lib/nutrition.js'
 import { useAmount } from './useAmount.js'
-import { MealSelect, N, Name, OffAttribution, SourceLabel, Stepper, mealLabel } from './parts.jsx'
+import { AmountControl, FoodHeading, MacroPanel, MealTabs, N, OffAttribution, UnitChips, mealLabel } from './parts.jsx'
+import { unitText } from './FoodDetail.jsx'
 
 // The scanner is an overlay on purpose: changing the URL hash while the
 // camera is open makes iOS WebKit ask for camera permission again
@@ -441,6 +442,8 @@ export default function Scanner({ uid, meal, setMeal, onClose, onNotFound, onAdd
   )
 }
 
+// The product that was found, as a sheet over the dimmed camera: name and
+// photo, meal, amount, what it adds, and one button.
 function FoundCard({ result, lang, meal, setMeal, onAgain, onAdd }) {
   const { t } = useLanguage()
   const { food, image } = result
@@ -448,43 +451,29 @@ function FoundCard({ result, lang, meal, setMeal, onAgain, onAdd }) {
   const g = t('nutrition.g')
   const name = foodName(food, lang) || t('nutrition.unnamed')
   return (
-    <div className="relative z-10 px-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
-      <div className="card p-3.5 flex flex-col gap-2.5">
-        <div className="flex gap-3 items-start">
-          {image && <img src={image} alt="" className="w-14 h-14 rounded-md object-contain bg-white shrink-0" />}
-          <div className="min-w-0 flex-1">
-            <div className="eyebrow flex items-center gap-2 flex-wrap">
-              <SourceLabel food={food} showVerifiedText />
-            </div>
-            <h3 className="text-xl leading-tight mt-1 line-clamp-2"><bdi>{name}</bdi></h3>
-            {food.brand && <Name className="text-chalkdim text-sm">{food.brand}</Name>}
-          </div>
-          <button type="button" onClick={onAgain} aria-label={t('nutrition.scanAgain')} className="w-11 h-11 -mt-1 -me-1 inline-flex items-center justify-center rounded-md hover:bg-surface2 shrink-0">
-            <X size={20} />
-          </button>
+    <>
+      <div className="absolute inset-0 bg-black/60 pointer-events-none" aria-hidden="true" />
+      <div
+        className="relative z-10 card rounded-b-none border-b-0 px-4 pt-4 flex flex-col gap-4 max-h-[78dvh] overflow-y-auto"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}
+      >
+        <FoodHeading name={name} food={food} image={image} as="h3" size="text-xl" />
+        <MealTabs value={meal} onChange={setMeal} />
+        <div className="flex flex-col gap-3">
+          <AmountControl value={a.qty} unit={unitText(a.option, g)} grams={a.option.kind === 'unit' ? a.grams : 0} onChange={a.setQty} onStep={a.step} />
+          <UnitChips options={a.options} value={a.unitIdx} onChange={a.setUnit} scroll />
         </div>
-        <Stepper value={a.qty} unit={a.option.kind === 'g' ? g : a.option.kind === '100g' ? '× 100 ' + g : a.option.label} onChange={a.setQty} onStep={a.step} />
-        <div className="grid grid-cols-2 gap-2">
-          <select aria-label={t('nutrition.unit')} value={a.unitIdx} onChange={(e) => a.setUnit(Number(e.target.value))} className="min-h-[44px]">
-            {a.options.map((o, i) => (
-              <option key={o.key} value={i}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <MealSelect value={meal} onChange={setMeal} />
+        <MacroPanel macros={a.macros} compact />
+        <div className="flex gap-2">
+          <Button variant="ghost" className="min-h-[52px] px-4 shrink-0" onClick={onAgain} aria-label={t('nutrition.scanAgain')}>
+            <ScanBarcode size={20} />
+          </Button>
+          <Button variant="brass" className="flex-1 min-h-[52px] text-base" disabled={!a.valid} onClick={() => onAdd(food, a.option, a.q, meal)}>
+            <Plus size={20} /> {t('nutrition.addToButton', { meal: mealLabel(t, meal) })}
+          </Button>
         </div>
-        <div className="flex items-baseline justify-between gap-2 text-sm text-chalkdim">
-          <span className="truncate">{t('nutrition.forThisAmount')}</span>
-          <span className="whitespace-nowrap">
-            <N mono className="text-irontext text-xl">{fmt(a.macros.protein, 1)}</N> {g} {t('nutrition.proteinWord')} · <N mono>{fmt(a.macros.kcal, 0)}</N> {t('nutrition.kcalUnit')}
-          </span>
-        </div>
-        <Button variant="brass" className="w-full min-h-[52px] text-base" disabled={!a.valid} onClick={() => onAdd(food, a.option, a.q, meal)}>
-          <Plus size={20} /> {t('nutrition.addToButton', { meal: mealLabel(t, meal) })}
-        </Button>
         {food.source === 'off' && <OffAttribution />}
       </div>
-    </div>
+    </>
   )
 }

@@ -16,8 +16,10 @@ import {
   searchFoods,
   searchOff,
   sumLogs,
+  logName,
+  queryLang,
 } from '../../lib/nutrition.js'
-import { AmountText, Forward, MealSelect, MohAttribution, N, Name, OffAttribution, SheetHeader, SourceLabel, mealLabel, useDirtyForm } from './parts.jsx'
+import { AmountText, Forward, MacroInputs, MealTabs, MohAttribution, N, Name, OffAttribution, SheetHeader, SourceLabel, mealLabel, useDirtyForm } from './parts.jsx'
 
 // Two-line row: name, then protein first, then kcal (quieter), then source.
 function Stats({ protein, kcal, extra, source }) {
@@ -223,6 +225,8 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
     }
   }
 
+  // Results show names in the language the search was typed in.
+  const qLang = queryLang(query, lang)
   const localCodes = new Set((results || []).map((r) => r.barcode).filter(Boolean))
   const shownOnline = online.filter((r) => !localCodes.has(r.barcode))
   const g = t('nutrition.g')
@@ -252,7 +256,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
     <>
       <SheetHeader title={t('nutrition.addSheetTitle', { meal: mealLabel(t, meal) })} onClose={onClose} />
       <div className="px-4 pt-2 shrink-0">
-        <MealSelect value={meal} onChange={setMeal} />
+        <MealTabs value={meal} onChange={setMeal} />
       </div>
       <div className="relative mx-4 mt-3 shrink-0">
         <Search size={18} className="absolute start-3 top-1/2 -translate-y-1/2 text-chalkdim pointer-events-none" aria-hidden="true" />
@@ -283,20 +287,12 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
             </Button>
           </div>
           {quickOpen && (
-            <form onSubmit={submitQuick} className="mx-4 mt-3 p-3 rounded-lg border border-line bg-ink grid grid-cols-2 gap-2.5 shrink-0">
-              {[
-                ['protein', 'quickProtein', 'decimal'],
-                ['kcal', 'quickKcal', 'decimal'],
-                ['carbs', 'quickCarbs', 'decimal'],
-                ['fat', 'quickFat', 'decimal'],
-              ].map(([k, label, mode]) => (
-                <label key={k} className="flex flex-col gap-1">
-                  <span className="text-xs text-chalkdim">{t(`nutrition.${label}`)}</span>
-                  <input inputMode={mode} dir="ltr" placeholder="0" className="num text-center" {...f(k)} />
-                </label>
-              ))}
-              <label className="col-span-2 flex flex-col gap-1">
-                <span className="text-xs text-chalkdim">{t('nutrition.quickName')}</span>
+            <form onSubmit={submitQuick} className="mx-4 mt-3 p-4 rounded-xl bg-surface2/60 grid grid-cols-2 gap-3 shrink-0">
+              <div className="col-span-2">
+                <MacroInputs values={quick} onChange={(k, v) => setQuick((s) => ({ ...s, [k]: v }))} />
+              </div>
+              <label className="col-span-2 flex flex-col gap-1.5">
+                <span className="text-sm text-chalkdim">{t('nutrition.quickName')}</span>
                 <input dir="auto" {...f('name')} />
               </label>
               {quickErr && (
@@ -343,7 +339,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
                 <li key={r.id}>
                   <button type="button" onClick={() => onPick(r)} className="w-full flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
                     <div className="min-w-0 flex-1">
-                      <Name className="font-medium">{foodName(r, lang)}</Name>
+                      <Name className="font-medium">{foodName(r, qLang)}</Name>
                       <Stats protein={r.protein} kcal={r.kcal} source={<>{r.brand && <>· <bdi>{r.brand}</bdi></>} · <SourceLabel food={r} /></>} />
                     </div>
                     <Forward size={20} className="text-chalkdim shrink-0" />
@@ -375,7 +371,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
                     <li key={r.source_ref}>
                       <button type="button" disabled={picking} onClick={() => pickOnline(r)} className="w-full flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
                         <div className="min-w-0 flex-1">
-                          <Name className="font-medium">{foodName(r, lang)}</Name>
+                          <Name className="font-medium">{foodName(r, qLang)}</Name>
                           <Stats protein={r.protein} kcal={r.kcal} source={<>{r.brand && <>· <bdi>{r.brand}</bdi></>} · <SourceLabel food={r} /></>} />
                         </div>
                         <Forward size={20} className="text-chalkdim shrink-0" />
@@ -416,7 +412,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
                   {(recent || []).map((r) => (
                     <li key={r.id} className="flex items-center gap-3 py-2.5">
                       <div className="min-w-0 flex-1">
-                        <Name className="font-medium">{r.name}</Name>
+                        <Name className="font-medium">{logName(r, lang)}</Name>
                         <Stats protein={r.protein} kcal={r.kcal} extra={r.grams != null ? <AmountText row={r} /> : null} />
                       </div>
                       {addBtn(r.id, t('nutrition.add'), () => logRecent(r))}
