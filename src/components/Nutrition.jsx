@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { Bookmark, Check, ChevronLeft, ChevronRight, Copy, Pencil, Plus, ScanBarcode } from 'lucide-react'
+import { BarChart3, Bookmark, Check, ChevronLeft, ChevronRight, Copy, Pencil, Plus, ScanBarcode } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -27,11 +27,12 @@ import {
   logName,
 } from '../lib/nutrition.js'
 import { Button, Card, LoadError } from './ui.jsx'
-import { AmountText, DirtyScope, N, Name, Sheet, ToneLabel, Track, UndoToast, useDiscardGuard } from './nutrition/parts.jsx'
+import { AmountText, DirtyScope, Forward, N, Name, Sheet, ToneLabel, Track, UndoToast, useDiscardGuard } from './nutrition/parts.jsx'
 import AddFood from './nutrition/AddFood.jsx'
 import FoodDetail from './nutrition/FoodDetail.jsx'
 import LabelForm from './nutrition/LabelForm.jsx'
 import Scanner from './nutrition/Scanner.jsx'
+import Trends from './nutrition/Trends.jsx'
 import Water from './nutrition/Water.jsx'
 import { EditLog, MyMealsView, SaveMealView, TargetsView } from './nutrition/Views.jsx'
 
@@ -306,6 +307,11 @@ function Diary() {
       {targetsKnown && (
         <>
           <Summary totals={totals} targets={targets} isAdmin={isAdmin} onEdit={() => push({ type: 'targets' })} />
+          <button type="button" onClick={() => push({ type: 'trends' })} className="card w-full flex items-center gap-3 px-4 min-h-[52px] -mt-2 text-start hover:bg-surface2 press-row">
+            <BarChart3 size={18} className="text-brass shrink-0" aria-hidden="true" />
+            <span className="flex-1 min-w-0 truncate text-sm">{t('nutrition.averagesOpen')}</span>
+            <Forward size={18} className="text-chalkdim shrink-0" aria-hidden="true" />
+          </button>
           {!targets && (
             <Card className="flex flex-col gap-2">
               {isAdmin ? (
@@ -466,6 +472,9 @@ function Diary() {
                     onSave={(name) => onSaveMeal(v.meal, name)}
                   />
                 )
+                break
+              case 'trends':
+                body = <Trends {...common} uid={uid} today={today} targets={targets} />
                 break
               case 'meals':
                 body = <MyMealsView {...common} uid={uid} date={date} meal={meal} setMeal={setMeal} onLog={addLogs} />
