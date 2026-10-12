@@ -51,6 +51,7 @@ export default function Stats() {
   const sessions = useMemo(() => applyCurrentTimed(rawSessions, exercises), [rawSessions, exercises])
   const [exerciseId, setExerciseId] = useState('')
   const [cardioMetric, setCardioMetric] = useState('duration')
+  const [cardioWeekly, setCardioWeekly] = useState('min')
 
   const weeks = useMemo(() => last12WeekStarts(), [])
 
@@ -295,8 +296,36 @@ export default function Stats() {
 
           <WeeklyChart title={t('stats.sessionsPerWeek')} data={weeklyData} dataKey="sessions" color={CHART.iron} />
           <WeeklyChart title={t('stats.volumePerWeek')} data={weeklyData} dataKey="volume" color={CHART.brass} note={t('stats.volumeNote')} />
-          {hasCardio && <WeeklyChart title={t('stats.cardioPerWeek')} data={weeklyData} dataKey="cardioMinutes" color={CHART.cardio} unit={t('sessionCard.minUnit')} />}
-          {totalCardioKm > 0 && <WeeklyChart title={t('stats.cardioDistancePerWeek')} data={weeklyData} dataKey="cardioKm" color={CHART.cardio} unit="km" digits={1} />}
+          {hasCardio && (
+            // Minutes and distance share one card, so the page stays a thumb's
+            // scroll shorter.
+            <WeeklyChart
+              title={cardioWeekly === 'km' && totalCardioKm > 0 ? t('stats.cardioDistancePerWeek') : t('stats.cardioPerWeek')}
+              data={weeklyData}
+              color={CHART.cardio}
+              {...(cardioWeekly === 'km' && totalCardioKm > 0 ? { dataKey: 'cardioKm', unit: 'km', digits: 1 } : { dataKey: 'cardioMinutes', unit: t('sessionCard.minUnit') })}
+              toggle={
+                totalCardioKm > 0 && (
+                  <div className="flex gap-1.5 mt-3" role="group" aria-label={t('stats.chartShows')}>
+                    {[
+                      ['min', t('stats.metricTime')],
+                      ['km', t('stats.metricDistance')],
+                    ].map(([k, label]) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => setCardioWeekly(k)}
+                        aria-pressed={cardioWeekly === k}
+                        className={`min-h-[44px] px-3 rounded-md border text-sm press ${cardioWeekly === k ? 'border-brass text-brass bg-brasssoft' : 'border-line text-chalkdim hover:text-chalk'}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )
+              }
+            />
+          )}
 
           <Card className="flex flex-col gap-3">
             <h2 className="eyebrow flex items-center gap-1.5 flex-wrap">
@@ -476,8 +505,8 @@ function Summary({ items }) {
 }
 
 // A 12-week bar chart that leads with this week's number and the weekly
-// average. This week's bar is solid; earlier weeks are dimmed so it stands out.
-function WeeklyChart({ title, data, dataKey, color, unit = '', digits = 0, note }) {
+// average. This week's bar is solid; earlier weeks are a shade dimmer.
+function WeeklyChart({ title, data, dataKey, color, unit = '', digits = 0, note, toggle }) {
   const { t, lang } = useLanguage()
   const fmtN = (v) => Number(v).toLocaleString(dateLocale(lang), { maximumFractionDigits: digits })
   const compact = (v) => Number(v).toLocaleString(dateLocale(lang), { notation: 'compact', maximumFractionDigits: 1 })
@@ -487,6 +516,7 @@ function WeeklyChart({ title, data, dataKey, color, unit = '', digits = 0, note 
   return (
     <Card>
       <h2 className="eyebrow">{title}</h2>
+      {toggle}
       <div className="flex items-end justify-between gap-3 mt-3 mb-4">
         <div className="min-w-0">
           <span className="num text-3xl text-chalk leading-none">
@@ -501,7 +531,10 @@ function WeeklyChart({ title, data, dataKey, color, unit = '', digits = 0, note 
           <div className="num text-chalk text-sm">
             <bdi dir="ltr">{fmtN(Math.round(avg * 10 ** digits) / 10 ** digits)}</bdi>
           </div>
-          <div className="text-chalkdim text-xs">{t('stats.weeklyAverage')}</div>
+          <div className="text-chalkdim text-xs inline-flex items-center gap-1.5">
+            <span className="w-3 border-t border-dashed border-chalkdim shrink-0" aria-hidden="true" />
+            {t('stats.weeklyAverage')}
+          </div>
         </div>
       </div>
       <div dir="ltr">
@@ -514,17 +547,13 @@ function WeeklyChart({ title, data, dataKey, color, unit = '', digits = 0, note 
             {avg > 0 && <ReferenceLine y={avg} stroke={CHART.chalkdim} strokeDasharray="4 4" />}
             <Bar dataKey={dataKey} radius={[4, 4, 0, 0]} maxBarSize={28}>
               {data.map((w, i) => (
-                <Cell key={w.week} fill={color} fillOpacity={i === last ? 1 : 0.45} />
+                <Cell key={w.week} fill={color} fillOpacity={i === last ? 1 : 0.7} />
               ))}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <p className="text-chalkdim text-xs mt-3 flex items-center gap-1.5">
-        <span className="w-4 border-t border-dashed border-chalkdim shrink-0" aria-hidden="true" />
-        {t('stats.averageLine')}
-      </p>
-      {note && <p className="text-chalkdim text-xs mt-2">{note}</p>}
+      {note && <p className="text-chalkdim text-xs mt-3">{note}</p>}
     </Card>
   )
 }

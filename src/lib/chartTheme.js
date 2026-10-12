@@ -10,6 +10,7 @@ export const CHART = {
   chalkdim: '#9CA0AA',
   line: '#31353E',
   surface: '#1C1F26',
+  ink: '#14161A',
 }
 
 export const axisProps = { stroke: CHART.chalkdim, fontSize: 12, tickLine: false, axisLine: false }

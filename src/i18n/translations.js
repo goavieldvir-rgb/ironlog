@@ -534,7 +534,6 @@ export const translations = {
       topSet: 'Top set',
       thisWeek: 'this week',
       weeklyAverage: '12-week average',
-      averageLine: 'Weekly average',
       firstLogged: 'First',
     },
     bodyWeight: {
@@ -1564,7 +1563,6 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       topSet: 'הסט הכבד ביותר',
       thisWeek: 'השבוע',
       weeklyAverage: 'ממוצע 12 שבועות',
-      averageLine: 'ממוצע שבועי',
       firstLogged: 'ראשון',
     },
     bodyWeight: {

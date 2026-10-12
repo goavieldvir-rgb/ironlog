@@ -281,10 +281,11 @@ function DailyChart({ stats, kind, targets, waterGoal, metric, setMetric }) {
       </div>
       <div dir="ltr">
         <ResponsiveContainer width="100%" height={week ? 200 : 180}>
-          <BarChart data={rows} margin={{ top: week ? 20 : 8, right: 0, left: 0, bottom: 0 }}>
+          <BarChart data={rows} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
             <XAxis dataKey="label" {...axisProps} interval={week ? 0 : 'preserveStartEnd'} minTickGap={8} />
             {/* No y scale: the dashed target line is the reference, and in a
-                week each bar carries its own number. */}
+                week each bar carries its own number inside its top, clear of
+                that line. */}
             <YAxis hide domain={[0, (max) => Math.max(max, target || 0) * 1.08]} />
             <Tooltip {...tooltipProps} formatter={(v) => [`${fmt(v, digits)} ${unit}`, metrics.find(([k]) => k === m)[1]]} />
             {target > 0 && <ReferenceLine y={target} stroke={CHART.chalkdim} strokeDasharray="4 4" />}
@@ -292,7 +293,7 @@ function DailyChart({ stats, kind, targets, waterGoal, metric, setMetric }) {
               {rows.map((r, i) => (
                 <Cell key={i} fill={r.hit ? CHART.good : BAR[m]} />
               ))}
-              {week && <LabelList dataKey="value" position="top" fill={CHART.chalkdim} fontSize={11} fontFamily='"IBM Plex Mono", monospace' formatter={(v) => (v == null ? '' : fmt(v, digits))} />}
+              {week && <LabelList dataKey="value" position="insideTop" offset={6} fill={CHART.ink} fontSize={11} fontFamily='"IBM Plex Mono", monospace' formatter={(v) => (v == null ? '' : fmt(v, digits))} />}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
@@ -353,7 +354,7 @@ function OnTarget({ stats, kind, targets, waterGoal }) {
               {stats.days.map((d) => (
                 <span
                   key={d.date}
-                  className={`flex-1 h-3 rounded-[3px] ${!d.finished ? 'border border-dashed border-line' : !r.has(d) ? 'border border-line' : r.hit(d) ? 'bg-good' : 'bg-chalkdim/35'}`}
+                  className={`flex-1 h-3 rounded-[3px] ${!d.finished ? 'border border-dashed border-line' : !r.has(d) ? 'border border-chalkdim/40' : r.hit(d) ? 'bg-good' : 'bg-chalkdim/35'}`}
                 />
               ))}
             </div>
@@ -373,7 +374,7 @@ function OnTarget({ stats, kind, targets, waterGoal }) {
         {[
           ['bg-good', t('nutrition.legendHit')],
           ['bg-chalkdim/35', t('nutrition.legendMissed')],
-          ['border border-line', t('nutrition.legendNotLogged')],
+          ['border border-chalkdim/40', t('nutrition.legendNotLogged')],
         ].map(([cls, label]) => (
           <span key={label} className="inline-flex items-center gap-1.5">
             <span className={`w-3 h-3 rounded-[3px] shrink-0 ${cls}`} aria-hidden="true" />
