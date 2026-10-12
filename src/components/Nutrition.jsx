@@ -31,6 +31,7 @@ import AddFood from './nutrition/AddFood.jsx'
 import FoodDetail from './nutrition/FoodDetail.jsx'
 import LabelForm from './nutrition/LabelForm.jsx'
 import Scanner from './nutrition/Scanner.jsx'
+import Water from './nutrition/Water.jsx'
 import { EditLog, MyMealsView, SaveMealView, TargetsView } from './nutrition/Views.jsx'
 
 // Nutrition diary (beta). Scanner and sheets are overlays inside this page on
@@ -102,17 +103,20 @@ function Diary() {
 
   const reload = useCallback(() => setReloadN((n) => n + 1), [])
 
-  function showToast(message, ids) {
+  // onUndo replaces the default undo (deleting the food log ids), e.g. for water.
+  function showToast(message, ids, onUndo) {
     clearTimeout(toastTimer.current)
-    setUndoToast({ message, ids })
+    setUndoToast({ message, ids, onUndo })
     toastTimer.current = setTimeout(() => setUndoToast(null), ids?.length ? 7000 : 2800)
   }
 
   async function undo() {
     const ids = undoToast?.ids || []
+    const onUndo = undoToast?.onUndo
     clearTimeout(toastTimer.current)
     setUndoToast(null)
     try {
+      if (onUndo) return await onUndo()
       await deleteLogs(ids)
     } catch (err) {
       console.error(err)
@@ -311,6 +315,8 @@ function Diary() {
               </Button>
             </Card>
           )}
+
+          <Water uid={uid} date={date} today={today} onPickDate={setDate} onToast={showToast} />
 
           {MEALS.map((m) => {
             const rows = logs.filter((r) => r.meal === m)
