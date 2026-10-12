@@ -11,14 +11,13 @@ import {
   getRecentLogs,
   getSavedMeals,
   FAV_EVENT,
-  loadFavorites,
-  refreshFavorites,
+  getFavorites,
   parseNum,
   searchFoods,
   searchOff,
   sumLogs,
 } from '../../lib/nutrition.js'
-import { AmountText, Forward, MealSelect, MohAttribution, N, Name, OffAttribution, SheetHeader, SourceLabel, mealLabel } from './parts.jsx'
+import { AmountText, Forward, MealSelect, MohAttribution, N, Name, OffAttribution, SheetHeader, SourceLabel, mealLabel, useDirtyForm } from './parts.jsx'
 
 // Two-line row: name, then protein first, then kcal (quieter), then source.
 function Stats({ protein, kcal, extra, source }) {
@@ -43,13 +42,14 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
   const [tab, setTab] = useState('recent')
   const [quickOpen, setQuickOpen] = useState(false)
   const [quick, setQuick] = useState({ protein: '', kcal: '', carbs: '', fat: '', name: '' })
+  useDirtyForm(quickOpen && Object.values(quick).some((x) => String(x).trim() !== ''))
   const [quickErr, setQuickErr] = useState('')
   const [results, setResults] = useState(null) // null = not searching
   const [searching, setSearching] = useState(false)
   const [searchErr, setSearchErr] = useState('')
   const [recent, setRecent] = useState(null)
   const [meals, setMeals] = useState(null)
-  const [favs, setFavs] = useState(() => loadFavorites(uid))
+  const [favs, setFavs] = useState(null) // null = not loaded
   const [done, setDone] = useState({})
   const [online, setOnline] = useState([])
   const [onlineBusy, setOnlineBusy] = useState(false)
@@ -152,23 +152,33 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid])
 
-  // Favorites change on the amount screen (the star) and in the foods table.
+  // Favorites are saved to the account; reload when the tab opens and when
+  // the star on the amount screen changes one.
+  const [favN, setFavN] = useState(0)
   useEffect(() => {
-    const sync = () => setFavs(loadFavorites(uid))
-    window.addEventListener(FAV_EVENT, sync)
-    return () => window.removeEventListener(FAV_EVENT, sync)
-  }, [uid])
+    const bump = () => setFavN((n) => n + 1)
+    window.addEventListener(FAV_EVENT, bump)
+    return () => window.removeEventListener(FAV_EVENT, bump)
+  }, [])
   useEffect(() => {
     if (tab !== 'favorites') return
     let off = false
-    setFavs(loadFavorites(uid))
-    refreshFavorites(uid).then((list) => {
-      if (!off) setFavs(list)
-    })
+    getFavorites(uid)
+      .then((list) => {
+        if (!off) setFavs(list)
+      })
+      .catch((err) => {
+        console.error(err)
+        if (!off) {
+          setFavs((f) => f || [])
+          setListErr(friendlyError(err, t, 'nutrition.loadFailed'))
+        }
+      })
     return () => {
       off = true
     }
-  }, [tab, uid])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, uid, favN])
 
   function flash(id) {
     setDone((d) => ({ ...d, [id]: true }))
@@ -417,9 +427,10 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
             )}
             {tab === 'favorites' && (
               <>
-                {favs.length === 0 && <p className="text-chalkdim text-sm py-2">{t('nutrition.emptyFavorites')}</p>}
+                {listErr && <p className="text-sm py-2" role="alert">{listErr}</p>}
+                {favs && favs.length === 0 && !listErr && <p className="text-chalkdim text-sm py-2">{t('nutrition.emptyFavorites')}</p>}
                 <ul className="divide-y divide-line">
-                  {favs.map((r) => (
+                  {(favs || []).map((r) => (
                     <li key={r.id}>
                       <button type="button" onClick={() => onPick(r)} className="w-full flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
                         <div className="min-w-0 flex-1">

@@ -26,7 +26,7 @@ import {
   updateLog,
 } from '../lib/nutrition.js'
 import { Button, Card, LoadError } from './ui.jsx'
-import { AmountText, N, Name, Sheet, ToneLabel, Track, UndoToast } from './nutrition/parts.jsx'
+import { AmountText, DirtyScope, N, Name, Sheet, ToneLabel, Track, UndoToast, useDiscardGuard } from './nutrition/parts.jsx'
 import AddFood from './nutrition/AddFood.jsx'
 import FoodDetail from './nutrition/FoodDetail.jsx'
 import LabelForm from './nutrition/LabelForm.jsx'
@@ -166,6 +166,16 @@ function Diary() {
   const push = (view) => setStack((s) => [...s, view])
   const pop = useCallback(() => setStack((s) => s.slice(0, -1)), [])
   const closeAll = useCallback(() => setStack([]), [])
+  // Back, X, Escape and a tap outside ask first when a form has typed values.
+  const guard = useDiscardGuard()
+  const depth = useRef(0)
+  depth.current = stack.length
+  const requestPop = useCallback(async () => {
+    if (await guard.ask([depth.current - 1])) pop()
+  }, [guard, pop])
+  const requestCloseAll = useCallback(async () => {
+    if (await guard.ask()) closeAll()
+  }, [guard, closeAll])
   const openAdd = (m) => {
     if (m) setMeal(m)
     setStack([{ type: 'add' }])
@@ -401,10 +411,10 @@ function Diary() {
       )}
 
       {stack.length > 0 && (
-        <Sheet onClose={closeAll} label={t('nutrition.title')}>
+        <Sheet onClose={requestCloseAll} label={t('nutrition.title')}>
           {stack.map((v, i) => {
             const isTop = i === stack.length - 1
-            const common = { onClose: closeAll, onBack: i > 0 ? pop : undefined }
+            const common = { onClose: requestCloseAll, onBack: i > 0 ? requestPop : undefined }
             let body = null
             switch (v.type) {
               case 'add':
@@ -415,7 +425,7 @@ function Diary() {
                     uid={uid}
                     authUid={user.uid}
                     date={date}
-                    onClose={closeAll}
+                    onClose={requestCloseAll}
                     onScan={() => setScanner(true)}
                     onPick={(food) => push({ type: 'detail', food })}
                     onLabel={() => push({ type: 'label', barcode: '' })}
@@ -464,7 +474,9 @@ function Diary() {
             }
             return (
               <div key={i} className={`${isTop ? 'flex' : 'hidden'} flex-col flex-1 min-h-0`}>
-                {body}
+                <DirtyScope guard={guard} id={i}>
+                  {body}
+                </DirtyScope>
               </div>
             )
           })}

@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { BadgeCheck, CheckCircle2, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { useLanguage } from '../../context/LanguageContext.jsx'
+import { useFeedback } from '../../context/FeedbackContext.jsx'
 import { useScrollLock } from '../../lib/scrollLock.js'
 import { badgeKind, fmt, MEALS, MEAL_KEY } from '../../lib/nutrition.js'
 
@@ -156,6 +157,56 @@ export function Stepper({ value, unit, onChange, onStep }) {
       </button>
     </div>
   )
+}
+
+// ---- unsaved-changes guard
+// A form calls useDirtyForm(hasTypedSomething). Whoever closes the sheet
+// calls ask(): it resolves true right away when nothing is typed, otherwise
+// after the person confirms "Discard". Saving closes without asking.
+const DirtyContext = createContext(null)
+
+export function useDiscardGuard() {
+  const { confirm } = useFeedback()
+  const { t } = useLanguage()
+  const forms = useRef(new Map())
+  const asking = useRef(false)
+  const ask = useCallback(
+    async (keys) => {
+      const dirty = [...forms.current].some(([k, v]) => v && (keys == null || keys.includes(k)))
+      if (!dirty) return true
+      if (asking.current) return false // Escape while the question is up
+      asking.current = true
+      try {
+        const ok = await confirm({
+          title: t('nutrition.discardTitle'),
+          body: t('nutrition.discardBody'),
+          confirmLabel: t('nutrition.discardConfirm'),
+          cancelLabel: t('nutrition.keepEditing'),
+          danger: true,
+        })
+        if (ok) for (const k of keys ?? [...forms.current.keys()]) forms.current.delete(k)
+        return ok
+      } finally {
+        asking.current = false
+      }
+    },
+    [confirm, t],
+  )
+  return useMemo(() => ({ forms, ask }), [ask])
+}
+
+// Gives the forms inside it a key in the guard (a sheet view, by position).
+export function DirtyScope({ guard, id, children }) {
+  const set = useCallback((dirty) => guard.forms.current.set(id, dirty), [guard, id])
+  return <DirtyContext.Provider value={set}>{children}</DirtyContext.Provider>
+}
+
+export function useDirtyForm(dirty) {
+  const set = useContext(DirtyContext)
+  useEffect(() => {
+    set?.(!!dirty)
+  }, [dirty, set])
+  useEffect(() => () => set?.(false), [set])
 }
 
 // Modal panel in the app's own card style. Children are the stacked views;
