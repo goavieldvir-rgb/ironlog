@@ -25,6 +25,7 @@ export default function Layout() {
   useScrollLock(open)
   const location = useLocation()
   const navType = useNavigationType()
+  const inWorkout = location.pathname.startsWith('/workout/')
 
   // Any navigation closes the menu (including the browser's back button),
   // and a newly opened page starts at its top. Nothing did this before, so
@@ -63,10 +64,19 @@ export default function Layout() {
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Dumbbell className="text-irontext" size={22} strokeWidth={2.5} />
-            <span className="font-display text-2xl tracking-wide">Ironlog</span>
-          </div>
+          {/* The logo goes home, except mid-workout, where a stray tap
+              shouldn't pull you out of the session. */}
+          {inWorkout ? (
+            <div className="flex items-center gap-2">
+              <Dumbbell className="text-irontext" size={22} strokeWidth={2.5} />
+              <span className="font-display text-2xl tracking-wide">Ironlog</span>
+            </div>
+          ) : (
+            <NavLink to="/" className="flex items-center gap-2" aria-label={t('nav.dashboard')}>
+              <Dumbbell className="text-irontext" size={22} strokeWidth={2.5} />
+              <span className="font-display text-2xl tracking-wide">Ironlog</span>
+            </NavLink>
+          )}
 
           <nav className="hidden md:flex items-center gap-1">
             {navLinks.map((l) => (
