@@ -5,7 +5,7 @@ import { useFeedback } from '../../context/FeedbackContext.jsx'
 import { Button } from '../ui.jsx'
 import { approveFood, fmt, foodName, friendlyError, isFavorite, toggleFavorite } from '../../lib/nutrition.js'
 import { useAmount } from './useAmount.js'
-import { MealSelect, N, OffAttribution, SheetHeader, SourceLabel, Stepper, Track, mealLabel } from './parts.jsx'
+import { MealSelect, N, OffAttribution, SheetHeader, SourceLabel, Stepper, TONE, ToneLabel, Track, mealLabel } from './parts.jsx'
 
 // Amount screen: pick a unit and quantity, see protein first, then add.
 export default function FoodDetail({ food: initial, meal, setMeal, targets, totals, favUid, isAdmin, onBack, onClose, onLog, onFoodChange }) {
@@ -119,25 +119,28 @@ export default function FoodDetail({ food: initial, meal, setMeal, targets, tota
         </div>
 
         <div className="card p-4">
-          <div className="eyebrow">{t('nutrition.protein')}</div>
+          <ToneLabel tone="protein">{t('nutrition.protein')}</ToneLabel>
           <div className="flex items-baseline gap-1.5 mt-1">
             <N mono className="text-3xl leading-none">{fmt(a.macros.protein, 1)}</N>
             <span className="text-chalkdim text-sm">{g}</span>
           </div>
           {pTarget > 0 && (
             <div className="mt-2.5">
-              <Track value={dayP} max={pTarget} />
+              <Track value={dayP} max={pTarget} tone="protein" />
               <p className="text-chalkdim text-xs mt-1.5">{t('nutrition.pctOfGoal', { n: fmt((a.macros.protein / pTarget) * 100, 0) })}</p>
             </div>
           )}
           <dl className="grid grid-cols-3 gap-3 mt-4 pt-3 border-t border-line">
             {[
-              [t('nutrition.calories'), a.macros.kcal, k],
-              [t('nutrition.carbs'), a.macros.carbs, g],
-              [t('nutrition.fat'), a.macros.fat, g],
-            ].map(([label, v, u]) => (
-              <div key={label} className="min-w-0">
-                <dt className="text-chalkdim text-xs truncate">{label}</dt>
+              ['kcal', t('nutrition.calories'), a.macros.kcal, k],
+              ['carbs', t('nutrition.carbs'), a.macros.carbs, g],
+              ['fat', t('nutrition.fat'), a.macros.fat, g],
+            ].map(([tone, label, v, u]) => (
+              <div key={tone} className="min-w-0">
+                <dt className="text-chalkdim text-xs truncate inline-flex items-center gap-1.5 max-w-full">
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${TONE[tone].dot}`} aria-hidden="true" />
+                  <span className="truncate">{label}</span>
+                </dt>
                 <dd className="text-base">
                   <N mono>{fmt(v, 1)}</N> <span className="text-chalkdim text-xs">{u}</span>
                 </dd>

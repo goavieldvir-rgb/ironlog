@@ -179,7 +179,8 @@ export function TargetsView({ targets, onBack, onClose, onSave }) {
   const [busy, setBusy] = useState(false)
   const int = (s) => {
     const n = parseNum(s)
-    return s === '' || !Number.isFinite(n) || n < 0 ? null : Math.round(n)
+    // 0 means "no target" (a 0 g target would read as reached all day)
+    return s === '' || !Number.isFinite(n) || n <= 0 ? null : Math.round(n)
   }
   async function submit(e) {
     e.preventDefault()

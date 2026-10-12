@@ -13,7 +13,7 @@ export function useAmount(food) {
   const [qty, setQty] = useState(() => String(options[defaultUnitIndex(options)].def))
   const option = options[unitIdx] || options[0]
   const q = parseNum(qty)
-  const valid = Number.isFinite(q) && q > 0
+  const valid = Number.isFinite(q) && q > 0 && round1(q * option.g) > 0
   const grams = valid ? round1(q * option.g) : 0
   const macros = scaleMacros(food, grams)
 

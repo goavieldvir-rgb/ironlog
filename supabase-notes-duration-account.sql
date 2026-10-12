@@ -1,3 +1,7 @@
+-- SUPERSEDED: already applied. Do not re-run on the live database: it would
+-- replace newer versions of its functions (the nutrition_enabled lock and the
+-- nutrition cleanup in delete_my_account). supabase/schema.sql is current.
+--
 -- Three features in one migration. Safe to run more than once.
 
 -- ─── 1. Last session's note per exercise ───────────────────────────────

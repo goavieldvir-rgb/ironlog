@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { Bookmark, ChevronLeft, ChevronRight, Copy, Pencil, Plus, ScanBarcode } from 'lucide-react'
+import { Bookmark, Check, ChevronLeft, ChevronRight, Copy, Pencil, Plus, ScanBarcode } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -26,7 +26,7 @@ import {
   updateLog,
 } from '../lib/nutrition.js'
 import { Button, Card, LoadError } from './ui.jsx'
-import { AmountText, N, Name, Sheet, Track, UndoToast } from './nutrition/parts.jsx'
+import { AmountText, N, Name, Sheet, ToneLabel, Track, UndoToast } from './nutrition/parts.jsx'
 import AddFood from './nutrition/AddFood.jsx'
 import FoodDetail from './nutrition/FoodDetail.jsx'
 import LabelForm from './nutrition/LabelForm.jsx'
@@ -71,6 +71,22 @@ function Diary() {
   const [undoToast, setUndoToast] = useState(null)
   const toastTimer = useRef(0)
   const loadedFor = useRef('')
+  const adding = useRef(false)
+  const [copiedFor, setCopiedFor] = useState('')
+
+  // A PWA resumed the next morning still shows yesterday as "Today": move
+  // to the new day when the app comes back, if it was showing today.
+  const shownToday = useRef(today)
+  shownToday.current = today
+  useEffect(() => {
+    const onShow = () => {
+      if (document.visibilityState !== 'visible') return
+      const now = toLocalISODate()
+      setDate((d) => (d === shownToday.current && d !== now ? now : d))
+    }
+    document.addEventListener('visibilitychange', onShow)
+    return () => document.removeEventListener('visibilitychange', onShow)
+  }, [])
 
   // Load the day, the day before it (for "copy"), and the targets.
   useEffect(() => {
@@ -118,6 +134,7 @@ function Diary() {
     try {
       if (onUndo) return await onUndo()
       await deleteLogs(ids)
+      setCopiedFor('')
     } catch (err) {
       console.error(err)
       toast(friendlyError(err, t), 'error')
@@ -126,7 +143,11 @@ function Diary() {
   }
 
   // Inserts rows into the diary and offers undo. Resolves true on success.
+  // A second tap while the first insert is on its way is ignored, so a slow
+  // connection can't log the same food or day twice.
   async function addLogs(rows, message) {
+    if (adding.current) return false
+    adding.current = true
     try {
       const inserted = await insertLogs(rows)
       showToast(message, inserted.map((r) => r.id))
@@ -136,6 +157,8 @@ function Diary() {
       console.error(err)
       toast(friendlyError(err, t), 'error')
       return false
+    } finally {
+      adding.current = false
     }
   }
 
@@ -169,7 +192,7 @@ function Diary() {
 
   async function copyPrevious() {
     const rows = cloneLogs(prevLogs, { uid, date })
-    await addLogs(rows, t('nutrition.copied', { n: rows.length }))
+    if (await addLogs(rows, t('nutrition.copied', { n: rows.length }))) setCopiedFor(date)
   }
 
   async function onSaveTargets(values) {
@@ -233,7 +256,7 @@ function Diary() {
   const targetsKnown = !loading && !loadError
 
   return (
-    <div className="flex flex-col gap-5 max-w-xl mx-auto w-full pb-6">
+    <div className="nutrition-page flex flex-col gap-5 max-w-xl mx-auto w-full pb-6">
       <div className="flex items-end justify-between gap-3">
         <div className="min-w-0">
           <div className="eyebrow mb-1">{actingAs ? <bdi>{actingAs.name || actingAs.email}</bdi> : t('nutrition.title')}</div>
@@ -295,11 +318,11 @@ function Diary() {
               <Plus size={20} /> {t('nutrition.addFood')}
             </Button>
             <Button variant="subtle" className="min-h-[56px] px-5 text-base" onClick={() => openScanner(defaultMeal())}>
-              <ScanBarcode size={20} /> {t('nutrition.scan')}
+              <ScanBarcode size={20} className="text-brass" /> {t('nutrition.scan')}
             </Button>
           </div>
 
-          {prevLogs.length > 0 && (
+          {prevLogs.length > 0 && copiedFor !== date && (
             <Card className="flex items-center justify-between gap-3 !py-3">
               <div className="min-w-0">
                 <div className="eyebrow">{date === today ? t('nutrition.yesterday') : t('nutrition.previousDayLabel')}</div>
@@ -360,7 +383,7 @@ function Diary() {
                           </div>
                           <div className="text-end shrink-0">
                             <div className="whitespace-nowrap">
-                              <N mono className="text-base">{fmt(r.protein, 1)}</N> <span className="text-chalkdim text-xs">{g} {t('nutrition.proteinWord')}</span>
+                              <N mono className="text-base text-irontext">{fmt(r.protein, 1)}</N> <span className="text-chalkdim text-xs">{g} {t('nutrition.proteinWord')}</span>
                             </div>
                             <div className="text-chalkdim text-xs whitespace-nowrap mt-0.5">
                               <N mono>{fmt(r.kcal, 0)}</N> {k}
@@ -390,6 +413,7 @@ function Diary() {
                     meal={meal}
                     setMeal={setMeal}
                     uid={uid}
+                    authUid={user.uid}
                     date={date}
                     onClose={closeAll}
                     onScan={() => setScanner(true)}
@@ -478,7 +502,7 @@ function Summary({ totals, targets, isAdmin, onEdit }) {
     <Card className="flex flex-col gap-4">
       <div>
         <div className="flex items-center justify-between gap-2">
-          <span className="eyebrow">{t('nutrition.protein')}</span>
+          <ToneLabel tone="protein">{t('nutrition.protein')}</ToneLabel>
           <span className="flex items-center gap-1">
             {pLeft != null && (
               <span className="text-chalkdim text-sm whitespace-nowrap">
@@ -487,7 +511,9 @@ function Summary({ totals, targets, isAdmin, onEdit }) {
                     <N mono className="text-chalk">{fmt(pLeft, 0)}</N> {g} {t('nutrition.left')}
                   </>
                 ) : (
-                  t('nutrition.targetReached')
+                  <span className="inline-flex items-center gap-1 text-good">
+                    <Check size={16} aria-hidden="true" /> {t('nutrition.targetReached')}
+                  </span>
                 )}
               </span>
             )}
@@ -509,17 +535,17 @@ function Summary({ totals, targets, isAdmin, onEdit }) {
         </div>
         {targets?.protein > 0 && (
           <div className="mt-3">
-            <Track value={p} max={targets.protein} />
+            <Track value={p} max={targets.protein} tone="protein" />
           </div>
         )}
       </div>
 
       <div className="border-t border-line pt-4">
         <div className="flex items-center justify-between gap-2">
-          <span className="eyebrow">{t('nutrition.calories')}</span>
+          <ToneLabel tone="kcal">{t('nutrition.calories')}</ToneLabel>
           {kLeft != null && (
-            <span className="text-chalkdim text-sm whitespace-nowrap">
-              <N mono className="text-chalk">{fmt(Math.abs(kLeft), 0)}</N> {kLeft >= 0 ? t('nutrition.left') : t('nutrition.overTarget')}
+            <span className={`text-sm whitespace-nowrap ${kLeft >= 0 ? 'text-chalkdim' : 'text-brass'}`}>
+              <N mono className={kLeft >= 0 ? 'text-chalk' : ''}>{fmt(Math.abs(kLeft), 0)}</N> {kLeft >= 0 ? t('nutrition.left') : t('nutrition.overTarget')}
             </span>
           )}
         </div>
@@ -537,19 +563,19 @@ function Summary({ totals, targets, isAdmin, onEdit }) {
         </div>
         {targets?.kcal > 0 && (
           <div className="mt-2.5">
-            <Track value={totals.kcal} max={targets.kcal} />
+            <Track value={totals.kcal} max={targets.kcal} tone="kcal" />
           </div>
         )}
       </div>
 
       <div className="grid grid-cols-2 gap-4 border-t border-line pt-4">
         {[
-          [t('nutrition.carbs'), totals.carbs, targets?.carbs],
-          [t('nutrition.fat'), totals.fat, targets?.fat],
-        ].map(([label, v, target]) => (
-          <div key={label}>
+          ['carbs', t('nutrition.carbs'), totals.carbs, targets?.carbs],
+          ['fat', t('nutrition.fat'), totals.fat, targets?.fat],
+        ].map(([tone, label, v, target]) => (
+          <div key={tone}>
             <div className="flex items-baseline justify-between gap-2">
-              <span className="eyebrow">{label}</span>
+              <ToneLabel tone={tone}>{label}</ToneLabel>
               <span className="text-chalkdim text-sm whitespace-nowrap">
                 <N mono className="text-chalk">{fmt(v, 0)}</N>
                 {target != null && (
@@ -563,7 +589,7 @@ function Summary({ totals, targets, isAdmin, onEdit }) {
             </div>
             {target > 0 && (
               <div className="mt-2">
-                <Track value={v} max={target} size="sm" />
+                <Track value={v} max={target} size="sm" tone={tone} />
               </div>
             )}
           </div>

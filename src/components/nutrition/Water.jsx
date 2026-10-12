@@ -136,7 +136,7 @@ export default function Water({ uid, date, today, onPickDate, onToast }) {
       <div>
         <div className="flex items-center justify-between gap-2">
           <span className="eyebrow inline-flex items-center gap-1.5">
-            <Droplet size={14} aria-hidden="true" /> {t('water.title')}
+            <Droplet size={14} className="text-cardiotext" aria-hidden="true" /> {t('water.title')}
           </span>
           <span className="flex items-center gap-1">
             {left != null && (
@@ -146,7 +146,9 @@ export default function Water({ uid, date, today, onPickDate, onToast }) {
                     <N mono className="text-chalk">{litres(left)}</N> {L} {t('nutrition.left')}
                   </>
                 ) : (
-                  t('water.goalReached')
+                  <span className="inline-flex items-center gap-1 text-good">
+                    <Check size={16} aria-hidden="true" /> {t('water.goalReached')}
+                  </span>
                 )}
               </span>
             )}
@@ -181,7 +183,7 @@ export default function Water({ uid, date, today, onPickDate, onToast }) {
         </div>
         {goal > 0 && (
           <div className="mt-3">
-            <Track value={total} max={goal} />
+            <Track value={total} max={goal} tone="water" />
           </div>
         )}
       </div>
@@ -189,7 +191,7 @@ export default function Water({ uid, date, today, onPickDate, onToast }) {
       <div className="grid grid-cols-4 gap-2">
         {QUICK_ML.map((v) => (
           <button key={v} type="button" onClick={() => add(v)} aria-label={t('water.addMl', { ml: v })} className="min-h-[48px] rounded-md border border-line bg-surface2 hover:border-chalk press text-sm whitespace-nowrap">
-            <N mono>+{v}</N> <span className="text-chalkdim text-xs">{ml}</span>
+            <N mono className="text-cardiotext">+{v}</N> <span className="text-chalkdim text-xs">{ml}</span>
           </button>
         ))}
         <button type="button" onClick={() => setSheet('custom')} className="min-h-[48px] rounded-md border border-line bg-surface2 hover:border-chalk press text-sm inline-flex items-center justify-center gap-1 whitespace-nowrap">
@@ -216,7 +218,7 @@ export default function Water({ uid, date, today, onPickDate, onToast }) {
                 className={`flex flex-col items-center gap-1 rounded-md py-1.5 press ${sel ? 'bg-surface2' : 'hover:bg-surface2'}`}
               >
                 <span className="relative w-3 h-12 rounded-full bg-surface2 overflow-hidden" aria-hidden="true">
-                  <span className={`absolute inset-x-0 bottom-0 rounded-full ${met ? 'bg-brass' : sel ? 'bg-chalk' : 'bg-chalkdim'}`} style={{ height: `${pct}%` }} />
+                  <span className={`absolute inset-x-0 bottom-0 rounded-full ${met ? 'bg-good' : sel ? 'bg-cardiotext' : 'bg-cardio/60'}`} style={{ height: `${pct}%` }} />
                 </span>
                 <span className={`text-xs ${sel ? 'text-chalk font-semibold' : 'text-chalkdim'}`} aria-hidden="true">
                   {fmtDate(lang, dObj, { weekday: 'narrow' })}

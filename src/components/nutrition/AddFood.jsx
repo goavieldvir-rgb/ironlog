@@ -10,7 +10,9 @@ import {
   friendlyError,
   getRecentLogs,
   getSavedMeals,
+  FAV_EVENT,
   loadFavorites,
+  refreshFavorites,
   parseNum,
   searchFoods,
   searchOff,
@@ -25,7 +27,7 @@ function Stats({ protein, kcal, extra, source }) {
     <div className="flex flex-wrap items-baseline gap-x-1.5 text-xs text-chalkdim mt-0.5">
       {extra && <span className="whitespace-nowrap">{extra} ·</span>}
       <span className="whitespace-nowrap">
-        <N mono className="text-chalk text-sm">{fmt(protein, 1)}</N> {t('nutrition.g')} {t('nutrition.proteinWord')}
+        <N mono className="text-irontext text-sm">{fmt(protein, 1)}</N> {t('nutrition.g')} {t('nutrition.proteinWord')}
       </span>
       <span className="whitespace-nowrap">
         · <N mono>{fmt(kcal, 0)}</N> {t('nutrition.kcalUnit')}
@@ -35,7 +37,7 @@ function Stats({ protein, kcal, extra, source }) {
   )
 }
 
-export default function AddFood({ meal, setMeal, uid, date, onClose, onScan, onPick, onLabel, onLog, onManageMeals }) {
+export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, onScan, onPick, onLabel, onLog, onManageMeals }) {
   const { t, lang } = useLanguage()
   const [query, setQuery] = useState('')
   const [tab, setTab] = useState('recent')
@@ -98,7 +100,7 @@ export default function AddFood({ meal, setMeal, uid, date, onClose, onScan, onP
     const ctrl = new AbortController()
     const timer = setTimeout(async () => {
       try {
-        const rows = await searchOff(q, { signal: ctrl.signal, uid })
+        const rows = await searchOff(q, { signal: ctrl.signal, uid: authUid })
         if (ctrl.signal.aborted) return
         setOnline(rows)
       } catch (err) {
@@ -150,9 +152,22 @@ export default function AddFood({ meal, setMeal, uid, date, onClose, onScan, onP
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid])
 
-  // Favorites may have changed on the amount screen.
+  // Favorites change on the amount screen (the star) and in the foods table.
   useEffect(() => {
-    if (tab === 'favorites') setFavs(loadFavorites(uid))
+    const sync = () => setFavs(loadFavorites(uid))
+    window.addEventListener(FAV_EVENT, sync)
+    return () => window.removeEventListener(FAV_EVENT, sync)
+  }, [uid])
+  useEffect(() => {
+    if (tab !== 'favorites') return
+    let off = false
+    setFavs(loadFavorites(uid))
+    refreshFavorites(uid).then((list) => {
+      if (!off) setFavs(list)
+    })
+    return () => {
+      off = true
+    }
   }, [tab, uid])
 
   function flash(id) {
