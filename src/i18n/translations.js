@@ -461,7 +461,7 @@ export const translations = {
       start: 'Start rest timer',
       pause: 'Pause rest timer',
       restart: 'Restart rest timer',
-      tip: "A countdown timer for resting between sets. Tap 60/90/120/180 to start it at that many seconds — it'll beep and vibrate your phone when time's up. The restart button reruns whatever duration you last used.",
+      tip: "A countdown timer for resting between sets. Tap 60/90/120/180 to start it at that many seconds — it'll beep and vibrate your phone when time's up, then keep counting up in red (+00:15) so you can see how far past your rest you've gone. The restart button reruns whatever duration you last used.",
       expand: 'Show rest timer controls',
       collapse: 'Hide rest timer controls',
     },
@@ -646,7 +646,7 @@ Tap "Example" on an exercise to watch a short demo. It starts muted; tap "Sound 
 
 The three-dot menu on an exercise lets you move it, swap it for today only, remove it, or choose "Add a note for this exercise". A note shows up the next time you do that exercise. When you no longer need it, choose "Remove saved note".
 
-The rest timer at the bottom counts down between sets: tap 60, 90, 120 or 180. It sounds when time's up, as long as Ironlog is open.`,
+The rest timer at the bottom counts down between sets: tap 60, 90, 120 or 180. It sounds when time's up, as long as Ironlog is open, then counts up (+00:15) to show how long you've gone over.`,
       s6title: "History — everything you've logged",
       s6body: `Every finished workout lives here, most recent first. Tap one to see the full breakdown, set by set. If your coach left a comment on a workout, you'll see it there under "Trainer feedback". Only your coach can write it. Made a mistake typing a number? Open that session and tap "Edit" to fix it — no need to delete and redo the whole thing.
 
@@ -1478,7 +1478,7 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       start: 'התחלת טיימר מנוחה',
       pause: 'השהיית טיימר מנוחה',
       restart: 'הפעלה מחדש של טיימר המנוחה',
-      tip: 'טיימר מנוחה בין סטים. הקישו על 60/90/120/180 כדי להתחיל ספירה לאחור באותו מספר שניות — הוא יצפצף ויְרַעֵד את הטלפון כשהזמן נגמר. כפתור ההפעלה מחדש מריץ שוב את משך הזמן שהשתמשתם בו לאחרונה.',
+      tip: 'טיימר מנוחה בין סטים. הקישו על 60/90/120/180 כדי להתחיל ספירה לאחור באותו מספר שניות — הוא יצפצף ויְרַעֵד את הטלפון כשהזמן נגמר, ואז ימשיך לספור באדום (‎+00:15) כדי שתראו בכמה חרגתם מזמן המנוחה. כפתור ההפעלה מחדש מריץ שוב את משך הזמן שהשתמשתם בו לאחרונה.',
       expand: 'הצגת פקדי טיימר המנוחה',
       collapse: 'הסתרת פקדי טיימר המנוחה',
     },
@@ -1661,7 +1661,7 @@ RIR הוא "חזרות בשמורה": כמה חזרות נוספות יכולת�
 
 בתפריט שלוש הנקודות של תרגיל אפשר להעביר אותו, להחליף אותו להיום בלבד, להסיר אותו, או לבחור "הוספת הערה לתרגיל הזה". ההערה תופיע בפעם הבאה שתעשו את התרגיל. כשכבר לא צריך אותה, בחרו "הסרת ההערה השמורה".
 
-טיימר המנוחה בתחתית סופר לאחור בין סטים: הקישו 60, 90, 120 או 180. הוא משמיע צליל כשהזמן נגמר, כל עוד Ironlog פתוח.`,
+טיימר המנוחה בתחתית סופר לאחור בין סטים: הקישו 60, 90, 120 או 180. הוא משמיע צליל כשהזמן נגמר, כל עוד Ironlog פתוח, ואז ממשיך לספור (‎+00:15) כדי להראות בכמה חרגתם.`,
       s6title: 'היסטוריה — כל מה שתועד',
       s6body: `כל אימון שהושלם נמצא כאן, מהאחרון לראשון. הקישו על אחד כדי לראות את הפירוט המלא, סט אחר סט. אם המאמן השאיר הערה על אימון, תראו אותה שם תחת "משוב מהמאמן". רק המאמן יכול לכתוב אותה. טעיתם בהקלדת מספר? פתחו את האימון והקישו "עריכה" כדי לתקן — אין צורך למחוק ולתעד הכל מחדש.
 
