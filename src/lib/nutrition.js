@@ -1,4 +1,5 @@
 import { supabase } from '../supabase.js'
+import { normalizeHe, searchTextFor } from './foodText.js'
 
 // Nutrition diary: pure helpers (text normalising, macro maths) and plain
 // async data functions. Every data function throws on a Supabase error.
@@ -13,26 +14,9 @@ export const MEAL_KEY = {
 
 // ---------------------------------------------------------------- text
 
-// Lowercase, drop nikud/cantillation and quote marks, fold final letters
-// into their regular forms, collapse spaces. Used on both the stored
-// search_text and the query so "קוטג'" finds "קוטג" and "ממרח" finds "ממרח".
-export function normalizeHe(text) {
-  return String(text ?? '')
-    .toLowerCase()
-    .replace(/[\u0591-\u05C7]/g, '')
-    .replace(/[\u05F3\u05F4'"`\u2019\u2018\u201C\u201D]/g, '')
-    .replace(/ך/g, 'כ')
-    .replace(/ם/g, 'מ')
-    .replace(/ן/g, 'נ')
-    .replace(/ף/g, 'פ')
-    .replace(/ץ/g, 'צ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-export function searchTextFor(food) {
-  return normalizeHe(`${food.name_he || ''} ${food.name_en || ''} ${food.brand || ''}`)
-}
+// normalizeHe / searchTextFor live in foodText.js (no Supabase import) so
+// the Tzameret import script can compute search_text exactly like the app.
+export { normalizeHe, searchTextFor }
 
 const HE_PREFIXES = 'הבלומשכ'
 
@@ -305,13 +289,73 @@ export async function deleteSavedMeal(id) {
 
 // ---------------------------------------------------------------- foods
 
+// ---- ranking (client side). The query fetches a wide, unordered-by-relevance
+// candidate set; these helpers pick the best RESULT_LIMIT of it.
+const FETCH_LIMIT = 200
+const RESULT_LIMIT = 30
+// Processed/derived variants lose ties against the plain food ("ביצה שלמה"
+// before "ביצה חלמון מיובש", "אורז לבן" before "קמח אורז").
+const DERIVED = new Set(['מיובש', 'מיובשת', 'מטוגן', 'מטוגנת', 'קפוא', 'חביתה', 'קמח', 'פודינג', 'עוגה', 'עוגת', 'חלבון', 'חלמון', 'תרנגול', 'שניצל', 'סלט', 'נקניק', 'פסטרמה', 'מרק', 'פאי', 'במילוי', 'shnitzel', 'salad', 'pastrami', 'soup', 'pie', 'ציפס', 'טוגנים', 'בבלילה', 'chips', 'coated', 'dried', 'fried', 'frozen', 'omelet', 'omelette', 'flour', 'pudding', 'cake', 'yolk', 'white'])
+const TOKEN_SPLIT = /[\s,;:.()/\\\-+%*]+/
+
+const stripPrefix = (w) => (w.length > 3 && HE_PREFIXES.includes(w[0]) ? w.slice(1) : w)
+
+function nameTokens(name) {
+  return normalizeHe(name).split(TOKEN_SPLIT).filter(Boolean)
+}
+
+// 0 exact name, 1 name starts with the query, 2 every word starts a word in
+// the first two comma segments, 3 same anywhere in the name (a one-letter
+// Hebrew prefix is allowed), 4 plain substring.
+function matchTier(name, qNorm, qWords) {
+  const n = normalizeHe(name)
+  if (!n) return 9
+  const flat = n.replace(/[,;:.()]/g, ' ').replace(/\s+/g, ' ').trim()
+  if (flat === qNorm) return 0
+  if (flat.startsWith(qNorm) || flat.startsWith(stripPrefix(qNorm))) return 1
+  const toks = nameTokens(name)
+  const atStart = (w, toks) => {
+    const ws = stripPrefix(w) // "בקוטג" also counts as "קוטג", as in searchTerms
+    return toks.some((t) => [w, ws].some((x) => t.startsWith(x) || (t.length > 1 && HE_PREFIXES.includes(t[0]) && t.slice(1).startsWith(x))))
+  }
+  // Words in the first two comma segments describe the food itself; later
+  // segments are usually preparation or brand ("..., אפוי, עוף טוב").
+  const head = nameTokens(normalizeHe(name).split(',').slice(0, 2).join(' '))
+  if (qWords.every((w) => atStart(w, head))) return 2
+  if (qWords.every((w) => atStart(w, toks))) return 3
+  return 4
+}
+
+export function rankFoods(foods, query, limit = RESULT_LIMIT) {
+  const qNorm = normalizeHe(query).replace(/[,()%_*"\\:]/g, '').replace(/\s+/g, ' ').trim()
+  const qWords = qNorm.split(' ').filter(Boolean)
+  const he = HEBREW.test(qNorm)
+  const scored = foods.map((f) => {
+    const names = he ? [f.name_he, f.name_en] : [f.name_en, f.name_he]
+    const primary = names.filter(Boolean)
+    const tier = Math.min(9, ...primary.map((nm) => matchTier(nm, qNorm, qWords)))
+    const best = primary.find((nm) => matchTier(nm, qNorm, qWords) === tier) || ''
+    const toks = nameTokens(best)
+    return {
+      f,
+      tier,
+      derived: toks.some((t) => DERIVED.has(t)) ? 1 : 0,
+      words: toks.length,
+      rank: (f.verified ? 0 : 10) + (SOURCE_RANK[f.source] ?? 9),
+      len: best.length,
+    }
+  })
+  scored.sort((a, b) => a.tier - b.tier || a.derived - b.derived || a.words - b.words || a.rank - b.rank || a.len - b.len)
+  return scored.slice(0, limit).map((x) => x.f)
+}
+
 export async function searchFoods(query) {
   const terms = searchTerms(query)
   if (!terms.length) return []
   let q = supabase.from('foods').select('*')
   for (const alts of terms) q = q.or(alts.map((a) => `search_text.ilike.%${a}%`).join(','))
-  const rows = check(await q.order('verified', { ascending: false }).order('source', { ascending: true }).limit(30))
-  return sortFoods(rows)
+  const rows = check(await q.order('verified', { ascending: false }).order('source', { ascending: true }).limit(FETCH_LIMIT))
+  return rankFoods(rows, query)
 }
 
 export async function findFoodsByBarcode(code) {

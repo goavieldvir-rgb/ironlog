@@ -65,6 +65,12 @@ export function OffAttribution({ className = '' }) {
   )
 }
 
+// Same quiet line as OffAttribution, for the Ministry of Health (Tzameret) foods.
+export function MohAttribution({ className = '' }) {
+  const { t } = useLanguage()
+  return <p className={`text-chalkdim text-xs ${className}`}>{t('nutrition.attrMoh')}</p>
+}
+
 // Neutral chalk bar; only an over-target bar turns brass.
 export function Track({ value, max, size = 'md' }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0
