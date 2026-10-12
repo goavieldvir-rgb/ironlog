@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Bar, BarChart, Cell, LabelList, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { useLanguage } from '../../context/LanguageContext.jsx'
 import { dateLocale, fmtDate } from '../../lib/dates.js'
@@ -121,8 +121,8 @@ export default function Trends({ uid, today, targets, onBack, onClose }) {
             ) : (
               <>
                 <Averages stats={stats} prevStats={prevStats} kind={kind} targets={targets} waterGoal={data.waterGoal} />
-                <DailyChart stats={stats} kind={kind} targets={targets} waterGoal={data.waterGoal} metric={metric} setMetric={setMetric} />
                 <OnTarget stats={stats} kind={kind} targets={targets} waterGoal={data.waterGoal} />
+                <DailyChart stats={stats} kind={kind} targets={targets} waterGoal={data.waterGoal} metric={metric} setMetric={setMetric} />
               </>
             )}
             <p className="text-chalkdim text-xs">{t('nutrition.averagesNote')}</p>
@@ -194,7 +194,7 @@ function AvgRow({ tone, label, value, target, unit, delta = null, kind, big = fa
         {delta != null && <Delta value={delta} unit={unit} kind={kind} />}
       </div>
       <div className="flex items-baseline gap-2 mt-1">
-        <N mono className={`${big ? 'text-4xl' : 'text-2xl'} leading-none`}>{fmt(value, digits)}</N>
+        <N mono className={`${big ? 'text-3xl' : 'text-xl'} leading-none`}>{fmt(value, digits)}</N>
         <span className="text-chalkdim text-sm whitespace-nowrap">
           {target != null ? (
             <>
@@ -280,42 +280,33 @@ function DailyChart({ stats, kind, targets, waterGoal, metric, setMetric }) {
         ))}
       </div>
       <div dir="ltr">
-        <ResponsiveContainer width="100%" height={week ? 200 : 180}>
-          <BarChart data={rows} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
+        <ResponsiveContainer width="100%" height={190}>
+          <BarChart data={rows} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={CHART.line} vertical={false} />
             <XAxis dataKey="label" {...axisProps} interval={week ? 0 : 'preserveStartEnd'} minTickGap={8} />
-            {/* No y scale: the dashed target line is the reference, and in a
-                week each bar carries its own number inside its top, clear of
-                that line. */}
-            <YAxis hide domain={[0, (max) => Math.max(max, target || 0) * 1.08]} />
+            <YAxis {...axisProps} width={40} allowDecimals={water} />
             <Tooltip {...tooltipProps} formatter={(v) => [`${fmt(v, digits)} ${unit}`, metrics.find(([k]) => k === m)[1]]} />
-            {target > 0 && <ReferenceLine y={target} stroke={CHART.chalkdim} strokeDasharray="4 4" />}
-            <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={36} isAnimationActive={false}>
+            {target > 0 && <ReferenceLine y={target} stroke={CHART.chalkdim} strokeDasharray="4 4" ifOverflow="extendDomain" />}
+            <Bar dataKey="value" radius={[3, 3, 0, 0]}>
               {rows.map((r, i) => (
                 <Cell key={i} fill={r.hit ? CHART.good : BAR[m]} />
               ))}
-              {week && <LabelList dataKey="value" position="insideTop" offset={6} fill={CHART.ink} fontSize={11} fontFamily='"IBM Plex Mono", monospace' formatter={(v) => (v == null ? '' : fmt(v, digits))} />}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
       {target > 0 && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-chalkdim text-xs">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-good shrink-0" aria-hidden="true" />
-            {m === 'kcal' ? t('nutrition.legendKcal') : t('nutrition.legendProtein')}
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="w-4 border-t border-dashed border-chalkdim shrink-0" aria-hidden="true" />
-            {t('nutrition.targetLine')} <N mono>{fmt(target, digits)}</N> {unit}
-          </span>
-        </div>
+        <p className="text-chalkdim text-xs flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-good shrink-0" aria-hidden="true" />
+          {m === 'kcal' ? t('nutrition.legendKcal') : t('nutrition.legendProtein')}
+        </p>
       )}
     </div>
   )
 }
 
-// One cell per day of the period, so a streak or a bad stretch shows at a
-// glance. Laid out left to right like the chart above it.
+// One cell per day of the period under each count, so a streak or a bad
+// stretch shows at a glance. Laid out left to right like the chart below.
 function OnTarget({ stats, kind, targets, waterGoal }) {
   const { t, lang } = useLanguage()
   const tp = targets?.protein
@@ -329,7 +320,7 @@ function OnTarget({ stats, kind, targets, waterGoal }) {
   const week = kind === 'week'
   const gap = week ? 'gap-1.5' : 'gap-[3px]'
   return (
-    <div className="card p-4 flex flex-col gap-4">
+    <div className="card p-4 flex flex-col gap-3">
       <h3 className="eyebrow">{t('nutrition.daysOnTarget')}</h3>
       {rows.map((r) => (
         <div key={r.tone} className="flex flex-col gap-2">
@@ -370,7 +361,7 @@ function OnTarget({ stats, kind, targets, waterGoal }) {
           ))}
         </div>
       )}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-chalkdim text-xs border-t border-line pt-3">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-chalkdim text-xs">
         {[
           ['bg-good', t('nutrition.legendHit')],
           ['bg-chalkdim/35', t('nutrition.legendMissed')],

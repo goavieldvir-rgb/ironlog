@@ -4,13 +4,11 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
-  Cell,
   LineChart,
   Line,
   XAxis,
   YAxis,
   CartesianGrid,
-  ReferenceLine,
   Tooltip,
 } from 'recharts'
 import { useAdmin } from '../context/AdminContext.jsx'
@@ -283,16 +281,14 @@ export default function Stats() {
 
       {hasData && (
         <>
-          <Summary
-            items={[
-              [Flame, t('stats.weekStreak'), streak],
-              [BarChart3, t('stats.sessionsLogged'), sessions.length],
-              [TrendingUp, t('stats.totalVolume'), totalVolume.toLocaleString(dateLocale(lang))],
-              hasCardio && [Heart, t('stats.cardioMinutes'), totalCardioMinutes.toLocaleString(dateLocale(lang))],
-              totalCardioKm > 0 && [Heart, t('stats.cardioDistance'), formatDistance(totalCardioKm)],
-              [Trophy, t('stats.personalRecords'), records.length],
-            ].filter(Boolean)}
-          />
+          <div className={`grid grid-cols-2 ${totalCardioKm > 0 ? 'sm:grid-cols-6' : hasCardio ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3`}>
+            <Stat icon={Flame} label={t('stats.weekStreak')} value={streak} />
+            <Stat icon={BarChart3} label={t('stats.sessionsLogged')} value={sessions.length} />
+            <Stat icon={TrendingUp} label={t('stats.totalVolume')} value={totalVolume.toLocaleString(dateLocale(lang))} />
+            {hasCardio && <Stat icon={Heart} label={t('stats.cardioMinutes')} value={totalCardioMinutes.toLocaleString(dateLocale(lang))} />}
+            {totalCardioKm > 0 && <Stat icon={Heart} label={t('stats.cardioDistance')} value={formatDistance(totalCardioKm)} />}
+            <Stat icon={Trophy} label={t('stats.personalRecords')} value={records.length} />
+          </div>
 
           <WeeklyChart title={t('stats.sessionsPerWeek')} data={weeklyData} dataKey="sessions" color={CHART.iron} />
           <WeeklyChart title={t('stats.volumePerWeek')} data={weeklyData} dataKey="volume" color={CHART.brass} note={t('stats.volumeNote')} />
@@ -306,7 +302,7 @@ export default function Stats() {
               {...(cardioWeekly === 'km' && totalCardioKm > 0 ? { dataKey: 'cardioKm', unit: 'km', digits: 1 } : { dataKey: 'cardioMinutes', unit: t('sessionCard.minUnit') })}
               toggle={
                 totalCardioKm > 0 && (
-                  <div className="flex gap-1.5 mt-3" role="group" aria-label={t('stats.chartShows')}>
+                  <div className="flex gap-1.5" role="group" aria-label={t('stats.chartShows')}>
                     {[
                       ['min', t('stats.metricTime')],
                       ['km', t('stats.metricDistance')],
@@ -485,75 +481,36 @@ export default function Stats() {
   )
 }
 
-// The headline numbers as one panel, split by hairlines rather than a grid
-// of separate boxes.
-function Summary({ items }) {
-  const odd = items.length % 2 === 1
-  return (
-    <div className={`grid grid-cols-2 ${['', '', '', 'sm:grid-cols-3', 'sm:grid-cols-4', 'sm:grid-cols-5', 'sm:grid-cols-6'][items.length]} gap-px bg-line border border-line rounded-xl overflow-hidden`}>
-      {items.map(([Icon, label, value], i) => (
-        <div key={label} className={`bg-surface px-4 py-4 flex flex-col gap-2.5 min-w-0 ${odd && i === items.length - 1 ? 'col-span-2 sm:col-span-1' : ''}`}>
-          <span className="flex items-center gap-1.5 text-chalkdim text-xs min-w-0">
-            <Icon size={14} className="text-brass shrink-0" aria-hidden="true" />
-            <span className="truncate">{label}</span>
-          </span>
-          <span className="num text-3xl text-chalk leading-none">{value}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// A 12-week bar chart that leads with this week's number and the weekly
-// average. This week's bar is solid; earlier weeks are a shade dimmer.
+// A 12-week bar chart, the same for sessions, volume and cardio.
 function WeeklyChart({ title, data, dataKey, color, unit = '', digits = 0, note, toggle }) {
-  const { t, lang } = useLanguage()
+  const { lang } = useLanguage()
   const fmtN = (v) => Number(v).toLocaleString(dateLocale(lang), { maximumFractionDigits: digits })
-  const compact = (v) => Number(v).toLocaleString(dateLocale(lang), { notation: 'compact', maximumFractionDigits: 1 })
-  const now = data[data.length - 1]?.[dataKey] ?? 0
-  const avg = data.reduce((s, w) => s + w[dataKey], 0) / (data.length || 1)
-  const last = data.length - 1
   return (
     <Card>
-      <h2 className="eyebrow">{title}</h2>
-      {toggle}
-      <div className="flex items-end justify-between gap-3 mt-3 mb-4">
-        <div className="min-w-0">
-          <span className="num text-3xl text-chalk leading-none">
-            <bdi dir="ltr">{fmtN(now)}</bdi>
-          </span>
-          <span className="text-chalkdim text-sm ms-1.5">
-            {unit && `${unit} `}
-            {t('stats.thisWeek')}
-          </span>
-        </div>
-        <div className="text-end shrink-0">
-          <div className="num text-chalk text-sm">
-            <bdi dir="ltr">{fmtN(Math.round(avg * 10 ** digits) / 10 ** digits)}</bdi>
-          </div>
-          <div className="text-chalkdim text-xs inline-flex items-center gap-1.5">
-            <span className="w-3 border-t border-dashed border-chalkdim shrink-0" aria-hidden="true" />
-            {t('stats.weeklyAverage')}
-          </div>
-        </div>
-      </div>
+      <h2 className="eyebrow mb-4">{title}</h2>
+      {toggle && <div className="-mt-1 mb-4">{toggle}</div>}
       <div dir="ltr">
-        <ResponsiveContainer width="100%" height={170}>
-          <BarChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke={CHART.line} strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="label" {...axisProps} minTickGap={16} />
-            <YAxis {...axisProps} width={34} allowDecimals={digits > 0} tickCount={4} tickFormatter={compact} />
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" stroke={CHART.line} vertical={false} />
+            <XAxis dataKey="label" {...axisProps} />
+            <YAxis {...axisProps} allowDecimals={digits > 0} width={40} />
             <Tooltip {...tooltipProps} formatter={(v) => [`${fmtN(v)}${unit ? ` ${unit}` : ''}`, title]} />
-            {avg > 0 && <ReferenceLine y={avg} stroke={CHART.chalkdim} strokeDasharray="4 4" />}
-            <Bar dataKey={dataKey} radius={[4, 4, 0, 0]} maxBarSize={28}>
-              {data.map((w, i) => (
-                <Cell key={w.week} fill={color} fillOpacity={i === last ? 1 : 0.7} />
-              ))}
-            </Bar>
+            <Bar dataKey={dataKey} fill={color} radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
-      {note && <p className="text-chalkdim text-xs mt-3">{note}</p>}
+      {note && <p className="text-chalkdim text-xs mt-2">{note}</p>}
+    </Card>
+  )
+}
+
+function Stat({ icon: Icon, label, value }) {
+  return (
+    <Card className="flex flex-col items-center justify-center py-5 gap-1.5 text-center">
+      <Icon size={18} className="text-brass" />
+      <span className="num text-3xl text-chalk leading-none">{value}</span>
+      <span className="text-chalkdim text-xs">{label}</span>
     </Card>
   )
 }
