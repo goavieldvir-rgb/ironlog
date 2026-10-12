@@ -24,3 +24,16 @@ export function dateLocale(lang) {
 export function fmtDate(lang, date, opts) {
   return date.toLocaleDateString(dateLocale(lang), opts)
 }
+
+// Weeks start on Sunday (the app is used in Israel). Every weekly bucket
+// (Stats, streak, weekly summary, People, nutrition averages) uses this.
+export function weekStartDate(date) {
+  const d = new Date(date)
+  d.setDate(d.getDate() - d.getDay())
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+export function weekStartOf(dateISO) {
+  return toLocalISODate(weekStartDate(new Date(dateISO + 'T00:00:00')))
+}
