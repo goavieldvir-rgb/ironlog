@@ -951,6 +951,7 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       attrBefore: 'Contains data from ',
       attrMid: ', available under the ',
       attrAfter: '.',
+      attrMoh: 'Basic foods: Israel Ministry of Health (Tzameret)',
     },
   },
   he: {
@@ -1903,6 +1904,7 @@ RIR הוא "חזרות בשמורה": כמה חזרות נוספות יכולת�
       attrBefore: 'מכיל נתונים מאתר ',
       attrMid: ', הזמינים ברישיון ',
       attrAfter: '.',
+      attrMoh: 'מזונות בסיס: משרד הבריאות (צמרת)',
     },
   },
 }

@@ -16,7 +16,7 @@ import {
   searchOff,
   sumLogs,
 } from '../../lib/nutrition.js'
-import { AmountText, Forward, MealSelect, N, Name, OffAttribution, SheetHeader, SourceLabel, mealLabel } from './parts.jsx'
+import { AmountText, Forward, MealSelect, MohAttribution, N, Name, OffAttribution, SheetHeader, SourceLabel, mealLabel } from './parts.jsx'
 
 // Two-line row: name, then protein first, then kcal (quieter), then source.
 function Stats({ protein, kcal, extra, source }) {
@@ -326,6 +326,7 @@ export default function AddFood({ meal, setMeal, uid, date, onClose, onScan, onP
                 </li>
               ))}
             </ul>
+            {results.some((r) => r.source === 'moh') && <MohAttribution className="mt-3" />}
             {(onlineBusy || onlineErr || shownOnline.length > 0) && (
               <h3 className="text-chalkdim text-xs pt-4 pb-1">{t('nutrition.fromOff')}</h3>
             )}
