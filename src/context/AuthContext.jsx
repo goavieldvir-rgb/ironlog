@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '../supabase.js'
+import { supabase, isPasswordRecovery, clearPasswordRecovery } from '../supabase.js'
 import { removeDeviceReminder } from '../lib/push.js'
 
 const AuthContext = createContext(null)
@@ -7,15 +7,20 @@ const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  // True while the person is signed in only through a reset-password link
+  // and hasn't chosen a new password yet.
+  const [recovery, setRecovery] = useState(isPasswordRecovery)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
+      setRecovery(isPasswordRecovery())
       setLoading(false)
     })
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
+      setRecovery(isPasswordRecovery())
       setLoading(false)
     })
 
@@ -27,6 +32,11 @@ export function AuthProvider({ children }) {
       ? { uid: user.id, email: user.email, displayName: user.user_metadata?.full_name || '' }
       : null,
     loading,
+    recovery,
+    finishRecovery: () => {
+      clearPasswordRecovery()
+      setRecovery(false)
+    },
     login: async (email, password) => {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error

@@ -1,8 +1,8 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react'
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext.jsx'
 import { useLanguage } from './context/LanguageContext.jsx'
-import { supabase } from './supabase.js'
+import { supabase, openedFromAuthLink } from './supabase.js'
 import Login from './components/Login.jsx'
 import Layout from './components/Layout.jsx'
 import Dashboard from './components/Dashboard.jsx'
@@ -28,30 +28,20 @@ import Privacy from './components/Privacy.jsx'
 const Nutrition = lazy(() => import('./components/Nutrition.jsx'))
 
 export default function App() {
-  const { user, loading } = useAuth()
+  const { user, loading, recovery } = useAuth()
   const { t } = useLanguage()
-  const navigate = useNavigate()
   const location = useLocation()
-  const [pendingReset, setPendingReset] = useState(false)
   const [resetLinkError, setResetLinkError] = useState(false)
 
+  // Supabase reads a reset link's code (or its "expired" error) from the URL
+  // by itself while it starts up. If that failed, say so on the login screen
+  // instead of silently showing an empty form.
   useEffect(() => {
-    const code = new URLSearchParams(window.location.search).get('code')
-    if (!code) return
-    window.history.replaceState({}, '', window.location.pathname + window.location.hash)
-    supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-      if (!error) setPendingReset(true)
-      else setResetLinkError(true)
+    if (!openedFromAuthLink) return
+    supabase.auth.initialize().then(({ error }) => {
+      if (error) setResetLinkError(true)
     })
   }, [])
-
-  useEffect(() => {
-    if (user && pendingReset) {
-      navigate('/reset-password')
-      setPendingReset(false)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, pendingReset])
 
   if (loading) {
     return (
@@ -96,6 +86,10 @@ export default function App() {
       </Route>
     </Routes>
   )
+
+  // Signed in from a reset link: the only place to go is choosing a new
+  // password. Anything else (the dashboard, a menu link) leads back here.
+  if (recovery && location.pathname !== '/reset-password') return <Navigate to="/reset-password" replace />
 
   if (location.pathname === '/reset-password') return content
 
