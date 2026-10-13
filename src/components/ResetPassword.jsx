@@ -2,12 +2,14 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 import { friendlyAuthError } from '../lib/authErrors.js'
 import { Button, Card, Field } from './ui.jsx'
 
 export default function ResetPassword() {
   const navigate = useNavigate()
   const { t } = useLanguage()
+  const { user, finishRecovery } = useAuth()
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
@@ -29,6 +31,7 @@ export default function ResetPassword() {
     try {
       const { error } = await supabase.auth.updateUser({ password })
       if (error) throw error
+      finishRecovery()
       setDone(true)
     } catch (err) {
       setError(friendlyAuthError(err, t, 'resetPassword.genericError'))
@@ -42,6 +45,7 @@ export default function ResetPassword() {
       <div>
         <div className="eyebrow mb-1">{t('resetPassword.account')}</div>
         <h1 className="text-3xl">{t('resetPassword.title')}</h1>
+        {user?.email && <p className="text-sm text-chalkdim mt-1"><bdi>{user.email}</bdi></p>}
       </div>
 
       <Card>
