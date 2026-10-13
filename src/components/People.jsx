@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Users, ShieldCheck, UserPlus, Copy, Check, AlertTriangle } from 'lucide-react'
+import { Users, ShieldCheck, UserPlus, Copy, Check, AlertTriangle, Apple } from 'lucide-react'
 import { ForwardArrow } from './DirectionalIcon.jsx'
 import { supabase } from '../supabase.js'
 import { toLocalISODate, fmtDate, weekStartDate } from '../lib/dates.js'
@@ -26,12 +26,28 @@ export default function People() {
   const [inviting, setInviting] = useState(false)
   const [activity, setActivity] = useState([])
   const [consents, setConsents] = useState([])
+  const [savingNutrition, setSavingNutrition] = useState(null)
 
   function daysAgo(iso) {
     const days = Math.round((Date.now() - new Date(iso + 'T00:00:00').getTime()) / 86400000)
     if (days === 0) return t('people.today')
     if (days === 1) return t('people.yesterday')
     return t('people.daysAgo')(days)
+  }
+
+  // Nutrition is a beta switched on per trainee. Only admins may change the
+  // flag; the database refuses it from anyone else.
+  async function toggleNutrition(p) {
+    const next = !p.nutrition_enabled
+    setSavingNutrition(p.id)
+    const { error } = await supabase.from('profiles').update({ nutrition_enabled: next }).eq('id', p.id)
+    setSavingNutrition(null)
+    if (error) {
+      console.error(error)
+      alert(t('people.nutritionError'))
+      return
+    }
+    setPeople((list) => list.map((x) => (x.id === p.id ? { ...x, nutrition_enabled: next } : x)))
   }
 
   useEffect(() => {
@@ -162,6 +178,21 @@ export default function People() {
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
                     <span className="text-chalkdim">{activityText}</span>
                   </p>
+                )}
+                {!p.is_admin && (
+                  <div>
+                    <button
+                      onClick={() => toggleNutrition(p)}
+                      disabled={savingNutrition === p.id}
+                      aria-pressed={!!p.nutrition_enabled}
+                      className={`mt-2 inline-flex items-center gap-1.5 text-xs rounded-full border px-2.5 py-1 disabled:opacity-50 ${
+                        p.nutrition_enabled ? 'border-good text-good' : 'border-chalkdim/40 text-chalkdim'
+                      }`}
+                    >
+                      <Apple size={12} />
+                      {p.nutrition_enabled ? t('people.nutritionOn') : t('people.nutritionOff')}
+                    </button>
+                  </div>
                 )}
               </div>
               <button
