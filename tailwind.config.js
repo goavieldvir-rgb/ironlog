@@ -22,6 +22,8 @@ export default {
         cardiosoft: '#1F2A38',
         line: '#31353E',
         good: '#4CAF7D',
+        // good is too light for a chalk label (2.3:1); this one is 4.8:1.
+        goodbtn: '#287548',
       },
       fontFamily: {
         display: ['"Barlow Condensed"', '"Rubik"', 'sans-serif'],
