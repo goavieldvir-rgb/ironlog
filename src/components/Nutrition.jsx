@@ -53,6 +53,9 @@ const shiftDay = (iso, n) => {
   return toLocalISODate(d)
 }
 
+// How far ahead the diary lets you plan meals.
+const MAX_DAYS_AHEAD = 30
+
 function Diary() {
   const { t, lang } = useLanguage()
   const { user } = useAuth()
@@ -257,8 +260,20 @@ function Diary() {
   const totals = sumLogs(logs)
   const prevTotals = sumLogs(prevLogs)
   const isToday = date === today
+  // ISO dates compare as strings, so a later day sorts after today.
+  const isFuture = date > today
+  const tomorrow = shiftDay(today, 1)
+  const lastDay = shiftDay(today, MAX_DAYS_AHEAD)
+  // Time of day says nothing about a planned day: start from breakfast.
+  const addMeal = () => (isFuture ? 'breakfast' : defaultMeal())
   const dateObj = new Date(date + 'T00:00:00')
-  const dayLabel = isToday ? t('nutrition.today') : date === shiftDay(today, -1) ? t('nutrition.yesterday') : fmtDate(lang, dateObj, { weekday: 'long' })
+  const dayLabel = isToday
+    ? t('nutrition.today')
+    : date === shiftDay(today, -1)
+      ? t('nutrition.yesterday')
+      : date === tomorrow
+        ? t('nutrition.tomorrow')
+        : fmtDate(lang, dateObj, { weekday: 'long' })
   const dateLine = fmtDate(lang, dateObj, { weekday: 'short', day: 'numeric', month: 'long' })
   const g = t('nutrition.g')
   const k = t('nutrition.kcalUnit')
@@ -273,7 +288,10 @@ function Diary() {
         <div className="min-w-0">
           <div className="eyebrow mb-1">{actingAs ? <bdi>{actingAs.name || actingAs.email}</bdi> : t('nutrition.title')}</div>
           <h1 className="text-3xl truncate">{dayLabel}</h1>
-          <p className="text-chalkdim text-sm mt-1 font-body"><bdi>{dateLine}</bdi></p>
+          <p className="text-chalkdim text-sm mt-1 font-body flex items-center gap-2">
+            <bdi>{dateLine}</bdi>
+            {isFuture && <span className="text-xs text-brass border border-brass/40 rounded-full px-2 py-0.5 whitespace-nowrap">{t('nutrition.planned')}</span>}
+          </p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {!isToday && (
@@ -285,7 +303,7 @@ function Diary() {
             <span className="rtl:hidden"><ChevronLeft size={22} /></span>
             <span className="ltr:hidden"><ChevronRight size={22} /></span>
           </button>
-          <button type="button" disabled={isToday} onClick={() => setDate(shiftDay(date, 1))} aria-label={t('nutrition.nextDay')} className="w-11 h-11 inline-flex items-center justify-center rounded-md hover:bg-surface2 press disabled:opacity-30 disabled:pointer-events-none">
+          <button type="button" disabled={date >= lastDay} onClick={() => setDate(shiftDay(date, 1))} aria-label={t('nutrition.nextDay')} className="w-11 h-11 inline-flex items-center justify-center rounded-md hover:bg-surface2 press disabled:opacity-30 disabled:pointer-events-none">
             <span className="rtl:hidden"><ChevronRight size={22} /></span>
             <span className="ltr:hidden"><ChevronLeft size={22} /></span>
           </button>
@@ -331,10 +349,10 @@ function Diary() {
           )}
 
           <div className="flex gap-2">
-            <Button variant="brass" className="flex-1 min-h-[56px] text-base" onClick={() => openAdd(defaultMeal())}>
+            <Button variant="brass" className="flex-1 min-h-[56px] text-base" onClick={() => openAdd(addMeal())}>
               <Plus size={20} /> {t('nutrition.addFood')}
             </Button>
-            <Button variant="subtle" className="min-h-[56px] px-5 text-base" onClick={() => openScanner(defaultMeal())}>
+            <Button variant="subtle" className="min-h-[56px] px-5 text-base" onClick={() => openScanner(addMeal())}>
               <ScanBarcode size={20} className="text-brass" /> {t('nutrition.scan')}
             </Button>
           </div>
@@ -342,7 +360,7 @@ function Diary() {
           {prevLogs.length > 0 && copiedFor !== date && (
             <Card className="flex items-center justify-between gap-3 !py-3">
               <div className="min-w-0">
-                <div className="eyebrow">{date === today ? t('nutrition.yesterday') : t('nutrition.previousDayLabel')}</div>
+                <div className="eyebrow">{isToday ? t('nutrition.yesterday') : date === tomorrow ? t('nutrition.today') : t('nutrition.previousDayLabel')}</div>
                 <p className="text-sm mt-0.5 whitespace-nowrap">
                   <N mono>{fmt(prevTotals.protein, 1)}</N> {g} {t('nutrition.proteinWord')}
                 </p>
@@ -351,12 +369,13 @@ function Diary() {
                 </p>
               </div>
               <Button variant="ghost" className="shrink-0 whitespace-nowrap" onClick={copyPrevious}>
-                <Copy size={16} /> {date === today ? t('nutrition.copyYesterday') : t('nutrition.copyPrevious')}
+                <Copy size={16} /> {isToday ? t('nutrition.copyYesterday') : date === tomorrow ? t('nutrition.copyToday') : t('nutrition.copyPrevious')}
               </Button>
             </Card>
           )}
 
-          <Water uid={uid} date={date} today={today} onPickDate={setDate} onToast={showToast} />
+          {/* Water is logged as you drink it, so a planned day has none. */}
+          {!isFuture && <Water uid={uid} date={date} today={today} onPickDate={setDate} onToast={showToast} />}
 
           {MEALS.map((m) => {
             const rows = logs.filter((r) => r.meal === m)
@@ -384,7 +403,7 @@ function Diary() {
                   </div>
                 </div>
                 {rows.length === 0 ? (
-                  <p className="text-chalkdim text-sm px-1 pb-1">{t('nutrition.nothingLogged')}</p>
+                  <p className="text-chalkdim text-sm px-1 pb-1">{isFuture ? t('nutrition.nothingPlanned') : t('nutrition.nothingLogged')}</p>
                 ) : (
                   <ul className="card divide-y divide-line overflow-hidden">
                     {rows.map((r) => (
