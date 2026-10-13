@@ -610,7 +610,7 @@ export default function WorkoutSession() {
           <Button type="button" variant="danger" onClick={handleDiscard} disabled={saving || saved}>
             {t('workout.discard')}
           </Button>
-          <Button onClick={handleFinish} disabled={saving || saved || entries.length === 0} variant={saved ? 'subtle' : 'primary'}>
+          <Button onClick={handleFinish} disabled={saving || saved || entries.length === 0} variant={saved ? 'subtle' : 'save'}>
             {saved ? (
               <>
                 <Check size={16} /> {t('workout.saved')}
@@ -618,7 +618,9 @@ export default function WorkoutSession() {
             ) : saving ? (
               t('workout.saving')
             ) : (
-              t('workout.finishSave')
+              <>
+                <Check size={16} /> {t('workout.finishSave')}
+              </>
             )}
           </Button>
         </div>
