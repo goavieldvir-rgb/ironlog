@@ -117,7 +117,8 @@ export default function History() {
 
   const groups = useMemo(() => {
     const out = []
-    for (const s of filtered) {
+    const sorted = [...filtered].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.created_at || '').localeCompare(a.created_at || '')))
+    for (const s of sorted) {
       const k = monthKey(s.date)
       let g = out[out.length - 1]
       if (!g || g.key !== k) {
