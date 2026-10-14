@@ -1,15 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { Plus, Check, Library, Clock } from 'lucide-react'
-import { BackChevron } from './DirectionalIcon.jsx'
+import { Plus, Library, X } from 'lucide-react'
 import { InfoTip } from './InfoTip.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, logSession, addExercise, clearExerciseNote } from '../lib/db.js'
 import { saveDraft, loadDraft, clearDraft, FREESTYLE_KEY } from '../lib/draft.js'
-import { toLocalISODate } from '../lib/dates.js'
-import { Button, Card, CategoryTag, Field } from './ui.jsx'
+import { toLocalISODate, fmtDate } from '../lib/dates.js'
+import { Button, Card, Field } from './ui.jsx'
 import SessionEntryCard from './SessionEntryCard.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
 import ExerciseSelect from './ExerciseSelect.jsx'
@@ -119,6 +118,8 @@ export default function WorkoutSession() {
   // after a phone lock or app switch keeps the original start time.
   const [startedAt, setStartedAt] = useState(null)
   const [now, setNow] = useState(Date.now())
+  const restRef = useRef(null)
+  const dateInputRef = useRef(null)
   // Tracks whether we've done the initial "restore a draft, or build fresh
   // from the routine" pass — autosave shouldn't run before that, or it'd
   // immediately overwrite a real draft with an empty one for a split second.
@@ -470,7 +471,8 @@ export default function WorkoutSession() {
           notes: e.notes || '',
           ...(e.coachNote ? { coachNote: e.coachNote } : {}),
           ...(e.targetRir != null ? { targetRir: e.targetRir } : {}),
-          sets: e.sets,
+          // `done` is only the on-screen tick; it isn't part of a saved set.
+          sets: e.sets.map(({ done, ...set }) => set),
         })),
       })
       clearDraft(effectiveUid, draftKey)
@@ -513,28 +515,74 @@ export default function WorkoutSession() {
 
   const availableToAdd = exercises.filter((e) => !entries.some((en) => en.exerciseId === e.id))
 
+  const allWorking = entries.flatMap((e) => workingSets(e.sets))
+  const doneCount = allWorking.filter((x) => x.done).length
+  const progressPct = allWorking.length ? Math.round((doneCount / allWorking.length) * 100) : 0
+  const title = isFreestyle ? t('workout.freestyleSession') : routine?.name
+  const dateLabel = fmtDate(lang, new Date(date + 'T00:00:00'), { day: 'numeric', month: 'short' })
+  function openDatePicker() {
+    const el = dateInputRef.current
+    if (!el) return
+    try {
+      el.showPicker()
+    } catch {
+      el.focus()
+      el.click()
+    }
+  }
+
   return (
     <div className="flex flex-col">
-      <div className="flex flex-col gap-5 max-w-2xl pb-4">
-        <Link to="/routines" className="text-chalkdim text-sm inline-flex items-center gap-1 min-h-[44px] hover:text-chalk w-fit">
-          <BackChevron size={15} /> {t('routines.title')}
-        </Link>
-
-        <div className="flex items-start justify-between flex-wrap gap-2">
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-3xl">{isFreestyle ? t('workout.freestyleSession') : routine?.name}</h1>
-              <CategoryTag category={category} />
-            </div>
-            {elapsedMin != null && elapsedMin <= 300 && (
-              <p className="text-chalkdim text-xs mt-1 inline-flex items-center gap-1 num">
-                <Clock size={12} /> {t('workout.elapsed', { min: elapsedMin })}
-              </p>
-            )}
+      <div className="flex flex-col gap-3 max-w-2xl pb-48">
+        <header className="grid grid-cols-[88px_minmax(0,1fr)_88px] items-center -mx-2">
+          <Link
+            to="/routines"
+            aria-label={t('common.close')}
+            title={t('common.close')}
+            className="press w-11 h-11 flex items-center justify-center text-chalkdim hover:text-chalk"
+          >
+            <X size={22} strokeWidth={1.75} />
+          </Link>
+          <div className="flex flex-col items-center min-w-0">
+            <h1 className="text-[15px] leading-5 font-semibold truncate max-w-full">{title}</h1>
+            <p className="text-[13px] leading-[18px] text-chalkdim num flex items-center gap-1 max-w-full">
+              {elapsedMin != null && elapsedMin <= 300 && (
+                <>
+                  <span className="truncate">{t('workout.elapsed', { min: elapsedMin })}</span>
+                  <span aria-hidden="true">·</span>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={openDatePicker}
+                aria-label={t('workout.date')}
+                className="hit hover:text-chalk transition-colors whitespace-nowrap"
+              >
+                {dateLabel}
+              </button>
+              <input
+                ref={dateInputRef}
+                type="date"
+                value={date}
+                onChange={(e) => e.target.value && setDate(e.target.value)}
+                tabIndex={-1}
+                aria-hidden="true"
+                className="sr-only"
+              />
+            </p>
           </div>
-          <Field label={t('workout.date')}>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-fit" />
-          </Field>
+          <button
+            type="button"
+            onClick={handleFinish}
+            disabled={saving || saved || entries.length === 0}
+            className="press justify-self-end h-11 px-3 text-[15px] font-semibold text-accent disabled:opacity-40 disabled:pointer-events-none"
+          >
+            {saved ? t('workout.saved') : saving ? t('workout.saving') : t('workout.finish')}
+          </button>
+        </header>
+
+        <div className="h-[3px] rounded-full bg-surface2 overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={allWorking.length} aria-valuenow={doneCount}>
+          <div className="h-full rounded-full bg-accent transition-[width] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none" style={{ width: `${progressPct}%` }} />
         </div>
 
         {entries.map((entry, i) => (
@@ -554,6 +602,7 @@ export default function WorkoutSession() {
             onRemoveSet={(setIdx) => removeSet(i, setIdx)}
             onRemoveEntry={() => removeEntry(i)}
             onUpdateNote={(text) => updateNote(i, text)}
+            onSetDone={() => restRef.current?.start()}
             onClearLastNote={() => clearLastNote(entry.exerciseId)}
             onSwapExercise={() => {
               setSwapIndex(i)
@@ -582,7 +631,7 @@ export default function WorkoutSession() {
             <Button type="button" variant="ghost" onClick={addFreestyleExercise} disabled={!pickId}>
               <Plus size={16} /> {t('common.add')}
             </Button>
-            <Button type="button" variant="brass" onClick={() => setShowLibraryPicker(true)}>
+            <Button type="button" variant="ghost" onClick={() => setShowLibraryPicker(true)}>
               <Library size={16} /> {t('routines.browseLibrary')}
             </Button>
           </div>
@@ -606,22 +655,9 @@ export default function WorkoutSession() {
           </Field>
         </Card>
 
-        <div className="flex justify-between items-center gap-2">
+        <div className="flex items-center">
           <Button type="button" variant="danger" onClick={handleDiscard} disabled={saving || saved}>
             {t('workout.discard')}
-          </Button>
-          <Button onClick={handleFinish} disabled={saving || saved || entries.length === 0} variant={saved ? 'subtle' : 'save'}>
-            {saved ? (
-              <>
-                <Check size={16} /> {t('workout.saved')}
-              </>
-            ) : saving ? (
-              t('workout.saving')
-            ) : (
-              <>
-                <Check size={16} /> {t('workout.finishSave')}
-              </>
-            )}
           </Button>
         </div>
       </div>
@@ -652,7 +688,7 @@ export default function WorkoutSession() {
               <button
                 type="button"
                 onClick={() => setShowLibraryPicker(true)}
-                className="text-brass text-sm hover:underline inline-flex items-center gap-1"
+                className="text-chalkdim hover:text-chalk text-sm inline-flex items-center gap-1"
               >
                 <Library size={14} /> {t('routines.browseLibrary')}
               </button>
@@ -660,7 +696,7 @@ export default function WorkoutSession() {
                   surfaced directly here — swapping usually happens because
                   a machine is taken, and the replacement often isn't in
                   anyone's list yet. */}
-              <button type="button" onClick={() => setCreatingCustom(true)} className="text-brass text-sm hover:underline inline-flex items-center gap-1">
+              <button type="button" onClick={() => setCreatingCustom(true)} className="text-chalkdim hover:text-chalk text-sm inline-flex items-center gap-1">
                 <Plus size={14} /> {t('exercises.cantFind')}
               </button>
             </div>
@@ -723,7 +759,7 @@ export default function WorkoutSession() {
         />
       )}
 
-      <RestTimer />
+      <RestTimer ref={restRef} />
     </div>
   )
 }

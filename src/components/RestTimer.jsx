@@ -1,21 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { Play, Pause, RotateCcw, Timer, Bell, BellOff, ChevronUp, ChevronDown } from 'lucide-react'
-import { Button } from './ui.jsx'
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { Play, Pause, RotateCcw, Bell, BellOff } from 'lucide-react'
 import { InfoTip } from './InfoTip.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 const PRESETS = [60, 90, 120, 180]
-const EXPANDED_KEY = 'ironlog:restTimerExpanded'
-
-// Slim bar by default so the timer doesn't cover the sets; the trainee's
-// last explicit choice is remembered.
-function readExpanded() {
-  try {
-    return localStorage.getItem(EXPANDED_KEY) === '1'
-  } catch {
-    return false
-  }
-}
+const DEFAULT_REST = 90
 
 function beep() {
   try {
@@ -41,15 +30,20 @@ function beep() {
 // entirely rather than offering something that can't work.
 const canNotify = typeof window !== 'undefined' && 'Notification' in window
 
-export default function RestTimer() {
+// A floating dock that stays hidden until a rest is running. The page starts
+// it through the ref (`ref.current.start()`) when a set is ticked off.
+const RestTimer = forwardRef(function RestTimer(_props, ref) {
   const { t } = useLanguage()
   const [notifyOn, setNotifyOn] = useState(canNotify && Notification.permission === 'granted')
-  const [secondsLeft, setSecondsLeft] = useState(90)
-  const [lastDuration, setLastDuration] = useState(90)
+  const [secondsLeft, setSecondsLeft] = useState(DEFAULT_REST)
+  const [lastDuration, setLastDuration] = useState(DEFAULT_REST)
   const [running, setRunning] = useState(false)
+  // Whether a rest is on screen at all (running, paused or in overtime).
+  const [active, setActive] = useState(false)
   const [finished, setFinished] = useState(false)
-  const [totalDuration, setTotalDuration] = useState(90)
-  const [expanded, setExpanded] = useState(readExpanded)
+  const [totalDuration, setTotalDuration] = useState(DEFAULT_REST)
+  // Presets and alerts live one tap away so the dock stays slim.
+  const [expanded, setExpanded] = useState(false)
   // The actual wall-clock moment the timer should hit zero — not a ticking
   // counter. Mobile browsers throttle or fully pause setInterval while the
   // tab/app is backgrounded, so a counter-based timer silently freezes and
@@ -134,34 +128,58 @@ export default function RestTimer() {
     setFinished(false)
     alertedRef.current = false
     setRunning(true)
+    setActive(true)
   }
+
+  useImperativeHandle(ref, () => ({
+    // A new rest, at whichever length was used last.
+    start: () => start(lastDuration),
+  }))
 
   function pause() {
     setRunning(false)
   }
 
   // Restart: go back to whichever duration was actually last used — not a
-  // hardcoded default — and start counting down again immediately. This is
-  // what the button next to Play is for: minimizing taps between sets.
+  // hardcoded default — and start counting down again immediately.
   function restart() {
     start(lastDuration)
   }
 
-  function toggleExpanded() {
-    const next = !expanded
-    setExpanded(next)
-    try {
-      localStorage.setItem(EXPANDED_KEY, next ? '1' : '0')
-    } catch {
-      // Storage unavailable (private mode) — the choice just won't persist.
+  // Nudges the rest by a few seconds, from the stored end time while running
+  // (or from the frozen remainder while paused).
+  function adjust(delta) {
+    if (!running) {
+      const next = Math.max(1, secondsLeft + delta)
+      setSecondsLeft(next)
+      setTotalDuration((d) => Math.max(d, next))
+      return
     }
+    const end = Math.max(Date.now() + 1000, (endTimeRef.current || Date.now()) + delta * 1000)
+    endTimeRef.current = end
+    const remaining = Math.ceil((end - Date.now()) / 1000)
+    setSecondsLeft(remaining)
+    setTotalDuration((d) => Math.max(d, remaining))
+    // Pushed back into the future: it should alert again when it gets there.
+    setFinished(false)
+    alertedRef.current = false
+  }
+
+  function skip() {
+    endTimeRef.current = null
+    alertedRef.current = false
+    setRunning(false)
+    setActive(false)
+    setFinished(false)
+    setExpanded(false)
+    setSecondsLeft(lastDuration)
   }
 
   const overtime = secondsLeft < 0
   const shown = Math.abs(secondsLeft)
-  const mm = String(Math.floor(shown / 60)).padStart(2, '0')
+  const mm = Math.floor(shown / 60)
   const ss = String(shown % 60).padStart(2, '0')
-  // Always "+01:23", left to right, in Hebrew too — the plus sign would
+  // Always "+1:23", left to right, in Hebrew too — the plus sign would
   // otherwise jump to the far side of the digits.
   const clock = (
     <span dir="ltr">
@@ -169,120 +187,101 @@ export default function RestTimer() {
       {mm}:{ss}
     </span>
   )
+  const pct = overtime ? 100 : totalDuration > 0 ? Math.min(100, Math.max(0, (1 - secondsLeft / totalDuration) * 100)) : 0
 
-  if (!expanded) {
-    const progress = running && totalDuration > 0 ? (Math.max(0, secondsLeft) / totalDuration) * 100 : 0
-    return (
-      <div
-        className={`sticky bottom-0 z-10 border-t backdrop-blur px-4 transition-colors ${
-          finished ? 'bg-ironsoft border-iron' : 'bg-ink/95 border-line'
-        }`}
-        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-      >
-        {running && !overtime && (
-          <div
-            className="absolute top-0 start-0 h-0.5 bg-brass transition-[width] duration-1000 ease-linear"
-            style={{ width: `${progress}%` }}
-            aria-hidden="true"
-          />
-        )}
-        <div className="flex items-center h-14">
-          <button
-            onClick={toggleExpanded}
-            aria-expanded="false"
-            aria-label={t('restTimer.expand')}
-            className="press flex-1 min-h-[44px] h-full flex items-center gap-2 text-start"
-          >
-            <Timer size={16} className={finished ? 'text-irontext' : running ? 'text-brass' : 'text-chalkdim'} />
-            <span className={`num text-2xl leading-none ${finished ? 'text-irontext' : running ? 'text-brass' : 'text-chalk'}`}>
-              {clock}
-            </span>
-          </button>
-          {running ? (
-            <Button variant="subtle" onClick={pause} title={t('restTimer.pause')} aria-label={t('restTimer.pause')} className="!px-2.5 !min-w-[44px] !min-h-[44px]">
-              <Pause size={14} />
-            </Button>
-          ) : (
-            <Button variant="subtle" onClick={() => start()} title={t('restTimer.start')} aria-label={t('restTimer.start')} className="!px-2.5 !min-w-[44px] !min-h-[44px]">
-              <Play size={14} />
-            </Button>
-          )}
-          <button
-            onClick={toggleExpanded}
-            aria-expanded="false"
-            title={t('restTimer.expand')}
-            aria-label={t('restTimer.expand')}
-            className="press inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded text-chalkdim hover:text-chalk hover:bg-surface2"
-          >
-            <ChevronUp size={18} />
-          </button>
-        </div>
-      </div>
-    )
-  }
+  const dockBtn = 'press h-11 min-w-[52px] rounded-xl text-chalk text-[15px] font-medium'
+  const smallBtn = 'press inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl text-chalkdim hover:text-chalk'
 
   return (
     <div
-      className={`sticky bottom-0 z-10 border-t backdrop-blur px-4 py-1 flex items-center gap-x-3 gap-y-0 flex-wrap transition-colors ${
-        finished ? 'bg-ironsoft border-iron' : 'bg-ink/95 border-line'
+      role="timer"
+      aria-live="off"
+      aria-label={t('restTimer.rest')}
+      aria-hidden={!active}
+      inert={!active ? '' : undefined}
+      className={`fixed inset-x-4 mx-auto max-w-[460px] z-20 rounded-[20px] bg-[#232326] overflow-hidden transition-[transform,opacity] duration-[220ms] ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none ${
+        active ? 'translate-y-0 opacity-100' : 'translate-y-[calc(100%+64px)] opacity-0 pointer-events-none'
       }`}
-      style={{ paddingBottom: 'calc(0.625rem + env(safe-area-inset-bottom, 0px))' }}
+      style={{
+        bottom: 'max(24px, calc(env(safe-area-inset-bottom, 0px) + 12px))',
+        boxShadow: '0 16px 40px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.4)',
+      }}
     >
-      <div className="flex items-center gap-1.5">
-        <Timer size={16} className={finished ? 'text-irontext' : 'text-chalkdim'} />
-        <span className={`num text-2xl leading-none ${finished ? 'text-irontext' : 'text-chalk'}`}>
-          {clock}
-        </span>
-        <InfoTip text={t('restTimer.tip')} />
-      </div>
-
-      <div className="flex gap-1 order-last w-full justify-between min-[560px]:order-none min-[560px]:w-auto">
-        {PRESETS.map((p) => (
-          <button
-            key={p}
-            onClick={() => {
-              start(p)
-              setExpanded(false)
-            }}
-            className="press px-2.5 min-h-[44px] min-w-[44px] flex-1 min-[560px]:flex-none rounded text-sm num text-chalkdim hover:text-chalk hover:bg-surface2"
-          >
-            {p}s
-          </button>
-        ))}
-      </div>
-
-      <div className="flex items-center gap-1 ms-auto">
-        {canNotify && (
-          <button
-            onClick={toggleNotify}
-            title={notifyOn ? t('restTimer.notifyOn') : t('restTimer.notifyOff')} aria-label={notifyOn ? t('restTimer.notifyOn') : t('restTimer.notifyOff')}
-            className={`inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-surface2 ${notifyOn ? 'text-brass' : 'text-chalkdim hover:text-chalk'}`}
-          >
-            {notifyOn ? <Bell size={14} /> : <BellOff size={14} />}
-          </button>
-        )}
-        {running ? (
-          <Button variant="subtle" onClick={pause} title={t('restTimer.pause')} aria-label={t('restTimer.pause')} className="!px-2.5 !min-w-[44px] !min-h-[44px]">
-            <Pause size={14} />
-          </Button>
-        ) : (
-          <Button variant="subtle" onClick={() => start()} title={t('restTimer.start')} aria-label={t('restTimer.start')} className="!px-2.5 !min-w-[44px] !min-h-[44px]">
-            <Play size={14} />
-          </Button>
-        )}
-        <Button variant="ghost" onClick={restart} title={t('restTimer.restart')} aria-label={t('restTimer.restart')} className="!px-2.5 !min-w-[44px] !min-h-[44px]">
-          <RotateCcw size={14} />
-        </Button>
+      <div className="flex items-center gap-1 h-16 ps-[18px] pe-2">
         <button
-          onClick={toggleExpanded}
-          aria-expanded="true"
-          title={t('restTimer.collapse')}
-          aria-label={t('restTimer.collapse')}
-          className="press inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded text-chalkdim hover:text-chalk hover:bg-surface2"
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          title={expanded ? t('restTimer.collapse') : t('restTimer.expand')}
+          className="flex-1 min-w-0 h-full flex items-center gap-2.5 text-start"
         >
-          <ChevronDown size={18} />
+          <span className="text-sm text-chalkdim">{overtime ? t('restTimer.over') : t('restTimer.rest')}</span>
+          <span className="num text-2xl font-semibold tracking-[-0.01em]">{clock}</span>
+        </button>
+        <button type="button" onClick={() => adjust(-15)} className={dockBtn}>
+          <bdi dir="ltr">−15</bdi>
+        </button>
+        <button type="button" onClick={() => adjust(15)} className={dockBtn}>
+          <bdi dir="ltr">+15</bdi>
+        </button>
+        <button type="button" onClick={skip} className={`${dockBtn} px-3.5 bg-[#34343A]`}>
+          {overtime ? t('restTimer.next') : t('restTimer.skip')}
         </button>
       </div>
+
+      {expanded && (
+        <div className="flex items-center gap-1 ps-3 pe-2 pb-2 pt-0.5 border-t border-white/[0.06] flex-wrap">
+          <div className="flex gap-1">
+            {PRESETS.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => {
+                  start(p)
+                  setExpanded(false)
+                }}
+                className="press px-2.5 min-h-[44px] min-w-[44px] rounded-xl text-sm num text-chalkdim hover:text-chalk"
+              >
+                {p}s
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-0.5 ms-auto">
+            <InfoTip text={t('restTimer.tip')} />
+            {canNotify && (
+              <button
+                type="button"
+                onClick={toggleNotify}
+                title={notifyOn ? t('restTimer.notifyOn') : t('restTimer.notifyOff')}
+                aria-label={notifyOn ? t('restTimer.notifyOn') : t('restTimer.notifyOff')}
+                className={`${smallBtn} ${notifyOn ? '!text-chalk' : ''}`}
+              >
+                {notifyOn ? <Bell size={16} /> : <BellOff size={16} />}
+              </button>
+            )}
+            {running ? (
+              <button type="button" onClick={pause} title={t('restTimer.pause')} aria-label={t('restTimer.pause')} className={smallBtn}>
+                <Pause size={16} />
+              </button>
+            ) : (
+              <button type="button" onClick={() => start()} title={t('restTimer.start')} aria-label={t('restTimer.start')} className={smallBtn}>
+                <Play size={16} />
+              </button>
+            )}
+            <button type="button" onClick={restart} title={t('restTimer.restart')} aria-label={t('restTimer.restart')} className={smallBtn}>
+              <RotateCcw size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div
+        className="absolute bottom-0 start-0 h-[3px] bg-chalk/30 transition-[width] duration-1000 ease-linear motion-reduce:transition-none"
+        style={{ width: `${pct}%` }}
+        aria-hidden="true"
+      />
     </div>
   )
-}
+})
+
+export default RestTimer
