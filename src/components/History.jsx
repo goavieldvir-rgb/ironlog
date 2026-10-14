@@ -56,7 +56,7 @@ function sessionMeta(s, t, lang) {
     if (c && c.distance != null) km += toKm(c.distance, e.unit)
   }
   const parts = []
-  if (sets > 0) parts.push(`${sets} ${t('history.setsLabel')}`)
+  if (sets > 0) parts.push(`${sets} ${t(sets === 1 ? 'history.setLabelOne' : 'history.setsLabel')}`)
   if (s.duration_minutes) parts.push(t('workout.durationShort', { min: s.duration_minutes }))
   if (volume > 0) parts.push(`${Math.round(volume).toLocaleString(dateLocale(lang))} ${unit}`)
   if (km > 0) parts.push(`${formatDistance(km)} ${kmLabel}`)
