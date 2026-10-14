@@ -6,7 +6,7 @@ import { MoreVertical } from 'lucide-react'
 // either overflow a phone-width row or leave it mostly empty.
 //
 // items: [{ key, label, icon, onClick, danger, disabled, hidden }]
-export default function OverflowMenu({ label, items }) {
+export default function OverflowMenu({ label, items, trigger, triggerClassName, align = 'end' }) {
   const [open, setOpen] = useState(false)
   const [up, setUp] = useState(false)
   const wrapRef = useRef(null)
@@ -51,15 +51,18 @@ export default function OverflowMenu({ label, items }) {
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="press inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-md text-chalkdim hover:text-chalk hover:bg-surface2"
+        className={
+          triggerClassName ||
+          'press inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-[10px] text-chalkdim hover:text-chalk hover:bg-surface2'
+        }
       >
-        <MoreVertical size={18} />
+        {trigger || <MoreVertical size={18} />}
       </button>
       {open && (
         <div
           ref={menuRef}
           role="menu"
-          className={`absolute end-0 z-30 min-w-[13rem] max-w-[16rem] rounded-md border border-line bg-surface2 py-1 shadow-lg ${
+          className={`absolute ${align === 'start' ? 'start-0' : 'end-0'} z-30 min-w-[13rem] max-w-[16rem] rounded-[14px] bg-[#232326] py-1 shadow-[0_16px_40px_rgba(0,0,0,0.55),0_2px_6px_rgba(0,0,0,0.4)] ${
             up ? 'bottom-full mb-1' : 'top-full mt-1'
           }`}
         >
@@ -73,7 +76,7 @@ export default function OverflowMenu({ label, items }) {
                 setOpen(false)
                 it.onClick()
               }}
-              className={`flex w-full items-center gap-2.5 px-3 min-h-[44px] text-start text-sm hover:bg-ink disabled:opacity-40 disabled:pointer-events-none ${
+              className={`flex w-full items-center gap-2.5 px-3 min-h-[44px] text-start text-sm hover:bg-white/[0.06] disabled:opacity-40 disabled:pointer-events-none ${
                 it.danger ? 'text-irontext' : 'text-chalk'
               }`}
             >

@@ -1,7 +1,7 @@
 import ExerciseVideo from './ExerciseVideo.jsx'
 import React, { useEffect, useRef, useState } from 'react'
-import { X, Plus, Trash2, Minus, CornerDownLeft, History, StickyNote, Repeat, ArrowUp, ArrowDown, Trophy, Link2 } from 'lucide-react'
-import { Card, Badge } from './ui.jsx'
+import { X, Plus, Trash2, Minus, CornerDownLeft, StickyNote, Repeat, ArrowUp, ArrowDown, Trophy, Link2, Check, Flame } from 'lucide-react'
+import { Badge } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import OverflowMenu from './OverflowMenu.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -13,7 +13,9 @@ import { cardioSummary } from '../lib/cardio.js'
 import CardioTotals from './CardioTotals.jsx'
 import { entryName } from '../lib/names.js'
 
-function Stepper({ value, onChange, step, min = 0, max, label, placeholder, bare }) {
+const hasVal = (v) => v !== '' && v != null
+
+function Stepper({ value, onChange, step, min = 0, max, label, placeholder, done }) {
   const holdRef = useRef(null)
 
   function bump(delta) {
@@ -47,9 +49,11 @@ function Stepper({ value, onChange, step, min = 0, max, label, placeholder, bare
 
   useEffect(() => stopHold, [])
 
+  // The +/- buttons only appear on wider screens; on a phone the row is too
+  // tight for them and the number is typed instead.
   const btn =
-    (bare ? 'max-[559px]:hidden ' : '') + 'px-1.5 min-w-[30px] min-h-[44px] shrink-0 bg-surface2 text-chalkdim hover:text-chalk active:bg-line active:scale-90 ' +
-    'transition-transform duration-75 select-none touch-none border border-line flex items-center justify-center'
+    'max-[559px]:hidden px-1.5 min-w-[30px] min-h-[44px] shrink-0 bg-surface2 text-chalkdim hover:text-chalk active:bg-white/10 ' +
+    'transition-colors select-none touch-none flex items-center justify-center'
 
   // Bumping happens on press for immediacy; the click handler only fires
   // for keyboard activation (detail === 0), so a tap never counts twice.
@@ -68,12 +72,7 @@ function Stepper({ value, onChange, step, min = 0, max, label, placeholder, bare
 
   return (
     <div className="flex items-stretch min-w-0">
-      <button
-        type="button"
-        {...holdProps(-step)}
-        aria-label={label ? `${label} \u2212${step}` : undefined}
-        className={`${btn} rounded-s-md border-e-0`}
-      >
+      <button type="button" {...holdProps(-step)} aria-label={label ? `${label} −${step}` : undefined} className={`${btn} rounded-s-[10px]`}>
         <Minus size={13} />
       </button>
       <input
@@ -84,14 +83,11 @@ function Stepper({ value, onChange, step, min = 0, max, label, placeholder, bare
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         aria-label={label}
-        className={`num text-center !rounded-none !px-0.5 min-w-0 w-full ${bare ? 'max-[559px]:!rounded-md' : ''}`}
+        className={`num text-center !px-0.5 min-w-0 w-full text-[17px] font-medium placeholder:text-[#6E6E74] !rounded-[10px] min-[560px]:!rounded-none ${
+          done ? '!bg-transparent' : ''
+        }`}
       />
-      <button
-        type="button"
-        {...holdProps(step)}
-        aria-label={label ? `${label} +${step}` : undefined}
-        className={`${btn} rounded-e-md border-s-0`}
-      >
+      <button type="button" {...holdProps(step)} aria-label={label ? `${label} +${step}` : undefined} className={`${btn} rounded-e-[10px]`}>
         <Plus size={13} />
       </button>
     </div>
@@ -122,6 +118,8 @@ export default function SessionEntryCard({
   onSwapExercise,
   onMoveUp,
   onMoveDown,
+  // Called when a set is ticked off, so the page can start the rest timer.
+  onSetDone,
   removable = false,
   // 'start' | 'mid' | 'end' when this card is part of a superset chain.
   supersetPos = null,
@@ -130,9 +128,8 @@ export default function SessionEntryCard({
   // Follow the current language (switching mid-workout updates the name).
   const displayName = liveExercise ? (lang === 'he' && liveExercise.name_he) || liveExercise.name : entryName(entry, {}, lang)
   const [showNote, setShowNote] = useState(!!entry.notes)
-  const [showQuickFill, setShowQuickFill] = useState(false)
-  // Index of the set that numbers were just filled into, so it can flash.
-  const [justFilled, setJustFilled] = useState(null)
+  // Indexes of the sets that numbers were just filled into, so they can flash.
+  const [justFilled, setJustFilled] = useState([])
   const isCardio = entry.category === 'cardio'
   // Timed holds (plank, wall sit) are bodyweight-style sets whose "reps"
   // field holds seconds, so everything else about them carries over.
@@ -150,13 +147,13 @@ export default function SessionEntryCard({
   // Show RIR if the exercise tracks it now, OR if this entry already has
   // RIR values logged (e.g. editing an old session) — logged data should
   // never be hidden just because the setting was later switched off.
-  const hasLoggedRir = (entry.sets || []).some((s) => s.rir !== '' && s.rir != null)
+  const hasLoggedRir = (entry.sets || []).some((s) => hasVal(s.rir))
   const showRir = !isCardio && (hasLoggedRir || (liveExercise ? !!liveExercise.track_rir : !!entry.trackRir))
 
   function copyFromPrevious(setIdx) {
     const prev = entry.sets[setIdx - 1]
     if (!prev) return
-    flashFilled(setIdx)
+    flashFilled([setIdx])
     if (isCardio) onUpdateSet(setIdx, { duration: prev.duration, intensity: prev.intensity, distance: prev.distance })
     else onUpdateSet(setIdx, { weight: prev.weight, reps: prev.reps })
   }
@@ -207,14 +204,13 @@ export default function SessionEntryCard({
   // Warm-ups: labels and last-time hints count working sets only, and the
   // suggestion ramps toward the first working set's weight (else last
   // time's top weight).
-  const firstWorkingIdx = (entry.sets || []).findIndex((s) => !isWarmup(s))
   const setLabels = (() => {
     let n = 0
     return (entry.sets || []).map((s) => (isWarmup(s) ? t('sessionCard.warmupShort') : String(++n)))
   })()
   const firstWorking = workingSets(entry.sets)[0]
   const workingWeight = (() => {
-    const filled = firstWorking && firstWorking.weight !== '' && firstWorking.weight != null ? Number(firstWorking.weight) : null
+    const filled = firstWorking && hasVal(firstWorking.weight) ? Number(firstWorking.weight) : null
     if (filled > 0) return filled
     if (topSetData && Number(topSetData.weight) > 0) return Number(topSetData.weight)
     return Number(lastWeight) > 0 ? Number(lastWeight) : null
@@ -244,16 +240,14 @@ export default function SessionEntryCard({
       ? (Number(a.duration) || 0) === (Number(b.duration) || 0) && (Number(a.intensity) || 0) === (Number(b.intensity) || 0)
       : (Number(a.weight) || 0) === (Number(b.weight) || 0) && (Number(a.reps) || 0) === (Number(b.reps) || 0)
   const hasChoice = lastSetData && topSetData && !sameSet(lastSetData, topSetData)
-  const hasAnyLastData = lastSetData != null || lastWeight != null
 
-  function flashFilled(setIdx) {
-    setJustFilled(setIdx)
+  function flashFilled(idxs) {
+    setJustFilled(idxs)
     if (navigator.vibrate) navigator.vibrate(12)
-    setTimeout(() => setJustFilled((cur) => (cur === setIdx ? null : cur)), 700)
+    setTimeout(() => setJustFilled((cur) => (cur === idxs ? [] : cur)), 700)
   }
 
   function applySet(setIdx, data) {
-    flashFilled(setIdx)
     if (isCardio) {
       onUpdateSet(setIdx, {
         duration: String(data.duration),
@@ -267,78 +261,186 @@ export default function SessionEntryCard({
     }
   }
 
-  function useLastTime(setIdx) {
-    if (hasChoice) {
-      setShowQuickFill((v) => !v)
-      return
-    }
-    const data =
-      lastSetData ||
-      (isCardio
-        ? { duration: lastWeight, intensity: lastReps, distance: lastDistance }
-        : { weight: lastWeight, reps: lastReps })
+  // Tapping a set's "Previous" copies last session's numbers into that set.
+  function usePrevious(setIdx, data) {
     applySet(setIdx, data)
+    flashFilled([setIdx])
   }
 
-  function pickQuickFill(setIdx, data) {
-    applySet(setIdx, data)
-    setShowQuickFill(false)
+  // The "Last set" / "Top set" chips fill every working set that isn't done.
+  function fillAll(data) {
+    const idxs = []
+    ;(entry.sets || []).forEach((s, j) => {
+      if (isWarmup(s) || s.done) return
+      idxs.push(j)
+      applySet(j, data)
+    })
+    flashFilled(idxs)
   }
 
-  function formatQuickFillLabel(data) {
+  // Short text for one set's numbers, with no unit: "85 × 6", "+10 × 8",
+  // "45s", "20 min · 5".
+  function numbersText(data) {
     if (isCardio) {
-      const dist = data.distance != null && data.distance !== '' ? ` · ${data.distance}${distanceUnit}` : ''
-      return `${data.duration} ${t('sessionCard.minUnit')} · ${intensityLabel} ${data.intensity}${dist}`
+      return `${data.duration} ${t('sessionCard.minUnit')}${hasVal(data.intensity) ? ` · ${data.intensity}` : ''}`
     }
-    const rirPart = showRir && data.rir != null && data.rir !== '' ? ` · RIR ${data.rir}` : ''
     if (isTimed) {
-      const added = Number(data.weight) > 0 ? `+${data.weight}${entry.unit} · ` : ''
-      return `${added}${formatSeconds(data.reps)}${rirPart}`
+      const added = Number(data.weight) > 0 ? `+${data.weight} · ` : ''
+      return `${added}${formatSeconds(data.reps)}`
     }
-    return `${data.weight}${entry.unit} × ${data.reps}${rirPart}`
+    if (entry.bodyweight) return Number(data.weight) > 0 ? `+${data.weight} × ${data.reps}` : `${data.reps}`
+    return `${data.weight} × ${data.reps}`
   }
 
-  const prevLabel = (() => {
+  // What was logged for the Nth working set last time. Old data that only has
+  // one last-known value shows it on every set.
+  function previousFor(j) {
+    if (isWarmup(entry.sets[j])) return null
+    const n = workingSets(entry.sets.slice(0, j)).length
+    if (lastSets.length > 0) return lastSets[n] || null
     if (lastWeight == null) return null
-    if (isCardio) {
-      const dist = lastDistance != null ? ` · ${lastDistance}${distanceUnit}` : ''
-      return `${t('sessionCard.previously')} ${lastWeight} ${t('sessionCard.minUnit')} · ${intensityLabel} ${lastReps}${dist}`
-    }
-    if (isTimed) {
-      const added = Number(lastWeight) > 0 ? `+${lastWeight}${entry.unit} · ` : ''
-      return `${t('sessionCard.previously')} ${added}${formatSeconds(lastReps)}`
-    }
-    if (entry.bodyweight) {
-      const added = Number(lastWeight) > 0 ? `+${lastWeight}${entry.unit} ` : ''
-      return `${t('sessionCard.previously')} ${added}${t('sessionCard.bodyweightBadge')} × ${lastReps}`
-    }
-    return `${t('sessionCard.previously')} ${lastWeight}${entry.unit} × ${lastReps}`
-  })()
+    return isCardio
+      ? { duration: lastWeight, intensity: lastReps, distance: lastDistance }
+      : { weight: lastWeight, reps: lastReps }
+  }
 
-  // Coach-set target for this exercise, e.g. "3×10 · RIR 2". Absent for
-  // freestyle exercises and routines written before targets were shown.
-  const targetLabel = (() => {
+  // Coach-set target for this exercise, e.g. "×10 · RIR 2". The number of
+  // sets is already visible as rows, so only reps and RIR are worth saying.
+  const targetBody = (() => {
     if (isCardio || !entry.targetSets) return null
-    const reps = entry.targetReps !== '' && entry.targetReps != null ? `×${entry.targetReps}${isTimed ? 's' : ''}` : ''
-    const rir = entry.targetRir != null ? ` · RIR ${entry.targetRir}` : ''
-    return { head: t('workout.targetLine'), body: `${entry.targetSets}${reps}${rir}` }
+    const reps = hasVal(entry.targetReps) ? `${entry.targetSets}×${entry.targetReps}${isTimed ? 's' : ''}` : ''
+    const rir = entry.targetRir != null ? `RIR ${entry.targetRir}` : ''
+    return [reps, rir].filter(Boolean).join(' · ') || null
   })()
 
-  // Supersets get a brass edge down the start side, with a short connector
+  // Supersets get an edge down the start side, with a short connector
   // bridging the gap to the next card in the chain.
   const linkNext = supersetPos === 'start' || supersetPos === 'mid'
-  const supersetClass = supersetPos ? 'relative border-s-[3px] border-s-brass' : ''
+  const supersetClass = supersetPos ? 'border-s-[3px] border-s-chalkdim/50' : ''
+
+  // Placeholders: the nearest value typed above wins over last session's, so
+  // changing the first set carries down to the sets below it without writing
+  // anything into them. Tapping the tick logs whatever is showing.
+  const fieldDefs = isCardio
+    ? [['duration', lastWeight], ['intensity', lastReps], ['distance', lastDistance]]
+    : [['weight', lastWeight], ['reps', lastReps], ...(showRir ? [['rir', undefined]] : [])]
+  function placeholderFor(j, key, fallback) {
+    if (isWarmup(entry.sets[j])) return ''
+    for (let i = j - 1; i >= 0; i--) {
+      if (isWarmup(entry.sets[i])) continue
+      if (hasVal(entry.sets[i][key])) return String(entry.sets[i][key])
+    }
+    const v = previousFor(j)?.[key]
+    if (hasVal(v)) return String(v)
+    // Past the sets logged last time, fall back to the single last-known value.
+    return hasVal(fallback) ? String(fallback) : ''
+  }
+
+  function toggleDone(j) {
+    const s = entry.sets[j]
+    if (s.done) {
+      onUpdateSet(j, { done: false })
+      return
+    }
+    const patch = { done: true }
+    for (const [key, fallback] of fieldDefs) {
+      if (hasVal(s[key])) continue
+      const v = placeholderFor(j, key, fallback)
+      if (v !== '') patch[key] = v
+    }
+    const m = { ...s, ...patch }
+    const complete = isCardio ? hasVal(m.duration) : hasVal(m.reps) && (entry.bodyweight || hasVal(m.weight))
+    // A set with nothing in it can't be ticked off.
+    if (!complete) return
+    onUpdateSet(j, patch)
+    if (navigator.vibrate) navigator.vibrate(10)
+    onSetDone?.()
+  }
+
+  const setMenu = (j) => (
+    <OverflowMenu
+      label={`${t('sessionCard.moreSetActions')} ${setLabels[j]}`}
+      align="start"
+      triggerClassName={`press num text-[15px] font-medium min-h-[44px] w-7 inline-flex items-center justify-center rounded-[10px] hover:text-chalk ${
+        isWarmup(entry.sets[j]) ? 'text-[#7C7C82]' : 'text-chalkdim'
+      }`}
+      trigger={setLabels[j]}
+      items={[
+        {
+          key: 'warmup',
+          label: t('sessionCard.toggleWarmup'),
+          icon: <Flame size={16} />,
+          onClick: () => onUpdateSet(j, { warmup: !entry.sets[j].warmup }),
+          hidden: isCardio,
+        },
+        {
+          key: 'same',
+          label: isCardio ? t('sessionCard.sameAsAbove') : t('sessionCard.sameAsSetAbove'),
+          icon: <CornerDownLeft size={16} />,
+          onClick: () => copyFromPrevious(j),
+          hidden: j === 0,
+        },
+        { key: 'remove', label: t('sessionCard.removeSet'), icon: <Trash2 size={16} />, onClick: () => onRemoveSet(j), danger: true },
+      ]}
+    />
+  )
+
+  const prevCell = (j) => {
+    const s = entry.sets[j]
+    const data = previousFor(j)
+    if (!data) return <span className="text-[14px] text-[#7C7C82]">—</span>
+    const text = numbersText(data)
+    return (
+      <button
+        type="button"
+        disabled={!!s.done}
+        onClick={() => usePrevious(j, data)}
+        aria-label={`${t('sessionCard.copyPrevious')} ${text}`}
+        className="num h-11 min-w-0 w-full text-start text-[14px] text-[#7C7C82] active:text-chalk disabled:pointer-events-none transition-colors duration-150 whitespace-nowrap overflow-hidden text-ellipsis"
+      >
+        <bdi dir="ltr">{text}</bdi>
+      </button>
+    )
+  }
+
+  const doneBtn = (j) => {
+    const done = !!entry.sets[j].done
+    return (
+      <button
+        type="button"
+        onClick={() => toggleDone(j)}
+        aria-pressed={done}
+        aria-label={t('sessionCard.markDone')}
+        className={`press justify-self-center w-10 h-10 rounded-[11px] border-[1.5px] flex items-center justify-center transition-[background-color,border-color] duration-150 ${
+          done ? 'bg-accent border-transparent' : 'border-[#3A3A40]'
+        }`}
+      >
+        <Check size={18} strokeWidth={2.6} className={`text-ink transition-[opacity,transform] duration-150 ${done ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} />
+      </button>
+    )
+  }
+
+  const headLabel = 'text-[12px] leading-4 text-[#7C7C82]'
+  const cols = isCardio || showRir
+    ? 'grid-cols-[28px_minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_44px]'
+    : 'grid-cols-[28px_minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)_44px]'
+  const rowBase = `grid gap-1.5 items-center min-h-[52px] ${cols}`
+  const prevHead = (
+    <span className="inline-flex items-center gap-1 text-start">
+      {t('sessionCard.prevCol')} <InfoTip text={t('sessionCard.previousTip')} />
+    </span>
+  )
 
   return (
-    <Card className={`flex flex-col gap-2.5 !p-3 min-[560px]:!p-4 ${supersetClass}`}>
-      {linkNext && <span className="absolute -start-[3px] top-full w-[3px] h-5 bg-brass" aria-hidden="true" />}
-      <div className="flex items-start justify-between gap-2 -mt-1 -me-2">
-        <div className="min-w-0 flex-1 pt-1">
+    <section className={`relative bg-surface rounded-[22px] pt-[18px] px-3.5 pb-1.5 flex flex-col gap-3 ${supersetClass}`}>
+      {linkNext && <span className="absolute -start-[3px] top-full w-[3px] h-3 bg-chalkdim/50" aria-hidden="true" />}
+      <div className="flex items-start justify-between gap-2 -mt-2.5 -me-2.5">
+        <div className="min-w-0 flex-1 pt-1.5 px-0.5 flex flex-col gap-1.5">
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-lg">{displayName}</h2>
+            <h2 className="text-[17px] leading-[22px] font-semibold">{displayName}</h2>
             {weightPr != null && (
               <span
-                className="pr-pop inline-flex items-center gap-1 rounded-full bg-brasssoft text-brass px-2 py-0.5 text-xs font-medium"
+                className="pr-pop inline-flex items-center gap-1 rounded-full bg-accentsoft text-accent px-2 h-[22px] text-xs font-semibold"
                 title={t('sessionCard.prTitle', { prev: `${personalBest}${prUnit}` })}
               >
                 <Trophy size={12} /> {single ? t('sessionCard.prBadge') : t('sessionCard.weightPrBadge')} {weightPr}
@@ -347,7 +449,7 @@ export default function SessionEntryCard({
             )}
             {repsPr && (
               <span
-                className="pr-pop inline-flex items-center gap-1 rounded-full bg-brasssoft text-brass px-2 py-0.5 text-xs font-medium"
+                className="pr-pop inline-flex items-center gap-1 rounded-full bg-accentsoft text-accent px-2 h-[22px] text-xs font-semibold"
                 title={t('sessionCard.repsPrTitle', { weight: `${repsPr.weight}${entry.unit}` })}
               >
                 <Trophy size={12} /> {t('sessionCard.repsPrBadge')}{' '}
@@ -368,50 +470,40 @@ export default function SessionEntryCard({
             {isTimed && <Badge tone="brass">{t('exercises.timedBadge')}</Badge>}
             {!isCardio && !isTimed && entry.bodyweight && <Badge tone="brass">{t('sessionCard.bodyweightBadge')}</Badge>}
             {/* Next to the name rather than in the icon row: sitting among
-                the icons it made that row so wide on a phone that the name,
-                "Previously" and the last note were squeezed into a narrow
-                column, a word or two per line. */}
+                the icons it made that row so wide on a phone that the name
+                and the notes were squeezed into a narrow column. */}
             <ExerciseVideo
               name={displayName}
               matchNames={[liveExercise?.name, entry.nameEn]}
               videoUrl={entry.videoUrl}
-              className="text-xs"
+              className="text-[13px] !text-chalkdim hover:!text-chalk"
             />
           </div>
-          {/* The coach's cue for this exercise, set in the routine. Boxed with
-              a "Coach:" label so it can't be mistaken for the trainee's own
-              saved note below it (plain brass text with a sticky-note icon). */}
+          {/* The coach's cue for this exercise, set in the routine, with the
+              label in primary text so it isn't mistaken for the lifter's own
+              saved note beneath it. */}
           {entry.coachNote && (
-            <p className="mt-1.5 rounded-md bg-brasssoft border-s-2 border-brass ps-2.5 pe-2 py-1.5 text-sm text-chalk">
-              <span className="font-medium text-brass">{t('workout.coachLabel')}</span> {entry.coachNote}
+            <p className="text-[13px] leading-[18px] text-chalkdim">
+              <span className="font-medium text-chalk">{t('workout.coachLabel')}</span> {entry.coachNote}
             </p>
           )}
-          {targetLabel && (
-            <p className="num text-chalk text-sm mt-1">
-              {targetLabel.head} <bdi dir="ltr">{targetLabel.body}</bdi>
-            </p>
-          )}
-          {prevLabel && (
-            <p className="num text-chalkdim text-sm mt-0.5 inline-flex items-center gap-1 flex-wrap">
-              {prevLabel}
-              <InfoTip text={t('sessionCard.previousTip')} />
+          {targetBody && (
+            <p className="num text-[13px] leading-[18px] text-chalkdim">
+              {t('workout.targetLine')} <bdi dir="ltr">{targetBody}</bdi>
             </p>
           )}
           {/* The last note written on this exercise — "seat on 4", "left
               knee sore" — resurfaced the next time it comes up, which is
               when it's actually useful. */}
           {liveExercise?.last_note && (
-            <p className="text-brass text-sm mt-1 flex items-start gap-1">
-              <StickyNote size={12} className="shrink-0 mt-0.5" />
-              <span>
-                {liveExercise.last_note_date && (
-                  <span className="text-chalkdim">
-                    {fmtDate(lang, new Date(liveExercise.last_note_date + 'T00:00:00'), { day: 'numeric', month: 'short' })}
-                    {': '}
-                  </span>
-                )}
-                {liveExercise.last_note}
-              </span>
+            <p className="text-[13px] leading-[18px] text-chalkdim">
+              {liveExercise.last_note_date && (
+                <>
+                  {fmtDate(lang, new Date(liveExercise.last_note_date + 'T00:00:00'), { day: 'numeric', month: 'short' })}
+                  {': '}
+                </>
+              )}
+              {liveExercise.last_note}
             </p>
           )}
         </div>
@@ -428,178 +520,130 @@ export default function SessionEntryCard({
         />
       </div>
 
-      {showQuickFill && hasChoice && (
-        <div className="flex flex-col gap-1.5 bg-surface2 rounded-md p-2.5 -mt-1">
-          <span className="eyebrow">{t('sessionCard.copyInNumbers')}</span>
-          <div className="flex flex-col sm:flex-row gap-1.5">
+      {hasChoice && (
+        <div className="flex flex-wrap items-center gap-2 px-0.5">
+          <span className="hidden min-[560px]:inline text-[13px] text-[#7C7C82]">{t('sessionCard.fillFrom')}</span>
+          {[
+            ['sessionCard.lastSetChip', lastSetData],
+            ['sessionCard.topSetChip', topSetData],
+          ].map(([key, data]) => (
             <button
-              onClick={() => pickQuickFill(Math.max(0, firstWorkingIdx), lastSetData)}
-              className="flex-1 text-start rounded-md bg-ink border border-line hover:border-brass px-3 py-2"
+              key={key}
+              type="button"
+              onClick={() => fillAll(data)}
+              className="press inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-surface2 text-chalkdim text-[13px] font-medium num"
             >
-              <p className="text-xs text-chalkdim">{t('sessionCard.lastSetDone')}</p>
-              <p className="num text-sm">{formatQuickFillLabel(lastSetData)}</p>
+              {t(key)}{' '}
+              <b className="text-chalk font-semibold">
+                <bdi dir="ltr">{numbersText(data)}</bdi>
+              </b>
             </button>
-            <button
-              onClick={() => pickQuickFill(Math.max(0, firstWorkingIdx), topSetData)}
-              className="flex-1 text-start rounded-md bg-ink border border-line hover:border-brass px-3 py-2"
-            >
-              <p className="text-xs text-chalkdim">{t('sessionCard.topSetDone')}</p>
-              <p className="num text-sm">{formatQuickFillLabel(topSetData)}</p>
-            </button>
-          </div>
+          ))}
         </div>
       )}
 
-      {(() => {
-        // Previous session's number for this set, shown greyed inside the
-        // empty box so the last numbers are right there without a column.
-        const prev = (j, key, fallback) => {
-          if (isWarmup(entry.sets[j])) return ''
-          const v = lastSets[workingSets(entry.sets.slice(0, j)).length]?.[key]
-          if (v != null && v !== '') return String(v)
-          return fallback != null && fallback !== '' ? String(fallback) : ''
-        }
-        const setMenu = (j) => (
-          <OverflowMenu
-            label={`${t('sessionCard.moreSetActions')} ${j + 1}`}
-            items={[
-              {
-                key: 'last',
-                label: hasChoice ? t('sessionCard.chooseLastTime') : t('sessionCard.useLastTime'),
-                icon: <History size={16} />,
-                onClick: () => useLastTime(j),
-                hidden: !(j === firstWorkingIdx && hasAnyLastData),
-              },
-              {
-                key: 'same',
-                label: isCardio ? t('sessionCard.sameAsAbove') : t('sessionCard.sameAsSetAbove'),
-                icon: <CornerDownLeft size={16} />,
-                onClick: () => copyFromPrevious(j),
-                hidden: j === 0 || j === firstWorkingIdx,
-              },
-              { key: 'remove', label: t('sessionCard.removeSet'), icon: <Trash2 size={16} />, onClick: () => onRemoveSet(j), danger: true },
-            ]}
-          />
-        )
-        const rowBase = 'grid gap-1 items-center grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem]'
-        const extraCol = '!grid-cols-[1.2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_2.75rem]'
-        const cardioExtraCol = extraCol
-        // The third number (RIR, or distance for cardio) is a narrow input
-        // in the same row; the +/- buttons are dropped on phones to make room.
-        const thirdCell = 'min-w-0'
-        const menuCell = 'justify-self-end'
-
-        if (isCardio) {
-          return (
-            <div className="flex flex-col gap-1.5">
-              <div className={`${rowBase} ${cardioExtraCol} text-chalkdim eyebrow px-0.5`}>
-                <span>#</span>
-                <span className="truncate">{t('sessionCard.min')}</span>
-                <span className="truncate">{intensityLabel}</span>
-                <span className="truncate">{distanceUnit}</span>
-                <span />
-              </div>
-              {entry.sets.map((s, j) => (
-                <div key={j} className={`${rowBase} ${cardioExtraCol} ${justFilled === j ? 'flash-fill' : ''}`}>
-                  <span className="num text-chalkdim text-sm">{j + 1}</span>
-                  <Stepper bare value={s.duration} step={1} min={0} placeholder={prev(j, 'duration', lastWeight)} onChange={(v) => onUpdateSet(j, { duration: v })} label={`${t('sessionCard.set')} ${j + 1} ${t('sessionCard.min')}`} />
-                  <Stepper
-                    bare
-                    label={`${t('sessionCard.set')} ${j + 1} ${intensityLabel}`}
-                    value={s.intensity}
-                    step={1}
-                    min={1}
-                    max={intensityMax}
-                    placeholder={prev(j, 'intensity', lastReps)}
-                    onChange={(v) => onUpdateSet(j, { intensity: v })}
-                  />
-                  <div className={thirdCell}>
-                    <div>
-                      <Stepper bare value={s.distance} step={0.1} min={0} placeholder={prev(j, 'distance', lastDistance)} onChange={(v) => onUpdateSet(j, { distance: v })} label={`${t('sessionCard.set')} ${j + 1} ${distanceUnit}`} />
-                    </div>
-                  </div>
-                  <div className={menuCell}>{setMenu(j)}</div>
-                </div>
-              ))}
-              <button onClick={onAddSet} className="text-chalkdim hover:text-chalk text-sm inline-flex items-center gap-1 min-h-[44px] pe-3 w-fit">
-                <Plus size={13} /> {t('sessionCard.addInterval')}
-              </button>
-              {/* Pace and speed appear as soon as a set has both a time and a distance. */}
-              {(() => {
-                const sum = cardioSummary(entry.sets)
-                return sum && sum.distance != null ? (
-                  <p className="num text-sm text-chalkdim -mt-1 text-start">
-                    <CardioTotals sets={entry.sets} unit={entry.unit} minLabel={t('sessionCard.minUnit')} />
-                  </p>
-                ) : null
-              })()}
-            </div>
-          )
-        }
-        const strengthCols = showRir ? `${rowBase} ${extraCol}` : rowBase
-        return (
-          <div className="flex flex-col gap-1.5">
-            <div className={`${strengthCols} text-chalkdim eyebrow px-0.5`}>
-              {/* "#" like the cardio header: the word "Set" in wide-tracked
-                  capitals is wider than this column and ran into the next
-                  label, reading as "SETWT (KG)". */}
-              <span>#</span>
-              {/* The leading "+" already says "extra weight"; spelling out
-                  "optional" too didn't fit at phone width and got cut off. */}
-              <span className="truncate" title={entry.bodyweight ? t('sessionCard.opt') : undefined}>
-                {entry.bodyweight ? `+${t('sessionCard.wt')} (${entry.unit})` : `${t('sessionCard.wt')} (${entry.unit})`}
+      <div className="flex flex-col gap-0.5">
+        <div className={`${rowBase} !min-h-0 pb-1 ${headLabel}`}>
+          <span className="text-center">{t('sessionCard.set')}</span>
+          {prevHead}
+          {isCardio ? (
+            <>
+              <span className="text-center truncate">{t('sessionCard.min')}</span>
+              <span className="text-center truncate">{intensityLabel}</span>
+              <span className="text-center truncate">{distanceUnit}</span>
+            </>
+          ) : (
+            <>
+              <span className="text-center truncate" title={entry.bodyweight ? t('sessionCard.opt') : undefined}>
+                {entry.bodyweight ? `+${entry.unit}` : entry.unit}
               </span>
-              <span>{isTimed ? t('sessionCard.seconds') : t('sessionCard.reps')}</span>
+              <span className="text-center truncate">{isTimed ? t('sessionCard.seconds') : t('sessionCard.reps')}</span>
               {showRir && (
-                <span className="inline-flex items-center gap-0.5">
+                <span className="inline-flex items-center justify-center gap-0.5">
                   {t('sessionCard.rir')} <InfoTip text={t('sessionCard.rirTip')} />
                 </span>
               )}
-              <span />
-            </div>
-            {entry.sets.map((s, j) => (
-              // Warm-ups are muted cell by cell, not on the whole row: opacity
-              // on the row also faded the "..." menu inside it and trapped it
-              // under the next rows, so its items couldn't be tapped.
-              <div key={j} className={`${strengthCols} ${justFilled === j ? 'flash-fill' : ''} ${isWarmup(s) ? '[&>*:not(:last-child)]:opacity-70' : ''}`}>
-                <button
-                  type="button"
-                  onClick={() => onUpdateSet(j, { warmup: !s.warmup })}
-                  title={t('sessionCard.toggleWarmup')}
-                  aria-label={t('sessionCard.toggleWarmup')}
-                  aria-pressed={isWarmup(s)}
-                  className={`num text-sm text-start min-h-[44px] ${isWarmup(s) ? 'text-brass' : 'text-chalkdim hover:text-chalk'}`}
-                >
-                  {setLabels[j]}
-                </button>
-                <Stepper bare={showRir} value={s.weight} step={weightStep} placeholder={prev(j, 'weight', lastWeight)} onChange={(v) => onUpdateSet(j, { weight: v })} label={`${t('sessionCard.set')} ${setLabels[j]} ${t('sessionCard.wt')} (${entry.unit})`} />
-                <Stepper bare={showRir} value={s.reps} step={isTimed ? 5 : 1} placeholder={prev(j, 'reps', lastReps)} onChange={(v) => onUpdateSet(j, { reps: v })} label={`${t('sessionCard.set')} ${setLabels[j]} ${isTimed ? t('sessionCard.seconds') : t('sessionCard.reps')}`} />
-                {showRir && (
-                  <div className={thirdCell}>
-                    <div>
-                      <Stepper bare value={s.rir} step={1} min={0} max={10} placeholder={prev(j, 'rir')} onChange={(v) => onUpdateSet(j, { rir: v })} label={`${t('sessionCard.set')} ${setLabels[j]} RIR`} />
-                    </div>
-                  </div>
-                )}
-                <div className={showRir ? menuCell : 'justify-self-end'}>{setMenu(j)}</div>
-              </div>
-            ))}
-            <div className="flex flex-wrap items-center gap-x-3">
-              <button onClick={onAddSet} className="text-chalkdim hover:text-chalk text-sm inline-flex items-center gap-1 min-h-[44px] pe-3 w-fit">
-                <Plus size={13} /> {t('sessionCard.addSet')}
-              </button>
-              {onAddWarmups && warmupSuggestion.length > 0 && (
-                <button onClick={addWarmups} className="text-chalkdim hover:text-brass text-sm inline-flex items-center gap-1 min-h-[44px] pe-3 w-fit">
-                  <Plus size={13} /> {t('sessionCard.addWarmups')}
-                </button>
+            </>
+          )}
+          <span />
+        </div>
+
+        {entry.sets.map((s, j) => {
+          const done = !!s.done
+          const stepFor = (key) => (key === 'weight' ? weightStep : key === 'reps' ? (isTimed ? 5 : 1) : key === 'distance' ? 0.1 : 1)
+          const cell = (key, label, opts = {}) => (
+            <Stepper
+              value={s[key]}
+              step={opts.step ?? stepFor(key)}
+              min={opts.min}
+              max={opts.max}
+              done={done}
+              placeholder={placeholderFor(j, key, fieldDefs.find((f) => f[0] === key)?.[1])}
+              onChange={(v) => onUpdateSet(j, { [key]: v })}
+              label={`${t('sessionCard.set')} ${setLabels[j]} ${label}`}
+            />
+          )
+          return (
+            // Warm-ups are muted cell by cell, not on the whole row: opacity
+            // on the row also faded the set menu inside it and trapped it
+            // under the next rows, so its items couldn't be tapped.
+            <div
+              key={j}
+              className={`${rowBase} ${justFilled.includes(j) ? 'flash-fill' : ''} ${isWarmup(s) ? '[&>*:not(:first-child):not(:last-child)]:opacity-70' : ''}`}
+            >
+              {setMenu(j)}
+              {prevCell(j)}
+              {isCardio ? (
+                <>
+                  {cell('duration', t('sessionCard.min'), { min: 0, step: 1 })}
+                  {cell('intensity', intensityLabel, { min: 1, max: intensityMax, step: 1 })}
+                  {cell('distance', distanceUnit, { min: 0 })}
+                </>
+              ) : (
+                <>
+                  {cell('weight', `${t('sessionCard.wt')} (${entry.unit})`)}
+                  {cell('reps', isTimed ? t('sessionCard.seconds') : t('sessionCard.reps'))}
+                  {showRir && cell('rir', 'RIR', { min: 0, max: 10 })}
+                </>
               )}
+              {doneBtn(j)}
             </div>
-          </div>
-        )
-      })()}
+          )
+        })}
+      </div>
+
+      <div className="flex border-t border-white/[0.06]">
+        <button
+          type="button"
+          onClick={onAddSet}
+          className="press flex-1 h-11 text-chalkdim hover:text-chalk text-sm font-medium inline-flex items-center justify-center gap-1.5"
+        >
+          <Plus size={16} /> {isCardio ? t('sessionCard.addInterval') : t('sessionCard.addSet')}
+        </button>
+        {!isCardio && onAddWarmups && warmupSuggestion.length > 0 && (
+          <button
+            type="button"
+            onClick={addWarmups}
+            className="press flex-1 h-11 text-chalkdim hover:text-chalk text-sm font-medium inline-flex items-center justify-center gap-1.5"
+          >
+            <Plus size={16} /> {t('sessionCard.addWarmups')}
+          </button>
+        )}
+      </div>
+
+      {/* Pace and speed appear as soon as a set has both a time and a distance. */}
+      {isCardio &&
+        (() => {
+          const sum = cardioSummary(entry.sets)
+          return sum && sum.distance != null ? (
+            <p className="num text-sm text-chalkdim -mt-1 pb-2 text-start">
+              <CardioTotals sets={entry.sets} unit={entry.unit} minLabel={t('sessionCard.minUnit')} />
+            </p>
+          ) : null
+        })()}
 
       {onUpdateNote && showNote && (
-        <div className="flex flex-col gap-1 pt-1 border-t border-line">
+        <div className="flex flex-col gap-1 pb-3 px-0.5">
           <span className="eyebrow">{t('sessionCard.noteLabel')}</span>
           <input
             value={entry.notes || ''}
@@ -609,6 +653,6 @@ export default function SessionEntryCard({
           />
         </div>
       )}
-    </Card>
+    </section>
   )
 }
