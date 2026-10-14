@@ -80,9 +80,9 @@ export default function FoodDetail({ food: initial, meal, setMeal, targets, tota
               aria-pressed={fav}
               aria-label={t('nutrition.favorite')}
               onClick={toggleFav}
-              className="w-11 h-11 inline-flex items-center justify-center rounded-md hover:bg-surface2"
+              className="w-11 h-11 inline-flex items-center justify-center rounded-full hover:bg-surface2"
             >
-              <Star size={22} className={fav ? 'text-brass' : 'text-chalkdim'} fill={fav ? 'currentColor' : 'none'} />
+              <Star size={22} className={fav ? 'text-chalk' : 'text-chalkdim'} fill={fav ? 'currentColor' : 'none'} />
             </button>
           ) : null
         }
@@ -120,7 +120,7 @@ export default function FoodDetail({ food: initial, meal, setMeal, targets, tota
           {food.source === 'off' && <OffAttribution />}
         </div>
       </div>
-      <div className="p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] border-t border-line shrink-0">
+      <div className="p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] shrink-0">
         <Button variant="brass" className="w-full min-h-[52px] text-base justify-between" onClick={add} disabled={!a.valid || busy}>
           <span className="inline-flex items-center gap-2">
             <Plus size={20} />

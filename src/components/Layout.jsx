@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom'
-import { Dumbbell, LayoutDashboard, ListChecks, History, Library, LogOut, Menu, X, Users, UserCheck, BarChart3, Scale, FileText, HelpCircle, CircleUser, Bell, Apple } from 'lucide-react'
+import { Dumbbell, LayoutDashboard, ListChecks, History, Library, LogOut, X, Users, UserCheck, BarChart3, Scale, FileText, HelpCircle, CircleUser, Bell, Apple, Home, Ellipsis } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -53,14 +53,45 @@ export default function Layout() {
     ...(nutritionAllowed ? [{ to: '/nutrition', labelKey: 'nav.nutrition', icon: Apple }] : []),
   ]
 
+  // The four destinations used every day, plus More for everything else.
+  // Nutrition takes the second slot only for people whose coach turned it on.
+  const tabs = [
+    { to: '/', labelKey: 'nav.today', icon: Home, end: true },
+    nutritionAllowed
+      ? { to: '/nutrition', labelKey: 'nav.nutritionTab', icon: Apple }
+      : { to: '/routines', labelKey: 'nav.routines', icon: ListChecks },
+    { to: '/history', labelKey: 'nav.history', icon: History },
+    { to: '/stats', labelKey: 'nav.progress', icon: BarChart3 },
+  ]
+  const tabPaths = new Set(tabs.map((tab) => tab.to))
+  const showTabs = !inWorkout
+
   function toggleLang() {
     setLang(lang === 'en' ? 'he' : 'en')
   }
 
   return (
     <div className="min-h-dvh flex flex-col">
+      {/* On phones the brand bar is gone: navigation lives in the floating
+          tab bar at the bottom, and each screen carries its own title. */}
+      {actingAs && (
+        <div className="md:hidden sticky top-0 z-20 bg-surface text-chalk text-sm" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+          <div className="px-4 py-1.5 flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 min-w-0">
+              <UserCheck size={15} className="shrink-0 text-chalkdim" />
+              <span className="truncate">
+                {t('layout.managingAccount')} <strong>{actingAs.name}</strong>
+                {t('layout.accountSuffix')}
+              </span>
+            </span>
+            <button onClick={() => setActingAs(null)} className="press shrink-0 rounded-full bg-accent text-ink font-semibold px-3 min-h-11 text-xs">
+              {t('layout.backToMyAccount')}
+            </button>
+          </div>
+        </div>
+      )}
       <header
-        className="border-b border-line sticky top-0 z-20 bg-ink/95 backdrop-blur"
+        className="hidden md:block border-b border-line sticky top-0 z-20 bg-ink/95 backdrop-blur"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -131,16 +162,13 @@ export default function Layout() {
             </button>
           </div>
 
-          <button className="md:hidden inline-flex items-center justify-center min-w-[44px] min-h-[44px] -me-2" aria-label={t('layout.menu')} aria-expanded={open} onClick={() => setOpen(!open)}>
-            {open ? <X size={22} /> : <Menu size={22} />}
-          </button>
         </div>
 
         {/* Lives inside the sticky header (not above it) so it sits below
             the phone's status bar and stays on screen while scrolling —
             "back to my account" must always be one tap away. */}
         {actingAs && (
-          <div className="bg-brasssoft text-brass text-sm border-t border-line">
+          <div className="bg-surface text-chalk text-sm border-t border-line">
             <div className="max-w-5xl mx-auto px-4 py-1.5 flex items-center justify-between gap-2">
               <span className="inline-flex items-center gap-1.5 min-w-0">
                 <UserCheck size={15} className="shrink-0" />
@@ -171,32 +199,29 @@ export default function Layout() {
           was scrolled to. */}
       {open &&
         createPortal(
-          <div className="md:hidden fixed inset-0 z-40 bg-ink flex flex-col" role="dialog" aria-modal="true" aria-label={t('layout.menu')}>
-            <div className="border-b border-line" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
-              <div className="px-4 h-16 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Dumbbell className="text-irontext" size={22} strokeWidth={2.5} />
-                  <span className="font-display text-2xl tracking-wide">Ironlog</span>
-                </div>
-                <button className="p-2" aria-label={t('common.close')} onClick={() => setOpen(false)}>
-                  <X size={22} />
+          <div className="md:hidden fixed inset-0 z-40 bg-ink flex flex-col" role="dialog" aria-modal="true" aria-label={t('nav.more')}>
+            <div style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+              <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+                <h1 className="text-[30px] leading-9">{t('nav.more')}</h1>
+                <button className="press w-11 h-11 rounded-full bg-surface flex items-center justify-center" aria-label={t('common.close')} onClick={() => setOpen(false)}>
+                  <X size={20} />
                 </button>
               </div>
             </div>
             <nav className="flex-1 overflow-y-auto overscroll-contain px-4 py-3 flex flex-col gap-1" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}>
-              {navLinks.map((l) => (
+              {navLinks.filter((l) => !tabPaths.has(l.to)).map((l) => (
                 <NavLink
                   key={l.to}
                   to={l.to}
                   end={l.end}
                   onClick={() => setOpen(false)}
                   className={({ isActive }) =>
-                    `flex items-center gap-2 px-2 py-3 rounded-md whitespace-nowrap ${
+                    `flex items-center gap-3 px-3 min-h-[52px] rounded-[14px] text-[15px] whitespace-nowrap ${
                       isActive ? 'bg-surface2 text-chalk' : 'text-chalkdim'
                     }`
                   }
                 >
-                  <l.icon size={16} />
+                  <l.icon size={18} />
                   {t(l.labelKey)}
                 </NavLink>
               ))}
@@ -204,7 +229,7 @@ export default function Layout() {
                 to="/notifications"
                 onClick={() => setOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center gap-2 px-2 py-3 rounded-md whitespace-nowrap ${
+                  `flex items-center gap-3 px-3 min-h-[52px] rounded-[14px] text-[15px] whitespace-nowrap ${
                     isActive ? 'bg-surface2 text-chalk' : 'text-chalkdim'
                   }`
                 }
@@ -215,7 +240,7 @@ export default function Layout() {
                 to="/account"
                 onClick={() => setOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center gap-2 px-2 py-3 rounded-md whitespace-nowrap ${
+                  `flex items-center gap-3 px-3 min-h-[52px] rounded-[14px] text-[15px] whitespace-nowrap ${
                     isActive ? 'bg-surface2 text-chalk' : 'text-chalkdim'
                   }`
                 }
@@ -226,7 +251,7 @@ export default function Layout() {
                 to="/help"
                 onClick={() => setOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center gap-2 px-2 py-3 rounded-md whitespace-nowrap ${
+                  `flex items-center gap-3 px-3 min-h-[52px] rounded-[14px] text-[15px] whitespace-nowrap ${
                     isActive ? 'bg-surface2 text-chalk' : 'text-chalkdim'
                   }`
                 }
@@ -235,7 +260,7 @@ export default function Layout() {
               </NavLink>
               <button
                 onClick={toggleLang}
-                className="flex items-center justify-between gap-2 px-2 min-h-11 rounded-md text-sm text-chalkdim whitespace-nowrap"
+                className="flex items-center justify-between gap-2 px-3 min-h-[52px] rounded-[14px] text-[15px] text-chalkdim whitespace-nowrap"
               >
                 <span>{t('layout.language')}</span>
                 <span className="flex rounded-md bg-surface2 p-0.5 text-xs num">
@@ -243,7 +268,7 @@ export default function Layout() {
                   <span className={`px-2 py-1 rounded ${lang === 'he' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>עב</span>
                 </span>
               </button>
-              <button onClick={logout} className="flex items-center gap-2 px-2 py-2.5 rounded-md text-sm text-irontext whitespace-nowrap">
+              <button onClick={logout} className="flex items-center gap-3 px-3 min-h-[52px] rounded-[14px] text-[15px] text-irontext whitespace-nowrap">
                 <LogOut size={16} /> {t('nav.logout')}
               </button>
             </nav>
@@ -251,9 +276,50 @@ export default function Layout() {
           document.body,
         )}
 
-      <main className="flex-1 max-w-5xl mx-auto w-full px-4 pt-6" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)' }}>
+      <main
+        className={`flex-1 max-w-5xl mx-auto w-full px-5 md:px-4 pt-6 ${showTabs ? 'pb-[calc(env(safe-area-inset-bottom,0px)+7.5rem)]' : 'pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]'} md:pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]`}
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1.5rem)' }}
+      >
         <Outlet />
       </main>
+
+      {showTabs && (
+        <>
+          {/* Fades the content out under the bar so text never sits
+              half-legible behind the blur. */}
+          <div aria-hidden="true" className="md:hidden fixed inset-x-0 bottom-0 z-20 h-32 pointer-events-none bg-gradient-to-b from-ink/0 to-ink/90" />
+          <nav
+            aria-label={t('nav.tabs')}
+            className="md:hidden fixed inset-x-4 z-30 h-16 p-1.5 rounded-[24px] grid grid-cols-5 gap-1 bg-[#242428]/75 backdrop-blur-xl backdrop-saturate-150 shadow-[inset_0_0.5px_0_rgba(255,255,255,0.14),0_12px_32px_rgba(0,0,0,0.5)]"
+            style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 14px)' }}
+          >
+            {tabs.map((tab) => (
+              <NavLink
+                key={tab.to}
+                to={tab.to}
+                end={tab.end}
+                className={({ isActive }) =>
+                  `press flex flex-col items-center justify-center gap-0.5 rounded-[18px] text-[11px] font-medium transition-colors duration-150 ${
+                    isActive ? 'bg-white/[0.08] text-chalk' : 'text-[#8A8A90]'
+                  }`
+                }
+              >
+                <tab.icon size={22} strokeWidth={1.75} aria-hidden="true" />
+                <span className="truncate max-w-full px-1">{t(tab.labelKey)}</span>
+              </NavLink>
+            ))}
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              aria-expanded={open}
+              className="press flex flex-col items-center justify-center gap-0.5 rounded-[18px] text-[11px] font-medium text-[#8A8A90]"
+            >
+              <Ellipsis size={22} strokeWidth={1.75} aria-hidden="true" />
+              <span>{t('nav.more')}</span>
+            </button>
+          </nav>
+        </>
+      )}
     </div>
   )
 }

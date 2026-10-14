@@ -70,7 +70,7 @@ export default function LabelForm({ barcode: initialBarcode = '', prefill, uid, 
       <form onSubmit={save} className="flex-1 min-h-0 flex flex-col">
         <div className="flex-1 overflow-y-auto px-4 pb-4 flex flex-col gap-4">
           {scanned && (
-            <div className="rounded-lg border border-line bg-ink p-3 flex gap-2.5 text-sm text-chalkdim">
+            <div className="rounded-[14px] bg-surface2 p-3 flex gap-2.5 text-sm text-chalkdim">
               <AlertCircle size={18} className="shrink-0 mt-0.5" aria-hidden="true" />
               <div>
                 {incomplete ? (
@@ -95,7 +95,7 @@ export default function LabelForm({ barcode: initialBarcode = '', prefill, uid, 
             <input inputMode="numeric" dir="ltr" className="num" value={f.barcode} onChange={(e) => setF((s) => ({ ...s, barcode: e.target.value.replace(/[^\d]/g, '') }))} readOnly={scanned} />
           </label>
           {existing && (
-            <div className="rounded-lg border border-line bg-ink p-3 flex flex-col gap-2" role="alert">
+            <div className="rounded-[14px] bg-surface2 p-3 flex flex-col gap-2" role="alert">
               <p className="text-sm font-medium">{t('nutrition.existsTitle')}</p>
               <Name>{foodName(existing, lang)}</Name>
               <SourceLabel food={existing} showVerifiedText className="text-xs" />
@@ -114,7 +114,7 @@ export default function LabelForm({ barcode: initialBarcode = '', prefill, uid, 
             </div>
             {filled &&
               (sanity ? (
-                <div className="mt-3 rounded-lg border border-chalkdim/40 bg-ink p-3 flex gap-2.5 text-sm" role="status">
+                <div className="mt-3 rounded-[14px] bg-surface2 p-3 flex gap-2.5 text-sm" role="status">
                   <AlertTriangle size={18} className="shrink-0 mt-0.5 text-chalkdim" aria-hidden="true" />
                   <p>
                     {sanity.kind === 'kcal'
@@ -123,7 +123,7 @@ export default function LabelForm({ barcode: initialBarcode = '', prefill, uid, 
                   </p>
                 </div>
               ) : (
-                <p className="mt-3 flex items-center gap-2 text-sm text-good" role="status">
+                <p className="mt-3 flex items-center gap-2 text-sm text-chalk" role="status">
                   <Check size={16} /> {t('nutrition.sanityOk')}
                 </p>
               ))}
@@ -147,7 +147,7 @@ export default function LabelForm({ barcode: initialBarcode = '', prefill, uid, 
             </p>
           )}
         </div>
-        <div className="p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] border-t border-line shrink-0">
+        <div className="p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] shrink-0">
           <Button type="submit" variant="brass" className="w-full min-h-[52px] text-base" disabled={busy}>
             <Check size={20} /> {t('nutrition.saveAndAdd')}
           </Button>

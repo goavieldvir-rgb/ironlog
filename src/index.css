@@ -3,8 +3,14 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* The one accent colour, as RGB channels. */
+    --accent: 255 91 58;
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  }
   html {
-    background-color: #14161A;
+    background-color: #0B0B0C;
     overscroll-behavior: none;
     touch-action: manipulation;
     overflow-x: clip;
@@ -32,25 +38,26 @@
     max-width: 100vw;
   }
   ::selection {
-    background-color: #D64545;
-    color: #EDEDE6;
+    background-color: rgb(var(--accent) / 0.35);
+    color: #F2F2EF;
   }
   * {
     @apply border-line;
   }
   :focus-visible {
-    outline: 2px solid #C9A24B;
+    outline: 2px solid rgb(var(--accent));
     outline-offset: 2px;
   }
   input, select, textarea {
-    @apply bg-surface2 text-chalk placeholder:text-chalkdim/90 rounded-md px-3 py-2 text-sm border border-line focus:border-brass outline-none transition-colors;
+    @apply bg-surface2 text-chalk placeholder:text-chalkdim/90 rounded-[10px] px-3 py-2 text-[15px] border border-transparent focus:border-accent outline-none transition-colors;
   }
   input:not([type='checkbox']):not([type='radio']),
   select {
     min-height: 44px;
   }
   h1, h2, h3, h4 {
-    @apply font-display;
+    @apply font-display font-semibold;
+    letter-spacing: -0.02em;
   }
 }
 
@@ -60,7 +67,11 @@
      Kept small and fast: noticeable while your thumb is down, invisible
      otherwise. */
   .press {
-    @apply transition-transform duration-75 active:scale-95;
+    transition: transform 160ms var(--ease-out);
+  }
+  .press:active {
+    transform: scale(0.97);
+    transition-duration: 100ms;
   }
   .press-row {
     @apply transition-transform duration-75 active:scale-[0.99];
@@ -69,7 +80,7 @@
      which numbers appeared without you typing them. */
   @keyframes fillflash {
     from {
-      background-color: rgba(201, 162, 75, 0.22);
+      background-color: rgb(var(--accent) / 0.18);
     }
     to {
       background-color: transparent;
@@ -122,27 +133,15 @@
     min-height: 44px;
     transform: translate(-50%, -50%);
   }
+  /* Small secondary label in sentence case. The old tracked, uppercase
+     monospace label was the most "2020" thing in the app. */
   .eyebrow {
-    @apply font-mono text-[11px] tracking-widest2 uppercase text-chalkdim;
-  }
-  /* Wide letter-spacing is a trick that makes Latin all-caps text read as
-     sleek and designed — Hebrew doesn't have the same case distinction or
-     the same benefit from extra tracking, and it just makes short words
-     (category badges, section labels) look stretched apart and harder to
-     read. Only apply the wide tracking in LTR contexts. */
-  [dir='rtl'] .eyebrow {
-    letter-spacing: normal;
-  }
-  /* Plex Mono has no Hebrew, and its wide word space splits two-word
-     labels ("שם  המוצר"); on the nutrition screens Hebrew eyebrows use the
-     body face. */
-  [dir='rtl'] .nutrition-page .eyebrow {
-    @apply font-body text-xs;
+    @apply font-body text-[13px] font-medium text-chalkdim;
   }
   .num {
-    @apply font-mono tabular-nums;
+    @apply tabular-nums;
   }
-  /* Same reasoning as the eyebrow override above: italics are a Latin
+  /* Italics are a Latin
      typographic convention (a genuinely different, cursive-derived letter
      shape). Hebrew has no equivalent tradition — a browser-faked slant on
      Hebrew glyphs just looks tilted and slightly broken, not stylish.
@@ -152,7 +151,7 @@
     font-style: normal;
   }
   .card {
-    @apply bg-surface border border-line rounded-xl;
+    @apply bg-surface rounded-[20px];
   }
   /* A lighter treatment for repeated list rows (a routine, a session, a
      person) — no heavy border, just enough separation to scan a list
@@ -167,14 +166,15 @@
   .stat-number {
     @apply font-display num tabular-nums text-chalk leading-none;
     font-size: clamp(2.25rem, 8vw, 3.25rem);
-    font-weight: 500;
+    font-weight: 600;
+    letter-spacing: -0.03em;
   }
   .scrollbar-thin::-webkit-scrollbar {
     height: 6px;
     width: 6px;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: #31353E;
+    background: #3A3A40;
     border-radius: 4px;
   }
 }

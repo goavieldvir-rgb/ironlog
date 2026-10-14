@@ -28,7 +28,7 @@ function Stats({ protein, kcal, extra, source }) {
     <div className="flex flex-wrap items-baseline gap-x-1.5 text-xs text-chalkdim mt-0.5">
       {extra && <span className="whitespace-nowrap">{extra} ·</span>}
       <span className="whitespace-nowrap">
-        <N mono className="text-irontext text-sm">{fmt(protein, 1)}</N> {t('nutrition.g')} {t('nutrition.proteinWord')}
+        <N mono className="text-chalk font-semibold text-sm">{fmt(protein, 1)}</N> {t('nutrition.g')} {t('nutrition.proteinWord')}
       </span>
       <span className="whitespace-nowrap">
         · <N mono>{fmt(kcal, 0)}</N> {t('nutrition.kcalUnit')}
@@ -241,7 +241,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
       type="button"
       onClick={onClick}
       aria-label={label}
-      className={`w-11 h-11 shrink-0 inline-flex items-center justify-center rounded-md border press ${done[id] ? 'border-good text-good bg-good/10' : 'border-line bg-surface2 text-chalk'}`}
+      className={`w-11 h-11 shrink-0 inline-flex items-center justify-center rounded-full press ${done[id] ? 'text-ink bg-chalk' : 'bg-surface2 text-chalk'}`}
     >
       {done[id] ? <Check size={20} /> : <Plus size={20} />}
     </button>
@@ -287,7 +287,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
             </Button>
           </div>
           {quickOpen && (
-            <form onSubmit={submitQuick} className="mx-4 mt-3 p-4 rounded-xl bg-surface2/60 grid grid-cols-2 gap-3 shrink-0">
+            <form onSubmit={submitQuick} className="mx-4 mt-3 p-4 rounded-[14px] bg-surface2 grid grid-cols-2 gap-3 shrink-0">
               <div className="col-span-2">
                 <MacroInputs values={quick} onChange={(k, v) => setQuick((s) => ({ ...s, [k]: v }))} />
               </div>
@@ -305,7 +305,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
               </Button>
             </form>
           )}
-          <div className="flex mx-4 mt-3 border-b border-line shrink-0" role="tablist">
+          <div className="flex mx-4 mt-3 border-b border-white/[0.06] shrink-0" role="tablist">
             {tabs.map(([k, label]) => (
               <button
                 key={k}
@@ -334,7 +334,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
                 {searching ? t('nutrition.searching') : `${results.length === 1 ? t('nutrition.resultsOne') : t('nutrition.resultsCount', { n: results.length })} · ${t('nutrition.valuesPer100')}`}
               </p>
             )}
-            <ul className="divide-y divide-line">
+            <ul className="divide-y divide-white/[0.06]">
               {results.map((r) => (
                 <li key={r.id}>
                   <button type="button" onClick={() => onPick(r)} className="w-full flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
@@ -366,7 +366,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
             )}
             {shownOnline.length > 0 && (
               <>
-                <ul className="divide-y divide-line">
+                <ul className="divide-y divide-white/[0.06]">
                   {shownOnline.map((r) => (
                     <li key={r.source_ref}>
                       <button type="button" disabled={picking} onClick={() => pickOnline(r)} className="w-full flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
@@ -408,7 +408,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
               <>
                 {listErr && <p className="text-sm py-2" role="alert">{listErr}</p>}
                 {recent && recent.length === 0 && !listErr && <p className="text-chalkdim text-sm py-2">{t('nutrition.emptyRecent')}</p>}
-                <ul className="divide-y divide-line">
+                <ul className="divide-y divide-white/[0.06]">
                   {(recent || []).map((r) => (
                     <li key={r.id} className="flex items-center gap-3 py-2.5">
                       <div className="min-w-0 flex-1">
@@ -425,7 +425,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
               <>
                 {listErr && <p className="text-sm py-2" role="alert">{listErr}</p>}
                 {favs && favs.length === 0 && !listErr && <p className="text-chalkdim text-sm py-2">{t('nutrition.emptyFavorites')}</p>}
-                <ul className="divide-y divide-line">
+                <ul className="divide-y divide-white/[0.06]">
                   {(favs || []).map((r) => (
                     <li key={r.id}>
                       <button type="button" onClick={() => onPick(r)} className="w-full flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
@@ -443,7 +443,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
             {tab === 'meals' && (
               <>
                 {meals && meals.length === 0 && <p className="text-chalkdim text-sm py-2">{t('nutrition.emptyMeals')}</p>}
-                <ul className="divide-y divide-line">
+                <ul className="divide-y divide-white/[0.06]">
                   {(meals || []).map((m) => {
                     const tot = sumLogs(m.items || [])
                     const n = (m.items || []).length

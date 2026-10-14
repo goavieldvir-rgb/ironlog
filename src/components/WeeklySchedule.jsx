@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
-import { Play, Pencil, CalendarDays, Check } from 'lucide-react'
+import { Play, CalendarDays, Check } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { setScheduleDay } from '../lib/db.js'
 import { sessionTitle } from '../lib/names.js'
-import { Card, Button, Field } from './ui.jsx'
+import { Button, Field } from './ui.jsx'
 import { toLocalISODate } from '../lib/dates.js'
 import { InfoTip } from './InfoTip.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
@@ -19,7 +19,7 @@ const SLOT_LABEL_KEYS = ['slotMobility', 'slotStrength', 'slotCardio']
 
 // `schedule` is loaded by Dashboard (it also drives the "Start today's
 // workout" button), so both always agree and an edit here refreshes both.
-export default function WeeklySchedule({ effectiveUid, routines, routinesLoading = false, sessions = [], schedule, scheduleLoading = false, refreshSchedule }) {
+export default function WeeklySchedule({ effectiveUid, routines, routinesLoading = false, sessions = [], schedule, scheduleLoading = false, refreshSchedule, openRequest = null }) {
   const { t } = useLanguage()
   const { toast, confirm } = useFeedback()
   const navigate = useNavigate()
@@ -68,6 +68,12 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
     return sessions.filter((s) => s.date === weekDates[dow])
   }
   useScrollLock(openDay != null)
+
+  // The home screen can ask for a day's panel (the rest-day card's link).
+  useEffect(() => {
+    if (openRequest) openDayPanel(openRequest.day)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRequest])
 
   // Every routine actually assigned to a day, across all 3 slots, in
   // slot order — filters out empty slots entirely, so an empty slot 1
@@ -159,49 +165,47 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
   const isTodayOpen = openDay === today
 
   return (
-    <Card className="flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-2 mb-1">
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
         <h2 className="eyebrow inline-flex items-center gap-1">
           {t('dashboard.weeklySchedule')} <InfoTip text={t('dashboard.weeklyScheduleTip')} />
         </h2>
         <button
           type="button"
           onClick={() => openDayPanel(today, 'edit')}
-          className="hit text-chalkdim text-xs hover:text-brass inline-flex items-center gap-1"
+          className="hit text-chalkdim text-[13px] hover:text-chalk px-1"
         >
-          <Pencil size={12} /> {t('dashboard.editWeek')}
+          {t('dashboard.editWeek')}
         </button>
       </div>
 
-      {DAYS.map((dow) => {
-        const dr = routinesForDay(dow)
-        const isToday = dow === today
-        return (
-          <button
-            key={dow}
-            type="button"
-            onClick={() => openDayPanel(dow)}
-            className={`press-row flex items-center justify-between gap-2 rounded-md px-3 py-2.5 min-h-[44px] text-start transition-colors ${
-              isToday ? 'bg-ironsoft border border-iron/40' : 'hover:bg-surface2 border border-transparent'
-            }`}
-          >
-            <span className={`text-sm inline-flex items-center gap-1.5 shrink-0 ${isToday ? 'text-chalk' : 'text-chalkdim'}`}>
-              {t(`dashboard.day${dow}`)}
-              {isToday && <span className="eyebrow text-irontext">{t('dashboard.today')}</span>}
-            </span>
-            <span className="flex items-center gap-1.5 min-w-0 max-w-[60%]">
-              {loggedOnDay(dow).length > 0 && <Check size={14} className="text-good shrink-0" />}
-              {planLoading ? (
-                <span className="h-3 w-24 rounded bg-surface2 animate-pulse" aria-hidden="true" />
-              ) : (
-                <span className={`text-sm truncate ${dr.length > 0 ? 'text-chalk' : 'text-chalkdim italic'}`}>
-                  {dr.length > 0 ? dr.map((r) => r.name).join(' + ') : t('dashboard.restDay')}
-                </span>
-              )}
-            </span>
-          </button>
-        )
-      })}
+      <div className="grid grid-cols-7 gap-1">
+        {DAYS.map((dow) => {
+          const isToday = dow === today
+          const logged = loggedOnDay(dow).length > 0
+          const dateNum = Number(weekDates[dow].slice(8))
+          return (
+            <button
+              key={dow}
+              type="button"
+              onClick={() => openDayPanel(dow)}
+              aria-label={`${t(`dashboard.day${dow}`)} ${dateNum}${logged ? ` · ${t('dashboard.alreadyLogged')}` : ''}`}
+              aria-current={isToday ? 'date' : undefined}
+              className="press flex flex-col items-center gap-2 min-h-11 py-1"
+            >
+              <span className="text-xs leading-4 text-chalkdim/70">{t(`dashboard.dayShort${dow}`).charAt(0)}</span>
+              <span
+                className={`w-9 h-9 rounded-full flex items-center justify-center text-[15px] tabular-nums ${
+                  isToday ? 'bg-chalk text-ink font-semibold' : logged ? 'bg-surface2 text-chalk font-medium' : 'text-chalkdim/70 font-medium'
+                }`}
+              >
+                {dateNum}
+              </span>
+              <span className={`w-1 h-1 rounded-full ${logged ? 'bg-accent' : 'bg-transparent'}`} aria-hidden="true" />
+            </button>
+          )
+        })}
+      </div>
 
       {/* Rendered at the top level of the page so nothing it sits inside
           (a card, a pressed row) can shift or clip the panel. */}
@@ -211,15 +215,15 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
             <div className="flex items-center justify-between gap-2 mb-4">
               <h2 className="text-xl inline-flex items-center gap-2">
                 {t(`dashboard.day${openDay}`)}
-                {isTodayOpen && <span className="eyebrow text-irontext">{t('dashboard.today')}</span>}
+                {isTodayOpen && <span className="eyebrow">{t('dashboard.today')}</span>}
               </h2>
               {mode === 'view' && (
                 <button
                   type="button"
                   onClick={() => setMode('edit')}
-                  className="hit text-chalkdim text-xs hover:text-brass inline-flex items-center gap-1 shrink-0"
+                  className="hit text-chalkdim text-xs hover:text-chalk inline-flex items-center gap-1 shrink-0"
                 >
-                  <Pencil size={12} /> {t('dashboard.editDay')}
+                  {t('dashboard.editDay')}
                 </button>
               )}
             </div>
@@ -246,16 +250,16 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
                 )}
 
                 {loggedOnDay(openDay).length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-line flex flex-col gap-1.5">
-                    <p className="eyebrow text-good">{t('dashboard.alreadyLogged')}</p>
+                  <div className="mt-4 pt-4 border-t border-white/[0.06] flex flex-col gap-1.5">
+                    <p className="eyebrow">{t('dashboard.alreadyLogged')}</p>
                     {loggedOnDay(openDay).map((s) => (
                       <Link
                         key={s.id}
                         to={`/history/${s.id}`}
                         onClick={close}
-                        className="text-sm text-chalk hover:text-brass truncate inline-flex items-center gap-1.5"
+                        className="text-sm text-chalk hover:text-chalkdim truncate inline-flex items-center gap-1.5"
                       >
-                        <Check size={14} className="text-good shrink-0" />
+                        <Check size={14} className="text-chalkdim shrink-0" />
                         {sessionTitle(s, t)}
                       </Link>
                     ))}
@@ -266,7 +270,7 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
                     can train anything today without touching the plan,
                     which stays as it is for next week. */}
                 {isTodayOpen && (
-                  <div className="mt-4 pt-4 border-t border-line">
+                  <div className="mt-4 pt-4 border-t border-white/[0.06]">
                     {showOther ? (
                       <div className="flex flex-col gap-2">
                         <p className="text-chalkdim text-xs">{t('dashboard.startAnythingHint')}</p>
@@ -276,10 +280,10 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
                             key={r.id}
                             type="button"
                             onClick={() => startRoutine(r.id)}
-                            className="press-row w-full text-start rounded-md bg-surface2 hover:bg-line px-3 py-2.5 text-sm flex items-center justify-between gap-2"
+                            className="press-row w-full text-start rounded-[10px] bg-surface2 hover:bg-surface2/70 px-3 py-2.5 text-sm flex items-center justify-between gap-2"
                           >
                             <span className="truncate">{r.name}</span>
-                            <Play size={14} className="shrink-0 text-brass" />
+                            <Play size={14} className="shrink-0 text-chalkdim" />
                           </button>
                         ))}
                       </div>
@@ -287,7 +291,7 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
                       <button
                         type="button"
                         onClick={() => setShowOther(true)}
-                        className="text-brass text-sm hover:underline inline-flex items-center gap-1"
+                        className="press text-chalk text-sm min-h-11 inline-flex items-center gap-1.5"
                       >
                         <CalendarDays size={14} />
                         {dayRoutines.length > 0 ? t('dashboard.startSomethingElse') : t('dashboard.trainAnyway')}
@@ -312,8 +316,8 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
                       key={dow}
                       type="button"
                       onClick={() => switchDay(dow)}
-                      className={`press min-h-11 rounded text-xs ${
-                        dow === openDay ? 'bg-brass text-ink' : 'bg-surface2 text-chalkdim hover:text-chalk'
+                      className={`press min-h-11 rounded-[10px] text-xs ${
+                        dow === openDay ? 'bg-chalk text-ink font-semibold' : 'bg-surface2 text-chalkdim hover:text-chalk'
                       }`}
                     >
                       {t(`dashboard.dayShort${dow}`)}
@@ -356,6 +360,6 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
         </div>,
         document.body,
       )}
-    </Card>
+    </div>
   )
 }

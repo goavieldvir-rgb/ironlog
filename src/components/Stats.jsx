@@ -1,14 +1,13 @@
 import React, { useMemo, useState } from 'react'
-import { Flame, TrendingUp, Trophy, BarChart3, Heart } from 'lucide-react'
 import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  Cell,
   LineChart,
   Line,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
 } from 'recharts'
 import { useAdmin } from '../context/AdminContext.jsx'
@@ -18,13 +17,14 @@ import { useCollection } from '../lib/db.js'
 import { entryName, exerciseMap } from '../lib/names.js'
 import { toLocalISODate, fmtDate, dateLocale, weekStartOf } from '../lib/dates.js'
 import { disambiguateLabels } from '../lib/disambiguate.js'
-import { Card, EmptyState, LoadError, Field } from './ui.jsx'
+import { EmptyState, LoadError, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { workingSets } from '../lib/warmup.js'
 import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
 import { cardioSummary, formatPace, formatSpeed, formatDistance, toKm } from '../lib/cardio.js'
+import { ACCENT, CHALK, CHALKDIM, MUTED, GRID, SURFACE } from '../theme.js'
 
-const COLORS = { iron: '#D64545', brass: '#C9A24B', cardio: '#4C8CC9', chalk: '#EDEDE6', chalkdim: '#9CA0AA', grid: '#31353E' }
+const COLORS = { iron: ACCENT, brass: ACCENT, cardio: MUTED, chalk: CHALK, chalkdim: CHALKDIM, grid: GRID }
 
 
 function shortDate(lang, iso) {
@@ -245,12 +245,20 @@ export default function Stats() {
   const loadFailed = !!loadError && rawSessions.length === 0
   const hasData = !loading && sessions.length > 0
 
+  const nf = (n) => n.toLocaleString(dateLocale(lang))
+  const current = weeklyData[weeklyData.length - 1]
+  const headline = streak === 0 ? t('stats.streakNone') : streak === 1 ? t('stats.streakOne') : t('stats.streakMany', { n: streak })
+  const supportParts = [
+    sessions.length === 1 ? t('stats.partSessionsOne') : t('stats.partSessions', { n: nf(sessions.length) }),
+    t('stats.partVolume', { n: nf(totalVolume) }),
+    records.length === 1 ? t('stats.partRecordsOne') : t('stats.partRecords', { n: records.length }),
+  ]
+  if (hasCardio) supportParts.push(t('stats.partCardioMin', { n: nf(totalCardioMinutes) }))
+  if (totalCardioKm > 0) supportParts.push(t('stats.partCardioKm', { n: formatDistance(totalCardioKm) }))
+
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <div className="eyebrow mb-1">{t('stats.insights')}</div>
-        <h1 className="text-3xl">{t('stats.title')}</h1>
-      </div>
+    <div className="flex flex-col gap-6 pb-[120px]">
+      <h1 className="text-[30px] leading-9">{t('stats.title')}</h1>
 
       {!loading && loadFailed && <LoadError onRetry={refreshSessions} />}
 
@@ -263,98 +271,53 @@ export default function Stats() {
 
       {hasData && (
         <>
-          <div className={`grid grid-cols-2 ${totalCardioKm > 0 ? 'sm:grid-cols-6' : hasCardio ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3`}>
-            <Stat icon={Flame} label={t('stats.weekStreak')} value={streak} />
-            <Stat icon={BarChart3} label={t('stats.sessionsLogged')} value={sessions.length} />
-            <Stat icon={TrendingUp} label={t('stats.totalVolume')} value={totalVolume.toLocaleString(dateLocale(lang))} />
-            {hasCardio && <Stat icon={Heart} label={t('stats.cardioMinutes')} value={totalCardioMinutes.toLocaleString(dateLocale(lang))} />}
-            {totalCardioKm > 0 && <Stat icon={Heart} label={t('stats.cardioDistance')} value={formatDistance(totalCardioKm)} />}
-            <Stat icon={Trophy} label={t('stats.personalRecords')} value={records.length} />
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[26px] leading-8 font-semibold tracking-[-0.015em] tabular-nums">{headline}</p>
+            <p className="text-[15px] leading-[21px] text-chalkdim tabular-nums">{supportParts.join(' · ')}</p>
           </div>
 
-          <Card>
-            <h2 className="eyebrow mb-4">{t('stats.sessionsPerWeek')}</h2>
-            <div dir="ltr">
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={weeklyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
-                  <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke={COLORS.chalkdim} fontSize={12} allowDecimals={false} tickLine={false} axisLine={false} width={28} />
-                  <Tooltip
-                    contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
-                    labelStyle={{ color: COLORS.chalk }}
-                  />
-                  <Bar dataKey="sessions" fill={COLORS.iron} radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
+          <WeeklyChart
+            title={t('stats.sessionsPerWeek')}
+            caption={t('stats.thisWeekValue', { value: nf(current.sessions) })}
+            data={weeklyData}
+            dataKey="sessions"
+            yWidth={28}
+            allowDecimals={false}
+          />
 
-          <Card>
-            <h2 className="eyebrow mb-4">{t('stats.volumePerWeek')}</h2>
-            <div dir="ltr">
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={weeklyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
-                  <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} width={40} />
-                  <Tooltip
-                    contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
-                    labelStyle={{ color: COLORS.chalk }}
-                  />
-                  <Bar dataKey="volume" fill={COLORS.brass} radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <p className="text-chalkdim text-xs mt-2">
-              {t('stats.volumeNote')}
-            </p>
-          </Card>
+          <WeeklyChart
+            title={t('stats.volumePerWeek')}
+            caption={t('stats.thisWeekValue', { value: nf(current.volume) })}
+            data={weeklyData}
+            dataKey="volume"
+            yWidth={44}
+            note={t('stats.volumeNote')}
+          />
 
           {hasCardio && (
-            <Card>
-              <h2 className="eyebrow mb-4">{t('stats.cardioPerWeek')}</h2>
-              <div dir="ltr">
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={weeklyData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
-                    <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} width={32} />
-                    <Tooltip
-                      contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
-                      labelStyle={{ color: COLORS.chalk }}
-                      formatter={(value) => [`${value} min`, t('stats.cardioTooltipLabel')]}
-                    />
-                    <Bar dataKey="cardioMinutes" fill={COLORS.cardio} radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
+            <WeeklyChart
+              title={t('stats.cardioPerWeek')}
+              caption={t('stats.thisWeekValue', { value: `${nf(current.cardioMinutes)} ${t('sessionCard.minUnit')}` })}
+              data={weeklyData}
+              dataKey="cardioMinutes"
+              yWidth={36}
+              tooltipFormatter={(value) => [`${value} min`, t('stats.cardioTooltipLabel')]}
+            />
           )}
 
           {totalCardioKm > 0 && (
-            <Card>
-              <h2 className="eyebrow mb-4">{t('stats.cardioDistancePerWeek')}</h2>
-              <div dir="ltr">
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={weeklyData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
-                    <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} width={32} />
-                    <Tooltip
-                      contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
-                      labelStyle={{ color: COLORS.chalk }}
-                      formatter={(value) => [`${value} km`, t('stats.cardioTooltipLabel')]}
-                    />
-                    <Bar dataKey="cardioKm" fill={COLORS.cardio} radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
+            <WeeklyChart
+              title={t('stats.cardioDistancePerWeek')}
+              caption={t('stats.thisWeekValue', { value: `${formatDistance(current.cardioKm)} km` })}
+              data={weeklyData}
+              dataKey="cardioKm"
+              yWidth={36}
+              tooltipFormatter={(value) => [`${value} km`, t('stats.cardioTooltipLabel')]}
+            />
           )}
 
-          <Card className="flex flex-col gap-3">
-            <h2 className="eyebrow flex items-center gap-1.5 flex-wrap">
+          <section className="bg-surface rounded-[22px] p-[18px] flex flex-col gap-3">
+            <h2 className="text-[15px] leading-5 flex items-center gap-1.5 flex-wrap">
               {t('stats.progressByExercise')}
               <InfoTip text={t('stats.progressTip')} />
             </h2>
@@ -376,7 +339,7 @@ export default function Stats() {
                     type="button"
                     onClick={() => setCardioMetric(k)}
                     aria-pressed={metric === k}
-                    className={`min-h-[44px] px-3 rounded-md border text-sm ${metric === k ? 'border-brass text-brass bg-brasssoft' : 'border-line text-chalkdim hover:text-chalk'}`}
+                    className={`min-h-[44px] px-4 rounded-full text-sm font-medium transition-colors duration-200 ${metric === k ? 'bg-[#2A2A2E] text-chalk' : 'bg-surface2 text-chalkdim'}`}
                   >
                     {metricLabel[k]}
                   </button>
@@ -388,14 +351,11 @@ export default function Stats() {
               <div dir="ltr">
                 <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={selectedProgress.points}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
-                    <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="label" {...AXIS} />
                     <YAxis
-                      stroke={COLORS.chalkdim}
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
+                      {...AXIS}
                       width={36}
+                      tickCount={4}
                       reversed={isCardioSel && metric === 'pace'}
                       tickFormatter={isCardioSel && metric === 'pace' ? formatPace : undefined}
                       domain={
@@ -411,8 +371,8 @@ export default function Stats() {
                       }
                     />
                     <Tooltip
-                      contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
-                      labelStyle={{ color: COLORS.chalk }}
+                      {...TOOLTIP}
+                      cursor={{ stroke: GRID }}
                       formatter={(value) => {
                         if (isCardioSel) {
                           if (metric === 'distance') return [`${formatDistance(value)} ${distUnit}`, metricLabel.distance]
@@ -430,9 +390,16 @@ export default function Stats() {
                       type="monotone"
                       connectNulls
                       dataKey={isCardioSel ? metric : selectedProgress.bodyweight ? 'reps' : 'weight'}
-                      stroke={selectedProgress.category === 'cardio' ? COLORS.cardio : COLORS.iron}
-                      strokeWidth={2.5}
-                      dot={{ fill: selectedProgress.category === 'cardio' ? COLORS.cardio : COLORS.iron, r: 3 }}
+                      stroke={COLORS.chalkdim}
+                      strokeWidth={2}
+                      dot={(p) =>
+                        p.index === selectedProgress.points.length - 1 ? (
+                          <circle key={p.key} cx={p.cx} cy={p.cy} r={5} fill={ACCENT} />
+                        ) : (
+                          <circle key={p.key} cx={p.cx} cy={p.cy} r={2.5} fill={COLORS.chalkdim} />
+                        )
+                      }
+                      activeDot={{ r: 5, fill: COLORS.chalk }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -448,36 +415,36 @@ export default function Stats() {
                 {selectedProgress.timed ? t('stats.timedTrackingNote') : t('stats.bodyweightTrackingNote')}
               </p>
             )}
-          </Card>
+          </section>
 
-          <Card className="flex flex-col gap-2">
-            <h2 className="eyebrow mb-1 flex items-center gap-1.5 flex-wrap">
+          <section className="flex flex-col gap-2.5">
+            <h2 className="text-[17px] leading-[22px] flex items-center gap-1.5 flex-wrap">
               {t('stats.personalRecords')}
               <InfoTip text={t('stats.recordsTip')} />
             </h2>
             {records.length === 0 ? (
               <p className="text-chalkdim text-sm">{t('stats.noCompletedSets')}</p>
             ) : (
-              <div className="flex flex-col divide-y divide-line">
+              <div className="flex flex-col">
                 {records.map((r, i) => (
-                  <div key={r.id} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 py-2.5">
-                    <p className="truncate min-w-0">{recordLabels[i]}</p>
-                    <div className="text-end shrink-0">
-                      <p className="num text-chalk">
-                        {r.category === 'cardio'
-                          ? `${r.duration} ${t('sessionCard.minUnit')} · ${r.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe')} ${r.intensity}${
-                              r.distance != null ? ` · ${r.distance}${r.unit}` : ''
-                            }`
-                          : r.timed
-                            ? `${r.weight > 0 ? `+${r.weight}${r.unit} · ` : ''}${formatSeconds(r.reps)}`
+                  <div key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 min-h-[58px] py-2.5 border-b border-white/[0.07] last:border-b-0">
+                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                      <p className="text-[15px] leading-5 font-medium truncate">{recordLabels[i]}</p>
+                      <p className="text-chalkdim text-[13px] leading-[18px]">{shortDate(lang, r.date)}</p>
+                    </div>
+                    <p className="num text-base font-semibold text-end shrink-0">
+                      {r.category === 'cardio'
+                        ? `${r.duration} ${t('sessionCard.minUnit')} · ${r.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe')} ${r.intensity}${
+                            r.distance != null ? ` · ${r.distance}${r.unit}` : ''
+                          }`
+                        : r.timed
+                          ? `${r.weight > 0 ? `+${r.weight}${r.unit} · ` : ''}${formatSeconds(r.reps)}`
                           : r.bodyweight
                             ? `${r.weight > 0 ? `+${r.weight}${r.unit} ` : ''}${t('sessionCard.bwShort')} × ${r.reps}`
                             : `${r.weight}${r.unit} × ${r.reps}`}
-                      </p>
-                      <p className="text-chalkdim text-xs">{shortDate(lang, r.date)}</p>
-                    </div>
+                    </p>
                     {r.category === 'cardio' && (r.farthest != null || r.bestPace != null) && (
-                      <p className="num text-chalkdim text-xs basis-full">
+                      <p className="num text-chalkdim text-[13px] basis-full">
                         {r.farthest != null && (
                           <>
                             {t('stats.farthest')} <bdi dir="ltr">{formatDistance(r.farthest)}{r.unit === 'mi' ? 'mi' : 'km'}</bdi>
@@ -495,19 +462,52 @@ export default function Stats() {
                 ))}
               </div>
             )}
-          </Card>
+          </section>
         </>
       )}
     </div>
   )
 }
 
-function Stat({ icon: Icon, label, value }) {
+// Shared look for every chart axis: tabular chalkdim numbers, no ticks, no
+// axis lines and no gridlines.
+const AXIS = {
+  stroke: CHALKDIM,
+  tick: { fill: CHALKDIM, fontSize: 12 },
+  tickLine: false,
+  axisLine: false,
+  tickMargin: 8,
+}
+const TOOLTIP = {
+  contentStyle: { background: '#1E1E21', border: 0, borderRadius: 12, fontSize: 13 },
+  labelStyle: { color: CHALK },
+  itemStyle: { color: CHALK },
+}
+
+// One neutral bar per week; the current week carries the accent.
+function WeeklyChart({ title, caption, data, dataKey, yWidth, allowDecimals = true, note, tooltipFormatter }) {
+  const last = data.length - 1
   return (
-    <Card className="flex flex-col items-center justify-center py-5 gap-1.5 text-center">
-      <Icon size={18} className="text-brass" />
-      <span className="num text-3xl text-chalk leading-none">{value}</span>
-      <span className="text-chalkdim text-xs">{label}</span>
-    </Card>
+    <section className="bg-surface rounded-[22px] pt-[18px] px-[18px] pb-3.5 flex flex-col gap-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-[15px] leading-5">{title}</h2>
+        <span className="text-[13px] text-chalkdim tabular-nums shrink-0">{caption}</span>
+      </div>
+      <div dir="ltr">
+        <ResponsiveContainer width="100%" height={150}>
+          <BarChart data={data} margin={{ left: 0, right: 0, top: 4, bottom: 0 }} barCategoryGap="22%">
+            <XAxis dataKey="label" {...AXIS} ticks={[data[0].label, data[last].label]} interval={0} padding={{ left: 0, right: 0 }} />
+            <YAxis {...AXIS} allowDecimals={allowDecimals} tickCount={3} width={yWidth} />
+            <Tooltip {...TOOLTIP} cursor={{ fill: 'rgba(255,255,255,0.04)' }} formatter={tooltipFormatter} />
+            <Bar dataKey={dataKey} radius={[6, 6, 2, 2]} minPointSize={2}>
+              {data.map((d, i) => (
+                <Cell key={d.week} fill={i === last ? ACCENT : MUTED} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      {note && <p className="text-chalkdim text-xs">{note}</p>}
+    </section>
   )
 }
