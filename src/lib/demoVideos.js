@@ -236,6 +236,19 @@ const ALIASES = {
   'barbell curls': 'barbell_curl',
   'concentration curl': 'concentration_curl',
   'concentration curls': 'concentration_curl',
+  // Shared-library names that reuse a close variant's clip.
+  'hip adduction machine': 'adductor_machine',
+  'lying leg curl': 'leg_curl',
+  'cable crossover': 'cable_fly',
+  'dumbbell shoulder press': 'seated_dumbbell_shoulder_press',
+  'wide grip pull up': 'pull_up',
+  'neutral grip pull up': 'pull_up',
+  'chin up': 'pull_up',
+  'chin ups': 'pull_up',
+  'iso lateral row machine': 'machine_single_arm_row',
+  'stiff leg deadlift': 'romanian_deadlift',
+  'standing calf raise machine': 'calf_raise',
+  'jogging': 'treadmill',
 }
 
 // The demo entry for an exercise name, or null when there's no alias or no
