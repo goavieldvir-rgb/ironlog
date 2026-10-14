@@ -23,8 +23,9 @@ import { InfoTip } from './InfoTip.jsx'
 import { workingSets } from '../lib/warmup.js'
 import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
 import { cardioSummary, formatPace, formatSpeed, formatDistance, toKm } from '../lib/cardio.js'
+import { ACCENT, CHALK, CHALKDIM, MUTED, GRID, SURFACE } from '../theme.js'
 
-const COLORS = { iron: '#D64545', brass: '#C9A24B', cardio: '#4C8CC9', chalk: '#EDEDE6', chalkdim: '#9CA0AA', grid: '#31353E' }
+const COLORS = { iron: ACCENT, brass: ACCENT, cardio: MUTED, chalk: CHALK, chalkdim: CHALKDIM, grid: GRID }
 
 
 function shortDate(lang, iso) {
@@ -281,7 +282,7 @@ export default function Stats() {
                   <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis stroke={COLORS.chalkdim} fontSize={12} allowDecimals={false} tickLine={false} axisLine={false} width={28} />
                   <Tooltip
-                    contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
+                    contentStyle={{ background: SURFACE, border: 0, borderRadius: 12, fontSize: 13 }}
                     labelStyle={{ color: COLORS.chalk }}
                   />
                   <Bar dataKey="sessions" fill={COLORS.iron} radius={[4, 4, 0, 0]} />
@@ -299,7 +300,7 @@ export default function Stats() {
                   <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} width={40} />
                   <Tooltip
-                    contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
+                    contentStyle={{ background: SURFACE, border: 0, borderRadius: 12, fontSize: 13 }}
                     labelStyle={{ color: COLORS.chalk }}
                   />
                   <Bar dataKey="volume" fill={COLORS.brass} radius={[4, 4, 0, 0]} />
@@ -321,7 +322,7 @@ export default function Stats() {
                     <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
                     <YAxis stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} width={32} />
                     <Tooltip
-                      contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
+                      contentStyle={{ background: SURFACE, border: 0, borderRadius: 12, fontSize: 13 }}
                       labelStyle={{ color: COLORS.chalk }}
                       formatter={(value) => [`${value} min`, t('stats.cardioTooltipLabel')]}
                     />
@@ -342,7 +343,7 @@ export default function Stats() {
                     <XAxis dataKey="label" stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} />
                     <YAxis stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} width={32} />
                     <Tooltip
-                      contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
+                      contentStyle={{ background: SURFACE, border: 0, borderRadius: 12, fontSize: 13 }}
                       labelStyle={{ color: COLORS.chalk }}
                       formatter={(value) => [`${value} km`, t('stats.cardioTooltipLabel')]}
                     />
@@ -411,7 +412,7 @@ export default function Stats() {
                       }
                     />
                     <Tooltip
-                      contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
+                      contentStyle={{ background: SURFACE, border: 0, borderRadius: 12, fontSize: 13 }}
                       labelStyle={{ color: COLORS.chalk }}
                       formatter={(value) => {
                         if (isCardioSel) {

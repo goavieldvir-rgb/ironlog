@@ -7,11 +7,12 @@ import { getLogTotalsRange, kcalOnTarget, periodRange, periodStats, shiftDay, sh
 import { getWaterGoal, getWaterLogs, litres } from '../../lib/water.js'
 import { LoadError } from '../ui.jsx'
 import { Backward, Forward, N, SheetHeader, ToneLabel, Track } from './parts.jsx'
+import { ACCENT, CHALK, CHALKDIM, MUTED, GRID, SURFACE } from '../../theme.js'
 
 // Week and month averages against the targets, as a view in the diary's
 // sheet. Only finished days count (see nutritionStats.js).
 
-const COLORS = { protein: '#D64545', kcal: '#C9A24B', good: '#4CAF7D', chalkdim: '#9CA0AA', grid: '#31353E' }
+const COLORS = { protein: ACCENT, kcal: MUTED, good: '#4CAF7D', chalkdim: CHALKDIM, grid: GRID }
 
 export default function Trends({ uid, today, targets, onBack, onClose }) {
   const { t, lang } = useLanguage()
@@ -264,7 +265,7 @@ function DailyChart({ stats, kind, targets, metric, setMetric }) {
             <YAxis stroke={COLORS.chalkdim} fontSize={12} tickLine={false} axisLine={false} width={40} />
             <Tooltip
               cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-              contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
+              contentStyle={{ background: SURFACE, border: 0, borderRadius: 12, fontSize: 13 }}
               labelStyle={{ color: '#EDEDE6' }}
               formatter={(v) => [`${v} ${unit}`, metric === 'kcal' ? t('nutrition.calories') : t('nutrition.protein')]}
             />

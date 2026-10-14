@@ -21,8 +21,9 @@ import {
 } from '../lib/db.js'
 import { Button, Card, EmptyState, LoadError, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
+import { ACCENT, CHALK, CHALKDIM, MUTED, GRID, SURFACE } from '../theme.js'
 
-const COLORS = { iron: '#D64545', chalk: '#EDEDE6', chalkdim: '#9CA0AA', grid: '#31353E' }
+const COLORS = { iron: ACCENT, chalk: CHALK, chalkdim: CHALKDIM, grid: GRID }
 
 // If someone logs a few entries in kg and later switches to lb (or vice
 // versa) — easy to do by accident since the unit is just a dropdown on
@@ -146,7 +147,7 @@ export default function BodyWeight() {
                   domain={['dataMin - 2', 'dataMax + 2']}
                 />
                 <Tooltip
-                  contentStyle={{ background: '#1C1F26', border: '1px solid #31353E', borderRadius: 8, fontSize: 13 }}
+                  contentStyle={{ background: SURFACE, border: 0, borderRadius: 12, fontSize: 13 }}
                   labelStyle={{ color: COLORS.chalk }}
                   formatter={(value) => [`${value}${displayUnit}`, t('bodyWeight.weightTooltipLabel')]}
                 />
