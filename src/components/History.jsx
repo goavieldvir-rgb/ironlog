@@ -1,22 +1,67 @@
 import React, { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Trash2, Search, X } from 'lucide-react'
+import { Search, X, CalendarDays } from 'lucide-react'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { fmtDate } from '../lib/dates.js'
-import { useFeedback } from '../context/FeedbackContext.jsx'
-import { useCollection, deleteSession } from '../lib/db.js'
+import { fmtDate, dateLocale } from '../lib/dates.js'
+import { useCollection } from '../lib/db.js'
 import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
-import { Card, CategoryTag, EmptyState, LoadError, Button, Field } from './ui.jsx'
-import { Tabs } from './ExerciseLibrary.jsx'
+import { EmptyState, LoadError, Button, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { workingSets } from '../lib/warmup.js'
+import { cardioSummary, formatDistance, toKm } from '../lib/cardio.js'
 
-function formatDate(lang, iso) {
-  if (!iso) return ''
+function dayParts(lang, iso) {
   const d = new Date(iso + 'T00:00:00')
-  return fmtDate(lang, d, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+  // Hebrew short weekdays come back as "יום ה׳"; the block only has room for "ה׳".
+  const dow = fmtDate(lang, d, { weekday: 'short' }).replace(/^יום\s*/, '')
+  return { dow, day: d.getDate() }
+}
+
+function monthKey(iso) {
+  return iso ? iso.slice(0, 7) : ''
+}
+
+function monthLabel(lang, iso) {
+  const d = new Date(iso + 'T00:00:00')
+  const sameYear = d.getFullYear() === new Date().getFullYear()
+  return fmtDate(lang, d, sameYear ? { month: 'long' } : { month: 'long', year: 'numeric' })
+}
+
+// Sets, minutes and volume for lifting sessions; minutes and distance for
+// cardio. Each piece is left out when there is nothing to say.
+function sessionMeta(s, t, lang) {
+  const lifts = (s.entries || []).filter((e) => e.category !== 'cardio')
+  const sets = lifts.reduce((n, e) => n + workingSets(e.sets).length, 0)
+  const volume = lifts.reduce(
+    (sum, e) =>
+      e.timed
+        ? sum
+        : sum +
+          workingSets(e.sets).reduce((v, set) => {
+            const w = Number(set.weight)
+            const r = Number(set.reps)
+            return v + (isFinite(w) && isFinite(r) ? w * r : 0)
+          }, 0),
+    0,
+  )
+  const rawUnit = lifts.find((e) => e.unit)?.unit || 'kg'
+  const unit = lang === 'he' && rawUnit === 'kg' ? 'ק״ג' : rawUnit
+  const kmLabel = lang === 'he' ? 'ק״מ' : 'km'
+  let km = 0
+  for (const e of s.entries || []) {
+    if (e.category !== 'cardio') continue
+    const c = cardioSummary(e.sets)
+    if (c && c.distance != null) km += toKm(c.distance, e.unit)
+  }
+  const parts = []
+  if (sets > 0) parts.push(`${sets} ${t('history.setsLabel')}`)
+  if (s.duration_minutes) parts.push(t('workout.durationShort', { min: s.duration_minutes }))
+  if (volume > 0) parts.push(`${Math.round(volume).toLocaleString(dateLocale(lang))} ${unit}`)
+  if (km > 0) parts.push(`${formatDistance(km)} ${kmLabel}`)
+  // Each piece is isolated left-to-right so a Hebrew unit can't reorder its number.
+  return parts.map((p) => `\u2066${p}\u2069`).join(' · ')
 }
 
 // A session matches a text search if the routine name, any exercise name,
@@ -41,7 +86,6 @@ function matchesQuery(session, q, t, exById, lang) {
 export default function History() {
   const { effectiveUid } = useAdmin()
   const { t, lang } = useLanguage()
-  const { confirm, toast } = useFeedback()
   const [sessions, loading, refresh, loadError] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const loadFailed = !!loadError && sessions.length === 0
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
@@ -71,48 +115,94 @@ export default function History() {
     setTab('all')
   }
 
+  const groups = useMemo(() => {
+    const out = []
+    const sorted = [...filtered].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.created_at || '').localeCompare(a.created_at || '')))
+    for (const s of sorted) {
+      const k = monthKey(s.date)
+      let g = out[out.length - 1]
+      if (!g || g.key !== k) {
+        g = { key: k, name: monthLabel(lang, s.date), rows: [] }
+        out.push(g)
+      }
+      g.rows.push(s)
+    }
+    return out
+  }, [filtered, lang])
+
+  const filterOpts = [
+    { id: 'all', label: t('tabs.all') },
+    { id: 'strength', label: t('tabs.strength') },
+    { id: 'mobility', label: t('tabs.mobility') },
+    { id: 'cardio', label: t('tabs.cardio') },
+  ]
+
   return (
-    <div className="flex flex-col gap-5">
-      <div>
-        <div className="eyebrow mb-1">{t('history.log')}</div>
-        <h1 className="text-3xl">{t('history.title')}</h1>
+    <div className="flex flex-col gap-4 pb-[120px]">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-[30px] leading-9">{t('history.title')}</h1>
+        <button
+          type="button"
+          onClick={() => setShowDateFilter((v) => !v)}
+          aria-label={t('history.dateRange')}
+          aria-expanded={showDateFilter}
+          title={t('history.dateRange')}
+          className={`press inline-flex items-center justify-center w-11 h-11 rounded-full text-chalk transition-colors ${
+            showDateFilter || dateFrom || dateTo ? 'bg-surface2' : 'bg-surface'
+          }`}
+        >
+          <CalendarDays size={20} strokeWidth={1.75} />
+        </button>
       </div>
 
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative flex-1 min-w-[180px]">
-            <Search size={14} className="absolute start-2.5 top-1/2 -translate-y-1/2 text-chalkdim" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder={t('history.searchPlaceholder')}
-              className="w-full ps-8"
-            />
-          </div>
-          <InfoTip text={t('history.searchTip')} />
-          <Button variant="ghost" onClick={() => setShowDateFilter((v) => !v)}>
-            {t('history.dateRange')}
-          </Button>
-          {hasActiveFilters && (
-            <button onClick={clearFilters} className="text-chalkdim text-xs hover:text-chalk inline-flex items-center gap-1">
-              <X size={13} /> {t('history.clearFilters')}
-            </button>
-          )}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 min-w-0">
+          <Search size={20} strokeWidth={1.75} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-chalkdim/70 pointer-events-none" />
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={t('history.searchPlaceholder')}
+            aria-label={t('history.searchPlaceholder')}
+            className="w-full h-11 ps-11 pe-3.5 bg-surface rounded-[12px] border-0 text-[15px]"
+          />
         </div>
-
-        {showDateFilter && (
-          <div className="flex items-end gap-2 flex-wrap">
-            <Field label={t('history.from')}>
-              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-            </Field>
-            <Field label={t('history.to')}>
-              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-            </Field>
-          </div>
-        )}
-
-        <Tabs tab={tab} setTab={setTab} />
+        <InfoTip text={t('history.searchTip')} />
       </div>
+
+      {showDateFilter && (
+        <div className="flex items-end gap-2 flex-wrap">
+          <Field label={t('history.from')}>
+            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          </Field>
+          <Field label={t('history.to')}>
+            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </Field>
+        </div>
+      )}
+
+      <div role="tablist" className="grid grid-cols-4 gap-0.5 p-[3px] rounded-[12px] bg-surface">
+        {filterOpts.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === o.id}
+            onClick={() => setTab(o.id)}
+            className={`min-h-[44px] rounded-[9px] text-sm font-medium transition-colors duration-200 ${
+              tab === o.id ? 'bg-[#2A2A2E] text-chalk' : 'bg-transparent text-chalkdim'
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+
+      {hasActiveFilters && (
+        <button onClick={clearFilters} className="self-start text-chalkdim text-sm hover:text-chalk inline-flex items-center gap-1 min-h-[44px] -my-2">
+          <X size={14} /> {t('history.clearFilters')}
+        </button>
+      )}
 
       {!loading && filtered.length === 0 && sessions.length > 0 && (
         <EmptyState
@@ -140,48 +230,40 @@ export default function History() {
         />
       )}
 
-      <div className="flex flex-col gap-2">
-        {filtered.map((s) => {
-          const totalSets = (s.entries || []).reduce((n, e) => n + workingSets(e.sets).length, 0)
-          return (
-            <Link key={s.id} to={`/history/${s.id}`}>
-              <Card className="flex items-center justify-between gap-3 hover:border-brass/50 transition-colors">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap min-w-0">
-                    <h2 className="text-lg leading-tight truncate min-w-0">{sessionTitle(s, t)}</h2>
-                    <CategoryTag category={s.category} />
+      {groups.map((g) => (
+        <section key={g.key} className="flex flex-col gap-2 mt-1">
+          <div className="flex items-baseline justify-between px-1">
+            <h2 className="text-[15px] leading-5">{g.name}</h2>
+            <span className="text-[13px] text-chalkdim">
+              {g.rows.length === 1 ? t('history.sessionCountOne') : t('history.sessionCountMany', { n: g.rows.length })}
+            </span>
+          </div>
+          <div className="bg-surface rounded-[18px] overflow-hidden">
+            {g.rows.map((s, i) => {
+              const { dow, day } = dayParts(lang, s.date)
+              return (
+                <Link
+                  key={s.id}
+                  to={`/history/${s.id}`}
+                  className={`press-row flex items-center gap-3.5 min-h-[64px] ps-4 pe-3.5 py-2 text-chalk hover:bg-surface2/50 transition-colors ${
+                    i > 0 ? 'border-t border-white/[0.06]' : ''
+                  }`}
+                >
+                  <div className="w-[34px] shrink-0 flex flex-col items-center">
+                    <span className="text-[11px] leading-[14px] text-chalkdim/70">{dow}</span>
+                    <span className="text-[19px] leading-6 font-semibold tabular-nums">{day}</span>
                   </div>
-                  <p className="text-chalkdim text-xs mt-1">
-                    {formatDate(lang, s.date)} · {s.entries?.length || 0} {t('history.exercisesLabel')} · {totalSets} {t('history.setsLabel')}
-                    {s.duration_minutes ? ` · ${t('workout.durationShort', { min: s.duration_minutes })}` : ''}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    onClick={async (e) => {
-                      e.preventDefault()
-                      if (!(await confirm({ title: t('history.deleteConfirm'), body: t('feedback.cantUndo'), confirmLabel: t('common.delete'), danger: true }))) return
-                      try {
-                        await deleteSession(effectiveUid, s.id)
-                        refresh()
-                        toast(t('feedback.deleted'))
-                      } catch {
-                        toast(t('feedback.deleteFailed'), 'error')
-                      }
-                    }}
-                    title={t('common.delete')}
-                    aria-label={t('common.delete')}
-                    className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-ironsoft text-chalkdim hover:text-irontext"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                  <ForwardChevron size={18} className="text-chalkdim" />
-                </div>
-              </Card>
-            </Link>
-          )
-        })}
-      </div>
+                  <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                    <span className="text-[15px] leading-5 font-medium truncate">{sessionTitle(s, t)}</span>
+                    <span className="text-[13px] leading-[18px] text-chalkdim truncate tabular-nums">{sessionMeta(s, t, lang)}</span>
+                  </div>
+                  <ForwardChevron size={16} strokeWidth={2} className="text-[#5E5E64] shrink-0" />
+                </Link>
+              )
+            })}
+          </div>
+        </section>
+      ))}
     </div>
   )
 }
