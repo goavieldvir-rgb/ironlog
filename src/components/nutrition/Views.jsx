@@ -123,7 +123,7 @@ export function EditLog({ row, onBack, onClose, onSave, onDelete }) {
           </div>
         )}
       </div>
-      <div className="p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] border-t border-line shrink-0 flex gap-2">
+      <div className="p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] shrink-0 flex gap-2">
         <Button variant="danger" onClick={() => onDelete(row.id)} aria-label={t('nutrition.delete')} className="min-h-[52px] px-4">
           <Trash2 size={18} /> {t('nutrition.delete')}
         </Button>
@@ -188,7 +188,7 @@ export function TargetsView({ targets, onBack, onClose, onSave }) {
             </p>
           )}
         </div>
-        <div className="p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] border-t border-line shrink-0">
+        <div className="p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] shrink-0">
           <Button type="submit" variant="brass" className="w-full min-h-[52px] text-base" disabled={busy}>
             <Check size={20} /> {t('nutrition.save')}
           </Button>
@@ -225,7 +225,7 @@ export function SaveMealView({ defaultName, count, onBack, onClose, onSave }) {
           </label>
           <p className="text-chalkdim text-sm">{count === 1 ? t('nutrition.itemsOne') : t('nutrition.itemsMany', { n: count })}</p>
         </div>
-        <div className="p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] border-t border-line shrink-0">
+        <div className="p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] shrink-0">
           <Button type="submit" variant="brass" className="w-full min-h-[52px] text-base" disabled={!name.trim() || busy}>
             <Check size={20} /> {t('nutrition.save')}
           </Button>
@@ -284,7 +284,7 @@ export function MyMealsView({ uid, date, meal, setMeal, onBack, onClose, onLog }
                 <h3 className="text-xl leading-tight"><bdi>{m.name}</bdi></h3>
                 <p className="text-chalkdim text-xs mt-0.5">{items.length === 1 ? t('nutrition.itemsOne') : t('nutrition.itemsMany', { n: items.length })}</p>
               </div>
-              <ul className="divide-y divide-line border-t border-line">
+              <ul className="divide-y divide-white/[0.06]">
                 {items.map((it, i) => (
                   <li key={i} className="flex items-center justify-between gap-3 px-4 py-2.5">
                     <div className="min-w-0">
@@ -298,7 +298,7 @@ export function MyMealsView({ uid, date, meal, setMeal, onBack, onClose, onLog }
                   </li>
                 ))}
               </ul>
-              <dl className="grid grid-cols-4 border-t border-line bg-ink divide-x divide-line rtl:divide-x-reverse text-center">
+              <dl className="grid grid-cols-4 bg-surface2 divide-x divide-white/[0.06] rtl:divide-x-reverse text-center">
                 {[
                   [t('nutrition.protein'), tot.protein],
                   [t('nutrition.calories'), tot.kcal, 0],

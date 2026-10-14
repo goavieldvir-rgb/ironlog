@@ -12,7 +12,7 @@ import { ACCENT, CHALK, CHALKDIM, MUTED, GRID, SURFACE } from '../../theme.js'
 // Week and month averages against the targets, as a view in the diary's
 // sheet. Only finished days count (see nutritionStats.js).
 
-const COLORS = { protein: ACCENT, kcal: MUTED, good: '#4CAF7D', chalkdim: CHALKDIM, grid: GRID }
+const COLORS = { protein: '#8A8A90', kcal: '#8A8A90', hit: ACCENT, chalkdim: CHALKDIM, grid: GRID }
 
 export default function Trends({ uid, today, targets, onBack, onClose }) {
   const { t, lang } = useLanguage()
@@ -67,7 +67,7 @@ export default function Trends({ uid, today, targets, onBack, onClose }) {
     <>
       <SheetHeader title={t('nutrition.averages')} onBack={onBack} onClose={onClose} />
       <div className="flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] flex flex-col gap-4">
-        <div role="radiogroup" aria-label={t('nutrition.period')} className="grid grid-cols-2 gap-1 p-1 mt-2 rounded-lg bg-ink border border-line">
+        <div role="radiogroup" aria-label={t('nutrition.period')} className="grid grid-cols-2 gap-1 p-1 mt-2 rounded-[14px] bg-surface2">
           {['week', 'month'].map((k) => (
             <button
               key={k}
@@ -75,7 +75,7 @@ export default function Trends({ uid, today, targets, onBack, onClose }) {
               role="radio"
               aria-checked={kind === k}
               onClick={() => pickKind(k)}
-              className={`min-h-[40px] rounded-md text-sm font-medium press transition-colors ${kind === k ? 'bg-surface2 text-chalk' : 'text-chalkdim hover:text-chalk'}`}
+              className={`min-h-[40px] rounded-[11px] text-sm font-medium press transition-colors ${kind === k ? 'bg-chalk text-ink' : 'text-chalkdim hover:text-chalk'}`}
             >
               {t(k === 'week' ? 'nutrition.week' : 'nutrition.month')}
             </button>
@@ -83,7 +83,7 @@ export default function Trends({ uid, today, targets, onBack, onClose }) {
         </div>
 
         <div className="flex items-center justify-between gap-2">
-          <button type="button" onClick={() => setAnchor(shiftPeriod(kind, from, -1))} aria-label={t('nutrition.prevPeriod')} className="w-11 h-11 inline-flex items-center justify-center rounded-md hover:bg-surface2 press shrink-0">
+          <button type="button" onClick={() => setAnchor(shiftPeriod(kind, from, -1))} aria-label={t('nutrition.prevPeriod')} className="w-11 h-11 inline-flex items-center justify-center rounded-full bg-surface2 hover:bg-white/10 press shrink-0">
             <Backward size={22} />
           </button>
           <div className="text-center min-w-0">
@@ -92,7 +92,7 @@ export default function Trends({ uid, today, targets, onBack, onClose }) {
               <bdi>{rangeLabel}</bdi>
             </div>
           </div>
-          <button type="button" disabled={current} onClick={() => setAnchor(shiftPeriod(kind, from, 1))} aria-label={t('nutrition.nextPeriod')} className="w-11 h-11 inline-flex items-center justify-center rounded-md hover:bg-surface2 press shrink-0 disabled:opacity-30 disabled:pointer-events-none">
+          <button type="button" disabled={current} onClick={() => setAnchor(shiftPeriod(kind, from, 1))} aria-label={t('nutrition.nextPeriod')} className="w-11 h-11 inline-flex items-center justify-center rounded-full bg-surface2 hover:bg-white/10 press shrink-0 disabled:opacity-30 disabled:pointer-events-none">
             <Forward size={22} />
           </button>
         </div>
@@ -102,7 +102,7 @@ export default function Trends({ uid, today, targets, onBack, onClose }) {
         {stats && (
           <>
             {stats.loggedDays === 0 ? (
-              <div className="card p-4">
+              <div className="bg-surface2 rounded-[20px] p-5">
                 <p className="text-sm text-chalkdim">{t('nutrition.noFinishedDays')}</p>
               </div>
             ) : (
@@ -126,7 +126,7 @@ function Averages({ stats, targets, waterGoal }) {
   const k = t('nutrition.kcalUnit')
   const { avg } = stats
   return (
-    <div className="card p-4 flex flex-col gap-4">
+    <div className="bg-surface2 rounded-[20px] p-5 flex flex-col gap-4">
       <div className="flex items-baseline justify-between gap-2">
         <h3 className="eyebrow">{t('nutrition.dailyAverage')}</h3>
         <span className="text-chalkdim text-xs whitespace-nowrap">{t('nutrition.daysLogged', { n: stats.loggedDays, total: stats.finishedDays })}</span>
@@ -135,14 +135,14 @@ function Averages({ stats, targets, waterGoal }) {
       <AvgRow tone="protein" label={t('nutrition.protein')} value={avg.protein} target={targets?.protein} unit={g} big />
       <AvgRow tone="kcal" label={t('nutrition.calories')} value={avg.kcal} target={targets?.kcal} unit={k} />
 
-      <div className="grid grid-cols-2 gap-4 border-t border-line pt-4">
+      <div className="grid grid-cols-2 gap-4 border-t border-white/[0.06] pt-4">
         {[
           ['carbs', t('nutrition.carbs'), avg.carbs, targets?.carbs],
           ['fat', t('nutrition.fat'), avg.fat, targets?.fat],
         ].map(([tone, label, v, target]) => (
           <div key={tone}>
             <div className="flex items-baseline justify-between gap-2">
-              <ToneLabel tone={tone}>{label}</ToneLabel>
+              <ToneLabel>{label}</ToneLabel>
               <span className="text-chalkdim text-sm whitespace-nowrap">
                 <N mono className="text-chalk">{fmt(v, 0)}</N>
                 {target != null && (
@@ -173,8 +173,8 @@ function Averages({ stats, targets, waterGoal }) {
 function AvgRow({ tone, label, value, target, unit, big = false, digits = 0 }) {
   const { t } = useLanguage()
   return (
-    <div className={big ? '' : 'border-t border-line pt-4'}>
-      <ToneLabel tone={tone}>{label}</ToneLabel>
+    <div className={big ? '' : 'border-t border-white/[0.06] pt-4'}>
+      <ToneLabel>{label}</ToneLabel>
       <div className="flex items-baseline gap-2 mt-1">
         <N mono className={`${big ? 'text-3xl' : 'text-xl'} leading-none`}>{fmt(value, digits)}</N>
         <span className="text-chalkdim text-sm whitespace-nowrap">
@@ -204,18 +204,18 @@ function OnTarget({ stats, targets, waterGoal }) {
   ]
   if (stats.waterDays > 0) rows.push(['water', t('water.title'), t('nutrition.ruleWater'), waterGoal ? stats.waterHits : null, stats.waterDays])
   return (
-    <div className="card p-4 flex flex-col gap-3">
+    <div className="bg-surface2 rounded-[20px] p-5 flex flex-col gap-3">
       <h3 className="eyebrow">{t('nutrition.daysOnTarget')}</h3>
       {rows.map(([tone, label, rule, hits, total]) => (
         <div key={tone} className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <ToneLabel tone={tone} plain>
+            <ToneLabel plain>
               <span className="text-chalk text-sm">{label}</span>
             </ToneLabel>
             <p className="text-chalkdim text-xs mt-0.5">{hits == null ? t('nutrition.noTargetSet') : rule}</p>
           </div>
           {hits != null && (
-            <span className={`text-sm whitespace-nowrap shrink-0 ${hits === total ? 'text-good' : 'text-chalkdim'}`}>
+            <span className={`text-sm whitespace-nowrap shrink-0 ${hits === total ? 'text-chalk' : 'text-chalkdim'}`}>
               {t('nutrition.hitsOf', { n: hits, total })}
             </span>
           )}
@@ -239,7 +239,7 @@ function DailyChart({ stats, kind, targets, metric, setMetric }) {
   })
   const unit = metric === 'kcal' ? t('nutrition.kcalUnit') : t('nutrition.g')
   return (
-    <div className="card p-4 flex flex-col gap-3">
+    <div className="bg-surface2 rounded-[20px] p-5 flex flex-col gap-3">
       <h3 className="eyebrow">{t('nutrition.perDay')}</h3>
       <div className="flex gap-1.5" role="group" aria-label={t('nutrition.chartShows')}>
         {[
@@ -251,7 +251,7 @@ function DailyChart({ stats, kind, targets, metric, setMetric }) {
             type="button"
             onClick={() => setMetric(k)}
             aria-pressed={metric === k}
-            className={`min-h-[44px] px-3 rounded-md border text-sm ${metric === k ? 'border-brass text-brass bg-brasssoft' : 'border-line text-chalkdim hover:text-chalk'}`}
+            className={`min-h-[44px] px-4 rounded-full text-sm press ${metric === k ? 'bg-chalk text-ink font-medium' : 'bg-surface2 text-chalkdim hover:text-chalk'}`}
           >
             {label}
           </button>
@@ -266,13 +266,13 @@ function DailyChart({ stats, kind, targets, metric, setMetric }) {
             <Tooltip
               cursor={{ fill: 'rgba(255,255,255,0.04)' }}
               contentStyle={{ background: SURFACE, border: 0, borderRadius: 12, fontSize: 13 }}
-              labelStyle={{ color: '#EDEDE6' }}
+              labelStyle={{ color: CHALK }}
               formatter={(v) => [`${v} ${unit}`, metric === 'kcal' ? t('nutrition.calories') : t('nutrition.protein')]}
             />
             {target > 0 && <ReferenceLine y={target} stroke={COLORS.chalkdim} strokeDasharray="4 4" ifOverflow="extendDomain" />}
             <Bar dataKey="value" radius={[3, 3, 0, 0]}>
               {rows.map((r, i) => (
-                <Cell key={i} fill={r.hit ? COLORS.good : COLORS[metric]} />
+                <Cell key={i} fill={r.hit ? COLORS.hit : COLORS[metric]} />
               ))}
             </Bar>
           </BarChart>
@@ -280,7 +280,7 @@ function DailyChart({ stats, kind, targets, metric, setMetric }) {
       </div>
       {target > 0 && (
         <p className="text-chalkdim text-xs flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-good shrink-0" aria-hidden="true" />
+          <span className="w-2 h-2 rounded-full bg-accent shrink-0" aria-hidden="true" />
           {metric === 'kcal' ? t('nutrition.legendKcal') : t('nutrition.legendProtein')}
         </p>
       )}

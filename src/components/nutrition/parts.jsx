@@ -40,7 +40,7 @@ export function SourceLabel({ food, showVerifiedText = false, className = '' }) 
   const kind = badgeKind(food)
   if (kind === 'coach')
     return (
-      <span className={`inline-flex items-center gap-1 text-brass whitespace-nowrap ${className}`} title={t('nutrition.srcCoach')}>
+      <span className={`inline-flex items-center gap-1 text-chalk whitespace-nowrap ${className}`} title={t('nutrition.srcCoach')}>
         <BadgeCheck size={13} aria-hidden="true" />
         <span className={showVerifiedText ? '' : 'sr-only'}>{t('nutrition.srcCoach')}</span>
       </span>
@@ -72,37 +72,32 @@ export function MohAttribution({ className = '' }) {
   return <p className={`text-chalkdim text-xs ${className}`}>{t('nutrition.attrMoh')}</p>
 }
 
-// Each measure keeps one colour everywhere it appears (bar, legend dot):
-// protein iron, calories brass, carbs cardio blue, fat chalk, water cardio
-// blue. A protein or water bar that reaches its target turns green.
+// Protein is the one measure in the accent; every other bar is neutral grey.
 export const TONE = {
-  protein: { bar: 'bg-iron', dot: 'bg-iron', text: 'text-irontext' },
-  kcal: { bar: 'bg-brass', dot: 'bg-brass', text: 'text-brass' },
-  carbs: { bar: 'bg-cardio', dot: 'bg-cardio', text: 'text-cardiotext' },
-  fat: { bar: 'bg-chalk', dot: 'bg-chalk', text: 'text-chalk' },
-  water: { bar: 'bg-cardio', dot: 'bg-cardio', text: 'text-cardiotext' },
+  protein: { bar: 'bg-accent' },
+  kcal: { bar: 'bg-[#8A8A90]' },
+  carbs: { bar: 'bg-[#8A8A90]' },
+  fat: { bar: 'bg-[#8A8A90]' },
+  water: { bar: 'bg-[#8A8A90]' },
 }
-const GOAL_TONES = ['protein', 'water']
 
 export function Track({ value, max, size = 'md', tone = 'fat' }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0
-  const met = GOAL_TONES.includes(tone) && max > 0 && value >= max
-  const h = size === 'sm' ? 'h-1.5' : 'h-2'
+  const h = size === 'sm' ? 'h-1' : tone === 'kcal' ? 'h-1' : 'h-1.5'
   return (
-    <div className={`${h} rounded-full bg-surface2 overflow-hidden`} aria-hidden="true">
+    <div className={`${h} rounded-full bg-[#232326] overflow-hidden`} aria-hidden="true">
       <div
-        className={`${met ? 'bg-good' : (TONE[tone] || TONE.fat).bar} h-full rounded-full transition-[width] duration-500 motion-reduce:transition-none`}
+        className={`${(TONE[tone] || TONE.fat).bar} h-full rounded-full transition-[width] duration-300 ease-[var(--ease-out)] motion-reduce:transition-none`}
         style={{ width: `${pct}%` }}
       />
     </div>
   )
 }
 
-// Eyebrow with the measure's colour dot, the legend for its bar.
-export function ToneLabel({ tone, children, plain = false }) {
+// Quiet label for a measure. No colour dot: the bar says which is which.
+export function ToneLabel({ children, plain = false }) {
   return (
     <span className={`${plain ? 'text-xs text-chalkdim' : 'eyebrow'} inline-flex items-center gap-1.5`}>
-      <span className={`w-2 h-2 rounded-full shrink-0 ${(TONE[tone] || TONE.fat).dot}`} aria-hidden="true" />
       {children}
     </span>
   )
@@ -111,15 +106,15 @@ export function ToneLabel({ tone, children, plain = false }) {
 const MEAL_SHORT = { breakfast: 'mealShortBreakfast', lunch: 'mealShortLunch', dinner: 'mealShortDinner', snack: 'mealShortSnack' }
 
 // Selected chip look shared with the rest of the app (Stats metric toggles).
-const ON = 'border-brass text-brass bg-brasssoft'
-const OFF = 'border-line text-chalkdim hover:text-chalk'
+const ON = 'bg-chalk text-ink font-medium'
+const OFF = 'bg-surface2 text-chalkdim hover:text-chalk'
 
 // Four meals as one segmented row: the choice is visible without opening
 // anything, and it takes one tap.
 export function MealTabs({ value, onChange, className = '' }) {
   const { t } = useLanguage()
   return (
-    <div role="radiogroup" aria-label={t('nutrition.meal')} className={`grid grid-cols-4 gap-1 p-1 rounded-lg bg-ink border border-line ${className}`}>
+    <div role="radiogroup" aria-label={t('nutrition.meal')} className={`grid grid-cols-4 gap-1 p-1 rounded-[14px] bg-surface2 ${className}`}>
       {MEALS.map((m) => (
         <button
           key={m}
@@ -128,7 +123,7 @@ export function MealTabs({ value, onChange, className = '' }) {
           aria-checked={value === m}
           aria-label={t(MEAL_KEY[m])}
           onClick={() => onChange(m)}
-          className={`min-h-[40px] px-1 rounded-md text-sm font-medium truncate press transition-colors ${value === m ? 'bg-surface2 text-chalk' : 'text-chalkdim hover:text-chalk'}`}
+          className={`min-h-[40px] px-1 rounded-[11px] text-sm font-medium truncate press transition-colors ${value === m ? 'bg-chalk text-ink' : 'text-chalkdim hover:text-chalk'}`}
         >
           {t(`nutrition.${MEAL_SHORT[m]}`)}
         </button>
@@ -154,7 +149,7 @@ export function UnitChips({ options, value, onChange, scroll = false }) {
           role="radio"
           aria-checked={i === value}
           onClick={() => onChange(i)}
-          className={`min-h-[40px] px-3.5 rounded-full border text-sm whitespace-nowrap shrink-0 press ${i === value ? ON : OFF}`}
+          className={`min-h-[40px] px-3.5 rounded-full text-sm whitespace-nowrap shrink-0 press ${i === value ? ON : OFF}`}
         >
           <bdi>{o.label}</bdi>
           {o.kind === 'unit' && (
@@ -172,7 +167,7 @@ export function UnitChips({ options, value, onChange, scroll = false }) {
 // of the number, the unit and the weight underneath.
 export function AmountControl({ value, unit, grams, onChange, onStep }) {
   const { t } = useLanguage()
-  const b = 'w-12 h-12 rounded-full bg-surface2 border border-line inline-flex items-center justify-center text-chalk hover:bg-surface2/70 press shrink-0'
+  const b = 'w-12 h-12 rounded-full bg-surface2 inline-flex items-center justify-center text-chalk hover:bg-surface2/70 press shrink-0'
   const len = Math.max(1, String(value).length)
   const showGrams = grams > 0 && unit !== t('nutrition.g')
   return (
@@ -189,7 +184,7 @@ export function AmountControl({ value, unit, grams, onChange, onStep }) {
           onChange={(e) => onChange(e.target.value.replace(/[^\d.,]/g, ''))}
           onFocus={(e) => e.target.select()}
           style={{ width: `${Math.min(len, 6) + 1}ch` }}
-          className="num !bg-transparent !border-0 !border-b !border-transparent focus:!border-brass !rounded-none !px-0 !py-0 !min-h-[52px] text-center !text-[40px] leading-none"
+          className="num !bg-transparent !border-0 !border-b !border-transparent focus:!border-accent !rounded-none !px-0 !py-0 !min-h-[52px] text-center !text-[40px] leading-none"
         />
         <button type="button" aria-label={t('nutrition.more')} onClick={() => onStep(1)} className={b}>
           <Plus size={20} />
@@ -220,12 +215,12 @@ export function MacroPanel({ macros, proteinTarget, dayProtein, compact = false 
     ['fat', t('nutrition.fat'), macros.fat, g, 1],
   ]
   return (
-    <div className={`rounded-xl bg-surface2/60 ${compact ? 'px-3.5 py-3' : 'p-4'}`}>
+    <div className={`rounded-[14px] bg-surface2 ${compact ? 'px-3.5 py-3' : 'p-4'}`}>
       <div className="flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <ToneLabel tone="protein" plain>{t('nutrition.protein')}</ToneLabel>
+          <ToneLabel plain>{t('nutrition.protein')}</ToneLabel>
           <div className="flex items-baseline gap-1 mt-0.5" data-macro="protein">
-            <N mono className={`text-irontext leading-none ${compact ? 'text-[28px]' : 'text-[34px]'}`}>{fmt(macros.protein, 1)}</N>
+            <N mono className={`text-chalk leading-none ${compact ? 'text-[28px]' : 'text-[34px]'}`}>{fmt(macros.protein, 1)}</N>
             <span className="text-chalkdim text-sm">{g}</span>
           </div>
         </div>
@@ -233,7 +228,6 @@ export function MacroPanel({ macros, proteinTarget, dayProtein, compact = false 
           {rest.map(([tone, label, v, u, d]) => (
             <div key={tone} className="min-w-0">
               <dt className="text-chalkdim text-xs inline-flex items-center gap-1.5">
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${TONE[tone].dot}`} aria-hidden="true" />
                 {label}
               </dt>
               <dd className="text-base">
@@ -294,7 +288,6 @@ export function MacroInputs({ values, onChange, per = '' }) {
       {fields.map(([k, label, unit]) => (
         <label key={k} className="flex flex-col gap-1.5 min-w-0">
           <span className="text-sm text-chalkdim inline-flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full shrink-0 ${TONE[k].dot}`} aria-hidden="true" />
             <span className="truncate">{label}</span>
           </span>
           <span className="relative" dir="ltr">
@@ -323,11 +316,11 @@ export function Stepper({ value, unit, onChange, onStep }) {
   const b = 'w-12 min-h-[48px] inline-flex items-center justify-center text-xl text-chalk hover:bg-surface2 press shrink-0'
   const len = Math.max(1, String(value).length)
   return (
-    <div className="flex items-stretch rounded-md border border-line bg-surface2 overflow-hidden">
+    <div className="flex items-stretch rounded-[14px] bg-surface2 overflow-hidden">
       <button type="button" aria-label={t('nutrition.less')} onClick={() => onStep(-1)} className={b}>
         −
       </button>
-      <div className="flex-1 min-w-0 flex items-center justify-center gap-1.5 bg-ink px-2">
+      <div className="flex-1 min-w-0 flex items-center justify-center gap-1.5 bg-surface px-2">
         <input
           inputMode="decimal"
           aria-label={t('nutrition.amount')}
@@ -412,7 +405,7 @@ export function Sheet({ onClose, children, label }) {
   }, [onClose])
   return createPortal(
     <div
-      className="nutrition-page fixed inset-0 z-40 bg-ink/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 pt-[calc(env(safe-area-inset-top,0px)+0.625rem)] sm:p-4"
+      className="nutrition-page fixed inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 pt-[calc(env(safe-area-inset-top,0px)+0.625rem)] sm:p-4"
       onClick={onClose}
     >
       <div
@@ -420,8 +413,9 @@ export function Sheet({ onClose, children, label }) {
         aria-modal="true"
         aria-label={label}
         onClick={(e) => e.stopPropagation()}
-        className="card relative w-full max-w-lg h-full sm:h-[min(44rem,calc(100dvh-2rem))] rounded-b-none sm:rounded-b-xl flex flex-col overflow-hidden"
+        className="relative w-full max-w-lg h-full sm:h-[min(44rem,calc(100dvh-2rem))] bg-surface rounded-t-[28px] rounded-b-none sm:rounded-b-[28px] flex flex-col overflow-hidden animate-sheet motion-reduce:animate-none"
       >
+        <div className="mx-auto mt-2.5 mb-1 h-1 w-9 rounded-full bg-white/20 shrink-0" aria-hidden="true" />
         {children}
       </div>
     </div>,
@@ -434,14 +428,14 @@ export function SheetHeader({ title, onBack, onClose, right }) {
   return (
     <div className="flex items-center gap-1 px-2 pt-2 shrink-0">
       {onBack && (
-        <button type="button" onClick={onBack} aria-label={t('nutrition.back')} className="w-11 h-11 inline-flex items-center justify-center rounded-md hover:bg-surface2 shrink-0">
+        <button type="button" onClick={onBack} aria-label={t('nutrition.back')} className="w-11 h-11 inline-flex items-center justify-center rounded-full hover:bg-surface2 shrink-0">
           <Backward size={22} />
         </button>
       )}
-      <h2 className={`text-xl flex-1 min-w-0 truncate ${onBack ? '' : 'ps-2'}`}>{title}</h2>
+      <h2 className={`text-[17px] flex-1 min-w-0 truncate ${onBack ? '' : 'ps-2'}`}>{title}</h2>
       {right}
       {onClose && (
-        <button type="button" onClick={onClose} aria-label={t('nutrition.close')} className="w-11 h-11 inline-flex items-center justify-center rounded-md hover:bg-surface2 shrink-0">
+        <button type="button" onClick={onClose} aria-label={t('nutrition.close')} className="w-11 h-11 inline-flex items-center justify-center rounded-full hover:bg-surface2 shrink-0">
           <X size={22} />
         </button>
       )}
@@ -449,8 +443,7 @@ export function SheetHeader({ title, onBack, onClose, right }) {
   )
 }
 
-// Same look as the app's success toast (green, top of the screen), with an
-// Undo button. It sits over the header only, never over the controls.
+// Neutral toast at the top of the screen, with an Undo button. It sits over the header only, never over the controls.
 export function UndoToast({ toast, onUndo }) {
   const { t } = useLanguage()
   if (!toast) return null
@@ -461,11 +454,11 @@ export function UndoToast({ toast, onUndo }) {
       role="status"
       aria-live="polite"
     >
-      <div className="pointer-events-auto flex items-center gap-2.5 rounded-lg bg-green-800 text-white ps-4 pe-1.5 py-1.5 text-sm font-medium w-full max-w-sm shadow-lg border border-green-600">
-        <CheckCircle2 size={20} className="shrink-0" />
+      <div className="pointer-events-auto flex items-center gap-2.5 rounded-[16px] bg-surface2 text-chalk ps-4 pe-1.5 py-1.5 text-sm font-medium w-full max-w-sm shadow-lg">
+        <CheckCircle2 size={20} className="shrink-0 text-chalkdim" />
         <span className="flex-1 min-w-0 truncate">{toast.message}</span>
         {toast.ids?.length > 0 && (
-          <button type="button" onClick={onUndo} className="min-h-[44px] px-3 rounded-md font-semibold underline underline-offset-2 hover:bg-green-700 shrink-0">
+          <button type="button" onClick={onUndo} className="min-h-[44px] px-3 rounded-full font-semibold text-chalk hover:bg-white/10 shrink-0">
             {t('nutrition.undo')}
           </button>
         )}

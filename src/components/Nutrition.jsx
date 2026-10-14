@@ -27,7 +27,7 @@ import {
   logName,
 } from '../lib/nutrition.js'
 import { Button, Card, LoadError } from './ui.jsx'
-import { AmountText, DirtyScope, Forward, N, Name, Sheet, ToneLabel, Track, UndoToast, useDiscardGuard } from './nutrition/parts.jsx'
+import { AmountText, DirtyScope, Forward, N, Name, Sheet, Track, UndoToast, useDiscardGuard } from './nutrition/parts.jsx'
 import AddFood from './nutrition/AddFood.jsx'
 import FoodDetail from './nutrition/FoodDetail.jsx'
 import LabelForm from './nutrition/LabelForm.jsx'
@@ -283,29 +283,29 @@ function Diary() {
   const targetsKnown = !loading && !loadError
 
   return (
-    <div className="nutrition-page flex flex-col gap-5 max-w-xl mx-auto w-full pb-6">
-      <div className="flex items-end justify-between gap-3">
+    <div className="nutrition-page flex flex-col gap-5 max-w-xl mx-auto w-full pb-[120px]">
+      <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="eyebrow mb-1">{actingAs ? <bdi>{actingAs.name || actingAs.email}</bdi> : t('nutrition.title')}</div>
-          <h1 className="text-3xl truncate">{dayLabel}</h1>
-          <p className="text-chalkdim text-sm mt-1 font-body flex items-center gap-2">
+          {actingAs && <div className="eyebrow mb-1"><bdi>{actingAs.name || actingAs.email}</bdi></div>}
+          <h1 className="text-[30px] leading-9 font-semibold truncate">{dayLabel}</h1>
+          <p className="text-chalkdim text-[15px] flex items-center gap-2">
             <bdi>{dateLine}</bdi>
-            {isFuture && <span className="text-xs text-brass border border-brass/40 rounded-full px-2 py-0.5 whitespace-nowrap">{t('nutrition.planned')}</span>}
+            {isFuture && <span className="text-xs text-chalkdim bg-surface2 rounded-full px-2 py-0.5 whitespace-nowrap">{t('nutrition.planned')}</span>}
           </p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {!isToday && (
-            <button type="button" onClick={() => setDate(today)} className="min-h-[44px] px-3 rounded-md text-sm text-chalk border border-line hover:bg-surface2">
+            <button type="button" onClick={() => setDate(today)} className="min-h-[44px] px-4 rounded-full text-sm text-chalk bg-surface hover:bg-surface2 press">
               {t('nutrition.today')}
             </button>
           )}
-          <button type="button" onClick={() => setDate(shiftDay(date, -1))} aria-label={t('nutrition.prevDay')} className="w-11 h-11 inline-flex items-center justify-center rounded-md hover:bg-surface2 press">
-            <span className="rtl:hidden"><ChevronLeft size={22} /></span>
-            <span className="ltr:hidden"><ChevronRight size={22} /></span>
+          <button type="button" onClick={() => setDate(shiftDay(date, -1))} aria-label={t('nutrition.prevDay')} className="w-11 h-11 inline-flex items-center justify-center rounded-full bg-surface hover:bg-surface2 press">
+            <span className="rtl:hidden"><ChevronLeft size={20} /></span>
+            <span className="ltr:hidden"><ChevronRight size={20} /></span>
           </button>
-          <button type="button" disabled={date >= lastDay} onClick={() => setDate(shiftDay(date, 1))} aria-label={t('nutrition.nextDay')} className="w-11 h-11 inline-flex items-center justify-center rounded-md hover:bg-surface2 press disabled:opacity-30 disabled:pointer-events-none">
-            <span className="rtl:hidden"><ChevronRight size={22} /></span>
-            <span className="ltr:hidden"><ChevronLeft size={22} /></span>
+          <button type="button" disabled={date >= lastDay} onClick={() => setDate(shiftDay(date, 1))} aria-label={t('nutrition.nextDay')} className="w-11 h-11 inline-flex items-center justify-center rounded-full bg-surface hover:bg-surface2 press disabled:text-[#4A4A50] disabled:pointer-events-none">
+            <span className="rtl:hidden"><ChevronRight size={20} /></span>
+            <span className="ltr:hidden"><ChevronLeft size={20} /></span>
           </button>
         </div>
       </div>
@@ -326,7 +326,7 @@ function Diary() {
         <>
           <Summary totals={totals} targets={targets} isAdmin={isAdmin} onEdit={() => push({ type: 'targets' })} />
           <button type="button" onClick={() => push({ type: 'trends' })} className="card w-full flex items-center gap-3 px-4 min-h-[52px] -mt-2 text-start hover:bg-surface2 press-row">
-            <BarChart3 size={18} className="text-brass shrink-0" aria-hidden="true" />
+            <BarChart3 size={18} className="text-chalkdim shrink-0" aria-hidden="true" />
             <span className="flex-1 min-w-0 truncate text-sm">{t('nutrition.averagesOpen')}</span>
             <Forward size={18} className="text-chalkdim shrink-0" aria-hidden="true" />
           </button>
@@ -348,12 +348,12 @@ function Diary() {
             </Card>
           )}
 
-          <div className="flex gap-2">
-            <Button variant="brass" className="flex-1 min-h-[56px] text-base" onClick={() => openAdd(addMeal())}>
-              <Plus size={20} /> {t('nutrition.addFood')}
+          <div className="flex gap-2.5">
+            <Button variant="brass" className="flex-1 h-[52px] text-base" onClick={() => openAdd(addMeal())}>
+              <Plus size={18} strokeWidth={2.2} /> {t('nutrition.addFood')}
             </Button>
-            <Button variant="subtle" className="min-h-[56px] px-5 text-base" onClick={() => openScanner(addMeal())}>
-              <ScanBarcode size={20} className="text-brass" /> {t('nutrition.scan')}
+            <Button variant="subtle" className="w-[52px] h-[52px] !p-0 shrink-0" onClick={() => openScanner(addMeal())} aria-label={t('nutrition.scan')} title={t('nutrition.scan')}>
+              <ScanBarcode size={22} strokeWidth={1.75} />
             </Button>
           </div>
 
@@ -381,47 +381,47 @@ function Diary() {
             const rows = logs.filter((r) => r.meal === m)
             const mk = sumLogs(rows).kcal
             return (
-              <section key={m} aria-labelledby={`meal-${m}`}>
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <h2 id={`meal-${m}`} className="text-xl flex items-baseline gap-2.5 min-w-0">
+              <section key={m} aria-labelledby={`meal-${m}`} className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 id={`meal-${m}`} className="text-[17px] font-semibold flex items-baseline gap-2 min-w-0">
                     <span className="truncate">{t(MEAL_KEY[m])}</span>
                     {mk > 0 && (
-                      <span className="text-chalkdim text-sm whitespace-nowrap">
+                      <span className="text-chalkdim text-sm font-normal whitespace-nowrap">
                         <N mono>{fmt(mk, 0)}</N> {k}
                       </span>
                     )}
                   </h2>
                   <div className="flex items-center gap-1 shrink-0">
                     {rows.length > 0 && (
-                      <button type="button" onClick={() => push({ type: 'saveMeal', meal: m })} aria-label={`${t('nutrition.saveAsMeal')}: ${t(MEAL_KEY[m])}`} title={t('nutrition.saveAsMeal')} className="w-11 h-11 inline-flex items-center justify-center rounded-md text-chalkdim hover:text-chalk hover:bg-surface2">
-                        <Bookmark size={19} />
+                      <button type="button" onClick={() => push({ type: 'saveMeal', meal: m })} aria-label={`${t('nutrition.saveAsMeal')}: ${t(MEAL_KEY[m])}`} title={t('nutrition.saveAsMeal')} className="w-11 h-11 -my-1 inline-flex items-center justify-center rounded-full text-chalkdim hover:text-chalk press">
+                        <Bookmark size={18} />
                       </button>
                     )}
-                    <button type="button" onClick={() => openAdd(m)} aria-label={t('nutrition.addToMealLabel', { meal: t(MEAL_KEY[m]) })} className="w-11 h-11 inline-flex items-center justify-center rounded-md border border-line bg-surface2 hover:border-chalk press">
-                      <Plus size={20} />
+                    <button type="button" onClick={() => openAdd(m)} aria-label={t('nutrition.addToMealLabel', { meal: t(MEAL_KEY[m]) })} className="hit w-9 h-9 inline-flex items-center justify-center rounded-full bg-surface2 hover:bg-white/10 press">
+                      <Plus size={16} strokeWidth={2} />
                     </button>
                   </div>
                 </div>
                 {rows.length === 0 ? (
-                  <p className="text-chalkdim text-sm px-1 pb-1">{isFuture ? t('nutrition.nothingPlanned') : t('nutrition.nothingLogged')}</p>
+                  <p className="text-chalkdim text-sm">{isFuture ? t('nutrition.nothingPlanned') : t('nutrition.nothingLogged')}</p>
                 ) : (
-                  <ul className="card divide-y divide-line overflow-hidden">
+                  <ul className="bg-surface rounded-[18px] overflow-hidden divide-y divide-white/[0.06]">
                     {rows.map((r) => (
                       <li key={r.id}>
-                        <button type="button" onClick={() => push({ type: 'edit', row: r })} className="w-full flex items-center justify-between gap-3 px-4 py-3 min-h-[60px] text-start hover:bg-surface2 press-row">
+                        <button type="button" onClick={() => push({ type: 'edit', row: r })} className="w-full flex items-center justify-between gap-3 px-4 min-h-[60px] py-2 text-start hover:bg-surface2 press-row">
                           <div className="min-w-0 flex-1">
-                            <Name className="font-medium">{logName(r, lang)}</Name>
+                            <span dir="auto" className="block truncate text-[15px] leading-5 font-medium text-start">{logName(r, lang)}</span>
                             {r.grams != null && (
-                              <span className="block text-chalkdim text-xs whitespace-nowrap truncate mt-0.5">
+                              <span className="block text-chalkdim text-[13px] leading-[18px] truncate">
                                 <AmountText row={r} />
                               </span>
                             )}
                           </div>
                           <div className="text-end shrink-0">
-                            <div className="whitespace-nowrap">
-                              <N mono className="text-base text-irontext">{fmt(r.protein, 1)}</N> <span className="text-chalkdim text-xs">{g} {t('nutrition.proteinWord')}</span>
+                            <div className="whitespace-nowrap text-[15px] font-semibold">
+                              <N mono>{fmt(r.protein, 1)}</N> <span>{g}</span>
                             </div>
-                            <div className="text-chalkdim text-xs whitespace-nowrap mt-0.5">
+                            <div className="text-chalkdim text-[13px] whitespace-nowrap">
                               <N mono>{fmt(r.kcal, 0)}</N> {k}
                             </div>
                           </div>
@@ -540,102 +540,88 @@ function Summary({ totals, targets, isAdmin, onEdit }) {
   const pLeft = targets?.protein != null ? targets.protein - p : null
   const kLeft = targets?.kcal != null ? targets.kcal - totals.kcal : null
   return (
-    <Card className="flex flex-col gap-4">
-      <div>
-        <div className="flex items-center justify-between gap-2">
-          <ToneLabel tone="protein">{t('nutrition.protein')}</ToneLabel>
-          <span className="flex items-center gap-1">
+    <section className="bg-surface rounded-[22px] p-5 flex flex-col gap-[18px]" aria-label={t('nutrition.protein')}>
+      <div className="flex flex-col gap-2.5">
+        <div className="flex items-baseline justify-between gap-3">
+          <div className="flex items-baseline gap-2 min-w-0">
+            <N mono className="text-[44px] leading-[48px] font-semibold tracking-[-0.03em]">{fmt(p, 0)}</N>
+            <span className="text-chalkdim text-[15px] whitespace-nowrap">
+              {targets?.protein != null ? (
+                <>
+                  {t('nutrition.of')} <N mono>{fmt(targets.protein, 0)}</N> {g} {t('nutrition.proteinWord')}
+                </>
+              ) : (
+                <>
+                  {g} {t('nutrition.proteinWord')}
+                </>
+              )}
+            </span>
+          </div>
+          <span className="flex items-center gap-1 shrink-0">
             {pLeft != null && (
               <span className="text-chalkdim text-sm whitespace-nowrap">
                 {pLeft > 0 ? (
                   <>
-                    <N mono className="text-chalk">{fmt(pLeft, 0)}</N> {g} {t('nutrition.left')}
+                    <N mono>{fmt(pLeft, 0)}</N> {g} {t('nutrition.left')}
                   </>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-good">
+                  <span className="inline-flex items-center gap-1 text-chalk">
                     <Check size={16} aria-hidden="true" /> {t('nutrition.targetReached')}
                   </span>
                 )}
               </span>
             )}
             {isAdmin && targets && (
-              <button type="button" onClick={onEdit} aria-label={t('nutrition.editTargets')} className="w-11 h-11 -my-2 -me-2 inline-flex items-center justify-center rounded-md text-chalkdim hover:text-chalk hover:bg-surface2">
-                <Pencil size={16} />
+              <button type="button" onClick={onEdit} aria-label={t('nutrition.editTargets')} title={t('nutrition.editTargets')} className="w-11 h-11 -my-3 -me-2 inline-flex items-center justify-center rounded-full text-chalkdim hover:text-chalk press">
+                <Pencil size={15} />
               </button>
             )}
           </span>
         </div>
-        <div className="flex items-baseline gap-2 mt-1">
-          <N mono className="text-3xl leading-none">{fmt(p, 0)}</N>
-          {targets?.protein != null && (
-            <span className="text-chalkdim text-sm whitespace-nowrap">
-              {t('nutrition.of')} <N mono>{fmt(targets.protein, 0)}</N> {g}
-            </span>
-          )}
-          {targets?.protein == null && <span className="text-chalkdim text-sm">{g}</span>}
-        </div>
-        {targets?.protein > 0 && (
-          <div className="mt-3">
-            <Track value={p} max={targets.protein} tone="protein" />
-          </div>
-        )}
+        {targets?.protein > 0 && <Track value={p} max={targets.protein} tone="protein" />}
       </div>
 
-      <div className="border-t border-line pt-4">
-        <div className="flex items-center justify-between gap-2">
-          <ToneLabel tone="kcal">{t('nutrition.calories')}</ToneLabel>
-          {kLeft != null && (
-            <span className={`text-sm whitespace-nowrap ${kLeft >= 0 ? 'text-chalkdim' : 'text-brass'}`}>
-              <N mono className={kLeft >= 0 ? 'text-chalk' : ''}>{fmt(Math.abs(kLeft), 0)}</N> {kLeft >= 0 ? t('nutrition.left') : t('nutrition.overTarget')}
+      <div className="flex flex-col gap-2">
+        <div className="flex justify-between gap-3 text-sm">
+          <span className="whitespace-nowrap">
+            <N mono className="font-semibold">{fmt(totals.kcal, 0)}</N>{' '}
+            <span className="text-chalkdim">
+              {targets?.kcal != null ? (
+                <>
+                  {t('nutrition.of')} <N mono>{fmt(targets.kcal, 0)}</N> {k}
+                </>
+              ) : (
+                k
+              )}
             </span>
-          )}
-        </div>
-        <div className="flex items-baseline gap-2 mt-1">
-          <N mono className="text-xl leading-none">{fmt(totals.kcal, 0)}</N>
-          <span className="text-chalkdim text-sm whitespace-nowrap">
-            {targets?.kcal != null ? (
-              <>
-                {t('nutrition.of')} <N mono>{fmt(targets.kcal, 0)}</N> {k}
-              </>
-            ) : (
-              k
-            )}
           </span>
+          {kLeft != null && (
+            <span className="text-chalkdim whitespace-nowrap">
+              <N mono>{fmt(Math.abs(kLeft), 0)}</N> {kLeft >= 0 ? t('nutrition.left') : t('nutrition.overTarget')}
+            </span>
+          )}
         </div>
-        {targets?.kcal > 0 && (
-          <div className="mt-2.5">
-            <Track value={totals.kcal} max={targets.kcal} tone="kcal" />
-          </div>
-        )}
+        {targets?.kcal > 0 && <Track value={totals.kcal} max={targets.kcal} tone="kcal" />}
       </div>
 
-      <div className="grid grid-cols-2 gap-4 border-t border-line pt-4">
+      <div className="grid grid-cols-2 gap-3 pt-3.5 border-t border-white/[0.07] text-sm">
         {[
-          ['carbs', t('nutrition.carbs'), totals.carbs, targets?.carbs],
-          ['fat', t('nutrition.fat'), totals.fat, targets?.fat],
-        ].map(([tone, label, v, target]) => (
-          <div key={tone}>
-            <div className="flex items-baseline justify-between gap-2">
-              <ToneLabel tone={tone}>{label}</ToneLabel>
-              <span className="text-chalkdim text-sm whitespace-nowrap">
-                <N mono className="text-chalk">{fmt(v, 0)}</N>
-                {target != null && (
-                  <>
-                    {' / '}
-                    <N mono>{fmt(target, 0)}</N>
-                  </>
-                )}{' '}
-                {g}
-              </span>
-            </div>
-            {target > 0 && (
-              <div className="mt-2">
-                <Track value={v} max={target} size="sm" tone={tone} />
-              </div>
-            )}
-          </div>
+          [t('nutrition.carbs'), totals.carbs, targets?.carbs],
+          [t('nutrition.fat'), totals.fat, targets?.fat],
+        ].map(([label, v, target]) => (
+          <span key={label} className="text-chalkdim whitespace-nowrap">
+            {label}{' '}
+            <N mono className="text-chalk font-medium">{fmt(v, 0)}</N>
+            {target != null && (
+              <>
+                {' / '}
+                <N mono>{fmt(target, 0)}</N>
+              </>
+            )}{' '}
+            {g}
+          </span>
         ))}
       </div>
-    </Card>
+    </section>
   )
 }
