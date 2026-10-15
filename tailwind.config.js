@@ -42,9 +42,11 @@ export default {
       },
       keyframes: {
         sheet: { from: { transform: 'translateY(16px)', opacity: '0' }, to: { transform: 'none', opacity: '1' } },
+        toast: { from: { transform: 'translateY(-12px) scale(0.98)', opacity: '0' }, to: { transform: 'none', opacity: '1' } },
       },
       animation: {
         sheet: 'sheet 500ms cubic-bezier(0.32, 0.72, 0, 1)',
+        toast: 'toast 260ms cubic-bezier(0.23, 1, 0.32, 1)',
       },
     },
   },
