@@ -17,6 +17,27 @@ const hasVal = (v) => v !== '' && v != null
 
 function Stepper({ value, onChange, step, min = 0, max, label, placeholder, done }) {
   const holdRef = useRef(null)
+  const justFocused = useRef(false)
+
+  // Tapping into a cell selects what's there, so typing replaces the old
+  // number instead of appending to it. Selecting once on focus isn't
+  // enough: the tap's own mouseup (desktop) and iOS Safari's caret
+  // placement both land after focus and collapse the selection, so it is
+  // selected again on the next tick and that first mouseup is cancelled.
+  function selectAll(e) {
+    const el = e.target
+    justFocused.current = true
+    el.select()
+    setTimeout(() => {
+      if (document.activeElement === el) el.select()
+    }, 0)
+  }
+
+  function keepSelection(e) {
+    if (!justFocused.current) return
+    justFocused.current = false
+    e.preventDefault()
+  }
 
   function bump(delta) {
     const current = Number(value) || 0
@@ -82,6 +103,10 @@ function Stepper({ value, onChange, step, min = 0, max, label, placeholder, done
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={selectAll}
+        onMouseUp={keepSelection}
+        onKeyDown={() => (justFocused.current = false)}
+        onBlur={() => (justFocused.current = false)}
         aria-label={label}
         className={`num text-center !px-0.5 min-w-0 w-full text-[17px] font-medium placeholder:text-[#6E6E74] !rounded-[10px] min-[560px]:!rounded-none ${
           done ? '!bg-transparent' : ''
