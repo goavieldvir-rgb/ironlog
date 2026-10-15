@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, CheckCircle2, X } from 'lucide-react'
+import { AlertTriangle, Check, X } from 'lucide-react'
 import { useLanguage } from './LanguageContext.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 
@@ -80,8 +80,9 @@ export function FeedbackProvider({ children }) {
         </div>
       )}
 
-      {/* Success: big, green, top of the screen, nothing to tap (it never
-          blocks the header). Errors stay at the bottom with a close button. */}
+      {/* Success: a floating pill at the top of the screen, same raised
+          surface as the rest dock, nothing to tap (it never blocks the
+          header). Errors stay at the bottom with a close button. */}
       <div
         className="fixed inset-x-0 z-50 flex flex-col items-center gap-2 px-4 pointer-events-none"
         style={{ top: 'calc(0.75rem + env(safe-area-inset-top, 0px))' }}
@@ -91,9 +92,11 @@ export function FeedbackProvider({ children }) {
         {toasts.filter((x) => x.tone !== 'error').map((x) => (
           <div
             key={x.id}
-            className="flex items-center justify-center gap-2.5 rounded-lg bg-green-800 text-white px-4 py-3 text-base font-medium w-full max-w-sm shadow-lg border border-green-600"
+            className="flex items-center gap-2.5 rounded-full bg-[#232326] text-chalk ps-2.5 pe-4 py-2.5 text-[15px] font-semibold max-w-sm shadow-[0_8px_24px_rgba(0,0,0,0.45)] animate-toast motion-reduce:animate-none"
           >
-            <CheckCircle2 size={22} className="shrink-0" />
+            <span className="grid place-items-center w-7 h-7 rounded-full bg-good/15 text-good shrink-0">
+              <Check size={16} strokeWidth={2.75} />
+            </span>
             <span>{x.message}</span>
           </div>
         ))}
@@ -105,8 +108,8 @@ export function FeedbackProvider({ children }) {
         role="alert"
       >
         {toasts.filter((x) => x.tone === 'error').map((x) => (
-          <div key={x.id} className="pointer-events-auto card flex items-center gap-2 px-3.5 py-2.5 text-sm max-w-sm w-full shadow-lg border-iron text-chalk">
-            <AlertTriangle size={16} className="text-irontext shrink-0" />
+          <div key={x.id} className="pointer-events-auto flex items-center gap-2.5 rounded-[20px] bg-[#232326] ps-3 pe-3.5 py-3 text-[15px] max-w-sm w-full shadow-[0_8px_24px_rgba(0,0,0,0.45)] text-chalk animate-sheet motion-reduce:animate-none">
+            <AlertTriangle size={18} className="text-irontext shrink-0" />
             <span className="flex-1">{x.message}</span>
             <button onClick={() => setToasts((prev) => prev.filter((y) => y.id !== x.id))} className="text-chalkdim hover:text-chalk" aria-label={t('common.close')}>
               <X size={14} />
