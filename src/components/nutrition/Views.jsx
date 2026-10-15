@@ -15,6 +15,7 @@ import {
   logName,
   logUnit,
 } from '../../lib/nutrition.js'
+import { MACROS, macroGrams, setMacroPct, splitFromTargets, splitTotal } from '../../lib/macroSplit.js'
 import { AmountControl, AmountText, MacroInputs, MacroPanel, MealTabs, N, Name, SheetHeader, UnitChips, mealLabel, useDirtyForm } from './parts.jsx'
 
 const round2 = (n) => Math.round(n * 100) / 100
@@ -139,29 +140,33 @@ export function EditLog({ row, onBack, onClose, onSave, onDelete }) {
 
 export function TargetsView({ targets, onBack, onClose, onSave }) {
   const { t } = useLanguage()
-  const [v, setV] = useState({
-    kcal: targets?.kcal != null ? String(targets.kcal) : '',
-    protein: targets?.protein != null ? String(targets.protein) : '',
-    carbs: targets?.carbs != null ? String(targets.carbs) : '',
-    fat: targets?.fat != null ? String(targets.fat) : '',
-  })
-  const [start] = useState(v)
-  useDirtyForm(Object.keys(v).some((k) => v[k] !== start[k]))
+  const g = t('nutrition.g')
+  const [kcalText, setKcalText] = useState(targets?.kcal != null ? String(targets.kcal) : '')
+  const [split, setSplit] = useState(() => splitFromTargets(targets))
+  // The split before the current slider started moving; the other two keep
+  // its ratio. Replaced whenever a different slider is touched.
+  const [anchor, setAnchor] = useState({ key: null, split })
+  const [start] = useState({ kcalText, split })
+  useDirtyForm(kcalText !== start.kcalText || MACROS.some((k) => split[k] !== start.split[k]))
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const int = (s) => {
-    const n = parseNum(s)
-    // 0 means "no target" (a 0 g target would read as reached all day)
-    return s === '' || !Number.isFinite(n) || n <= 0 ? null : Math.round(n)
+  const kcal = parseNum(kcalText) > 0 ? Math.round(parseNum(kcalText)) : null
+  const total = splitTotal(split)
+  function move(key, value) {
+    const base = anchor.key === key ? anchor.split : split
+    if (anchor.key !== key) setAnchor({ key, split })
+    setSplit(setMacroPct(base, key, value))
   }
   async function submit(e) {
     e.preventDefault()
-    const kcal = int(v.kcal)
-    if (!kcal || kcal <= 0) return setError(t('nutrition.targetInvalid'))
+    if (!kcal) return setError(t('nutrition.targetInvalid'))
+    if (total !== 100) return setError(t('nutrition.splitMustTotal', { n: total }))
     setError('')
     setBusy(true)
     try {
-      await onSave({ kcal, protein: int(v.protein), carbs: int(v.carbs), fat: int(v.fat) })
+      // The columns hold whole grams; 0 g is stored as "no target", as before.
+      const grams = (k) => Math.round(macroGrams(kcal, split[k], k)) || null
+      await onSave({ kcal, protein: grams('protein'), carbs: grams('carbs'), fat: grams('fat') })
     } finally {
       setBusy(false)
     }
@@ -170,26 +175,60 @@ export function TargetsView({ targets, onBack, onClose, onSave }) {
     <>
       <SheetHeader title={t('nutrition.targetsTitle')} onBack={onBack} onClose={onClose} />
       <form onSubmit={submit} className="flex-1 min-h-0 flex flex-col">
-        <div className="flex-1 overflow-y-auto px-4 pb-4 grid grid-cols-2 gap-2.5 content-start">
-          {[
-            ['protein', 'targetProtein'],
-            ['kcal', 'targetKcal'],
-            ['carbs', 'targetCarbs'],
-            ['fat', 'targetFat'],
-          ].map(([k, label]) => (
-            <label key={k} className="flex flex-col gap-1.5 mt-2">
-              <span className="eyebrow">{t(`nutrition.${label}`)}</span>
-              <input inputMode="numeric" dir="ltr" className="num text-center !text-lg" value={v[k]} onChange={(e) => setV((s) => ({ ...s, [k]: e.target.value.replace(/[^\d]/g, '') }))} />
-            </label>
-          ))}
+        <div className="flex-1 overflow-y-auto px-4 pb-4 flex flex-col gap-5">
+          <label className="flex flex-col gap-1.5 mt-2">
+            <span className="eyebrow">{t('nutrition.targetKcal')}</span>
+            <input
+              inputMode="numeric"
+              dir="ltr"
+              className="num text-center !text-lg"
+              value={kcalText}
+              onChange={(e) => setKcalText(e.target.value.replace(/[^\d]/g, ''))}
+            />
+          </label>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-baseline justify-between">
+              <span className="eyebrow">{t('nutrition.macroSplit')}</span>
+              <span className={`text-sm num ${total === 100 ? 'text-chalkdim' : 'text-irontext'}`} dir="ltr">
+                {t('nutrition.splitTotal', { n: total })}
+              </span>
+            </div>
+            {MACROS.map((k) => {
+              const grams = macroGrams(kcal, split[k], k)
+              return (
+                <label key={k} className="flex flex-col gap-1">
+                  <span className="flex items-baseline justify-between gap-3">
+                    <span className="text-chalk">{t(`nutrition.${k}`)}</span>
+                    <span className="num" dir="ltr">
+                      <span className="text-chalk text-lg">{split[k]}%</span>
+                      <span className="text-chalkdim text-sm ms-2">
+                        {grams == null ? '—' : fmt(grams, 1)} {g}
+                      </span>
+                    </span>
+                  </span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={split[k]}
+                    onChange={(e) => move(k, e.target.value)}
+                    aria-valuetext={`${split[k]}%`}
+                    className="w-full !bg-transparent !px-0 !border-0 accent-accent"
+                  />
+                </label>
+              )
+            })}
+            <p className="text-chalkdim text-xs">{t('nutrition.splitHint')}</p>
+          </div>
           {error && (
-            <p className="col-span-2 text-sm text-irontext" role="alert">
+            <p className="text-sm text-irontext" role="alert">
               {error}
             </p>
           )}
         </div>
         <div className="p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] shrink-0">
-          <Button type="submit" variant="brass" className="w-full min-h-[52px] text-base" disabled={busy}>
+          <Button type="submit" variant="brass" className="w-full min-h-[52px] text-base" disabled={busy || total !== 100}>
             <Check size={20} /> {t('nutrition.save')}
           </Button>
         </div>
