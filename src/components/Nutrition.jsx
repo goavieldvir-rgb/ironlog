@@ -548,7 +548,7 @@ function Summary({ totals, targets, isAdmin, onEdit }) {
             <span className="text-chalkdim text-[15px] whitespace-nowrap">
               {targets?.protein != null ? (
                 <>
-                  {t('nutrition.of')} <N mono>{fmt(targets.protein, 0)}</N> {g} {t('nutrition.proteinWord')}
+                  {t('nutrition.of')} <N mono>{fmt(targets.protein, 1)}</N> {g} {t('nutrition.proteinWord')}
                 </>
               ) : (
                 <>
@@ -615,7 +615,7 @@ function Summary({ totals, targets, isAdmin, onEdit }) {
             {target != null && (
               <>
                 {' / '}
-                <N mono>{fmt(target, 0)}</N>
+                <N mono>{fmt(target, 1)}</N>
               </>
             )}{' '}
             {g}

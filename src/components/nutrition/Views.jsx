@@ -164,8 +164,9 @@ export function TargetsView({ targets, onBack, onClose, onSave }) {
     setError('')
     setBusy(true)
     try {
-      // The columns hold whole grams; 0 g is stored as "no target", as before.
-      const grams = (k) => Math.round(macroGrams(kcal, split[k], k)) || null
+      // Grams to one decimal (fat at 2,500 kcal / 20% is 55.6 g). 0 g is
+      // stored as "no target", as before.
+      const grams = (k) => round1(macroGrams(kcal, split[k], k)) || null
       await onSave({ kcal, protein: grams('protein'), carbs: grams('carbs'), fat: grams('fat') })
     } finally {
       setBusy(false)
