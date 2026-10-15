@@ -164,9 +164,9 @@ create policy "own saved meals or admin" on saved_meals for all to authenticated
 create table if not exists nutrition_targets (
   user_id uuid primary key references auth.users(id) on delete cascade,
   kcal integer check (kcal > 0),
-  protein integer check (protein >= 0),
-  carbs integer check (carbs >= 0),
-  fat integer check (fat >= 0),
+  protein numeric(6,1) check (protein >= 0),
+  carbs numeric(6,1) check (carbs >= 0),
+  fat numeric(6,1) check (fat >= 0),
   updated_at timestamptz not null default now()
 );
 

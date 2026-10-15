@@ -132,7 +132,7 @@ function Averages({ stats, targets, waterGoal }) {
         <span className="text-chalkdim text-xs whitespace-nowrap">{t('nutrition.daysLogged', { n: stats.loggedDays, total: stats.finishedDays })}</span>
       </div>
 
-      <AvgRow tone="protein" label={t('nutrition.protein')} value={avg.protein} target={targets?.protein} unit={g} big />
+      <AvgRow tone="protein" label={t('nutrition.protein')} value={avg.protein} target={targets?.protein} unit={g} big targetDigits={1} />
       <AvgRow tone="kcal" label={t('nutrition.calories')} value={avg.kcal} target={targets?.kcal} unit={k} />
 
       <div className="grid grid-cols-2 gap-4 border-t border-white/[0.06] pt-4">
@@ -148,7 +148,7 @@ function Averages({ stats, targets, waterGoal }) {
                 {target != null && (
                   <>
                     {' / '}
-                    <N mono>{fmt(target, 0)}</N>
+                    <N mono>{fmt(target, 1)}</N>
                   </>
                 )}{' '}
                 {g}
@@ -170,7 +170,7 @@ function Averages({ stats, targets, waterGoal }) {
   )
 }
 
-function AvgRow({ tone, label, value, target, unit, big = false, digits = 0 }) {
+function AvgRow({ tone, label, value, target, unit, big = false, digits = 0, targetDigits = digits }) {
   const { t } = useLanguage()
   return (
     <div className={big ? '' : 'border-t border-white/[0.06] pt-4'}>
@@ -180,7 +180,7 @@ function AvgRow({ tone, label, value, target, unit, big = false, digits = 0 }) {
         <span className="text-chalkdim text-sm whitespace-nowrap">
           {target != null ? (
             <>
-              {t('nutrition.of')} <N mono>{fmt(target, digits)}</N> {unit}
+              {t('nutrition.of')} <N mono>{fmt(target, targetDigits)}</N> {unit}
             </>
           ) : (
             unit

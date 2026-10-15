@@ -275,13 +275,21 @@ export async function getTargets(uid) {
 }
 
 export async function saveTargets(uid, t) {
-  return check(
-    await supabase
+  const upsert = (row) =>
+    supabase
       .from('nutrition_targets')
-      .upsert({ user_id: uid, ...t, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+      .upsert({ user_id: uid, ...row, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
       .select()
-      .single(),
-  )
+      .single()
+  const res = await upsert(t)
+  // 22P02: the macro columns are still whole numbers because
+  // supabase-macro-decimals.sql hasn't been run yet. Save whole grams
+  // rather than failing.
+  if (res.error?.code === '22P02') {
+    const whole = (n) => (n == null ? n : Math.round(n))
+    return check(await upsert({ ...t, protein: whole(t.protein), carbs: whole(t.carbs), fat: whole(t.fat) }))
+  }
+  return check(res)
 }
 
 // ---------------------------------------------------------------- saved meals
