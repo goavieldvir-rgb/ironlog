@@ -26,6 +26,7 @@ import ConsentGate from './components/ConsentGate.jsx'
 import Privacy from './components/Privacy.jsx'
 // Admin-only beta screen: loaded on demand so trainees never download it.
 const Nutrition = lazy(() => import('./components/Nutrition.jsx'))
+const PersonDetail = lazy(() => import('./components/PersonDetail.jsx'))
 
 export default function App() {
   const { user, loading, recovery } = useAuth()
@@ -72,6 +73,7 @@ export default function App() {
         <Route path="/history/:id" element={<SessionDetail />} />
         <Route path="/history/:id/edit" element={<EditSession />} />
         <Route path="/people" element={<People />} />
+        <Route path="/people/:id" element={<Suspense fallback={null}><PersonDetail /></Suspense>} />
         <Route path="/errors" element={<ErrorLogs />} />
         <Route path="/nutrition" element={<Suspense fallback={null}><Nutrition /></Suspense>} />
         <Route path="/stats" element={<Stats />} />

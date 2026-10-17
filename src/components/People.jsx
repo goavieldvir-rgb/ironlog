@@ -1,113 +1,91 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { Users, ShieldCheck, UserPlus, Copy, Check, AlertTriangle, Apple } from 'lucide-react'
-import { ForwardArrow } from './DirectionalIcon.jsx'
-import { supabase } from '../supabase.js'
-import { toLocalISODate, fmtDate, weekStartDate } from '../lib/dates.js'
+import { Link } from 'react-router-dom'
+import { Users, UserPlus, Copy, Check, AlertTriangle, Search, Pin } from 'lucide-react'
+import { ForwardChevron } from './DirectionalIcon.jsx'
+import { toLocalISODate } from '../lib/dates.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { TERMS_VERSION } from '../legal/terms.js'
-import { Card, Badge, EmptyState, Button, Field } from './ui.jsx'
+import { Card, Badge, EmptyState, Button, Field, LoadError } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
+import { fetchRoster, rosterFlags, attentionScore, adherence, daysSince } from '../lib/coach.js'
 
-function startOfWeekISO() {
-  return toLocalISODate(weekStartDate(new Date()))
-}
-
+// The coach's roster: who needs attention first, how each trainee is doing
+// against their plan, and what is waiting for review. Tapping a trainee opens
+// their coach page (PersonDetail).
 export default function People() {
   const { user } = useAuth()
   const { setActingAs } = useAdmin()
-  const { t, lang } = useLanguage()
-  const navigate = useNavigate()
-  const [people, setPeople] = useState([])
+  const { t } = useLanguage()
+  const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
+  const [reload, setReload] = useState(0)
   const [inviting, setInviting] = useState(false)
-  const [activity, setActivity] = useState([])
-  const [consents, setConsents] = useState([])
-  const [savingNutrition, setSavingNutrition] = useState(null)
-
-  function daysAgo(iso) {
-    const days = Math.round((Date.now() - new Date(iso + 'T00:00:00').getTime()) / 86400000)
-    if (days === 0) return t('people.today')
-    if (days === 1) return t('people.yesterday')
-    return t('people.daysAgo')(days)
-  }
-
-  // Nutrition is a beta switched on per trainee. Only admins may change the
-  // flag; the database refuses it from anyone else.
-  async function toggleNutrition(p) {
-    const next = !p.nutrition_enabled
-    setSavingNutrition(p.id)
-    const { error } = await supabase.from('profiles').update({ nutrition_enabled: next }).eq('id', p.id)
-    setSavingNutrition(null)
-    if (error) {
-      console.error(error)
-      alert(t('people.nutritionError'))
-      return
-    }
-    setPeople((list) => list.map((x) => (x.id === p.id ? { ...x, nutrition_enabled: next } : x)))
-  }
+  const [query, setQuery] = useState('')
+  const [view, setView] = useState('attention')
+  const today = toLocalISODate()
 
   useEffect(() => {
-    // Who has accepted which version of the terms. Admins can read every
-    // row; nobody can change one.
-    supabase
-      .from('consents')
-      .select('user_id, version, variant, accepted_at, guardian_name')
-      .order('accepted_at', { ascending: false })
-      .then(({ data, error }) => {
-        if (error) console.error(error)
-        setConsents(data || [])
+    let cancelled = false
+    setLoading(true)
+    fetchRoster(today)
+      .then((data) => {
+        if (cancelled) return
+        setRows(data)
+        setLoadError(null)
       })
-
-    supabase
-      .from('profiles')
-      .select('*')
-      .order('email', { ascending: true })
-      .then(({ data, error }) => {
-        if (error) console.error(error)
-        setPeople(data || [])
-        setLoading(false)
+      .catch((error) => {
+        console.error(error)
+        if (!cancelled) setLoadError(error)
       })
-
-    // Lightweight: just user_id + date, last 90 days, across everyone —
-    // RLS lets an admin read every row, this is what makes "who's gone
-    // quiet" possible without opening each person's account individually.
-    const cutoff = new Date()
-    cutoff.setDate(cutoff.getDate() - 90)
-    supabase
-      .from('sessions')
-      .select('user_id, date')
-      .gte('date', toLocalISODate(cutoff))
-      .then(({ data, error }) => {
-        if (error) console.error(error)
-        setActivity(data || [])
-      })
-  }, [])
-
-  const activityByUser = useMemo(() => {
-    const weekStart = startOfWeekISO()
-    const map = {}
-    for (const row of activity) {
-      if (!map[row.user_id]) map[row.user_id] = { thisWeek: 0, lastDate: null }
-      if (row.date >= weekStart) map[row.user_id].thisWeek += 1
-      if (!map[row.user_id].lastDate || row.date > map[row.user_id].lastDate) {
-        map[row.user_id].lastDate = row.date
-      }
+      .finally(() => !cancelled && setLoading(false))
+    return () => {
+      cancelled = true
     }
-    return map
-  }, [activity])
+  }, [reload, today])
 
-  function manage(person) {
-    if (person.id === user.uid) {
-      setActingAs(null)
-    } else {
-      setActingAs(person.id, person.full_name || person.email, person.email)
-    }
-    navigate('/')
-  }
+  const trainees = useMemo(
+    () =>
+      rows
+        .filter((p) => p.id !== user.uid)
+        .map((p) => {
+          const flags = rosterFlags(p, today)
+          return { ...p, flags, score: attentionScore(flags), adh: adherence(p.week_counts, p.planned_per_week) }
+        }),
+    [rows, user.uid, today],
+  )
+  const me = rows.find((p) => p.id === user.uid)
+
+  const totals = useMemo(
+    () => ({
+      attention: trainees.filter((p) => p.score > 0).length,
+      review: trainees.reduce((n, p) => n + (p.to_review || 0), 0),
+      prs: trainees.reduce((n, p) => n + (p.prs_7d || 0), 0),
+      active: trainees.filter((p) => (p.week_counts || []).at(-1) > 0).length,
+    }),
+    [trainees],
+  )
+
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    let list = trainees.filter((p) => !q || `${p.full_name || ''} ${p.email || ''}`.toLowerCase().includes(q))
+    if (view === 'review') list = list.filter((p) => p.to_review > 0)
+    const name = (p) => (p.full_name || p.email || '').toLowerCase()
+    return [...list].sort((a, b) => {
+      if (view === 'recent') return (b.last_session || '').localeCompare(a.last_session || '') || name(a).localeCompare(name(b))
+      if (view === 'attention' || view === 'review') return b.score - a.score || (b.to_review || 0) - (a.to_review || 0) || name(a).localeCompare(name(b))
+      return name(a).localeCompare(name(b))
+    })
+  }, [trainees, query, view])
+
+  const views = [
+    ['attention', t('people.viewAttention')],
+    ['review', t('people.viewReview')],
+    ['recent', t('people.viewRecent')],
+    ['name', t('people.viewName')],
+  ]
 
   return (
     <div className="flex flex-col gap-5">
@@ -132,82 +110,162 @@ export default function People() {
         </div>
       </div>
 
-      {!loading && people.length === 0 && (
+      {loadError && !rows.length && <LoadError onRetry={() => setReload((r) => r + 1)} />}
+
+      {!loading && !loadError && trainees.length === 0 && (
         <EmptyState title={t('people.emptyTitle')} body={t('people.emptyBody')} />
       )}
 
+      {trainees.length > 0 && (
+        <>
+          <div className="grid grid-cols-4 gap-2">
+            <Tile label={t('people.tileAttention')} value={totals.attention} onClick={() => setView('attention')} active={view === 'attention'} warn={totals.attention > 0} />
+            <Tile label={t('people.tileReview')} value={totals.review} onClick={() => setView('review')} active={view === 'review'} />
+            <Tile label={t('people.tileActive')} value={`${totals.active}/${trainees.length}`} />
+            <Tile label={t('people.tilePrs')} value={totals.prs} />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            {trainees.length > 5 && (
+              <label className="relative block">
+                <Search size={15} className="absolute top-1/2 -translate-y-1/2 start-3 text-chalkdim pointer-events-none" />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t('people.searchPlaceholder')}
+                  className="w-full ps-9"
+                  aria-label={t('people.searchPlaceholder')}
+                />
+              </label>
+            )}
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1" role="tablist">
+              {views.map(([key, label]) => (
+                <button
+                  key={key}
+                  role="tab"
+                  aria-selected={view === key}
+                  onClick={() => setView(key)}
+                  className={`press shrink-0 rounded-full px-3 min-h-9 text-xs font-medium ${
+                    view === key ? 'bg-chalk text-ink' : 'bg-surface2 text-chalkdim'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
       <div className="flex flex-col gap-2">
-        {people.map((p) => {
-          const stats = activityByUser[p.id]
-          const dotColor = stats?.thisWeek > 0 ? 'bg-good' : stats?.lastDate ? 'bg-brass' : 'bg-chalkdim'
-          const activityText = stats?.thisWeek > 0
-            ? t('people.sessionThisWeek')(stats.thisWeek)
-            : stats?.lastDate
-              ? t('people.quietSince')(daysAgo(stats.lastDate))
-              : t('people.noSessionsYet')
-          return (
-            <Card key={p.id} className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap min-w-0">
-                  <p className="truncate min-w-0">{p.full_name || p.email}</p>
-                  {p.id === user.uid && <Badge>{t('people.you')}</Badge>}
-                  {p.is_admin && (
-                    <Badge tone="brass">
-                      <span className="inline-flex items-center gap-1">
-                        <ShieldCheck size={11} /> {t('people.adminBadge')}
-                      </span>
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-chalkdim text-xs mt-0.5 truncate">{p.email}</p>
-                {(() => {
-                  const cs = consents.find((x) => x.user_id === p.id)
-                  if (!cs) return <p className="text-xs mt-1 text-irontext">{t('people.termsNotAccepted')}</p>
-                  const stale = cs.version < TERMS_VERSION
-                  return (
-                    <p className={`text-xs mt-1 ${stale ? 'text-brass' : 'text-chalkdim'}`}>
-                      {stale
-                        ? t('people.termsOutdated', { version: cs.version })
-                        : t('people.termsAccepted', { date: fmtDate(lang, new Date(cs.accepted_at)) })}
-                      {cs.variant === 'minor' && cs.guardian_name ? ` · ${t('people.guardian', { name: cs.guardian_name })}` : ''}
-                    </p>
-                  )
-                })()}
-                {p.id !== user.uid && (
-                  <p className="text-xs mt-1 inline-flex items-center gap-1.5">
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
-                    <span className="text-chalkdim">{activityText}</span>
-                  </p>
-                )}
-                {!p.is_admin && (
-                  <div>
-                    <button
-                      onClick={() => toggleNutrition(p)}
-                      disabled={savingNutrition === p.id}
-                      aria-pressed={!!p.nutrition_enabled}
-                      className={`mt-2 inline-flex items-center gap-1.5 text-xs rounded-full border px-2.5 py-1 disabled:opacity-50 ${
-                        p.nutrition_enabled ? 'border-good text-good' : 'border-chalkdim/40 text-chalkdim'
-                      }`}
-                    >
-                      <Apple size={12} />
-                      {p.nutrition_enabled ? t('people.nutritionOn') : t('people.nutritionOff')}
-                    </button>
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={() => manage(p)}
-                className="shrink-0 inline-flex items-center gap-1.5 text-sm text-brass hover:underline"
-              >
-                {p.id === user.uid ? t('people.backToMyAccount') : t('people.manage')} <ForwardArrow size={14} />
-              </button>
-            </Card>
-          )
-        })}
+        {shown.map((p) => (
+          <TraineeRow key={p.id} p={p} today={today} t={t} />
+        ))}
+        {trainees.length > 0 && shown.length === 0 && (
+          <p className="text-chalkdim text-sm text-center py-6">{view === 'review' && !query ? t('people.nothingToReview') : t('people.noMatches')}</p>
+        )}
       </div>
+
+      {me && (
+        <Card className="flex items-center justify-between gap-3">
+          <div className="min-w-0 flex items-center gap-2">
+            <p className="truncate">{me.full_name || me.email}</p>
+            <Badge>{t('people.you')}</Badge>
+          </div>
+          <button onClick={() => setActingAs(null)} className="shrink-0 text-sm text-chalkdim">
+            {t('people.backToMyAccount')}
+          </button>
+        </Card>
+      )}
 
       {inviting && <InviteModal onClose={() => setInviting(false)} t={t} />}
     </div>
+  )
+}
+
+function Tile({ label, value, onClick, active, warn }) {
+  const Tag = onClick ? 'button' : 'div'
+  return (
+    <Tag
+      onClick={onClick}
+      className={`rounded-[14px] px-3 py-2.5 text-start ${onClick ? 'press' : ''} ${active ? 'bg-surface2' : 'bg-surface'}`}
+    >
+      <div className={`num text-xl leading-tight ${warn ? 'text-accent' : 'text-chalk'}`}>{value}</div>
+      <div className="text-[11px] text-chalkdim leading-tight mt-0.5">{label}</div>
+    </Tag>
+  )
+}
+
+// Eight weeks of sessions as tiny bars, this week last. The plan, when there
+// is one, sets the full height so a short week reads as short.
+function WeekBars({ counts = [], planned }) {
+  const top = Math.max(planned || 0, ...counts, 1)
+  return (
+    <div className="flex items-end gap-[3px] h-7" aria-hidden="true">
+      {counts.map((n, i) => (
+        <span
+          key={i}
+          className={`w-[5px] rounded-sm ${i === counts.length - 1 ? 'bg-accent' : planned && n >= planned ? 'bg-chalk/70' : 'bg-chalkdim/40'}`}
+          style={{ height: `${Math.max(n ? 18 : 6, (n / top) * 100)}%` }}
+        />
+      ))}
+    </div>
+  )
+}
+
+const FLAG_TONES = {
+  warn: 'bg-accentsoft text-accent',
+  accent: 'bg-surface2 text-chalk',
+  good: 'bg-good/10 text-good',
+  muted: 'bg-surface2 text-chalkdim',
+}
+
+export function FlagChips({ flags, t }) {
+  if (!flags.length) return null
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {flags.map((f) => (
+        <span key={f.key} className={`text-[11px] rounded-full px-2 py-0.5 font-medium ${FLAG_TONES[f.tone]}`}>
+          {t(`people.flag.${f.key}`)(f.n)}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function TraineeRow({ p, today, t }) {
+  const thisWeek = (p.week_counts || []).at(-1) || 0
+  const quiet = daysSince(p.last_session, today)
+  const dot = p.score > 0 ? 'bg-accent' : thisWeek > 0 ? 'bg-good' : p.last_session ? 'bg-chalkdim' : 'bg-chalkdim/40'
+  const stats = p.last_session
+    ? [
+        p.planned_per_week ? t('people.weekOfPlan')(thisWeek, p.planned_per_week) : t('people.sessionThisWeek')(thisWeek),
+        p.adh != null ? t('people.adherenceShort')(p.adh) : null,
+        t('people.lastSession')(quiet),
+      ].filter(Boolean)
+    : [t('people.noSessionsYet')]
+
+  return (
+    <Link to={`/people/${p.id}`} className="card p-4 press-row flex items-center gap-3">
+      <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
+      <div className="min-w-0 flex-1 flex flex-col gap-1.5">
+        <div className="flex items-center gap-2 min-w-0">
+          <p className="truncate min-w-0">{p.full_name || p.email}</p>
+          {p.is_admin && <Badge>{t('people.adminBadge')}</Badge>}
+        </div>
+        <p className="text-xs text-chalkdim num">{stats.join(' · ')}</p>
+        <FlagChips flags={p.flags} t={t} />
+        {p.pinned_note && (
+          <p className="text-xs text-chalkdim inline-flex items-center gap-1 min-w-0">
+            <Pin size={11} className="shrink-0" />
+            <span className="truncate">{p.pinned_note}</span>
+          </p>
+        )}
+      </div>
+      <WeekBars counts={p.week_counts} planned={p.planned_per_week} />
+      <ForwardChevron size={16} className="text-chalkdim shrink-0" />
+    </Link>
   )
 }
 
