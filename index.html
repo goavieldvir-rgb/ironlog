@@ -31,8 +31,70 @@
       href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=IBM+Plex+Sans+Hebrew:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <!-- Launch screen. Lives in the page itself so it is on screen from the
+         first paint, before any script arrives; src/lib/splash.js takes it
+         down once the app has something real to show. The same classes draw
+         the in-app loader (src/components/Loading.jsx). -->
+    <style>
+      html, body { margin: 0; background: #0B0B0C; }
+      .il-splash {
+        position: fixed; inset: 0; z-index: 100;
+        display: flex; align-items: center; justify-content: center;
+        background: #0B0B0C;
+        transition: opacity 320ms cubic-bezier(0.23, 1, 0.32, 1);
+      }
+      .il-splash.is-out { opacity: 0; pointer-events: none; }
+      /* Held back a moment so a fast load never flashes it. */
+      .il-loader {
+        display: flex; flex-direction: column; align-items: center; gap: 28px;
+        opacity: 0;
+        animation: il-in 480ms cubic-bezier(0.23, 1, 0.32, 1) 160ms forwards;
+      }
+      .il-mark {
+        display: flex; align-items: center; gap: 8px;
+        direction: ltr; /* the wordmark reads the same in Hebrew */
+        color: #F2F2EF;
+        font: 600 24px/1 Geist, 'IBM Plex Sans Hebrew', system-ui, sans-serif;
+        letter-spacing: 0.025em;
+      }
+      .il-mark svg { color: #FF6369; flex: none; }
+      .il-track {
+        position: relative; overflow: hidden;
+        width: 56px; height: 2px; border-radius: 1px;
+        background: #26262A;
+      }
+      .il-track::after {
+        content: ''; position: absolute; inset: 0;
+        width: 40%; border-radius: inherit;
+        background: rgb(255 91 58);
+        animation: il-glide 1400ms cubic-bezier(0.65, 0, 0.35, 1) infinite;
+      }
+      @keyframes il-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+      @keyframes il-glide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+      @keyframes il-breathe { from { opacity: 0.35; } to { opacity: 1; } }
+      @media (prefers-reduced-motion: reduce) {
+        .il-loader { animation-name: il-fade; }
+        .il-track::after { width: 100%; animation: il-breathe 1200ms ease-in-out infinite alternate; }
+        @keyframes il-fade { from { opacity: 0; } to { opacity: 1; } }
+      }
+    </style>
   </head>
   <body>
+    <div id="splash" class="il-splash" aria-hidden="true">
+      <div class="il-loader">
+        <div class="il-mark">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.4 14.4 9.6 9.6" />
+            <path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z" />
+            <path d="m21.5 21.5-1.4-1.4" />
+            <path d="M3.9 3.9 2.5 2.5" />
+            <path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z" />
+          </svg>
+          Ironlog
+        </div>
+        <div class="il-track"></div>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
