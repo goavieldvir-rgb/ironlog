@@ -179,7 +179,7 @@ create extension if not exists pg_trgm;
 alter table public.profiles add column if not exists nutrition_enabled boolean not null default false;
 create table if not exists public.foods (
   id uuid primary key default gen_random_uuid(),
-  source text not null check (source in ('moh', 'off', 'user', 'coach')),
+  source text not null check (source in ('moh', 'usda', 'off', 'user', 'coach')),
   source_ref text,                -- Tzameret code or OFF barcode
   barcode text check (barcode ~ '^[0-9]{8,14}$'),
   name_he text,
@@ -895,7 +895,7 @@ alter table public.foods enable row level security;
 
 drop policy if exists "foods readable" on public.foods;
 create policy "foods readable" on public.foods for select to authenticated using (
-  nutrition_allowed() and (verified or source in ('moh', 'off') or created_by = auth.uid() or is_admin())
+  nutrition_allowed() and (verified or source in ('moh', 'usda', 'off') or created_by = auth.uid() or is_admin())
 );
 
 -- A trainee may only add a label they typed (private until verified). Only

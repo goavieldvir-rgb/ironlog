@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Loader2, Plus, ScanBarcode, Search, X, Zap } from 'lucide-react'
 import { useLanguage } from '../../context/LanguageContext.jsx'
 import { Button } from '../ui.jsx'
@@ -8,7 +8,11 @@ import {
   fmt,
   foodName,
   friendlyError,
-  getRecentLogs,
+  getLogHistory,
+  historyMap,
+  matchHistory,
+  rankFoods,
+  searchLocal,
   getSavedMeals,
   FAV_EVENT,
   getFavorites,
@@ -19,7 +23,9 @@ import {
   logName,
   queryLang,
 } from '../../lib/nutrition.js'
-import { AmountText, Forward, MacroInputs, MealTabs, MohAttribution, N, Name, OffAttribution, SheetHeader, SourceLabel, mealLabel, useDirtyForm } from './parts.jsx'
+import { catalogFood, loadCatalog } from '../../lib/foodCatalog.js'
+import { isStrongMatch } from '../../lib/foodRank.js'
+import { AmountText, Forward, MacroInputs, MealTabs, MohAttribution, N, Name, OffAttribution, SheetHeader, SourceLabel, UsdaAttribution, mealLabel, useDirtyForm } from './parts.jsx'
 
 // Two-line row: name, then protein first, then kcal (quieter), then source.
 function Stats({ protein, kcal, extra, source }) {
@@ -49,7 +55,10 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
   const [results, setResults] = useState(null) // null = not searching
   const [searching, setSearching] = useState(false)
   const [searchErr, setSearchErr] = useState('')
-  const [recent, setRecent] = useState(null)
+  const [history, setHistory] = useState(null) // every food this diary logged, newest first
+  const recent = history && history.slice(0, 20)
+  const hist = useMemo(() => historyMap(history), [history])
+  const [catalogReady, setCatalogReady] = useState(false)
   const [meals, setMeals] = useState(null)
   const [favs, setFavs] = useState(null) // null = not loaded
   const [done, setDone] = useState({})
@@ -61,11 +70,27 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
   const seq = useRef(0)
   const q = query.trim()
 
-  // Debounced search.
+  // The on-device food list answers every keystroke at once; until it has
+  // loaded, search asks the database (debounced).
+  useEffect(() => {
+    let off = false
+    loadCatalog(authUid)
+      .then((foods) => !off && foods && setCatalogReady(true))
+      .catch((err) => console.error(err)) // the database search still works
+    return () => {
+      off = true
+    }
+  }, [authUid])
+
+  const localResults = useMemo(
+    () => (catalogReady && q.length >= 2 ? searchLocal(q, { uid: authUid, history: hist }) : null),
+    [catalogReady, q, authUid, hist],
+  )
+
   useEffect(() => {
     const my = ++seq.current
-    if (q.length < 2) {
-      setResults(null)
+    if (q.length < 2 || localResults) {
+      setResults(localResults)
       setSearching(false)
       setSearchErr('')
       return
@@ -73,7 +98,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
     setSearching(true)
     const timer = setTimeout(async () => {
       try {
-        const rows = await searchFoods(q)
+        const rows = await searchFoods(q, { uid: authUid, history: hist })
         if (my !== seq.current) return
         setResults(rows)
         setSearchErr('')
@@ -87,7 +112,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
     }, 250)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q])
+  }, [q, localResults])
 
   // Online search (Open Food Facts allows few requests per minute): wait for
   // the typing to stop, and drop the request when the query changes.
@@ -133,12 +158,12 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
   const [listErr, setListErr] = useState('')
   useEffect(() => {
     let off = false
-    getRecentLogs(uid)
-      .then((r) => !off && setRecent(r))
+    getLogHistory(uid)
+      .then((r) => !off && setHistory(r))
       .catch((err) => {
         console.error(err)
         if (!off) {
-          setRecent([])
+          setHistory([])
           setListErr(friendlyError(err, t, 'nutrition.loadFailed'))
         }
       })
@@ -227,8 +252,18 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
 
   // Results show names in the language the search was typed in.
   const qLang = queryLang(query, lang)
+  // Foods this diary logged before that match, first and with one-tap add.
+  const logged = useMemo(() => (q.length >= 2 ? matchHistory(history, q) : []), [history, q])
+  const loggedIds = new Set(logged.map((r) => r.food_id).filter(Boolean))
+  const shownResults = (results || []).filter((r) => !loggedIds.has(r.id))
   const localCodes = new Set((results || []).map((r) => r.barcode).filter(Boolean))
-  const shownOnline = online.filter((r) => !localCodes.has(r.barcode))
+  // Open Food Facts search is loose: keep only products whose name has every
+  // word of the query, best match first.
+  const shownOnline = useMemo(
+    () => rankFoods(online.filter((r) => !localCodes.has(r.barcode) && isStrongMatch(r, q)), q, { limit: 20 }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [online, results, q],
+  )
   const g = t('nutrition.g')
   const tabs = [
     ['recent', t('nutrition.tabRecent')],
@@ -329,13 +364,41 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
         )}
         {results !== null && !searchErr && (
           <>
-            {(results.length > 0 || searching || (!onlineBusy && !onlineErr && shownOnline.length === 0)) && (
+            {logged.length > 0 && (
+              <>
+                <h3 className="text-chalkdim text-xs pt-3 pb-1">{t('nutrition.loggedBefore')}</h3>
+                <ul className="divide-y divide-white/[0.06] mb-1">
+                  {logged.map((r) => {
+                    const food = r.food_id && catalogFood(authUid, r.food_id)
+                    const body = (
+                      <>
+                        <Name className="font-medium">{logName(r, qLang)}</Name>
+                        <Stats protein={r.protein} kcal={r.kcal} extra={r.grams != null ? <AmountText row={r} /> : null} />
+                      </>
+                    )
+                    return (
+                      <li key={r.id} className="flex items-center gap-3 py-2.5">
+                        {food ? (
+                          <button type="button" onClick={() => onPick(food)} className="min-w-0 flex-1 text-start press-row">
+                            {body}
+                          </button>
+                        ) : (
+                          <div className="min-w-0 flex-1">{body}</div>
+                        )}
+                        {addBtn(r.id, t('nutrition.addSameAmount'), () => logRecent(r))}
+                      </li>
+                    )
+                  })}
+                </ul>
+              </>
+            )}
+            {(shownResults.length > 0 || searching || (!onlineBusy && !onlineErr && shownOnline.length === 0 && logged.length === 0)) && (
               <p className="text-chalkdim text-xs py-3" role="status">
-                {searching ? t('nutrition.searching') : `${results.length === 1 ? t('nutrition.resultsOne') : t('nutrition.resultsCount', { n: results.length })} · ${t('nutrition.valuesPer100')}`}
+                {searching ? t('nutrition.searching') : `${shownResults.length === 1 ? t('nutrition.resultsOne') : t('nutrition.resultsCount', { n: shownResults.length })} · ${t('nutrition.valuesPer100')}`}
               </p>
             )}
             <ul className="divide-y divide-white/[0.06]">
-              {results.map((r) => (
+              {shownResults.map((r) => (
                 <li key={r.id}>
                   <button type="button" onClick={() => onPick(r)} className="w-full flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
                     <div className="min-w-0 flex-1">
@@ -347,7 +410,8 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
                 </li>
               ))}
             </ul>
-            {results.some((r) => r.source === 'moh') && <MohAttribution className="mt-3" />}
+            {shownResults.some((r) => r.source === 'moh') && <MohAttribution className="mt-3" />}
+            {shownResults.some((r) => r.source === 'usda') && <UsdaAttribution className="mt-1" />}
             {(onlineBusy || onlineErr || shownOnline.length > 0) && (
               <h3 className="text-chalkdim text-xs pt-4 pb-1">{t('nutrition.fromOff')}</h3>
             )}
@@ -382,12 +446,12 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
                 <OffAttribution className="mt-3" />
               </>
             )}
-            {!searching && !onlineBusy && !onlineErr && results.length === 0 && shownOnline.length === 0 && (
+            {!searching && !onlineBusy && !onlineErr && shownResults.length === 0 && logged.length === 0 && shownOnline.length === 0 && (
               <p className="text-chalkdim text-sm py-3">
                 {t('nutrition.noResults', { q })} {t('nutrition.noResultsHint')}
               </p>
             )}
-            {shownOnline.length === 0 && results.some((r) => r.source === 'off') && <OffAttribution className="mt-3" />}
+            {shownOnline.length === 0 && shownResults.some((r) => r.source === 'off') && <OffAttribution className="mt-3" />}
             <Button variant="ghost" className="w-full mt-4 min-h-[48px]" onClick={() => onLabel()}>
               <Plus size={18} /> {t('nutrition.addFromLabel')}
             </Button>

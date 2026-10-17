@@ -26,3 +26,14 @@ from net._http_response h, jsonb_to_recordset(h.content::jsonb) as r(source_ref 
 where h.id = <id>
 on conflict (source, source_ref) where source_ref is not null do update set name_he=excluded.name_he, name_en=excluded.name_en, kcal=excluded.kcal, protein=excluded.protein, carbs=excluded.carbs, fat=excluded.fat, fiber=excluded.fiber, units=excluded.units, search_text=excluded.search_text;
 ```
+
+# USDA staples
+
+`usda-staples.json` is a hand-picked set of generic gym staples that Tzameret
+lacks (Greek yogurt, whey and soy protein powder, PB2, lean ground beef, deli
+turkey, tofu, mozzarella ...). Values per 100 g and household units come from
+USDA FoodData Central SR Legacy (2018-04 release, public domain / CC0);
+`source_ref` is the FDC id. Hebrew names were written for the app.
+
+Load with `supabase-usda-foods.sql` (it carries the same rows), run once in the
+SQL Editor.
