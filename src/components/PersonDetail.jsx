@@ -148,15 +148,17 @@ export default function PersonDetail() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <Link to="/people" className="eyebrow inline-flex items-center gap-1 mb-2">
-          <BackChevron size={14} /> {t('people.title')}
-        </Link>
-        <h1 className="text-3xl break-words">{name}</h1>
-        <p className="text-chalkdim text-sm mt-0.5 truncate" dir="ltr" style={{ textAlign: 'start' }}>
-          {p.email}
-        </p>
-        <div className="flex gap-2 mt-4 flex-wrap">
+      <div className="lg:flex lg:items-end lg:justify-between lg:gap-6">
+        <div className="min-w-0">
+          <Link to="/people" className="eyebrow inline-flex items-center gap-1 mb-2">
+            <BackChevron size={14} /> {t('people.title')}
+          </Link>
+          <h1 className="text-3xl break-words">{name}</h1>
+          <p className="text-chalkdim text-sm mt-0.5 truncate" dir="ltr" style={{ textAlign: 'start' }}>
+            {p.email}
+          </p>
+        </div>
+        <div className="flex gap-2 mt-4 lg:mt-0 flex-wrap shrink-0">
           <Button variant="brass" onClick={() => openAccount('/')}>
             {t('person.openAccount')} <ForwardArrow size={15} />
           </Button>
@@ -169,7 +171,7 @@ export default function PersonDetail() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
         {stats.map((s) => (
           <div key={s.label} className="card px-4 py-3">
             <div className="eyebrow">{s.label}</div>
@@ -179,133 +181,138 @@ export default function PersonDetail() {
         ))}
       </div>
 
-      {data.notes.filter((n) => n.pinned).map((n) => (
-        <div key={n.id} className="card px-4 py-3 flex gap-2 items-start">
-          <Pin size={14} className="text-accent shrink-0 mt-0.5" />
-          <p className="text-sm whitespace-pre-wrap">{n.body}</p>
+      <div className="flex flex-col gap-5 lg:grid lg:grid-cols-3 lg:items-start">
+        <div className="flex flex-col gap-5 lg:col-span-2">
+          {data.notes.filter((n) => n.pinned).map((n) => (
+            <div key={n.id} className="card px-4 py-3 flex gap-2 items-start">
+              <Pin size={14} className="text-accent shrink-0 mt-0.5" />
+              <p className="text-sm whitespace-pre-wrap">{n.body}</p>
+            </div>
+          ))}
+
+          <Section title={t('person.toReview')} count={derived.toReview.length}
+            action={derived.toReview.length > 1 && (
+              <button onClick={markAllReviewed} className="shrink-0 whitespace-nowrap text-xs text-chalkdim inline-flex items-center gap-1 min-h-9">
+                <CheckCheck size={14} /> {t('person.markAllReviewed')}
+              </button>
+            )}
+          >
+            {derived.toReview.length === 0 ? (
+              <p className="text-sm text-chalkdim">{t('person.allReviewed')}</p>
+            ) : (
+              <SessionList sessions={derived.toReview} lang={lang} t={t} today={today} onOpen={(s) => openAccount(`/history/${s.id}`)} />
+            )}
+          </Section>
+
+          <Section title={t('person.consistency')} hint={derived.planned ? t('person.planLine')(derived.planned, !!derived.scheduled) : t('person.noPlan')}>
+            <div className="h-36 lg:h-56 -mx-1">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={derived.weeks.map((w) => ({ ...w, label: shortDate(lang, w.week) }))}>
+                  <XAxis dataKey="label" stroke={CHALKDIM} fontSize={10} tickLine={false} axisLine={false} interval={2} reversed={lang === 'he'} />
+                  <YAxis hide allowDecimals={false} domain={[0, (max) => Math.max(max, derived.planned || 0)]} />
+                  <Tooltip
+                    cursor={{ fill: 'transparent' }}
+                    contentStyle={{ background: SURFACE, border: 0, borderRadius: 12, fontSize: 13 }}
+                    labelStyle={{ color: CHALK }}
+                    formatter={(v) => [v, t('person.sessions')]}
+                  />
+                  {derived.planned && <ReferenceLine y={derived.planned} stroke={CHALKDIM} strokeDasharray="3 3" />}
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={28}>
+                    {derived.weeks.map((w, i) => (
+                      <Cell key={w.week} fill={i === derived.weeks.length - 1 ? ACCENT : derived.planned && w.count >= derived.planned ? CHALKDIM : MUTED} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Section>
+
+          {data.weights.length > 1 && (
+            <Section
+              title={t('person.bodyWeight')}
+              hint={data.goal?.target_weight ? t('person.targetWeight')(Number(data.goal.target_weight), derived.lastWeight.unit) : null}
+            >
+              <div className="h-36 lg:h-56 -mx-1">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={data.weights.filter((w) => w.date >= shiftDay(today, -182)).map((w) => ({ ...w, weight: Number(w.weight), label: shortDate(lang, w.date) }))}>
+                    <XAxis dataKey="label" stroke={CHALKDIM} fontSize={10} tickLine={false} axisLine={false} minTickGap={24} reversed={lang === 'he'} />
+                    <YAxis
+                      hide
+                      domain={[
+                        (min) => Math.floor(Math.min(min, Number(data.goal?.target_weight) || min) - 1),
+                        (max) => Math.ceil(Math.max(max, Number(data.goal?.target_weight) || max) + 1),
+                      ]}
+                    />
+                    <Tooltip contentStyle={{ background: SURFACE, border: 0, borderRadius: 12, fontSize: 13 }} labelStyle={{ color: CHALK }} formatter={(v) => [v, t('person.weight')]} />
+                    {data.goal?.target_weight && <ReferenceLine y={Number(data.goal.target_weight)} stroke={CHALKDIM} strokeDasharray="3 3" />}
+                    <Line type="monotone" dataKey="weight" stroke={ACCENT} strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </Section>
+          )}
+
+          {recent.length > 0 && (
+            <Section title={t('person.recentSessions')}>
+              <SessionList sessions={recent} lang={lang} t={t} today={today} onOpen={(s) => openAccount(`/history/${s.id}`)} showReviewed />
+            </Section>
+          )}
         </div>
-      ))}
-
-      <Section title={t('person.toReview')} count={derived.toReview.length}
-        action={derived.toReview.length > 1 && (
-          <button onClick={markAllReviewed} className="shrink-0 whitespace-nowrap text-xs text-chalkdim inline-flex items-center gap-1 min-h-9">
-            <CheckCheck size={14} /> {t('person.markAllReviewed')}
-          </button>
-        )}
-      >
-        {derived.toReview.length === 0 ? (
-          <p className="text-sm text-chalkdim">{t('person.allReviewed')}</p>
-        ) : (
-          <SessionList sessions={derived.toReview} lang={lang} t={t} today={today} onOpen={(s) => openAccount(`/history/${s.id}`)} />
-        )}
-      </Section>
-
-      <Section title={t('person.consistency')} hint={derived.planned ? t('person.planLine')(derived.planned, !!derived.scheduled) : t('person.noPlan')}>
-        <div className="h-36 -mx-1">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={derived.weeks.map((w) => ({ ...w, label: shortDate(lang, w.week) }))}>
-              <XAxis dataKey="label" stroke={CHALKDIM} fontSize={10} tickLine={false} axisLine={false} interval={2} reversed={lang === 'he'} />
-              <YAxis hide allowDecimals={false} domain={[0, (max) => Math.max(max, derived.planned || 0)]} />
-              <Tooltip
-                cursor={{ fill: 'transparent' }}
-                contentStyle={{ background: SURFACE, border: 0, borderRadius: 12, fontSize: 13 }}
-                labelStyle={{ color: CHALK }}
-                formatter={(v) => [v, t('person.sessions')]}
-              />
-              {derived.planned && <ReferenceLine y={derived.planned} stroke={CHALKDIM} strokeDasharray="3 3" />}
-              <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                {derived.weeks.map((w, i) => (
-                  <Cell key={w.week} fill={i === derived.weeks.length - 1 ? ACCENT : derived.planned && w.count >= derived.planned ? CHALKDIM : MUTED} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </Section>
-
-      {data.weights.length > 1 && (
-        <Section
-          title={t('person.bodyWeight')}
-          hint={data.goal?.target_weight ? t('person.targetWeight')(Number(data.goal.target_weight), derived.lastWeight.unit) : null}
-        >
-          <div className="h-36 -mx-1">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data.weights.filter((w) => w.date >= shiftDay(today, -182)).map((w) => ({ ...w, weight: Number(w.weight), label: shortDate(lang, w.date) }))}>
-                <XAxis dataKey="label" stroke={CHALKDIM} fontSize={10} tickLine={false} axisLine={false} minTickGap={24} reversed={lang === 'he'} />
-                <YAxis
-                  hide
-                  domain={[
-                    (min) => Math.floor(Math.min(min, Number(data.goal?.target_weight) || min) - 1),
-                    (max) => Math.ceil(Math.max(max, Number(data.goal?.target_weight) || max) + 1),
-                  ]}
+        <div className="flex flex-col gap-5">
+          {p.nutrition_enabled && (
+            <Section title={t('person.nutrition')} hint={t('person.lastSevenDays')}>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <MiniStat label={t('person.daysLogged')} value={`${derived.food.days}/7`} />
+                <MiniStat
+                  label={t('person.avgKcal')}
+                  value={derived.food.kcal != null ? Math.round(derived.food.kcal) : '—'}
+                  sub={data.targets?.kcal ? t('person.ofTarget')(data.targets.kcal) : null}
                 />
-                <Tooltip contentStyle={{ background: SURFACE, border: 0, borderRadius: 12, fontSize: 13 }} labelStyle={{ color: CHALK }} formatter={(v) => [v, t('person.weight')]} />
-                {data.goal?.target_weight && <ReferenceLine y={Number(data.goal.target_weight)} stroke={CHALKDIM} strokeDasharray="3 3" />}
-                <Line type="monotone" dataKey="weight" stroke={ACCENT} strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </Section>
-      )}
+                <MiniStat
+                  label={t('person.avgProtein')}
+                  value={derived.food.protein != null ? `${Math.round(derived.food.protein)}g` : '—'}
+                  sub={data.targets?.protein ? t('person.ofTarget')(`${Math.round(data.targets.protein)}g`) : null}
+                />
+              </div>
+            </Section>
+          )}
 
-      {data.prs.length > 0 && (
-        <Section title={t('person.records')}>
-          <ul className="flex flex-col gap-2">
-            {data.prs.slice(0, 6).map((r, i) => (
-              <li key={i} className="flex items-center gap-2 text-sm">
-                <Trophy size={13} className="text-accent shrink-0" />
-                <span className="flex-1 min-w-0 truncate">{r.detail}</span>
-                <span className="text-xs text-chalkdim num shrink-0">{fmtDate(lang, new Date(r.sent_at), { month: 'short', day: 'numeric' })}</span>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
+          {data.prs.length > 0 && (
+            <Section title={t('person.records')}>
+              <ul className="flex flex-col gap-2">
+                {data.prs.slice(0, 6).map((r, i) => (
+                  <li key={i} className="flex items-center gap-2 text-sm">
+                    <Trophy size={13} className="text-accent shrink-0" />
+                    <span className="flex-1 min-w-0 truncate">{r.detail}</span>
+                    <span className="text-xs text-chalkdim num shrink-0">{fmtDate(lang, new Date(r.sent_at), { month: 'short', day: 'numeric' })}</span>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
 
-      {p.nutrition_enabled && (
-        <Section title={t('person.nutrition')} hint={t('person.lastSevenDays')}>
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <MiniStat label={t('person.daysLogged')} value={`${derived.food.days}/7`} />
-            <MiniStat
-              label={t('person.avgKcal')}
-              value={derived.food.kcal != null ? Math.round(derived.food.kcal) : '—'}
-              sub={data.targets?.kcal ? t('person.ofTarget')(data.targets.kcal) : null}
-            />
-            <MiniStat
-              label={t('person.avgProtein')}
-              value={derived.food.protein != null ? `${Math.round(derived.food.protein)}g` : '—'}
-              sub={data.targets?.protein ? t('person.ofTarget')(`${Math.round(data.targets.protein)}g`) : null}
-            />
-          </div>
-        </Section>
-      )}
+          <GoalForm
+            traineeId={p.id}
+            goal={data.goal}
+            scheduled={derived.scheduled}
+            today={today}
+            t={t}
+            lang={lang}
+            onSaved={(goal) => setData((d) => ({ ...d, goal }))}
+            onError={() => toast(t('feedback.saveFailed'), 'error')}
+          />
 
-      <GoalForm
-        traineeId={p.id}
-        goal={data.goal}
-        scheduled={derived.scheduled}
-        today={today}
-        t={t}
-        lang={lang}
-        onSaved={(goal) => setData((d) => ({ ...d, goal }))}
-        onError={() => toast(t('feedback.saveFailed'), 'error')}
-      />
-
-      <Notes
-        traineeId={p.id}
-        notes={data.notes}
-        t={t}
-        lang={lang}
-        confirm={confirm}
-        onChange={(notes) => setData((d) => ({ ...d, notes }))}
-        onError={() => toast(t('feedback.saveFailed'), 'error')}
-      />
-
-      {recent.length > 0 && (
-        <Section title={t('person.recentSessions')}>
-          <SessionList sessions={recent} lang={lang} t={t} today={today} onOpen={(s) => openAccount(`/history/${s.id}`)} showReviewed />
-        </Section>
-      )}
+          <Notes
+            traineeId={p.id}
+            notes={data.notes}
+            t={t}
+            lang={lang}
+            confirm={confirm}
+            onChange={(notes) => setData((d) => ({ ...d, notes }))}
+            onError={() => toast(t('feedback.saveFailed'), 'error')}
+          />
+        </div>
+      </div>
 
       <p className={`text-xs ${!consent || consent.version < TERMS_VERSION ? 'text-accent' : 'text-chalkdim'}`}>
         {!consent

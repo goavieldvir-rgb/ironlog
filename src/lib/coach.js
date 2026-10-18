@@ -26,6 +26,19 @@ export async function fetchRoster(today = toLocalISODate()) {
   return check(await supabase.rpc('coach_roster', { p_today: today })) || []
 }
 
+// The team's records from the last week, newest first, for the desktop panel.
+export async function fetchRecentPrs(today = toLocalISODate()) {
+  return check(
+    await supabase
+      .from('admin_notifications')
+      .select('trainee_id, detail, sent_at')
+      .eq('type', 'pr')
+      .gte('sent_at', shiftDay(today, -6))
+      .order('sent_at', { ascending: false })
+      .limit(20),
+  )
+}
+
 // Share of planned sessions done over the last four full weeks (this week is
 // still running). week_counts is oldest first, the last one is this week.
 export function adherence(weekCounts, planned) {
