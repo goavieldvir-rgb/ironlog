@@ -41,11 +41,14 @@ as $function$
     where user_id = auth.uid() and doc_key = 'progress-photos'
     order by accepted_at desc limit 1
   ), false)
-  and coalesce((
-    select variant <> 'minor' from consents
-    where user_id = auth.uid() and doc_key = 'training-terms'
-    order by version desc, accepted_at desc limit 1
-  ), false);
+  and exists (
+    select 1 from consents where user_id = auth.uid() and doc_key = 'training-terms'
+  )
+  -- Anyone who ever signed up as under 18 stays out, so a later 'adult' row
+  -- written by hand can't switch photos on.
+  and not exists (
+    select 1 from consents where user_id = auth.uid() and doc_key = 'training-terms' and variant = 'minor'
+  );
 $function$;
 revoke execute on function public.photos_allowed() from public, anon;
 grant execute on function public.photos_allowed() to authenticated;
@@ -115,3 +118,17 @@ begin
   end if;
 end $$;
 select cron.schedule('purge-progress-photos', '30 2 * * *', 'select public.run_photo_purge()');
+
+-- coach_roster showed the newest consent of any kind as the trainee's terms
+-- acceptance; a photo consent row would hide an outdated or under-18 terms
+-- record. Read only the terms rows. (Edits the live definition in place.)
+do $$
+declare d text;
+begin
+  d := pg_get_functiondef('public.coach_roster(date)'::regprocedure);
+  if position('training-terms' in d) = 0 then
+    execute replace(d, 'where cs.user_id = p.id order by cs.accepted_at desc limit 1',
+      'where cs.user_id = p.id and cs.doc_key = ''training-terms''
+    order by cs.version desc, cs.accepted_at desc limit 1');
+  end if;
+end $$;

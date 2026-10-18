@@ -11,23 +11,24 @@ const BUCKET = 'progress-photos'
 export const ANGLES = ['front', 'side', 'back']
 // Links to an image stop working after this long, so a copied link is useless.
 const LINK_SECONDS = 300
+// Pages re-sign their links a minute before they run out.
+export const LINK_REFRESH_MS = (LINK_SECONDS - 60) * 1000
 const MAX_SIDE = 1600
 
 // { enabled, minor }: photos are on when the latest photo consent is
-// 'granted', and never offered to someone who signed up as under 18.
+// 'granted', and never offered to anyone who ever signed up as under 18
+// (the same rule as photos_allowed() in the database).
 export async function fetchPhotoStatus(uid) {
-  const [photos, terms] = await Promise.all([
+  const [photos, minor] = await Promise.all([
     supabase.from('consents').select('variant, accepted_at').eq('user_id', uid).eq('doc_key', PHOTOS_DOC_KEY)
       .order('accepted_at', { ascending: false }).limit(1),
-    supabase.from('consents').select('variant').eq('user_id', uid).eq('doc_key', TERMS_DOC_KEY)
-      .order('version', { ascending: false }).order('accepted_at', { ascending: false }).limit(1),
+    supabase.from('consents').select('id').eq('user_id', uid).eq('doc_key', TERMS_DOC_KEY).eq('variant', 'minor').limit(1),
   ])
   if (photos.error) throw photos.error
-  if (terms.error) throw terms.error
+  if (minor.error) throw minor.error
   return {
     enabled: photos.data?.[0]?.variant === 'granted',
-    since: photos.data?.[0]?.variant === 'granted' ? photos.data[0].accepted_at : null,
-    minor: terms.data?.[0]?.variant === 'minor',
+    minor: minor.data.length > 0,
   }
 }
 
@@ -50,17 +51,53 @@ export async function photoUrls(paths) {
   return Object.fromEntries((data || []).filter((d) => d.signedUrl).map((d) => [d.path, d.signedUrl]))
 }
 
+// Saves one photo to the device, named by date and angle.
+export async function downloadPhoto(photo) {
+  const name = `progress-${photo.taken_on}-${photo.angle}.jpg`
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(photo.path, 60, { download: name })
+  if (error) throw error
+  const a = document.createElement('a')
+  a.href = data.signedUrl
+  a.download = name
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+}
+
 // Re-encodes the picked image as a JPEG no larger than MAX_SIDE. Drawing it
 // on a canvas keeps only the pixels, so location and camera details in the
 // original file never leave the phone.
+// Browsers apply the photo's rotation when they decode it into an <img>,
+// which also works on older iPhones without createImageBitmap for files.
+function decodeImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      resolve(img)
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('IMAGE_DECODE_FAILED'))
+    }
+    img.src = url
+  })
+}
+
 export async function prepareImage(file) {
-  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
-  const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height))
+  const img = await decodeImage(file)
+  const w = img.naturalWidth
+  const h = img.naturalHeight
+  const scale = Math.min(1, MAX_SIDE / Math.max(w, h))
   const canvas = document.createElement('canvas')
-  canvas.width = Math.round(bitmap.width * scale)
-  canvas.height = Math.round(bitmap.height * scale)
-  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-  bitmap.close?.()
+  canvas.width = Math.round(w * scale)
+  canvas.height = Math.round(h * scale)
+  const ctx = canvas.getContext('2d')
+  // JPEG has no transparency; without this a see-through PNG turns black.
+  ctx.fillStyle = '#fff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85))
   if (!blob) throw new Error('IMAGE_ENCODE_FAILED')
   return blob

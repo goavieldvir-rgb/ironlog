@@ -25,12 +25,31 @@ async function removeFiles(paths: string[]) {
   }
 }
 
-async function folderFiles(folder: string) {
-  const out: string[] = []
+async function list(folder: string) {
+  const out: { name: string; id: string | null }[] = []
   for (let offset = 0; ; offset += 1000) {
     const { data, error } = await db.storage.from(BUCKET).list(folder, { limit: 1000, offset })
     if (error) throw error
-    for (const f of data || []) if (f.id) out.push(`${folder}/${f.name}`)
+    out.push(...(data || []))
+    if (!data || data.length < 1000) return out
+  }
+}
+
+// Every file in a person's folder, including any whose row is missing.
+async function folderFiles(folder: string) {
+  return (await list(folder)).filter((f) => f.id).map((f) => `${folder}/${f.name}`)
+}
+
+async function allPhotoRows() {
+  const out: { id: string; user_id: string; path: string; created_at: string }[] = []
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db
+      .from('progress_photos')
+      .select('id, user_id, path, created_at')
+      .order('id')
+      .range(from, from + 999)
+    if (error) throw error
+    out.push(...(data || []))
     if (!data || data.length < 1000) return out
   }
 }
@@ -41,12 +60,10 @@ async function purge() {
   let removedPhotos = 0
   let removedOrphans = 0
 
-  const { data: photos, error } = await db.from('progress_photos').select('id, user_id, path, created_at')
-  if (error) throw error
-  const byUser = new Map<string, typeof photos>()
-  for (const p of photos || []) byUser.set(p.user_id, [...(byUser.get(p.user_id) || []), p])
+  const byUser = new Map<string, Awaited<ReturnType<typeof allPhotoRows>>>()
+  for (const p of await allPhotoRows()) byUser.set(p.user_id, [...(byUser.get(p.user_id) || []), p])
 
-  for (const [uid, list] of byUser) {
+  for (const [uid, rows] of byUser) {
     const { data: consent, error: cErr } = await db
       .from('consents')
       .select('variant')
@@ -58,29 +75,31 @@ async function purge() {
     const withdrawn = consent?.[0]?.variant !== 'granted'
     const { data: last, error: sErr } = await db.from('sessions').select('date').eq('user_id', uid).order('date', { ascending: false }).limit(1)
     if (sErr) throw sErr
-    const lastPhoto = list!.reduce((m, p) => (p.created_at > m ? p.created_at : m), '')
+    const lastPhoto = rows.reduce((m, p) => (p.created_at > m ? p.created_at : m), '')
     const inactive = (!last?.[0] || last[0].date < cutoffDate) && new Date(lastPhoto) < cutoff
     if (!withdrawn && !inactive) continue
-    await removeFiles(list!.map((p) => p.path))
-    const { error: delErr } = await db.from('progress_photos').delete().in('id', list!.map((p) => p.id))
-    if (delErr) throw delErr
-    removedPhotos += list!.length
+    const files = new Set([...rows.map((p) => p.path), ...(await folderFiles(uid))])
+    await removeFiles([...files])
+    for (let i = 0; i < rows.length; i += 100) {
+      const { error: delErr } = await db.from('progress_photos').delete().in('id', rows.slice(i, i + 100).map((p) => p.id))
+      if (delErr) throw delErr
+    }
+    removedPhotos += files.size
   }
 
   // Top-level folders are user ids; a folder with no matching profile was
   // left behind by a deleted account.
-  const { data: folders, error: listErr } = await db.storage.from(BUCKET).list('', { limit: 1000 })
-  if (listErr) throw listErr
-  const names = (folders || []).filter((f) => !f.id).map((f) => f.name)
-  if (names.length) {
-    const { data: profiles, error: pErr } = await db.from('profiles').select('id').in('id', names)
+  const names = (await list('')).filter((f) => !f.id).map((f) => f.name)
+  const alive = new Set<string>()
+  for (let i = 0; i < names.length; i += 100) {
+    const { data, error: pErr } = await db.from('profiles').select('id').in('id', names.slice(i, i + 100))
     if (pErr) throw pErr
-    const alive = new Set((profiles || []).map((p) => p.id))
-    for (const folder of names.filter((n) => !alive.has(n))) {
-      const files = await folderFiles(folder)
-      await removeFiles(files)
-      removedOrphans += files.length
-    }
+    for (const p of data || []) alive.add(p.id)
+  }
+  for (const folder of names.filter((n) => !alive.has(n))) {
+    const files = await folderFiles(folder)
+    await removeFiles(files)
+    removedOrphans += files.length
   }
 
   return json({ removedPhotos, removedOrphans })

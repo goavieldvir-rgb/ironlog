@@ -38,8 +38,10 @@ export default function PhotoCompare({ photos, urls }) {
   if (!angles.length) return null
   const latest = byDate.length > 1 ? byDate.at(-1) : null
   const preset = pair === 'first' ? byDate[0] : byDate.at(-2) || byDate[0]
-  const before = pair === 'custom' ? byDate.find((p) => p.taken_on === beforeDate) || preset : preset
-  const after = pair === 'custom' && latest ? byDate.find((p) => p.taken_on === afterDate) || latest : latest
+  let before = pair === 'custom' ? byDate.find((p) => p.taken_on === beforeDate) || preset : preset
+  let after = pair === 'custom' && latest ? byDate.find((p) => p.taken_on === afterDate) || latest : latest
+  // Two dates picked the wrong way round still read as before -> after.
+  if (before && after && before.taken_on > after.taken_on) [before, after] = [after, before]
 
   function pick(which, date) {
     setBeforeDate(which === 'before' ? date : before?.taken_on)
@@ -51,35 +53,35 @@ export default function PhotoCompare({ photos, urls }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex gap-2 flex-wrap items-center">
-      {angles.length > 1 && (
-        <div role="tablist" className="flex gap-1 bg-surface2 rounded-[12px] p-1">
-          {angles.map((a) => (
-            <button
-              key={a}
-              role="tab"
-              aria-selected={a === current}
-              onClick={() => setAngle(a)}
-              className={`px-3 min-h-9 rounded-[9px] text-sm ${a === current ? 'bg-surface text-chalk' : 'text-chalkdim'}`}
-            >
-              {t(`photos.angle.${a}`)}
-            </button>
-          ))}
-        </div>
-      )}
-      {byDate.length > 2 && (
-        <div className="flex gap-1 bg-surface2 rounded-[12px] p-1" role="group" aria-label={t('photos.compareWith')}>
-          {['previous', 'first'].map((k) => (
-            <button
-              key={k}
-              aria-pressed={pair === k}
-              onClick={() => setPair(k)}
-              className={`px-3 min-h-9 rounded-[9px] text-sm ${pair === k ? 'bg-surface text-chalk' : 'text-chalkdim'}`}
-            >
-              {t(`photos.vs.${k}`)}
-            </button>
-          ))}
-        </div>
-      )}
+        {angles.length > 1 && (
+          <div role="tablist" className="flex gap-1 bg-surface2 rounded-[12px] p-1">
+            {angles.map((a) => (
+              <button
+                key={a}
+                role="tab"
+                aria-selected={a === current}
+                onClick={() => setAngle(a)}
+                className={`px-3 min-h-9 rounded-[9px] text-sm ${a === current ? 'bg-surface text-chalk' : 'text-chalkdim'}`}
+              >
+                {t(`photos.angle.${a}`)}
+              </button>
+            ))}
+          </div>
+        )}
+        {byDate.length > 2 && (
+          <div className="flex gap-1 bg-surface2 rounded-[12px] p-1" role="group" aria-label={t('photos.compareWith')}>
+            {['previous', 'first'].map((k) => (
+              <button
+                key={k}
+                aria-pressed={pair === k}
+                onClick={() => setPair(k)}
+                className={`px-3 min-h-9 rounded-[9px] text-sm ${pair === k ? 'bg-surface text-chalk' : 'text-chalkdim'}`}
+              >
+                {t(`photos.vs.${k}`)}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-2 max-w-2xl">

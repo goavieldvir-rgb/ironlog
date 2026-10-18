@@ -1,16 +1,18 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Camera, Lock, Trash2 } from 'lucide-react'
+import { Camera, Download, Lock, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
 import {
   ANGLES,
+  LINK_REFRESH_MS,
   fetchPhotoStatus,
   listPhotos,
   photoUrls,
   addPhoto,
   deletePhoto,
+  downloadPhoto,
   turnPhotosOn,
   turnPhotosOff,
 } from '../lib/photos.js'
@@ -43,24 +45,53 @@ export default function ProgressPhotos({ uid, mode = 'own' }) {
   const [showAll, setShowAll] = useState(false)
   const [form, setForm] = useState({ date: toLocalISODate(), angle: 'front' })
   const fileRef = useRef(null)
+  // Only the newest load may write state, so a slow answer for the previous
+  // trainee can never show up on the next one's page.
+  const loadId = useRef(0)
 
   const load = useCallback(async () => {
+    const id = ++loadId.current
     try {
       const st = await fetchPhotoStatus(uid)
       const list = st.minor ? [] : await listPhotos(uid)
+      const signed = await photoUrls(list.map((p) => p.path))
+      if (id !== loadId.current) return
       setStatus(st)
       setPhotos(list)
-      setUrls(await photoUrls(list.map((p) => p.path)))
+      setUrls(signed)
       setFailed(false)
     } catch (e) {
       console.error(e)
-      setFailed(true)
+      if (id === loadId.current) setFailed(true)
     }
   }, [uid])
 
   useEffect(() => {
+    setStatus(null)
+    setPhotos([])
+    setUrls({})
+    setFailed(false)
+    setShowConsent(false)
+    setShowAll(false)
     load()
+    return () => {
+      loadId.current++
+    }
   }, [load])
+
+  // The image links expire, so a page left open (or a phone coming back
+  // from the background) gets fresh ones.
+  useEffect(() => {
+    if (!photos.length) return
+    const refresh = () => photoUrls(photos.map((p) => p.path)).then(setUrls).catch((e) => console.error(e))
+    const timer = setInterval(refresh, LINK_REFRESH_MS)
+    const onVisible = () => document.visibilityState === 'visible' && refresh()
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [photos])
 
   async function enable() {
     setBusy('consent')
@@ -108,9 +139,18 @@ export default function ProgressPhotos({ uid, mode = 'own' }) {
       toast(t('photos.added'))
     } catch (err) {
       console.error(err)
-      toast(t('photos.addFailed'), 'error')
+      toast(t(err?.message === 'IMAGE_DECODE_FAILED' ? 'photos.unsupported' : 'photos.addFailed'), 'error')
     } finally {
       setBusy(null)
+    }
+  }
+
+  async function save(p) {
+    try {
+      await downloadPhoto(p)
+    } catch (e) {
+      console.error(e)
+      toast(t('photos.downloadFailed'), 'error')
     }
   }
 
@@ -210,13 +250,24 @@ export default function ProgressPhotos({ uid, mode = 'own' }) {
                   <div className="text-chalk">{t(`photos.angle.${p.angle}`)}</div>
                   <div className="text-chalkdim num">{shortDate(lang, p.taken_on)}</div>
                 </div>
-                <button
-                  onClick={() => remove(p)}
-                  aria-label={t('common.delete')}
-                  className="absolute top-0 end-0 min-w-[40px] min-h-[40px] inline-flex items-center justify-center text-chalk"
-                >
-                  <span className="rounded-full bg-ink/70 p-1.5"><Trash2 size={13} /></span>
-                </button>
+                <div className="absolute top-0 end-0 flex">
+                  {own && (
+                    <button
+                      onClick={() => save(p)}
+                      aria-label={t('photos.download')}
+                      className="min-w-[40px] min-h-[40px] inline-flex items-center justify-center text-chalk"
+                    >
+                      <span className="rounded-full bg-ink/70 p-1.5"><Download size={13} /></span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => remove(p)}
+                    aria-label={t('common.delete')}
+                    className="min-w-[40px] min-h-[40px] inline-flex items-center justify-center text-chalk"
+                  >
+                    <span className="rounded-full bg-ink/70 p-1.5"><Trash2 size={13} /></span>
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -228,7 +279,7 @@ export default function ProgressPhotos({ uid, mode = 'own' }) {
         </div>
       )}
 
-      {own && status.enabled && (
+      {own && (status.enabled || photos.length > 0) && (
         <div className="flex items-center justify-between gap-3 flex-wrap border-t border-line pt-3">
           <p className="text-xs text-chalkdim flex items-center gap-1.5">
             <Lock size={12} /> {t('photos.privateNote')}

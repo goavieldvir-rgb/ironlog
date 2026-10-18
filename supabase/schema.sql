@@ -1155,7 +1155,8 @@ begin
   ) f on true
   left join lateral (
     select cs.version, cs.variant, cs.accepted_at, cs.guardian_name from consents cs
-    where cs.user_id = p.id order by cs.accepted_at desc limit 1
+    where cs.user_id = p.id and cs.doc_key = 'training-terms'
+    order by cs.version desc, cs.accepted_at desc limit 1
   ) c on true
   order by coalesce(p.full_name, p.email);
 end;
@@ -1205,11 +1206,14 @@ as $function$
     where user_id = auth.uid() and doc_key = 'progress-photos'
     order by accepted_at desc limit 1
   ), false)
-  and coalesce((
-    select variant <> 'minor' from consents
-    where user_id = auth.uid() and doc_key = 'training-terms'
-    order by version desc, accepted_at desc limit 1
-  ), false);
+  and exists (
+    select 1 from consents where user_id = auth.uid() and doc_key = 'training-terms'
+  )
+  -- Anyone who ever signed up as under 18 stays out, so a later 'adult' row
+  -- written by hand can't switch photos on.
+  and not exists (
+    select 1 from consents where user_id = auth.uid() and doc_key = 'training-terms' and variant = 'minor'
+  );
 $function$;
 revoke execute on function public.photos_allowed() from public, anon;
 grant execute on function public.photos_allowed() to authenticated;

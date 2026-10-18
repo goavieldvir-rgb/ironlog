@@ -40,7 +40,7 @@ export const privacy = {
       {
         heading: 'Progress photos',
         body:
-          'Progress photos are optional and off until you turn them on, with a separate agreement. Only you and your coach can see them; they are never public, shared or used for marketing. Each photo is resized and its location and camera details removed on your phone before upload, and it is shown only through links that expire after a few minutes. You can delete any photo, and turning photos off deletes all of them. They are deleted automatically if you stop training for 12 months, and when your account is deleted. Progress photos are not available to anyone under 18.',
+          'Progress photos are optional and off until you turn them on, with a separate agreement. Only you and your coach can see them; they are never public, never shared with anyone else, and never used for marketing. Each photo is resized and its location and camera details removed on your phone before upload, and it is shown only through links that expire after a few minutes. You can save or delete any photo, and turning photos off deletes all of them. They are deleted automatically if you stop training for 12 months, and when your account is deleted. Progress photos are not available to anyone under 18.',
       },
       {
         heading: 'Who can see it',
@@ -60,7 +60,7 @@ export const privacy = {
       {
         heading: 'How long it is kept',
         body:
-          'While your account exists. Deleting your account removes your data, including the record that you accepted the terms. Error reports are deleted after 90 days; if you delete your account sooner, they stay until then without your name. Backups are cleared by the host on its normal cycle.',
+          'While your account exists; progress photos are deleted sooner if you stop training for 12 months. Deleting your account removes your data, including the record that you accepted the terms. Error reports are deleted after 90 days; if you delete your account sooner, they stay until then without your name. Backups are cleared by the host on its normal cycle.',
       },
       {
         heading: 'Your rights',
@@ -99,7 +99,7 @@ export const privacy = {
       {
         heading: 'תמונות התקדמות',
         body:
-          'תמונות התקדמות הן אופציונליות וכבויות עד שתפעילו אותן, בהסכמה נפרדת. רק אתם והמאמן יכולים לראות אותן; הן לעולם לא ציבוריות, לא משותפות ולא משמשות לשיווק. כל תמונה מוקטנת, ופרטי המיקום והמצלמה נמחקים ממנה בטלפון לפני ההעלאה, והיא מוצגת רק דרך קישורים שפגים אחרי כמה דקות. אפשר למחוק כל תמונה, וכיבוי התמונות מוחק את כולן. הן נמחקות אוטומטית אם לא תתאמנו 12 חודשים, וכשהחשבון נמחק. תמונות התקדמות אינן זמינות למי שמתחת לגיל 18.',
+          'תמונות התקדמות הן אופציונליות וכבויות עד שתפעילו אותן, בהסכמה נפרדת. רק אתם והמאמן יכולים לראות אותן; הן לעולם לא ציבוריות, לא משותפות עם אחרים ולא משמשות לשיווק. כל תמונה מוקטנת, ופרטי המיקום והמצלמה נמחקים ממנה בטלפון לפני ההעלאה, והיא מוצגת רק דרך קישורים שתוקפם פג אחרי כמה דקות. אפשר לשמור או למחוק כל תמונה, וכיבוי התמונות מוחק את כולן. הן נמחקות אוטומטית אם לא תתאמנו במשך 12 חודשים, וכשהחשבון נמחק. תמונות התקדמות אינן זמינות למי שמתחת לגיל 18.',
       },
       {
         heading: 'מי יכול לראות',
@@ -119,7 +119,7 @@ export const privacy = {
       {
         heading: 'כמה זמן זה נשמר',
         body:
-          'כל עוד החשבון קיים. מחיקת החשבון מסירה את הנתונים שלכם, כולל הרישום על כך שאישרתם את התנאים. דוחות שגיאה נמחקים אחרי 90 יום; אם תמחקו את החשבון לפני כן, הם יישארו עד אז בלי שמכם. הגיבויים מתנקים אצל המארח במחזור הרגיל שלו.',
+          'כל עוד החשבון קיים; תמונות התקדמות נמחקות מוקדם יותר אם לא תתאמנו במשך 12 חודשים. מחיקת החשבון מסירה את הנתונים שלכם, כולל הרישום על כך שאישרתם את התנאים. דוחות שגיאה נמחקים אחרי 90 יום; אם תמחקו את החשבון לפני כן, הם יישארו עד אז בלי שמכם. הגיבויים מתנקים אצל המארח במחזור הרגיל שלו.',
       },
       {
         heading: 'הזכויות שלכם',
