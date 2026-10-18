@@ -21,6 +21,7 @@ import {
 } from '../lib/db.js'
 import { Button, Card, EmptyState, LoadError, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
+import ProgressPhotos from './ProgressPhotos.jsx'
 import { ACCENT, CHALK, CHALKDIM, MUTED, GRID, SURFACE } from '../theme.js'
 
 const COLORS = { iron: ACCENT, chalk: CHALK, chalkdim: CHALKDIM, grid: GRID }
@@ -54,7 +55,7 @@ function fullDate(lang, iso) {
 const emptyForm = { date: todayISO(), weight: '', unit: 'kg' }
 
 export default function BodyWeight() {
-  const { effectiveUid } = useAdmin()
+  const { effectiveUid, actingAs } = useAdmin()
   const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
   const [entries, loading, refresh, loadError] = useCollection(effectiveUid, 'body_weight_logs', 'date', 'asc')
@@ -239,6 +240,11 @@ export default function BodyWeight() {
           ))}
         </Card>
       )}
+
+      <Card>
+        <h2 className="eyebrow mb-3">{t('photos.title')}</h2>
+        <ProgressPhotos uid={effectiveUid} mode={actingAs ? 'coach' : 'own'} />
+      </Card>
     </div>
   )
 }

@@ -8,12 +8,13 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { supabase } from '../supabase.js'
+import { deleteAllPhotos } from '../lib/photos.js'
 import { Button, Card, Field } from './ui.jsx'
 
 // Everything a person has in Ironlog, read fresh from the database (not
 // from whatever a page happened to have loaded).
 async function fetchAllData(uid) {
-  const tables = ['exercises', 'routines', 'sessions', 'body_weight_logs', 'weekly_schedule']
+  const tables = ['exercises', 'routines', 'sessions', 'body_weight_logs', 'weekly_schedule', 'progress_photos']
   const results = await Promise.all(tables.map((tb) => supabase.from(tb).select('*').eq('user_id', uid)))
   const { data: profile, error: pErr } = await supabase.from('profiles').select('*').eq('id', uid).single()
   if (pErr) throw pErr
@@ -127,6 +128,9 @@ export default function Account() {
     if (!ok) return
     setBusy('delete')
     try {
+      // Image files aren't removed by the database function, so delete them
+      // first. Best effort: the nightly purge removes anything left behind.
+      await deleteAllPhotos(effectiveUid).catch((err) => console.error(err))
       const { error } = await supabase.rpc('delete_my_account')
       if (error) throw error
       await logout()

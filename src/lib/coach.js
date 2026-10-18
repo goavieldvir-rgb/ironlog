@@ -1,6 +1,6 @@
 import { supabase } from '../supabase.js'
 import { toLocalISODate, weekStartOf } from './dates.js'
-import { TERMS_VERSION } from '../legal/terms.js'
+import { TERMS_VERSION, TERMS_DOC_KEY } from '../legal/terms.js'
 
 // Coach-side data for the People page and a trainee's coach page. The
 // roster comes from one database call (coach_roster, supabase-coach-tools.sql)
@@ -124,6 +124,8 @@ export async function fetchTraineeDetail(uid, today = toLocalISODate()) {
       .from('consents')
       .select('version, variant, accepted_at, guardian_name')
       .eq('user_id', uid)
+      .eq('doc_key', TERMS_DOC_KEY)
+      .order('version', { ascending: false })
       .order('accepted_at', { ascending: false })
       .limit(1)
       .then(check),
