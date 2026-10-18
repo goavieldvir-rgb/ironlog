@@ -214,7 +214,7 @@ function check({ data, error }) {
 
 // ---------------------------------------------------------------- diary
 
-const LOG_SELECT = '*, food:foods(name_he,name_en,units)'
+const LOG_SELECT = '*, food:foods(name_he,name_en,units,barcode)'
 
 export async function getLogs(uid, date) {
   return check(

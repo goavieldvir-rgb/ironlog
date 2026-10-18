@@ -58,6 +58,13 @@ Isopure, Ghost, Premier Protein, Fulfil, Oikos, Kind, Clif and more, up to
 Pringles, Kellogg's, Alpro, Barilla and more, the 50 most popular each, English
 names only). Same filters, minus anything already in the first file.
 
+Both files were then cleaned: dropped rows named only by their brand, names in
+other scripts, test rows, exact repeats, and energy that contradicts the
+macros (more than 100 kcal off, or 0 kcal with macros); HTML entities and
+stray spaces or punctuation removed from names; all-caps names title-cased;
+brand spellings unified ("MYPROTEIN", "My Protein" -> "Myprotein"); fiber
+capped at carbs; pack sizes over 5 kg removed where they were not real.
+
 Load each like Tzameret (pg_net), as source 'off' with no `created_by`:
 
 ```sql

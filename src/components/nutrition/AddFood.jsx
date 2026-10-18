@@ -120,9 +120,11 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
   // dropped when the query changes.
   const [onlineAsked, setOnlineAsked] = useState('')
   const logged = useMemo(() => (q.length >= 2 ? matchHistory(history, q) : []), [history, q])
+  const loggedIds = useMemo(() => new Set(logged.map((r) => r.food_id).filter(Boolean)), [logged])
+  // Distinct foods: a logged food is also among the results.
   const strongHeld = useMemo(
-    () => logged.length + (results || []).filter((r) => isStrongMatch(r, q)).length,
-    [logged, results, q],
+    () => logged.length + (results || []).filter((r) => !loggedIds.has(r.id) && isStrongMatch(r, q)).length,
+    [logged, loggedIds, results, q],
   )
   const autoOnline = results !== null && !searching && strongHeld < 5
   const runOnline = q.length >= 2 && (autoOnline || onlineAsked === q)
@@ -267,13 +269,14 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
   // hold and live Open Food Facts products. OFF search is loose, so a live
   // product only shows when its name has every word of the query.
   const shownResults = useMemo(() => {
-    const loggedIds = new Set(logged.map((r) => r.food_id).filter(Boolean))
     const held = (results || []).filter((r) => !loggedIds.has(r.id))
     if (!online.length) return held
-    const codes = new Set([...(catalogBarcodes(authUid) || []), ...held.map((r) => r.barcode).filter(Boolean)])
+    const codes = new Set(
+      [...(catalogBarcodes(authUid) || []), ...(results || []).map((r) => r.barcode), ...logged.map((r) => r.food?.barcode)].filter(Boolean),
+    )
     const live = online.filter((r) => !codes.has(r.barcode) && isStrongMatch(r, q))
     return live.length ? rankFoods([...held, ...live], q, { limit: 40, history: hist }) : held
-  }, [logged, results, online, q, authUid, hist])
+  }, [logged, loggedIds, results, online, q, authUid, hist])
   const g = t('nutrition.g')
   const tabs = [
     ['recent', t('nutrition.tabRecent')],
