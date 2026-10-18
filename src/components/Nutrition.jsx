@@ -82,6 +82,8 @@ function Diary() {
   const [undoToast, setUndoToast] = useState(null)
   const toastTimer = useRef(0)
   const loadedFor = useRef('')
+  // The day the `logs` state belongs to, for writing edits back to dayCache.
+  const logsFor = useRef('')
   const adding = useRef(false)
   const [copiedFor, setCopiedFor] = useState('')
 
@@ -107,6 +109,8 @@ function Diary() {
     const prevKey = `${uid}|${shiftDay(date, -1)}`
     if (loadedFor.current !== key) {
       if (dayCache.has(key)) {
+        loadedFor.current = key
+        logsFor.current = key
         setLogs(dayCache.get(key))
         setPrevLogs(dayCache.get(prevKey) || [])
         setTargets(targetsCache.get(uid) ?? null)
@@ -118,6 +122,7 @@ function Diary() {
       .then(([day, prev, tg]) => {
         if (off) return
         loadedFor.current = key
+        logsFor.current = key
         dayCache.set(prevKey, prev || [])
         targetsCache.set(uid, tg || null)
         setLogs(day || [])
@@ -139,15 +144,17 @@ function Diary() {
 
   useEffect(() => () => clearTimeout(toastTimer.current), [])
 
-  // Keep the cache in step with edits made on the page.
+  // Keep the cache in step with edits made on the page. Runs only when the
+  // logs change, so a day switch never files the old day's logs under the new.
   useEffect(() => {
-    if (uid && loadedFor.current === `${uid}|${date}`) dayCache.set(loadedFor.current, logs)
-  }, [uid, date, logs])
+    if (logsFor.current) dayCache.set(logsFor.current, logs)
+  }, [logs])
 
   // Fetch the food list for search while the diary is idle, so the add sheet
   // searches on the first keystroke.
   useEffect(() => {
-    if (!user?.uid) return
+    // Saving data: wait until search is opened.
+    if (!user?.uid || navigator.connection?.saveData) return
     const run = () => loadCatalog(user.uid).catch((err) => console.error(err))
     if (typeof requestIdleCallback === 'function') {
       const id = requestIdleCallback(run, { timeout: 4000 })

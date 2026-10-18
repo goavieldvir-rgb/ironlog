@@ -1,7 +1,7 @@
 import { supabase } from '../supabase.js'
 import { rankFoods } from './foodRank.js'
 
-// The whole foods list this account may see (about 5,000 rows, ~250 KB
+// The whole foods list this account may see (about 18,000 rows, ~1 MB
 // gzipped), kept on the device so search answers on every keystroke without
 // a network round trip and ranks over every candidate instead of the first
 // 200. Stale-while-revalidate: a stored copy is used at once and refreshed
@@ -14,19 +14,41 @@ const MAX_AGE_MS = 24 * 60 * 60 * 1000 // refetch in full once a day regardless 
 const DB_NAME = 'ironlog-foods'
 const STORE = 'catalog'
 
+const IDB_TIMEOUT_MS = 1500 // some WebViews never answer indexedDB.open
+
 let mem = null // { uid, foods, savedAt, checkedAt, stamp }
 let loading = null
+// Foods added this session (id -> { uid, food }), so a list that was being
+// fetched while they were added still has them.
+const pending = new Map()
 
 // ---- IndexedDB (best effort; private mode or blocked storage just means no cache)
 
+let dbPromise = null
 function idb() {
-  return new Promise((resolve, reject) => {
-    if (typeof indexedDB === 'undefined') return reject(new Error('no indexedDB'))
-    const req = indexedDB.open(DB_NAME, 1)
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE)
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
-  })
+  if (!dbPromise) {
+    dbPromise = new Promise((resolve, reject) => {
+      if (typeof indexedDB === 'undefined') return reject(new Error('no indexedDB'))
+      const req = indexedDB.open(DB_NAME, 1)
+      req.onupgradeneeded = () => req.result.createObjectStore(STORE)
+      req.onsuccess = () => {
+        const db = req.result
+        // Let a newer version of the app upgrade the database.
+        db.onversionchange = () => {
+          db.close()
+          dbPromise = null
+        }
+        resolve(db)
+      }
+      req.onerror = () => reject(req.error)
+      req.onblocked = () => reject(new Error('indexedDB blocked'))
+      setTimeout(() => reject(new Error('indexedDB timeout')), IDB_TIMEOUT_MS)
+    })
+    dbPromise.catch(() => {
+      dbPromise = null
+    })
+  }
+  return dbPromise
 }
 
 async function idbGet(key) {
@@ -36,6 +58,7 @@ async function idbGet(key) {
       const req = db.transaction(STORE).objectStore(STORE).get(key)
       req.onsuccess = () => resolve(req.result || null)
       req.onerror = () => reject(req.error)
+      setTimeout(() => resolve(null), IDB_TIMEOUT_MS)
     })
   } catch {
     return null
@@ -90,7 +113,15 @@ async function fetchAll() {
   return { foods, stamp }
 }
 
+function withPending(uid, foods) {
+  if (!pending.size) return foods
+  const ids = new Set(foods.map((f) => f.id))
+  const extra = [...pending.values()].filter((p) => p.uid === uid && !ids.has(p.food.id)).map((p) => p.food)
+  return extra.length ? [...foods, ...extra] : foods
+}
+
 function keep(uid, foods, stamp, savedAt = Date.now()) {
+  foods = withPending(uid, foods)
   mem = { uid, foods, stamp, savedAt, checkedAt: Date.now() }
   idbPut(uid, { foods, stamp, savedAt })
   warm(foods)
@@ -137,13 +168,17 @@ export function loadCatalog(uid) {
   if (loading?.uid === uid) return loading.promise
   const promise = (async () => {
     const stored = await idbGet(uid)
+    // Signed out or switched account meanwhile: leave memory alone.
+    if (loading?.uid !== uid) return stored?.foods || null
     if (stored?.foods?.length) {
-      mem = { uid, foods: stored.foods, stamp: stored.stamp, savedAt: stored.savedAt || 0, checkedAt: 0 }
-      warm(stored.foods)
+      const foods = withPending(uid, stored.foods)
+      mem = { uid, foods, stamp: stored.stamp, savedAt: stored.savedAt || 0, checkedAt: 0 }
+      warm(foods)
       revalidate(uid)
-      return stored.foods
+      return foods
     }
     const { foods, stamp } = await fetchAll()
+    if (loading?.uid !== uid) return foods
     return keep(uid, foods, stamp)
   })().finally(() => {
     if (loading?.promise === promise) loading = null
@@ -153,13 +188,16 @@ export function loadCatalog(uid) {
 }
 
 // A food added or changed in this session (label entry, Open Food Facts
-// cache, approval) shows in search right away.
+// cache, approval) shows in search right away. Memory only: the stored copy
+// is marked out of date, and the next check refetches the list with it.
 export function upsertCatalogFood(food) {
-  if (!mem || !food?.id) return
+  const uid = loading?.uid ?? mem?.uid
+  if (!food?.id || !uid) return
+  pending.set(food.id, { uid, food })
+  if (mem?.uid !== uid) return
   const i = mem.foods.findIndex((f) => f.id === food.id)
   const foods = i >= 0 ? mem.foods.map((f, j) => (j === i ? food : f)) : [...mem.foods, food]
-  mem = { ...mem, foods }
-  idbPut(mem.uid, { foods, stamp: mem.stamp, savedAt: mem.savedAt })
+  mem = { ...mem, foods, stamp: null }
 }
 
 // Barcodes already in the catalog, so live Open Food Facts hits that we hold

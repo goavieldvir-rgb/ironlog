@@ -24,10 +24,13 @@ const stripPrefix = (w) => (w.length > 3 && HE_PREFIXES.includes(w[0]) ? w.slice
 // "berry", "ביצים"/"ביצה" -> "ביצ", "עגבניות"/"עגבניה" -> "עגבני".
 export function stem(w) {
   if (LATIN.test(w)) {
-    if (w.length > 4 && w.endsWith('ies')) return `${w.slice(0, -3)}y`
+    // "berries"/"berry" -> "berr", "cookies"/"cookie" -> "cook".
+    if (w.length > 4 && w.endsWith('ies')) return w.slice(0, -3)
     if (w.length > 4 && /(oes|ches|shes|sses|xes)$/.test(w)) return w.slice(0, -2)
-    if (w.length > 3 && w.endsWith('s') && !w.endsWith('ss')) return w.slice(0, -1)
-    return w
+    const s = w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w
+    if (s.length > 4 && s.endsWith('ie')) return s.slice(0, -2)
+    if (s.length > 4 && /[^aeiou]y$/.test(s)) return s.slice(0, -1)
+    return s
   }
   // Words arrive normalised, so a final ם is already מ.
   if (w.length > 4 && (w.endsWith('ימ') || w.endsWith('ות'))) return w.slice(0, -2)
@@ -35,8 +38,12 @@ export function stem(w) {
   return w
 }
 
+// normalizeHe plus Latin accents ("Café", "Müller" -> "cafe", "muller").
+// Only here, not in normalizeHe: the stored search_text keeps its accents.
+const fold = (text) => normalizeHe(text).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
 function words(text) {
-  return normalizeHe(text).split(SPLIT).filter(Boolean)
+  return fold(text).split(SPLIT).filter(Boolean)
 }
 
 // Processed/derived variants lose ties against the plain food ("ביצה שלמה"
@@ -49,7 +56,7 @@ const DERIVED = new Set(
 // Rows nobody means unless they ask for them: food-frequency questionnaire
 // composites, infant formula and baby food, medical foods, breast milk, and
 // liquid cheese whey (people typing "whey" mean protein powder).
-const NOISE = [/^ffq/, /^infant/, /^medical food/, /^baby/, /^מזונ רפואי/, /^תמל/, /לתינוקות/, /^חלב אמ\b/, /^milk, human/, /^porridge, infant/, /^whey, (acid|sweet), fluid/, /^מי גבינה, (חומצי|מתוק)/]
+const NOISE = [/^ffq/, /^infant/, /^medical food/, /^baby ?(food|formula|milk|cereal)/, /^מזונ רפואי/, /^תמל/, /לתינוקות/, /^חלב אמ(\s|,|$)/, /^milk, human/, /^porridge, infant/, /^whey, (acid|sweet), fluid/, /^מי גבינה, (חומצי|מתוק)/]
 const NOISE_WORDS = new Set(['ffq', 'infant', 'medical', 'baby', 'תמל', 'תינוקות', 'לתינוקות', 'רפואי', 'human', 'אמ'].map(normalizeHe))
 
 // Staples: the plain, everyday version of foods trainees log most, so
@@ -119,6 +126,10 @@ const BRAND_ALIASES = [
   ['milka', 'מילקה'],
   ['oreo', 'אוראו'],
   ['alpro', 'אלפרו'],
+  ['nescafe', 'nescafé', 'נס קפה', 'נסקפה'],
+  ['coca cola', 'coca-cola', 'קוקה קולה'],
+  ['pepsi', 'פפסי'],
+  ['ferrero', 'פררו'],
 ].map((group) => group.map((b) => words(b)))
 
 function brandWords(brand) {
@@ -137,9 +148,19 @@ function brandWords(brand) {
   return [...own, ...[...extra].filter((w) => !own.includes(w))]
 }
 
+const NEG = new Set(['ללא', 'בלי', 'without', 'no', 'not'])
+
+// A derived word in a name: "מיובשים" by its stem, but not "שמנת" (cream)
+// as "שמנ" (oil), so a stem from a dropped single letter must be long.
+function isDerived(t) {
+  if (DERIVED.has(t)) return true
+  const st = stem(t)
+  return DERIVED.has(st) && (st.length >= 4 || t.length - st.length >= 2)
+}
+
 // One name, prepared once per food.
 function prepName(name) {
-  const norm = normalizeHe(name)
+  const norm = fold(name)
   if (!norm) return null
   const toks = words(norm)
   if (!toks.length) return null
@@ -151,7 +172,10 @@ function prepName(name) {
     // A name word's stems, with and without a one-letter Hebrew prefix.
     stems: toks.map((t) => [...new Set([stem(t), stem(stripPrefix(t))])]),
     segLen: words(firstSeg).length,
-    derived: toks.filter((t) => DERIVED.has(t) || DERIVED.has(stem(t))),
+    // "אטריות/פסטה": every word of the first slash group is the head noun.
+    headLen: words(firstSeg.trim().split(/\s+/)[0] || '').length || 1,
+    // "ללא תוספת שמן" (no added oil) does not make a food an oil.
+    derived: toks.filter((t, i) => isDerived(t) && !NEG.has(toks[i - 1]) && !(NEG.has(toks[i - 2]) && toks[i - 1] === 'תוספת')),
     noise: NOISE.some((re) => re.test(norm)),
   }
 }
@@ -162,7 +186,8 @@ function prep(food) {
   if (!p) {
     p = { he: prepName(food.name_he), en: prepName(food.name_en), brand: brandWords(food.brand) }
     // Every word of the food in one string, for a cheap first pass.
-    p.hay = [...(p.he?.toks || []), ...(p.en?.toks || []), ...p.brand].join(' ')
+    // Stems too, so "strawberry" passes on "Strawberries".
+    p.hay = [...(p.he?.toks || []), ...(p.en?.toks || []), ...p.brand, ...(p.he?.stems.flat() || []), ...(p.en?.stems.flat() || [])].join(' ')
     prepared.set(food, p)
   }
   return p
@@ -170,44 +195,58 @@ function prep(food) {
 
 // Product words in the other script, so "אלפא חלבון" finds "Alfa Whey" and
 // "protein bar" finds "חטיף חלבון". Only for words that recur on labels.
-const TERMS = Object.fromEntries(
-  [
-    ['חלבון', 'protein', 'whey'],
-    ['חטיף', 'bar'],
-    ['אבקה', 'powder'],
-    ['אבקת', 'powder'],
-    ['שייק', 'shake'],
-    ['משקה', 'drink', 'shake'],
-    ['שוקולד', 'chocolate', 'choco'],
-    ['וניל', 'vanilla'],
-    ['עוגיות', 'cookies', 'cookie'],
-    ['קרמל', 'caramel'],
-    ['בננה', 'banana'],
-    ['תות', 'strawberry'],
-    ['קפה', 'coffee'],
-    ['בוטנים', 'peanut'],
-    ['יוגורט', 'yogurt', 'yoghurt'],
-    ['פודינג', 'pudding'],
-    ['קריספי', 'crispy'],
-    ['פריכיות', 'rice cakes'],
-  ].flatMap((group) => {
-    const g = group.map((w) => normalizeHe(w))
-    // Only across scripts: "whey" and "protein" stay different words.
-    return g.map((w) => [w, g.filter((x) => HEBREW.test(x) !== HEBREW.test(w) && !x.includes(' '))])
-  }),
-)
+const TERMS = {}
+for (const group of [
+  ['חלבון', 'protein', 'whey'],
+  ['חטיף', 'bar'],
+  ['אבקה', 'powder'],
+  ['אבקת', 'powder'],
+  ['שייק', 'shake'],
+  ['משקה', 'drink', 'shake'],
+  ['שוקולד', 'chocolate', 'choco'],
+  ['וניל', 'vanilla'],
+  ['עוגיות', 'cookies', 'cookie'],
+  ['קרמל', 'caramel'],
+  ['בננה', 'banana'],
+  ['תות', 'strawberry'],
+  ['קפה', 'coffee'],
+  ['בוטנים', 'peanut'],
+  ['יוגורט', 'yogurt', 'yoghurt'],
+  ['פודינג', 'pudding'],
+  ['קריספי', 'crispy'],
+  ['פריכיות', 'rice cakes'],
+  ['זירו', 'zero'],
+  ['פרו', 'pro'],
+  ['סקיר', 'skyr'],
+  ['קולה', 'cola'],
+  ['דיאט', 'diet'],
+  ['לייט', 'light'],
+  ['גרנולה', 'granola'],
+  ['קרם', 'cream'],
+  ['וופל', 'wafer'],
+]) {
+  const g = group.map((w) => normalizeHe(w))
+  // Only across scripts: "whey" and "protein" stay different words. A word
+  // in two groups ("shake") keeps the aliases of both.
+  for (const w of g) TERMS[w] = [...new Set([...(TERMS[w] || []), ...g.filter((x) => HEBREW.test(x) !== HEBREW.test(w) && !x.includes(' '))])]
+}
+
+// Israeli labels call plant milks "משקה" ("משקה סויה"), people type "חלב".
+const PLANT = new Set(['סויה', 'שקדימ', 'שיבולת', 'אורז', 'קוקוס', 'אגוזי', 'שועל'].map(normalizeHe))
 
 export function prepareQuery(query) {
   const ws = words(query)
+  const plantMilk = ws.length > 1 && PLANT.has(ws[1])
+  const qws = ws.map((w) => {
+    const exact = [...new Set([w, stripPrefix(w), ...(TERMS[w] || []), ...(TERMS[stripPrefix(w)] || [])])]
+    if (plantMilk && w === 'חלב') exact.push('משקה', 'milk', 'drink', 'beverage')
+    return { w, exact, stems: [...new Set(exact.map(stem))].filter((s) => s.length >= 2) }
+  })
   return {
     norm: ws.join(' '),
     he: HEBREW.test(query),
-    words: ws.map((w) => {
-      const exact = [...new Set([w, stripPrefix(w), ...(TERMS[w] || []), ...(TERMS[stripPrefix(w)] || [])])]
-      return { w, exact, stems: [...new Set(exact.map(stem))].filter((s) => s.length >= 2) }
-    }),
+    words: qws,
     wantsNoise: ws.some((w) => NOISE_WORDS.has(w) || NOISE_WORDS.has(stripPrefix(w))),
-    wantsDerived: new Set(ws.flatMap((w) => [w, stem(w), stripPrefix(w), stem(stripPrefix(w))]).filter((w) => DERIVED.has(w))),
   }
 }
 
@@ -234,11 +273,14 @@ function scoreName(pn, brand, pq, exactWeight = 1) {
   if (!pn) return -Infinity
   let s = 0
   let weakest = 4
+  let prev = -2
   pq.words.forEach((qw, k) => {
     let m = matchWord(qw, pn.toks, pn.stems)
     let inBrand = false
     if (!m.q && brand.length) {
       m = matchWord(qw, brand, brand.map((b) => [stem(b)]))
+      // A brand answers to its whole words; a short start ("פרו") is too loose.
+      if (m.q < 4 && qw.w.length < 4) m = { q: 0, i: -1 }
       inBrand = m.q > 0
     }
     if (!m.q) {
@@ -248,8 +290,12 @@ function scoreName(pn, brand, pq, exactWeight = 1) {
     weakest = Math.min(weakest, m.q)
     s += m.q * 100 - (inBrand ? 60 : 0)
     // The food itself: the head noun and the first comma segment.
-    if (!inBrand && m.i === 0 && m.q >= 3) s += k === 0 ? 160 : 60
+    if (!inBrand && m.i < pn.headLen && m.q >= 3) s += k === 0 ? 160 : 60
     else if (!inBrand && m.i < pn.segLen && m.q >= 3) s += 50
+    // Query words side by side in the name, in order: "חלב סויה" is soy
+    // milk, not "...ללא חלב" in a dish cooked with soy oil.
+    if (!inBrand && m.q >= 3 && m.i === prev + 1) s += 80
+    prev = inBrand ? -2 : m.i
   })
   if (s === -Infinity) return s
   if (pn.flat === pq.norm) s += 500 * exactWeight
@@ -257,7 +303,8 @@ function scoreName(pn, brand, pq, exactWeight = 1) {
   else if (pn.flat.startsWith(pq.norm)) s += 90 * exactWeight
   // Shorter names win ties: "Avocado" before "Avocado, raw, with peel and pip".
   s -= Math.max(0, pn.toks.length - pq.words.length) * 15
-  if (pn.derived.some((d) => !pq.wantsDerived.has(d) && !pq.wantsDerived.has(stem(d)))) s -= 140
+  // Unless the query asks for that variant (any spelling, alias or start of it).
+  if (pn.derived.some((d) => !pq.words.some((qw) => qw.exact.includes(d) || qw.stems.includes(stem(d)) || (qw.w.length >= 3 && d.startsWith(qw.w))))) s -= 140
   if (pn.noise && !pq.wantsNoise) s -= 600
   return { s, weakest }
 }
