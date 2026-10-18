@@ -1,5 +1,5 @@
 import ExerciseVideo from './ExerciseVideo.jsx'
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { Pencil, MessageSquareText, Check, Trash2 } from 'lucide-react'
 import { BackChevron } from './DirectionalIcon.jsx'
@@ -8,6 +8,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { fmtDate } from '../lib/dates.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, updateTrainerComment, deleteSession } from '../lib/db.js'
+import { markSessionsReviewed } from '../lib/coach.js'
 import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
 import { Card, CategoryTag, Badge, Button } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
@@ -75,7 +76,7 @@ function prSetIndex(entry, session, sessions) {
 }
 
 export default function SessionDetail() {
-  const { effectiveUid, isAdmin } = useAdmin()
+  const { effectiveUid, isAdmin, actingAs } = useAdmin()
   const { t, lang } = useLanguage()
   const { id } = useParams()
   const navigate = useNavigate()
@@ -85,6 +86,14 @@ export default function SessionDetail() {
   const sessions = useMemo(() => applyCurrentTimed(rawSessions, exercises), [rawSessions, exercises])
   const exById = useMemo(() => exerciseMap(exercises), [exercises])
   const session = sessions.find((s) => s.id === id)
+
+  // The coach opening a trainee's workout clears it from their "to review"
+  // list on the People page.
+  const unreviewed = isAdmin && actingAs && session && !session.reviewed_at
+  useEffect(() => {
+    if (unreviewed) markSessionsReviewed(effectiveUid, [session.id]).catch((e) => console.error(e))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unreviewed, session?.id])
 
   if (!loading && !session) return <p className="text-chalkdim">{t('sessionDetail.notFound')}</p>
   if (!session) return null

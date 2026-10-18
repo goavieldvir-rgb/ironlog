@@ -22,6 +22,7 @@ import { ScreenLoader } from './components/Loading.jsx'
 // the bulk of what this keeps out.
 const Nutrition = lazy(() => import('./components/Nutrition.jsx'))
 const People = lazy(() => import('./components/People.jsx'))
+const PersonDetail = lazy(() => import('./components/PersonDetail.jsx'))
 const ErrorLogs = lazy(() => import('./components/ErrorLogs.jsx'))
 const Stats = lazy(() => import('./components/Stats.jsx'))
 const BodyWeight = lazy(() => import('./components/BodyWeight.jsx'))
@@ -69,6 +70,7 @@ export default function App() {
         <Route path="/history/:id" element={<SessionDetail />} />
         <Route path="/history/:id/edit" element={<EditSession />} />
         <Route path="/people" element={<People />} />
+        <Route path="/people/:id" element={<PersonDetail />} />
         <Route path="/errors" element={<ErrorLogs />} />
         <Route path="/nutrition" element={<Nutrition />} />
         <Route path="/stats" element={<Stats />} />
