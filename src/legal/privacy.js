@@ -11,7 +11,7 @@
 // before relying on it — especially the health-data, minors and
 // international-transfer parts.
 
-export const PRIVACY_VERSION = 1
+export const PRIVACY_VERSION = 2
 
 // The person responsible for the data and
 // how to reach them. These appear in the notice below.
@@ -21,7 +21,7 @@ export const COACH_CONTACT = 'avieldvir.coaching@gmail.com'
 export const privacy = {
   en: {
     title: 'Privacy notice',
-    updated: 'Version 1',
+    updated: 'Version 2',
     sections: [
       {
         heading: 'Who is responsible',
@@ -30,12 +30,17 @@ export const privacy = {
       {
         heading: 'What is collected',
         body:
-          'Your account email and name. The workouts, sets and notes you log, and your body weight if you choose to record it. If you are under 18, the name and contact of your parent or guardian. A record that you accepted the terms, with the date and the wording you saw. Your reminder settings and, if you turn reminders on, the address your phone or browser gives the app so it can send them. Technical error reports when something breaks, which include the page address and the error text. The photo you pick for a share card stays on your phone and is never uploaded.',
+          'Your account email and name. The workouts, sets and notes you log, your body weight if you choose to record it, and progress photos if you turn them on. If you are under 18, the name and contact of your parent or guardian. A record that you accepted the terms, with the date and the wording you saw. Your reminder settings and, if you turn reminders on, the address your phone or browser gives the app so it can send them. Technical error reports when something breaks, which include the page address and the error text. The photo you pick for a share card stays on your phone and is never uploaded.',
       },
       {
         heading: 'Health and fitness data',
         body:
           'What you log about your training and body is health and fitness information, which is sensitive. It is processed only with the consent you give when you accept the terms, and only to run your training.',
+      },
+      {
+        heading: 'Progress photos',
+        body:
+          'Progress photos are optional and off until you turn them on, with a separate agreement. Only you and your coach can see them; they are never public, shared or used for marketing. Each photo is resized and its location and camera details removed on your phone before upload, and it is shown only through links that expire after a few minutes. You can delete any photo, and turning photos off deletes all of them. They are deleted automatically if you stop training for 12 months, and when your account is deleted. Progress photos are not available to anyone under 18.',
       },
       {
         heading: 'Who can see it',
@@ -75,7 +80,7 @@ export const privacy = {
 
   he: {
     title: 'הודעת פרטיות',
-    updated: 'גרסה 1',
+    updated: 'גרסה 2',
     sections: [
       {
         heading: 'מי אחראי',
@@ -84,12 +89,17 @@ export const privacy = {
       {
         heading: 'מה נאסף',
         body:
-          'האימייל והשם של החשבון. האימונים, הסטים וההערות שתיעדתם, ומשקל הגוף אם בחרתם לתעד אותו. אם אתם מתחת לגיל 18 — שם ופרטי קשר של ההורה או האפוטרופוס. רישום על כך שאישרתם את התנאים, עם התאריך והנוסח שראיתם. הגדרות התזכורות שלכם, ואם הפעלתם תזכורות — הכתובת שהטלפון או הדפדפן נותנים לאפליקציה כדי לשלוח אותן. דוחות שגיאה טכניים כשמשהו מתקלקל, שכוללים את כתובת הדף ואת טקסט השגיאה. התמונה שבחרתם לכרטיס שיתוף נשארת בטלפון שלכם ולא מועלית לשום מקום.',
+          'האימייל והשם של החשבון. האימונים, הסטים וההערות שתיעדתם, משקל הגוף אם בחרתם לתעד אותו, ותמונות התקדמות אם הפעלתם אותן. אם אתם מתחת לגיל 18 — שם ופרטי קשר של ההורה או האפוטרופוס. רישום על כך שאישרתם את התנאים, עם התאריך והנוסח שראיתם. הגדרות התזכורות שלכם, ואם הפעלתם תזכורות — הכתובת שהטלפון או הדפדפן נותנים לאפליקציה כדי לשלוח אותן. דוחות שגיאה טכניים כשמשהו מתקלקל, שכוללים את כתובת הדף ואת טקסט השגיאה. התמונה שבחרתם לכרטיס שיתוף נשארת בטלפון שלכם ולא מועלית לשום מקום.',
       },
       {
         heading: 'מידע על בריאות וכושר',
         body:
           'מה שתיעדתם על האימון והגוף שלכם הוא מידע על בריאות וכושר, והוא רגיש. הוא מעובד רק בהסכמה שנתתם כשאישרתם את התנאים, ורק כדי לנהל את האימון שלכם.',
+      },
+      {
+        heading: 'תמונות התקדמות',
+        body:
+          'תמונות התקדמות הן אופציונליות וכבויות עד שתפעילו אותן, בהסכמה נפרדת. רק אתם והמאמן יכולים לראות אותן; הן לעולם לא ציבוריות, לא משותפות ולא משמשות לשיווק. כל תמונה מוקטנת, ופרטי המיקום והמצלמה נמחקים ממנה בטלפון לפני ההעלאה, והיא מוצגת רק דרך קישורים שפגים אחרי כמה דקות. אפשר למחוק כל תמונה, וכיבוי התמונות מוחק את כולן. הן נמחקות אוטומטית אם לא תתאמנו 12 חודשים, וכשהחשבון נמחק. תמונות התקדמות אינן זמינות למי שמתחת לגיל 18.',
       },
       {
         heading: 'מי יכול לראות',

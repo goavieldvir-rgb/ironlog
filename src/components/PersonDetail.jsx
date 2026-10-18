@@ -11,6 +11,7 @@ import { toLocalISODate, fmtDate } from '../lib/dates.js'
 import { TERMS_VERSION } from '../legal/terms.js'
 import { Card, Badge, Button, Field, LoadError } from './ui.jsx'
 import { PageLoader } from './Loading.jsx'
+import ProgressPhotos from './ProgressPhotos.jsx'
 import {
   fetchTraineeDetail,
   weeklyCounts,
@@ -257,6 +258,12 @@ export default function PersonDetail() {
                   </LineChart>
                 </ResponsiveContainer>
               </div>
+            </Section>
+          )}
+
+          {!p.is_admin && (
+            <Section title={t('photos.title')}>
+              <ProgressPhotos uid={p.id} mode="coach" />
             </Section>
           )}
 
