@@ -27,6 +27,8 @@ export default function Layout() {
   const location = useLocation()
   const navType = useNavigationType()
   const inWorkout = location.pathname.startsWith('/workout/')
+  // The coach dashboard uses the full width of a desktop screen.
+  const wide = location.pathname.startsWith('/people')
 
   // Any navigation closes the menu (including the browser's back button),
   // and a newly opened page starts at its top. Nothing did this before, so
@@ -95,7 +97,7 @@ export default function Layout() {
         className="hidden md:block border-b border-line sticky top-0 z-20 bg-ink/95 backdrop-blur"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div className={`${wide ? 'max-w-7xl' : 'max-w-5xl'} mx-auto px-4 h-16 flex items-center justify-between`}>
           {/* The logo goes home, except mid-workout, where a stray tap
               shouldn't pull you out of the session. */}
           {inWorkout ? (
@@ -278,7 +280,7 @@ export default function Layout() {
         )}
 
       <main
-        className={`flex-1 max-w-5xl mx-auto w-full px-5 md:px-4 pt-6 ${showTabs ? 'pb-[calc(env(safe-area-inset-bottom,0px)+7.5rem)]' : 'pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]'} md:pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]`}
+        className={`flex-1 ${wide ? 'max-w-7xl' : 'max-w-5xl'} mx-auto w-full px-5 md:px-4 pt-6 ${showTabs ? 'pb-[calc(env(safe-area-inset-bottom,0px)+7.5rem)]' : 'pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]'} md:pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]`}
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1.5rem)' }}
       >
         <Suspense fallback={<PageLoader />}>
