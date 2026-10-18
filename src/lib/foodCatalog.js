@@ -162,6 +162,20 @@ export function upsertCatalogFood(food) {
   idbPut(mem.uid, { foods, stamp: mem.stamp, savedAt: mem.savedAt })
 }
 
+// Barcodes already in the catalog, so live Open Food Facts hits that we hold
+// anyway are not listed twice.
+const barcodeSets = new WeakMap()
+export function catalogBarcodes(uid) {
+  const foods = peekCatalog(uid)
+  if (!foods) return null
+  let set = barcodeSets.get(foods)
+  if (!set) {
+    set = new Set(foods.map((f) => f.barcode).filter(Boolean))
+    barcodeSets.set(foods, set)
+  }
+  return set
+}
+
 export function catalogFood(uid, id) {
   return peekCatalog(uid)?.find((f) => f.id === id) || null
 }

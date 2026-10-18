@@ -494,8 +494,12 @@ export function offToFood(p, code, uid) {
   // incomplete so the label form asks for the numbers.
   if (['proteins_100g', 'carbohydrates_100g', 'fat_100g'].every((k) => numOrNull(n[k]) == null)) return null
   const pick = (...keys) => keys.map((k) => (p[k] && String(p[k]).trim()) || null).find(Boolean) || null
-  const nameHe = pick('product_name_he')
-  const nameEn = pick('product_name_en', 'product_name')
+  // Israeli products often carry their Hebrew name in the generic
+  // product_name: file it by script, not by field.
+  const generic = pick('product_name')
+  const nameHe = pick('product_name_he') || (generic && HEBREW.test(generic) ? generic : null)
+  const en = pick('product_name_en')
+  const nameEn = (en && !HEBREW.test(en) ? en : null) || (generic && !HEBREW.test(generic) ? generic : null)
   const brand = p.brands ? String(p.brands).split(',')[0].trim() || null : null
   const units = []
   const pack = numOrNull(p.product_quantity) ?? parseGrams(p.quantity)

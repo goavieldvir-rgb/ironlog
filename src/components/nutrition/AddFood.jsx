@@ -23,7 +23,7 @@ import {
   logName,
   queryLang,
 } from '../../lib/nutrition.js'
-import { catalogFood, loadCatalog } from '../../lib/foodCatalog.js'
+import { catalogBarcodes, catalogFood, loadCatalog } from '../../lib/foodCatalog.js'
 import { isStrongMatch } from '../../lib/foodRank.js'
 import { AmountText, Forward, MacroInputs, MealTabs, MohAttribution, N, Name, OffAttribution, SheetHeader, SourceLabel, UsdaAttribution, mealLabel, useDirtyForm } from './parts.jsx'
 
@@ -114,12 +114,22 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, localResults])
 
-  // Online search (Open Food Facts allows few requests per minute): wait for
-  // the typing to stop, and drop the request when the query changes.
+  // Live Open Food Facts search for products we don't hold (it allows few
+  // requests per minute). It runs on its own when what we hold matches poorly,
+  // otherwise when asked ("search online"). Waits for typing to stop and is
+  // dropped when the query changes.
+  const [onlineAsked, setOnlineAsked] = useState('')
+  const logged = useMemo(() => (q.length >= 2 ? matchHistory(history, q) : []), [history, q])
+  const strongHeld = useMemo(
+    () => logged.length + (results || []).filter((r) => isStrongMatch(r, q)).length,
+    [logged, results, q],
+  )
+  const autoOnline = results !== null && !searching && strongHeld < 5
+  const runOnline = q.length >= 2 && (autoOnline || onlineAsked === q)
   useEffect(() => {
     setOnline([])
     setOnlineErr('')
-    if (q.length < 2) {
+    if (!runOnline) {
       setOnlineBusy(false)
       return
     }
@@ -137,13 +147,13 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
       } finally {
         if (!ctrl.signal.aborted) setOnlineBusy(false)
       }
-    }, 700)
+    }, 500)
     return () => {
       clearTimeout(timer)
       ctrl.abort()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, retryN])
+  }, [q, retryN, runOnline])
 
   async function pickOnline(row) {
     if (picking) return
@@ -252,18 +262,18 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
 
   // Results show names in the language the search was typed in.
   const qLang = queryLang(query, lang)
-  // Foods this diary logged before that match, first and with one-tap add.
-  const logged = useMemo(() => (q.length >= 2 ? matchHistory(history, q) : []), [history, q])
-  const loggedIds = new Set(logged.map((r) => r.food_id).filter(Boolean))
-  const shownResults = (results || []).filter((r) => !loggedIds.has(r.id))
-  const localCodes = new Set((results || []).map((r) => r.barcode).filter(Boolean))
-  // Open Food Facts search is loose: keep only products whose name has every
-  // word of the query, best match first.
-  const shownOnline = useMemo(
-    () => rankFoods(online.filter((r) => !localCodes.has(r.barcode) && isStrongMatch(r, q)), q, { limit: 20 }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [online, results, q],
-  )
+  // Foods this diary logged before that match sit first, with one-tap add
+  // (`logged`, above). Everything else is one list ranked together: foods we
+  // hold and live Open Food Facts products. OFF search is loose, so a live
+  // product only shows when its name has every word of the query.
+  const shownResults = useMemo(() => {
+    const loggedIds = new Set(logged.map((r) => r.food_id).filter(Boolean))
+    const held = (results || []).filter((r) => !loggedIds.has(r.id))
+    if (!online.length) return held
+    const codes = new Set([...(catalogBarcodes(authUid) || []), ...held.map((r) => r.barcode).filter(Boolean)])
+    const live = online.filter((r) => !codes.has(r.barcode) && isStrongMatch(r, q))
+    return live.length ? rankFoods([...held, ...live], q, { limit: 40, history: hist }) : held
+  }, [logged, results, online, q, authUid, hist])
   const g = t('nutrition.g')
   const tabs = [
     ['recent', t('nutrition.tabRecent')],
@@ -392,15 +402,15 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
                 </ul>
               </>
             )}
-            {(shownResults.length > 0 || searching || (!onlineBusy && !onlineErr && shownOnline.length === 0 && logged.length === 0)) && (
+            {(shownResults.length > 0 || searching) && (
               <p className="text-chalkdim text-xs py-3" role="status">
                 {searching ? t('nutrition.searching') : `${shownResults.length === 1 ? t('nutrition.resultsOne') : t('nutrition.resultsCount', { n: shownResults.length })} · ${t('nutrition.valuesPer100')}`}
               </p>
             )}
             <ul className="divide-y divide-white/[0.06]">
               {shownResults.map((r) => (
-                <li key={r.id}>
-                  <button type="button" onClick={() => onPick(r)} className="w-full flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
+                <li key={r.id || `off:${r.source_ref}`}>
+                  <button type="button" disabled={!r.id && picking} onClick={() => (r.id ? onPick(r) : pickOnline(r))} className="w-full flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
                     <div className="min-w-0 flex-1">
                       <Name className="font-medium">{foodName(r, qLang)}</Name>
                       <Stats protein={r.protein} kcal={r.kcal} source={<>{r.brand && <>· <bdi>{r.brand}</bdi></>} · <SourceLabel food={r} /></>} />
@@ -410,11 +420,6 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
                 </li>
               ))}
             </ul>
-            {shownResults.some((r) => r.source === 'moh') && <MohAttribution className="mt-3" />}
-            {shownResults.some((r) => r.source === 'usda') && <UsdaAttribution className="mt-1" />}
-            {(onlineBusy || onlineErr || shownOnline.length > 0) && (
-              <h3 className="text-chalkdim text-xs pt-4 pb-1">{t('nutrition.fromOff')}</h3>
-            )}
             {onlineBusy && (
               <p className="flex items-center gap-2 text-chalkdim text-sm py-3" role="status">
                 <Loader2 size={16} className="animate-spin" aria-hidden="true" /> {t('nutrition.searchingOnline')}
@@ -428,30 +433,19 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
                 </button>
               </div>
             )}
-            {shownOnline.length > 0 && (
-              <>
-                <ul className="divide-y divide-white/[0.06]">
-                  {shownOnline.map((r) => (
-                    <li key={r.source_ref}>
-                      <button type="button" disabled={picking} onClick={() => pickOnline(r)} className="w-full flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
-                        <div className="min-w-0 flex-1">
-                          <Name className="font-medium">{foodName(r, qLang)}</Name>
-                          <Stats protein={r.protein} kcal={r.kcal} source={<>{r.brand && <>· <bdi>{r.brand}</bdi></>} · <SourceLabel food={r} /></>} />
-                        </div>
-                        <Forward size={20} className="text-chalkdim shrink-0" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-                <OffAttribution className="mt-3" />
-              </>
+            {!runOnline && !searching && q.length >= 2 && (
+              <button type="button" onClick={() => setOnlineAsked(q)} className="w-full flex items-center justify-center gap-2 min-h-[48px] mt-2 text-sm text-chalk">
+                <Search size={16} aria-hidden="true" /> {t('nutrition.searchOnline')}
+              </button>
             )}
-            {!searching && !onlineBusy && !onlineErr && shownResults.length === 0 && logged.length === 0 && shownOnline.length === 0 && (
+            {!searching && !onlineBusy && !onlineErr && shownResults.length === 0 && logged.length === 0 && (
               <p className="text-chalkdim text-sm py-3">
                 {t('nutrition.noResults', { q })} {t('nutrition.noResultsHint')}
               </p>
             )}
-            {shownOnline.length === 0 && shownResults.some((r) => r.source === 'off') && <OffAttribution className="mt-3" />}
+            {shownResults.some((r) => r.source === 'moh') && <MohAttribution className="mt-3" />}
+            {shownResults.some((r) => r.source === 'usda') && <UsdaAttribution className="mt-1" />}
+            {shownResults.some((r) => r.source === 'off') && <OffAttribution className="mt-1" />}
             <Button variant="ghost" className="w-full mt-4 min-h-[48px]" onClick={() => onLabel()}>
               <Plus size={18} /> {t('nutrition.addFromLabel')}
             </Button>

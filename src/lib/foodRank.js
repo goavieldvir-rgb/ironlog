@@ -146,7 +146,7 @@ function matchWord(qw, toks, stems) {
 }
 
 // Score of one prepared name, or -Infinity when a query word is missing.
-function scoreName(pn, brand, pq) {
+function scoreName(pn, brand, pq, exactWeight = 1) {
   if (!pn) return -Infinity
   let s = 0
   let weakest = 4
@@ -168,9 +168,9 @@ function scoreName(pn, brand, pq) {
     else if (!inBrand && m.i < pn.segLen && m.q >= 3) s += 50
   })
   if (s === -Infinity) return s
-  if (pn.flat === pq.norm) s += 500
-  else if (pn.firstSeg === pq.norm) s += 260
-  else if (pn.flat.startsWith(pq.norm)) s += 90
+  if (pn.flat === pq.norm) s += 500 * exactWeight
+  else if (pn.firstSeg === pq.norm) s += 260 * exactWeight
+  else if (pn.flat.startsWith(pq.norm)) s += 90 * exactWeight
   // Shorter names win ties: "Avocado" before "Avocado, raw, with peel and pip".
   s -= Math.max(0, pn.toks.length - pq.words.length) * 15
   if (pn.derived.some((d) => !pq.wantsDerived.has(d) && !pq.wantsDerived.has(stem(d)))) s -= 140
@@ -185,8 +185,11 @@ export function scoreFood(food, pq, history) {
   const p = prep(food)
   const primary = pq.he ? p.he : p.en
   const secondary = pq.he ? p.en : p.he
-  const a = scoreName(primary, p.brand, pq)
-  const b = scoreName(secondary, p.brand, pq)
+  // A packaged product named just "Milk" or "טונה" should not beat the
+  // reference food of that name, so its exact-name bonus counts for less.
+  const w = food.source === 'off' ? 0.4 : 1
+  const a = scoreName(primary, p.brand, pq, w)
+  const b = scoreName(secondary, p.brand, pq, w)
   const best = a === -Infinity ? (b === -Infinity ? null : { ...b, s: b.s - 20 }) : b === -Infinity || a.s >= b.s - 20 ? a : { ...b, s: b.s - 20 }
   if (!best) return null
   let s = best.s
