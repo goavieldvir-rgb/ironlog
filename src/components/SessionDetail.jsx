@@ -7,7 +7,7 @@ import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { fmtDate } from '../lib/dates.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
-import { useCollection, updateTrainerComment, deleteSession } from '../lib/db.js'
+import { useCollection, updateTrainerComment, deleteSession, hasUnreadFeedback, markFeedbackSeen } from '../lib/db.js'
 import { markSessionsReviewed } from '../lib/coach.js'
 import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
 import { Card, CategoryTag, Badge, Button } from './ui.jsx'
@@ -95,6 +95,14 @@ export default function SessionDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unreviewed, session?.id])
 
+  // The trainee opening new feedback clears its unread mark. Not when the
+  // coach is looking at their account.
+  const unseen = !actingAs && hasUnreadFeedback(session)
+  useEffect(() => {
+    if (unseen) markFeedbackSeen(effectiveUid, session.id).catch((e) => console.error(e))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unseen, session?.id])
+
   if (!loading && !session) return <p className="text-chalkdim">{t('sessionDetail.notFound')}</p>
   if (!session) return null
 
@@ -138,7 +146,7 @@ export default function SessionDetail() {
         </div>
       </div>
 
-      <TrainerComment session={session} effectiveUid={effectiveUid} isAdmin={isAdmin} onSaved={refresh} t={t} />
+      <TrainerComment session={session} effectiveUid={effectiveUid} isAdmin={isAdmin} isNew={unseen} onSaved={refresh} t={t} />
 
       {session.notes && <p className="text-chalkdim text-[15px] px-1">{session.notes}</p>}
 
@@ -197,7 +205,7 @@ export default function SessionDetail() {
   )
 }
 
-function TrainerComment({ session, effectiveUid, isAdmin, onSaved, t }) {
+function TrainerComment({ session, effectiveUid, isAdmin, isNew, onSaved, t }) {
   const [editing, setEditing] = useState(false)
   const [text, setText] = useState(session.trainer_comment || '')
   const [saving, setSaving] = useState(false)
@@ -256,6 +264,7 @@ function TrainerComment({ session, effectiveUid, isAdmin, onSaved, t }) {
         <div className="min-w-0">
           <span className="eyebrow inline-flex items-center gap-1.5 flex-wrap">
             {t('sessionDetail.trainerFeedback')}
+            {isNew && <span className="text-[11px] normal-case tracking-normal rounded-full px-2 py-0.5 font-semibold bg-accent/15 text-accent">{t('sessionDetail.newFeedback')}</span>}
             <InfoTip text={t('sessionDetail.feedbackVisibilityTip')} />
           </span>
           <p className="text-[15px] mt-0.5">

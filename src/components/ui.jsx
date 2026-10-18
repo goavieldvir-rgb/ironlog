@@ -23,6 +23,11 @@ export function Card({ children, className = '' }) {
   return <div className={`card p-4 ${className}`}>{children}</div>
 }
 
+// Unread coach feedback on a workout row.
+export function FeedbackDot({ label }) {
+  return <span role="img" aria-label={label} title={label} className="inline-block w-2 h-2 rounded-full bg-accent me-2 align-middle -mt-0.5" />
+}
+
 export function Badge({ children, tone = 'default' }) {
   const tones = {
     default: 'bg-surface2 text-chalkdim',

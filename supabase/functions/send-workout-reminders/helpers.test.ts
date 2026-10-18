@@ -1,5 +1,5 @@
 // Run with: deno test supabase/functions/send-workout-reminders/helpers.test.ts
-import { isAllowedEndpoint, isDue, localParts, reminderKind } from './helpers.ts'
+import { feedbackCopy, isAllowedEndpoint, isDue, localParts, reminderKind } from './helpers.ts'
 
 const assert = (c: boolean, m: string) => { if (!c) throw new Error('FAIL ' + m) }
 
@@ -38,4 +38,13 @@ Deno.test('workout, rest day or nothing', () => {
   assert(reminderKind(0, 4, 0) === 'rest', 'rest day')
   assert(reminderKind(0, 4, 1) === null, 'trained on a rest day: no rest note')
   assert(reminderKind(0, 0, 0) === null, 'no plan at all: nothing')
+})
+
+Deno.test('feedback push copy', () => {
+  const a = feedbackCopy('en', 'Push day', '  Great depth\n on squats ')
+  assert(a.title === 'Coach feedback on Push day' && a.body === 'Great depth on squats', 'en with name')
+  assert(feedbackCopy('he', null, 'x').title === 'משוב מהמאמן', 'he without name')
+  assert(feedbackCopy('en', '', 'x').title === 'Feedback from your coach', 'blank name')
+  const long = feedbackCopy('en', null, 'a'.repeat(300)).body
+  assert(long.length === 140 && long.endsWith('…'), 'cut to 140')
 })

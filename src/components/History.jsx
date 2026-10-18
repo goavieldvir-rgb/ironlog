@@ -5,9 +5,9 @@ import { ForwardChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { fmtDate, dateLocale } from '../lib/dates.js'
-import { useCollection } from '../lib/db.js'
+import { useCollection, hasUnreadFeedback } from '../lib/db.js'
 import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
-import { EmptyState, LoadError, Button, Field } from './ui.jsx'
+import { EmptyState, LoadError, Button, Field, FeedbackDot } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { workingSets } from '../lib/warmup.js'
 import { cardioSummary, formatDistance, toKm } from '../lib/cardio.js'
@@ -84,7 +84,7 @@ function matchesQuery(session, q, t, exById, lang) {
 }
 
 export default function History() {
-  const { effectiveUid } = useAdmin()
+  const { effectiveUid, actingAs } = useAdmin()
   const { t, lang } = useLanguage()
   const [sessions, loading, refresh, loadError] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const loadFailed = !!loadError && sessions.length === 0
@@ -254,7 +254,10 @@ export default function History() {
                     <span className="text-[19px] leading-6 font-semibold tabular-nums">{day}</span>
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                    <span className="text-[15px] leading-5 font-medium truncate">{sessionTitle(s, t)}</span>
+                    <span className="text-[15px] leading-5 font-medium truncate">
+                      {!actingAs && hasUnreadFeedback(s) && <FeedbackDot label={t('history.newFeedback')} />}
+                      {sessionTitle(s, t)}
+                    </span>
                     <span className="text-[13px] leading-[18px] text-chalkdim truncate tabular-nums">{sessionMeta(s, t, lang)}</span>
                   </div>
                   <ForwardChevron size={16} strokeWidth={2} className="text-[#5E5E64] shrink-0" />

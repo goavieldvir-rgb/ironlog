@@ -482,6 +482,21 @@ export async function updateTrainerComment(uid, sessionId, comment) {
   if (error) throw error
 }
 
+// Feedback the trainee hasn't opened since the coach last wrote it. Feedback
+// from before trainer_comment_at existed has no time and counts as read.
+export function hasUnreadFeedback(s) {
+  return !!(s?.trainer_comment && s.trainer_comment_at && (!s.trainer_comment_seen_at || new Date(s.trainer_comment_seen_at) < new Date(s.trainer_comment_at)))
+}
+
+export async function markFeedbackSeen(uid, sessionId) {
+  const { error } = await supabase
+    .from('sessions')
+    .update({ trainer_comment_seen_at: new Date().toISOString() })
+    .eq('id', sessionId)
+    .eq('user_id', uid)
+  if (error) throw error
+}
+
 // Editing a past session only touches that session's own row — it
 // deliberately does NOT update the "last performance" snapshot on
 // exercises, since that should reflect the most recent session overall,
