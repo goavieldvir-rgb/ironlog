@@ -1,5 +1,7 @@
 import { supabase } from '../supabase.js'
 import { normalizeHe, searchTextFor } from './foodText.js'
+import { isStrongMatch, rankFoods } from './foodRank.js'
+import { peekCatalog, upsertCatalogFood } from './foodCatalog.js'
 
 // Nutrition diary: pure helpers (text normalising, macro maths) and plain
 // async data functions. Every data function throws on a Supabase error.
@@ -34,7 +36,7 @@ export function searchTerms(query) {
     })
 }
 
-const SOURCE_RANK = { coach: 0, moh: 1, off: 2, user: 3 }
+const SOURCE_RANK = { coach: 0, moh: 1, usda: 2, off: 3, user: 4 }
 
 export function sortFoods(foods) {
   return [...foods].sort(
@@ -76,9 +78,10 @@ export function queryLang(query, lang) {
   return lang
 }
 
-// 'coach' = brass "verified" badge, 'moh', 'off' or 'user' (unverified)
+// 'coach' = brass "verified" badge, 'moh', 'usda', 'off' or 'user' (unverified)
 export function badgeKind(food) {
   if (food.source === 'moh') return 'moh'
+  if (food.source === 'usda') return 'usda'
   if (food.verified) return 'coach'
   if (food.source === 'off') return 'off'
   return 'user'
@@ -233,21 +236,51 @@ export async function deleteLogs(ids) {
   check(await supabase.from('food_logs').delete().in('id', ids))
 }
 
-// Distinct recent foods (by food_id, or name for quick adds), newest first.
-export async function getRecentLogs(uid, limit = 20) {
+// Distinct foods this user logged (by food_id, or name for quick adds),
+// newest first, each with `uses`: how often it was logged in the last 500
+// entries. Feeds the Recent tab, "logged before" in search, and ranking.
+export async function getLogHistory(uid) {
   const rows = check(
-    await supabase.from('food_logs').select(LOG_SELECT).eq('user_id', uid).order('created_at', { ascending: false }).limit(200),
+    await supabase.from('food_logs').select(LOG_SELECT).eq('user_id', uid).order('created_at', { ascending: false }).limit(500),
   )
-  const seen = new Set()
-  const out = []
+  const byKey = new Map()
   for (const r of rows) {
     const key = r.food_id ? `f:${r.food_id}` : `n:${String(r.name).toLowerCase()}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    out.push(r)
-    if (out.length >= limit) break
+    const hit = byKey.get(key)
+    if (hit) hit.uses += 1
+    else byKey.set(key, { ...r, uses: 1 })
   }
-  return out
+  return [...byKey.values()]
+}
+
+// food_id -> { count } for ranking.
+export function historyMap(history) {
+  const m = new Map()
+  for (const r of history || []) if (r.food_id) m.set(r.food_id, { count: r.uses || 1 })
+  return m
+}
+
+// Logged-before entries that match a search, best first (match, then how
+// often it was logged). Names come from the food when it still exists (both
+// languages), else the name it was logged as.
+const historyFoods = new WeakMap()
+export function matchHistory(history, query, limit = 3) {
+  if (!history?.length) return []
+  let list = historyFoods.get(history)
+  if (!list) {
+    list = history.map((r, i) => {
+      const he = HEBREW.test(r.name)
+      return {
+        id: `h${i}`,
+        row: r,
+        name_he: r.food?.name_he || (he ? r.name : null),
+        name_en: r.food?.name_en || (he ? null : r.name),
+      }
+    })
+    historyFoods.set(history, list)
+  }
+  const uses = new Map(list.map((x) => [x.id, { count: x.row.uses || 1 }]))
+  return rankFoods(list.filter((x) => isStrongMatch(x, query)), query, { limit, history: uses }).map((x) => x.row)
 }
 
 // Copies of existing log rows for another day/meal (fresh rows, no id).
@@ -319,79 +352,28 @@ export async function deleteSavedMeal(id) {
 
 // ---------------------------------------------------------------- foods
 
-// ---- ranking (client side). The query fetches a wide, unordered-by-relevance
-// candidate set; these helpers pick the best RESULT_LIMIT of it.
+// Search ranks with foodRank.js. When the on-device catalog (foodCatalog.js)
+// is loaded every food is a candidate and no request is made; until then the
+// database is asked for a wide candidate set, which is ranked the same way.
 const FETCH_LIMIT = 200
 const RESULT_LIMIT = 30
-// Processed/derived variants lose ties against the plain food ("ביצה שלמה"
-// before "ביצה חלמון מיובש", "אורז לבן" before "קמח אורז").
-// Tokens are compared after normalizeHe, so the set is normalized too
-// (final letters folded). "white" is left out: Tzameret names plain foods
-// "Rice, white, cooked".
-const DERIVED = new Set(
-  ['מיובש', 'מיובשת', 'מטוגן', 'מטוגנת', 'קפוא', 'חביתה', 'קמח', 'פודינג', 'עוגה', 'עוגת', 'חלבון', 'חלמון', 'תרנגול', 'שניצל', 'סלט', 'נקניק', 'פסטרמה', 'מרק', 'פאי', 'במילוי', 'shnitzel', 'salad', 'pastrami', 'soup', 'pie', 'ציפס', 'טוגנים', 'בבלילה', 'chips', 'coated', 'dried', 'fried', 'frozen', 'omelet', 'omelette', 'flour', 'pudding', 'cake', 'yolk'].map(normalizeHe),
-)
-const TOKEN_SPLIT = /[\s,;:.()/\\\-+%*]+/
+const FOOD_COLS = 'id,source,source_ref,barcode,name_he,name_en,brand,kcal,protein,carbs,fat,fiber,units,verified,created_by'
 
-const stripPrefix = (w) => (w.length > 3 && HE_PREFIXES.includes(w[0]) ? w.slice(1) : w)
+export { rankFoods }
 
-function nameTokens(name) {
-  return normalizeHe(name).split(TOKEN_SPLIT).filter(Boolean)
+// opts.uid: the signed-in account (whose catalog to use); opts.history: a
+// historyMap() of the diary owner's logs, so their usual foods come first.
+export function searchLocal(query, { uid, history } = {}) {
+  const foods = peekCatalog(uid)
+  return foods ? rankFoods(foods, query, { limit: RESULT_LIMIT, history }) : null
 }
 
-// 0 exact name, 1 name starts with the query, 2 every word starts a word in
-// the first two comma segments, 3 same anywhere in the name (a one-letter
-// Hebrew prefix is allowed), 4 plain substring.
-function matchTier(name, qNorm, qWords) {
-  const n = normalizeHe(name)
-  if (!n) return 9
-  const flat = n.replace(/[,;:.()]/g, ' ').replace(/\s+/g, ' ').trim()
-  if (flat === qNorm) return 0
-  if (flat.startsWith(qNorm) || flat.startsWith(stripPrefix(qNorm))) return 1
-  const toks = nameTokens(name)
-  const atStart = (w, toks) => {
-    const ws = stripPrefix(w) // "בקוטג" also counts as "קוטג", as in searchTerms
-    return toks.some((t) => [w, ws].some((x) => t.startsWith(x) || (t.length > 1 && HE_PREFIXES.includes(t[0]) && t.slice(1).startsWith(x))))
-  }
-  // Words in the first two comma segments describe the food itself; later
-  // segments are usually preparation or brand ("..., אפוי, עוף טוב").
-  const head = nameTokens(normalizeHe(name).split(',').slice(0, 2).join(' '))
-  if (qWords.every((w) => atStart(w, head))) return 2
-  if (qWords.every((w) => atStart(w, toks))) return 3
-  return 4
-}
-
-export function rankFoods(foods, query, limit = RESULT_LIMIT) {
-  const qNorm = normalizeHe(query).replace(/[,()%_*"\\:]/g, '').replace(/\s+/g, ' ').trim()
-  const qWords = qNorm.split(' ').filter(Boolean)
-  const he = HEBREW.test(qNorm)
-  const scored = foods.map((f) => {
-    const names = he ? [f.name_he, f.name_en] : [f.name_en, f.name_he]
-    const primary = names.filter(Boolean)
-    const tier = Math.min(9, ...primary.map((nm) => matchTier(nm, qNorm, qWords)))
-    const best = primary.find((nm) => matchTier(nm, qNorm, qWords) === tier) || ''
-    const toks = nameTokens(best)
-    return {
-      f,
-      tier,
-      derived: toks.some((t) => DERIVED.has(t)) ? 1 : 0,
-      words: toks.length,
-      rank: (f.verified ? 0 : 10) + (SOURCE_RANK[f.source] ?? 9),
-      len: best.length,
-    }
-  })
-  // "Starts with the query" and "a word starts with it near the front" are
-  // one band, so a plain Ministry food ("גבינת קוטג' 5%") is not beaten by a
-  // branded product whose name happens to start with the word.
-  const band = (tier) => (tier === 2 ? 1 : tier)
-  scored.sort((a, b) => band(a.tier) - band(b.tier) || a.derived - b.derived || a.words - b.words || a.rank - b.rank || a.len - b.len)
-  return scored.slice(0, limit).map((x) => x.f)
-}
-
-export async function searchFoods(query) {
+export async function searchFoods(query, { uid, history } = {}) {
+  const local = searchLocal(query, { uid, history })
+  if (local) return local
   const terms = searchTerms(query)
   if (!terms.length) return []
-  let q = supabase.from('foods').select('*')
+  let q = supabase.from('foods').select(FOOD_COLS)
   for (const alts of terms) q = q.or(alts.map((a) => `search_text.ilike.%${a}%`).join(','))
   // The wide query can match a thousand rows ("שמן", "עוף") and is cut at
   // FETCH_LIMIT before ranking, so also fetch the names that start with the
@@ -402,14 +384,14 @@ export async function searchFoods(query) {
     q.order('verified', { ascending: false }).order('source', { ascending: true }).limit(FETCH_LIMIT),
     supabase
       .from('foods')
-      .select('*')
+      .select(FOOD_COLS)
       .or(`search_text.ilike."${head}%",search_text.ilike."% ${head}%",name_en.ilike."${raw}%"`)
       .limit(FETCH_LIMIT),
   ])
   const rows = check(wide)
   const ids = new Set(rows.map((r) => r.id))
   for (const r of check(starts)) if (!ids.has(r.id)) rows.push(r)
-  return rankFoods(rows, query)
+  return rankFoods(rows, query, { limit: RESULT_LIMIT, history })
 }
 
 export async function findFoodsByBarcode(code) {
@@ -418,11 +400,15 @@ export async function findFoodsByBarcode(code) {
 }
 
 export async function insertFood(food) {
-  return check(await supabase.from('foods').insert(food).select().single())
+  const row = check(await supabase.from('foods').insert(food).select().single())
+  upsertCatalogFood(row)
+  return row
 }
 
 export async function approveFood(id) {
-  return check(await supabase.from('foods').update({ verified: true }).eq('id', id).select().single())
+  const row = check(await supabase.from('foods').update({ verified: true }).eq('id', id).select().single())
+  upsertCatalogFood(row)
+  return row
 }
 
 // A food typed from a label. Admin entries are the coach's and verified.
@@ -508,8 +494,12 @@ export function offToFood(p, code, uid) {
   // incomplete so the label form asks for the numbers.
   if (['proteins_100g', 'carbohydrates_100g', 'fat_100g'].every((k) => numOrNull(n[k]) == null)) return null
   const pick = (...keys) => keys.map((k) => (p[k] && String(p[k]).trim()) || null).find(Boolean) || null
-  const nameHe = pick('product_name_he')
-  const nameEn = pick('product_name_en', 'product_name')
+  // Israeli products often carry their Hebrew name in the generic
+  // product_name: file it by script, not by field.
+  const generic = pick('product_name')
+  const nameHe = pick('product_name_he') || (generic && HEBREW.test(generic) ? generic : null)
+  const en = pick('product_name_en')
+  const nameEn = (en && !HEBREW.test(en) ? en : null) || (generic && !HEBREW.test(generic) ? generic : null)
   const brand = p.brands ? String(p.brands).split(',')[0].trim() || null : null
   const units = []
   const pack = numOrNull(p.product_quantity) ?? parseGrams(p.quantity)

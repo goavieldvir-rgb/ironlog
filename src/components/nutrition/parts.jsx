@@ -45,7 +45,7 @@ export function SourceLabel({ food, showVerifiedText = false, className = '' }) 
         <span className={showVerifiedText ? '' : 'sr-only'}>{t('nutrition.srcCoach')}</span>
       </span>
     )
-  const key = kind === 'moh' ? 'srcMoh' : kind === 'off' ? 'srcOff' : 'srcUser'
+  const key = { moh: 'srcMoh', usda: 'srcUsda', off: 'srcOff' }[kind] || 'srcUser'
   return <span className={`text-chalkdim whitespace-nowrap ${className}`}>{t(`nutrition.${key}`)}</span>
 }
 
@@ -70,6 +70,11 @@ export function OffAttribution({ className = '' }) {
 export function MohAttribution({ className = '' }) {
   const { t } = useLanguage()
   return <p className={`text-chalkdim text-xs ${className}`}>{t('nutrition.attrMoh')}</p>
+}
+
+export function UsdaAttribution({ className = '' }) {
+  const { t } = useLanguage()
+  return <p className={`text-chalkdim text-xs ${className}`}>{t('nutrition.attrUsda')}</p>
 }
 
 // Protein is the one measure in the accent; every other bar is neutral grey.
