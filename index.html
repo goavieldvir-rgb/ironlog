@@ -34,7 +34,12 @@
     <!-- Launch screen. Lives in the page itself so it is on screen from the
          first paint, before any script arrives; src/lib/splash.js takes it
          down once the app has something real to show. The same classes draw
-         the in-app loader (src/components/Loading.jsx). -->
+         the in-app loaders (src/components/Loading.jsx).
+
+         The mark assembles the way a bar is loaded: the bar, then the inner
+         plates, then the outer ones. While the wait goes on a light passes
+         across it, the only thing that moves. Plain CSS on purpose: it has
+         to run before any JavaScript has downloaded. -->
     <style>
       html, body { margin: 0; background: #0B0B0C; }
       .il-splash {
@@ -44,24 +49,38 @@
         transition: opacity 320ms cubic-bezier(0.23, 1, 0.32, 1);
       }
       .il-splash.is-out { opacity: 0; pointer-events: none; }
-      /* Held back a moment so a fast load never flashes it. */
+      .il-splash.is-out .il-loader {
+        transform: scale(0.97); filter: blur(4px);
+        transition: transform 320ms cubic-bezier(0.23, 1, 0.32, 1), filter 320ms cubic-bezier(0.23, 1, 0.32, 1);
+      }
       .il-loader {
         display: flex; flex-direction: column; align-items: center; gap: 28px;
-        opacity: 0;
-        animation: il-in 480ms cubic-bezier(0.23, 1, 0.32, 1) 160ms forwards;
       }
-      .il-mark {
-        display: flex; align-items: center; gap: 8px;
-        direction: ltr; /* the wordmark reads the same in Hebrew */
-        color: #F2F2EF;
-        font: 600 24px/1 Geist, 'IBM Plex Sans Hebrew', system-ui, sans-serif;
-        letter-spacing: 0.025em;
+      .il-logo { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+      .il-logo svg { display: block; width: 76px; height: auto; overflow: visible; }
+      .il-logo svg * { transform-box: fill-box; transform-origin: center; }
+      .il-word {
+        color: #F2F2EF; direction: ltr;
+        font: 600 20px/1 Geist, 'IBM Plex Sans Hebrew', system-ui, sans-serif;
+        letter-spacing: -0.01em;
       }
-      .il-mark svg { color: #FF6369; flex: none; }
+      /* Held back a moment so a fast load never flashes it. */
+      .il-bar { animation: il-bar 560ms cubic-bezier(0.23, 1, 0.32, 1) 160ms both; }
+      .il-plate-in { animation: il-plate 460ms cubic-bezier(0.32, 0.72, 0, 1) 360ms both; }
+      .il-plate-out { animation: il-plate 460ms cubic-bezier(0.32, 0.72, 0, 1) 440ms both; }
+      .il-word { animation: il-word 600ms cubic-bezier(0.23, 1, 0.32, 1) 560ms both; }
+      .il-sheen { animation: il-sheen 2400ms cubic-bezier(0.65, 0, 0.35, 1) 1100ms infinite both; }
+      @keyframes il-bar { from { transform: scaleX(0); opacity: 0; } to { transform: none; opacity: 1; } }
+      @keyframes il-plate { from { transform: scaleY(0.3); opacity: 0; } to { transform: none; opacity: 1; } }
+      @keyframes il-word { from { opacity: 0; filter: blur(6px); transform: translateY(4px); } to { opacity: 1; filter: none; transform: none; } }
+      /* The light crosses in the first half of each cycle, then rests. */
+      @keyframes il-sheen { 0% { transform: translateX(-60px); } 55%, 100% { transform: translateX(120px); } }
+      /* In-page loader: a hairline under the app's own header. */
       .il-track {
         position: relative; overflow: hidden;
         width: 56px; height: 2px; border-radius: 1px;
         background: #26262A;
+        animation: il-fade 400ms cubic-bezier(0.23, 1, 0.32, 1) 160ms both;
       }
       .il-track::after {
         content: ''; position: absolute; inset: 0;
@@ -69,30 +88,48 @@
         background: rgb(255 91 58);
         animation: il-glide 1400ms cubic-bezier(0.65, 0, 0.35, 1) infinite;
       }
-      @keyframes il-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+      @keyframes il-fade { from { opacity: 0; } to { opacity: 1; } }
       @keyframes il-glide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
-      @keyframes il-breathe { from { opacity: 0.35; } to { opacity: 1; } }
+      @keyframes il-breathe { from { opacity: 0.45; } to { opacity: 1; } }
       @media (prefers-reduced-motion: reduce) {
-        .il-loader { animation-name: il-fade; }
+        .il-bar, .il-plate-in, .il-plate-out, .il-word { animation: il-fade 400ms ease-out 160ms both; }
+        .il-sheen { display: none; }
+        .il-logo svg { animation: il-breathe 1400ms ease-in-out 600ms infinite alternate; }
         .il-track::after { width: 100%; animation: il-breathe 1200ms ease-in-out infinite alternate; }
-        @keyframes il-fade { from { opacity: 0; } to { opacity: 1; } }
+        .il-splash.is-out .il-loader { transform: none; filter: none; }
       }
     </style>
   </head>
   <body>
     <div id="splash" class="il-splash" aria-hidden="true">
       <div class="il-loader">
-        <div class="il-mark">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14.4 14.4 9.6 9.6" />
-            <path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z" />
-            <path d="m21.5 21.5-1.4-1.4" />
-            <path d="M3.9 3.9 2.5 2.5" />
-            <path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z" />
+        <div class="il-logo">
+          <svg viewBox="0 0 100 48" fill="rgb(255 91 58)">
+            <defs>
+              <clipPath id="il-clip">
+                <rect x="22" y="21.5" width="56" height="5" rx="2.5" />
+                <rect x="15" y="7" width="9" height="34" rx="3" />
+                <rect x="76" y="7" width="9" height="34" rx="3" />
+                <rect x="7" y="13" width="6" height="22" rx="3" />
+                <rect x="87" y="13" width="6" height="22" rx="3" />
+              </clipPath>
+              <linearGradient id="il-light" x1="0" x2="1" y1="0" y2="0">
+                <stop offset="0" stop-color="#fff" stop-opacity="0" />
+                <stop offset="0.5" stop-color="#fff" stop-opacity="0.55" />
+                <stop offset="1" stop-color="#fff" stop-opacity="0" />
+              </linearGradient>
+            </defs>
+            <rect class="il-bar" x="22" y="21.5" width="56" height="5" rx="2.5" />
+            <rect class="il-plate-in" x="15" y="7" width="9" height="34" rx="3" />
+            <rect class="il-plate-in" x="76" y="7" width="9" height="34" rx="3" />
+            <rect class="il-plate-out" x="7" y="13" width="6" height="22" rx="3" />
+            <rect class="il-plate-out" x="87" y="13" width="6" height="22" rx="3" />
+            <g clip-path="url(#il-clip)">
+              <rect class="il-sheen" x="0" y="0" width="28" height="48" fill="url(#il-light)" />
+            </g>
           </svg>
-          Ironlog
+          <div class="il-word">Ironlog</div>
         </div>
-        <div class="il-track"></div>
       </div>
     </div>
     <div id="root"></div>
