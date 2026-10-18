@@ -8,6 +8,7 @@ import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { Card, Badge, EmptyState, Button, Field, LoadError } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
+import { PageLoader } from './Loading.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { fetchRoster, fetchRecentPrs, rosterFlags, attentionScore, adherence, daysSince } from '../lib/coach.js'
 
@@ -122,6 +123,8 @@ export default function People() {
       </div>
 
       {loadError && !rows.length && <LoadError onRetry={() => setReload((r) => r + 1)} />}
+
+      {loading && !rows.length && !loadError && <PageLoader />}
 
       {!loading && !loadError && trainees.length === 0 && (
         <EmptyState title={t('people.emptyTitle')} body={t('people.emptyBody')} />

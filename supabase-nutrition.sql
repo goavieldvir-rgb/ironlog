@@ -65,7 +65,7 @@ grant execute on function nutrition_allowed() to authenticated;
 --   source 'coach' entered by the coach
 create table if not exists foods (
   id uuid primary key default gen_random_uuid(),
-  source text not null check (source in ('moh', 'off', 'user', 'coach')),
+  source text not null check (source in ('moh', 'usda', 'off', 'user', 'coach')),
   source_ref text,                -- Tzameret code or OFF barcode
   barcode text check (barcode ~ '^[0-9]{8,14}$'),
   name_he text,
@@ -94,7 +94,7 @@ alter table foods enable row level security;
 
 drop policy if exists "foods readable" on foods;
 create policy "foods readable" on foods for select to authenticated using (
-  nutrition_allowed() and (verified or source in ('moh', 'off') or created_by = auth.uid() or is_admin())
+  nutrition_allowed() and (verified or source in ('moh', 'usda', 'off') or created_by = auth.uid() or is_admin())
 );
 
 -- A trainee may only add a label they typed (private until verified). Only

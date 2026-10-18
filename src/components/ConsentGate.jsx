@@ -7,6 +7,7 @@ import { privacy } from '../legal/privacy.js'
 import { terms, termsPlainText, hashText, TERMS_VERSION, TERMS_DOC_KEY } from '../legal/terms.js'
 import { Button, Card, Field } from './ui.jsx'
 import { PrivacySections } from './Privacy.jsx'
+import { ScreenLoader } from './Loading.jsx'
 
 const CHECK_TIMEOUT_MS = 8000
 
@@ -144,7 +145,7 @@ export default function ConsentGate({ uid, children }) {
     }
   }
 
-  if (state === 'checking') return null
+  if (state === 'checking') return <ScreenLoader />
   if (state === 'ok') return children
 
   if (state === 'error') {

@@ -28,6 +28,7 @@ import {
 } from '../lib/nutrition.js'
 import { Button, Card, LoadError } from './ui.jsx'
 import { AmountText, DirtyScope, Forward, N, Name, Sheet, Track, UndoToast, useDiscardGuard } from './nutrition/parts.jsx'
+import { loadCatalog } from '../lib/foodCatalog.js'
 import AddFood from './nutrition/AddFood.jsx'
 import FoodDetail from './nutrition/FoodDetail.jsx'
 import LabelForm from './nutrition/LabelForm.jsx'
@@ -52,6 +53,11 @@ const shiftDay = (iso, n) => {
   d.setDate(d.getDate() + n)
   return toLocalISODate(d)
 }
+
+// Days already seen in this app session, so returning to the page or
+// stepping back a day shows the diary at once while it refreshes.
+const dayCache = new Map() // `${uid}|${date}` -> logs
+const targetsCache = new Map() // uid -> targets
 
 // How far ahead the diary lets you plan meals.
 const MAX_DAYS_AHEAD = 30
@@ -98,11 +104,22 @@ function Diary() {
     if (!uid) return
     let off = false
     const key = `${uid}|${date}`
-    if (loadedFor.current !== key) setLoading(true)
+    const prevKey = `${uid}|${shiftDay(date, -1)}`
+    if (loadedFor.current !== key) {
+      if (dayCache.has(key)) {
+        setLogs(dayCache.get(key))
+        setPrevLogs(dayCache.get(prevKey) || [])
+        setTargets(targetsCache.get(uid) ?? null)
+        setLoadError(null)
+        setLoading(false)
+      } else setLoading(true)
+    }
     Promise.all([getLogs(uid, date), getLogs(uid, shiftDay(date, -1)), getTargets(uid)])
       .then(([day, prev, tg]) => {
         if (off) return
         loadedFor.current = key
+        dayCache.set(prevKey, prev || [])
+        targetsCache.set(uid, tg || null)
         setLogs(day || [])
         setPrevLogs(prev || [])
         setTargets(tg || null)
@@ -121,6 +138,24 @@ function Diary() {
   }, [uid, date, reloadN])
 
   useEffect(() => () => clearTimeout(toastTimer.current), [])
+
+  // Keep the cache in step with edits made on the page.
+  useEffect(() => {
+    if (uid && loadedFor.current === `${uid}|${date}`) dayCache.set(loadedFor.current, logs)
+  }, [uid, date, logs])
+
+  // Fetch the food list for search while the diary is idle, so the add sheet
+  // searches on the first keystroke.
+  useEffect(() => {
+    if (!user?.uid) return
+    const run = () => loadCatalog(user.uid).catch((err) => console.error(err))
+    if (typeof requestIdleCallback === 'function') {
+      const id = requestIdleCallback(run, { timeout: 4000 })
+      return () => cancelIdleCallback(id)
+    }
+    const id = setTimeout(run, 1500)
+    return () => clearTimeout(id)
+  }, [user?.uid])
 
   const reload = useCallback(() => setReloadN((n) => n + 1), [])
 
@@ -214,6 +249,7 @@ function Diary() {
     try {
       const saved = await saveTargets(uid, values)
       setTargets(saved)
+      targetsCache.set(uid, saved)
       showToast(t('nutrition.targetsSaved'))
       pop()
     } catch (err) {

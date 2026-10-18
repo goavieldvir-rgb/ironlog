@@ -10,6 +10,7 @@ import { useFeedback } from '../context/FeedbackContext.jsx'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
 import { TERMS_VERSION } from '../legal/terms.js'
 import { Card, Badge, Button, Field, LoadError } from './ui.jsx'
+import { PageLoader } from './Loading.jsx'
 import {
   fetchTraineeDetail,
   weeklyCounts,
@@ -97,7 +98,7 @@ export default function PersonDetail() {
 
   if (!isAdmin) return null
   if (loadError && !data) return <LoadError onRetry={() => setReload((r) => r + 1)} />
-  if (!data) return <p className="eyebrow animate-pulse py-10 text-center">{t('common.loading')}</p>
+  if (!data) return <PageLoader />
 
   const p = data.profile
   const name = p.full_name || p.email
