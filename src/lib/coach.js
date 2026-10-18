@@ -185,3 +185,12 @@ export async function saveCoachGoal(traineeId, patch) {
       .single(),
   )
 }
+
+// Sign-up is by invitation: an email can create an account for 30 days
+// after the coach copies its invite (see supabase-security-round3.sql).
+// Copying again renews it.
+export async function recordInvite(email) {
+  const clean = email.trim().toLowerCase()
+  const expires = new Date(Date.now() + 30 * 86400_000).toISOString()
+  check(await supabase.from('signup_invites').upsert({ email: clean, expires_at: expires }, { onConflict: 'email' }))
+}

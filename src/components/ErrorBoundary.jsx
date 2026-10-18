@@ -36,12 +36,15 @@ class ErrorBoundaryInner extends React.Component {
       const {
         data: { session },
       } = await supabase.auth.getSession()
+      // Only signed-in people can file a report (the database refuses the rest).
+      if (!session?.user) return
       await supabase.from('error_logs').insert({
-        user_id: session?.user?.id || null,
+        user_id: session.user.id,
         message: String(error?.message || error).slice(0, 2000),
         stack: String(error?.stack || '').slice(0, 4000),
         component_stack: String(info?.componentStack || '').slice(0, 4000),
-        url: window.location.href,
+        // Not the query string: an invite link carries an email address there.
+        url: (window.location.origin + window.location.pathname + window.location.hash).slice(0, 500),
       })
     } catch (e) {
       // If logging itself fails (e.g. offline), there's nothing more useful

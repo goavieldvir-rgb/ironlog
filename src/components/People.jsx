@@ -10,7 +10,7 @@ import { Card, Badge, EmptyState, Button, Field, LoadError } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { PageLoader } from './Loading.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
-import { fetchRoster, fetchRecentPrs, rosterFlags, attentionScore, adherence, daysSince } from '../lib/coach.js'
+import { fetchRoster, fetchRecentPrs, rosterFlags, attentionScore, adherence, daysSince, recordInvite } from '../lib/coach.js'
 
 // The coach's roster: who needs attention first, how each trainee is doing
 // against their plan, and what is waiting for review. Tapping a trainee opens
@@ -310,6 +310,9 @@ function InviteModal({ onClose, t }) {
   const message = t('people.inviteMessage')(name, link)
 
   async function copy(text, setCopied) {
+    // Best effort: the link still works today if this fails, as long as
+    // invite-only sign-up hasn't been switched on.
+    recordInvite(email).catch((err) => console.error(err))
     await navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)

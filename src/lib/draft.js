@@ -90,3 +90,17 @@ export function listDrafts(uid) {
     return []
   }
 }
+
+// Signing out leaves nothing of a workout behind on a shared phone.
+export function clearAllDrafts() {
+  try {
+    const keys = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith(PREFIX)) keys.push(key)
+    }
+    keys.forEach((key) => localStorage.removeItem(key))
+  } catch {
+    // private mode: nothing was stored
+  }
+}

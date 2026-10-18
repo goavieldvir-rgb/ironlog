@@ -19,7 +19,7 @@ export default function ResetPassword() {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
-    if (password.length < 6) {
+    if (password.length < 8) {
       setError(t('resetPassword.minChars'))
       return
     }
@@ -61,7 +61,7 @@ export default function ResetPassword() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                minLength={6}
+                minLength={8}
                 required
                 autoFocus
               />
@@ -71,7 +71,7 @@ export default function ResetPassword() {
                 type="password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
-                minLength={6}
+                minLength={8}
                 required
               />
             </Field>
