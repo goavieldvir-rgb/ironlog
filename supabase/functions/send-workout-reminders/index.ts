@@ -1,13 +1,16 @@
-// Sends the daily "you have a workout today" web push, and the on-demand
-// "send a test notification" from the Notifications page.
+// Sends the daily "you have a workout today" web push, the "your coach left
+// feedback" push, and the on-demand "send a test notification" from the
+// Notifications page.
 //
 // Two ways in (deploy with verify_jwt = false, the function checks itself):
-//  - pg_cron, every 15 minutes: header x-cron-secret must match push_config.
+//  - the database, with header x-cron-secret matching push_config: pg_cron
+//    every 15 minutes for reminders, or the trainer feedback trigger
+//    (supabase-coach-feedback.sql) with { feedback_session_id }.
 //  - the app's test button: the signed-in user's own token; sends only to
 //    that user's own subscriptions, at most once a minute.
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import webpush from 'npm:web-push@3.6.7'
-import { isAllowedEndpoint, isDue, localParts, reminderKind } from './helpers.ts'
+import { feedbackCopy, isAllowedEndpoint, isDue, localParts, reminderKind } from './helpers.ts'
 
 const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
@@ -35,7 +38,7 @@ const TEST_COPY = {
 }
 
 // Returns 'sent' | 'removed' (expired on the phone's side). Throws otherwise.
-async function deliver(s: any, msg: { title: string; body: string }, tag: string) {
+async function deliver(s: any, msg: { title: string; body: string; url?: string }, tag: string, ttl = 3600) {
   if (!isAllowedEndpoint(s.endpoint)) {
     await db.from('push_subscriptions').delete().eq('id', s.id)
     return 'removed'
@@ -44,7 +47,7 @@ async function deliver(s: any, msg: { title: string; body: string }, tag: string
     await webpush.sendNotification(
       { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
       JSON.stringify({ ...msg, lang: s.lang, tag }),
-      { TTL: 3600 },
+      { TTL: ttl },
     )
     return 'sent'
   } catch (e: any) {
@@ -119,6 +122,28 @@ async function runReminders() {
   return json({ sent, skipped, removed, failed })
 }
 
+async function runFeedback(sessionId: string) {
+  const { data: session } = await db.from('sessions')
+    .select('id, user_id, routine_name, trainer_comment').eq('id', sessionId).maybeSingle()
+  if (!session?.trainer_comment?.trim()) return json({ error: 'no feedback' }, 404)
+
+  const { data: subs } = await db.from('push_subscriptions').select('*').eq('user_id', session.user_id)
+  let sent = 0, removed = 0, failed = 0
+  for (const s of subs || []) {
+    try {
+      const msg = feedbackCopy(s.lang, session.routine_name, session.trainer_comment)
+      // A day to arrive: feedback still matters if the phone was off overnight.
+      const r = await deliver(s, { ...msg, url: `#/history/${session.id}` }, `ironlog-feedback-${session.id}`, 86400)
+      if (r === 'sent') sent++
+      else removed++
+    } catch (e: any) {
+      console.error('feedback push failed', s.id, e?.message || e)
+      failed++
+    }
+  }
+  return json({ sent, removed, failed })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
   if (req.method !== 'POST') return json({ error: 'method' }, 405)
@@ -128,6 +153,10 @@ Deno.serve(async (req) => {
   webpush.setVapidDetails(cfg.vapid_subject, cfg.vapid_public, cfg.vapid_private)
 
   const secret = req.headers.get('x-cron-secret')
-  if (secret) return secret === cfg.cron_secret ? runReminders() : json({ error: 'forbidden' }, 403)
+  if (secret) {
+    if (secret !== cfg.cron_secret) return json({ error: 'forbidden' }, 403)
+    const body = await req.json().catch(() => ({}))
+    return body?.feedback_session_id ? runFeedback(String(body.feedback_session_id)) : runReminders()
+  }
   return runTest(req)
 })

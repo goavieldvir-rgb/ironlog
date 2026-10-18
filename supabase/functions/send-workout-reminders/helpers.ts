@@ -54,3 +54,15 @@ export function reminderKind(plannedToday: number, plannedThisWeek: number, logg
   if (plannedToday > 0) return loggedToday >= plannedToday ? null : 'workout'
   return loggedToday > 0 ? null : 'rest'
 }
+
+// The "your coach left feedback" push. The note itself is the body, cut to
+// what a lock screen shows.
+export function feedbackCopy(lang: string, routineName: string | null, comment: string) {
+  const he = lang === 'he'
+  const text = comment.trim().replace(/\s+/g, ' ')
+  const body = text.length > 140 ? text.slice(0, 139) + '…' : text
+  const name = routineName?.trim()
+  return he
+    ? { title: name ? `משוב מהמאמן על ${name}` : 'משוב מהמאמן', body }
+    : { title: name ? `Coach feedback on ${name}` : 'Feedback from your coach', body }
+}

@@ -15,19 +15,25 @@ self.addEventListener('push', (event) => {
       tag: data.tag || 'ironlog-reminder',
       lang: data.lang,
       dir: data.lang === 'he' ? 'rtl' : 'ltr',
+      // A screen inside the app to open on tap, such as '#/history/<id>'.
+      data: { url: typeof data.url === 'string' && data.url.startsWith('#/') ? data.url : '' },
     }),
   )
 })
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const target = self.registration.scope
+  const scope = self.registration.scope
+  const target = scope + (event.notification.data?.url || '')
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
       // Only a tab inside this app's own folder: every GitHub Pages project
       // on this account shares one origin.
-      const open = list.find((c) => c.url.startsWith(target))
-      if (open) return open.focus()
+      const open = list.find((c) => c.url.startsWith(scope))
+      if (open) {
+        if (target === scope) return open.focus()
+        return open.focus().then((c) => (c || open).navigate(target)).catch(() => self.clients.openWindow(target))
+      }
       return self.clients.openWindow(target)
     }),
   )

@@ -1,17 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Play, Plus, Check, Circle } from 'lucide-react'
+import { Play, Plus, Check, Circle, MessageSquareText } from 'lucide-react'
 import { InfoTip } from './InfoTip.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { fmtDate, toLocalISODate } from '../lib/dates.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
-import { useCollection } from '../lib/db.js'
+import { useCollection, hasUnreadFeedback } from '../lib/db.js'
 import { isFreestyleSession, sessionTitle, entryName, exerciseMap } from '../lib/names.js'
 import { workingSets } from '../lib/warmup.js'
 import { listDrafts, clearDraft } from '../lib/draft.js'
-import { Card, LoadError } from './ui.jsx'
+import { Card, LoadError, FeedbackDot } from './ui.jsx'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import WeeklySchedule from './WeeklySchedule.jsx'
 
@@ -174,6 +174,8 @@ export default function Dashboard() {
   const loadedPlan = !scheduleLoading && !routinesLoading && !sessionsLoading && !loadFailed
   const loggedToday = sessions.some((x) => x.date === todayIso)
   const recent = sessions.slice(0, 3)
+  // New coach feedback, newest workout first. Only the trainee sees this.
+  const unreadFeedback = actingAs ? [] : sessions.filter(hasUnreadFeedback)
   const firstName = (user.displayName || user.email || '').split(/[\s@]/)[0]
 
   const restLink = (label) => (
@@ -231,6 +233,21 @@ export default function Dashboard() {
         </Card>
       ))}
 
+      {unreadFeedback.length > 0 && (
+        <Link
+          to={unreadFeedback.length === 1 ? `/history/${unreadFeedback[0].id}` : '/history'}
+          className="press-row flex items-center gap-3 rounded-[18px] bg-accent/10 border border-accent/25 px-4 min-h-[60px] py-3 text-chalk"
+        >
+          <MessageSquareText size={18} className="text-accent shrink-0" />
+          <span className="flex-1 min-w-0 text-[15px] leading-5">
+            {unreadFeedback.length === 1
+              ? t('dashboard.feedbackBanner')
+              : t('dashboard.feedbackBannerMany', { n: unreadFeedback.length })}
+          </span>
+          <ForwardChevron size={16} className="text-chalkdim/70 shrink-0" />
+        </Link>
+      )}
+
       {loadFailed && <LoadError onRetry={retryAll} />}
 
       <WeeklySchedule
@@ -286,7 +303,10 @@ export default function Dashboard() {
                   className={`press-row flex items-center gap-3 min-h-[60px] ${i < recent.length - 1 ? 'border-b border-white/[0.06]' : ''}`}
                 >
                   <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                    <span className="text-[15px] leading-5 font-medium truncate">{sessionTitle(s, t)}</span>
+                    <span className="text-[15px] leading-5 font-medium truncate">
+                      {!actingAs && hasUnreadFeedback(s) && <FeedbackDot label={t('history.newFeedback')} />}
+                      {sessionTitle(s, t)}
+                    </span>
                     <span className="text-[13px] leading-[18px] text-chalkdim truncate">
                       {[shortDate(lang, s.date), s.duration_minutes ? t('workout.durationShort', { min: s.duration_minutes }) : null, load]
                         .filter(Boolean)
