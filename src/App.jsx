@@ -2,6 +2,7 @@ import React, { lazy, useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext.jsx'
 import { useLanguage } from './context/LanguageContext.jsx'
+import { useAdmin } from './context/AdminContext.jsx'
 import { supabase, openedFromAuthLink } from './supabase.js'
 import Login from './components/Login.jsx'
 import Layout from './components/Layout.jsx'
@@ -16,6 +17,7 @@ import EditSession from './components/EditSession.jsx'
 import ResetPassword from './components/ResetPassword.jsx'
 import ConsentGate from './components/ConsentGate.jsx'
 import Privacy from './components/Privacy.jsx'
+import { TwoStepChallenge, TwoStepRequired } from './components/TwoStep.jsx'
 import { ScreenLoader } from './components/Loading.jsx'
 // Screens that aren't on the way to logging a workout load on demand, so
 // launch only waits for what the first screen needs. Charts (recharts) are
@@ -32,7 +34,8 @@ const Notifications = lazy(() => import('./components/Notifications.jsx'))
 const Account = lazy(() => import('./components/Account.jsx'))
 
 export default function App() {
-  const { user, loading, recovery } = useAuth()
+  const { user, loading, recovery, needsCode, hasTwoStep } = useAuth()
+  const { isAdmin, profile, loadingProfile } = useAdmin()
   const { t } = useLanguage()
   const location = useLocation()
   const [resetLinkError, setResetLinkError] = useState(false)
@@ -53,6 +56,16 @@ export default function App() {
   if (!user && location.pathname === '/privacy') return <Privacy standalone />
 
   if (!user) return <Login resetLinkError={resetLinkError ? t('login.resetLinkInvalid') : ''} />
+
+  // A password alone (or a reset link) is not enough for an account with
+  // two-step verification on. The database enforces this too.
+  if (needsCode) return <TwoStepChallenge />
+
+  if (loadingProfile && !profile) return <ScreenLoader />
+
+  // The coach account sees every trainee's data, so it can't be used
+  // without two-step verification.
+  if (isAdmin && !hasTwoStep) return <TwoStepRequired />
 
   // Setting a new password has to stay reachable — someone arriving from a
   // reset link shouldn't be asked to accept terms before they can even get

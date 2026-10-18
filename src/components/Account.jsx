@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Download, FileSpreadsheet, Trash2 } from 'lucide-react'
+import { Download, FileSpreadsheet, ShieldCheck, Trash2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { applyCurrentTimed } from '../lib/timed.js'
 import { useAdmin } from '../context/AdminContext.jsx'
@@ -9,6 +9,8 @@ import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { supabase } from '../supabase.js'
 import { deleteAllPhotos } from '../lib/photos.js'
+import { confirmedApps, removeApp } from '../lib/mfa.js'
+import { TwoStepSetup } from './TwoStep.jsx'
 import { Button, Card, Field } from './ui.jsx'
 
 // Everything a person has in Ironlog, read fresh from the database (not
@@ -70,6 +72,71 @@ function toCsv(sessions, t, lang, exById) {
   // The leading BOM makes Excel read Hebrew exercise names correctly
   // instead of showing garbled characters.
   return '\uFEFF' + rows.join('\n')
+}
+
+// Your own sign-in, never the trainee's while viewing their account.
+function TwoStepCard() {
+  const { refreshMfa } = useAuth()
+  const { isAdmin } = useAdmin()
+  const { t } = useLanguage()
+  const { confirm, toast } = useFeedback()
+  const [apps, setApps] = useState(null)
+  const [settingUp, setSettingUp] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  const load = () => confirmedApps().then(setApps).catch((err) => { console.error(err); setApps([]) })
+  useEffect(() => { load() }, [])
+
+  async function turnOff() {
+    const ok = await confirm({
+      title: t('twoStep.turnOffTitle'),
+      body: t('twoStep.turnOffBody'),
+      confirmLabel: t('twoStep.turnOff'),
+      danger: true,
+    })
+    if (!ok) return
+    setBusy(true)
+    try {
+      for (const app of apps) await removeApp(app.id)
+      await refreshMfa()
+      await load()
+    } catch (err) {
+      console.error(err)
+      toast(t('twoStep.genericError'), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const on = apps?.length > 0
+  return (
+    <Card className="flex flex-col gap-3">
+      <h2 className="eyebrow flex items-center gap-1.5"><ShieldCheck size={14} /> {t('twoStep.title')}</h2>
+      {apps === null ? null : settingUp ? (
+        <TwoStepSetup onDone={() => { setSettingUp(false); load(); toast(t('twoStep.turnedOn')) }} onCancel={() => setSettingUp(false)} />
+      ) : on ? (
+        <>
+          <p className="text-chalkdim text-sm">{t('twoStep.onBody')}</p>
+          {isAdmin ? (
+            <p className="text-chalkdim text-xs">{t('twoStep.coachMustKeep')}</p>
+          ) : (
+            <div>
+              <Button variant="danger" onClick={turnOff} disabled={busy}>{t('twoStep.turnOff')}</Button>
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <p className="text-chalkdim text-sm">{t('twoStep.offBody')}</p>
+          <div>
+            <Button variant="ghost" onClick={() => setSettingUp(true)}>
+              <ShieldCheck size={16} /> {t('twoStep.turnOn')}
+            </Button>
+          </div>
+        </>
+      )}
+    </Card>
+  )
 }
 
 export default function Account() {
@@ -164,6 +231,8 @@ export default function Account() {
           </Button>
         </div>
       </Card>
+
+      {!actingAs && <TwoStepCard />}
 
       <Card className="flex flex-col gap-3 border-ironsoft">
         <h2 className="eyebrow text-irontext">{t('account.deleteTitle')}</h2>

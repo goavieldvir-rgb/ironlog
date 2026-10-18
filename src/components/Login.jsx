@@ -166,7 +166,7 @@ export default function Login({ resetLinkError }) {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    minLength={6}
+                    minLength={mode === 'signup' ? 8 : undefined}
                     required
                   />
                 </Field>

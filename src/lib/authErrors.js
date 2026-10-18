@@ -5,6 +5,7 @@ export function friendlyAuthError(err, t, fallbackKey = 'login.errorGeneric') {
   const msg = err?.message || ''
   if (code === 'invalid_credentials' || msg.includes('Invalid login credentials')) return t('login.errorBadCredentials')
   if (code === 'user_already_exists' || code === 'email_exists' || msg.includes('User already registered')) return t('login.errorAlreadyRegistered')
+  if (/invitation only/i.test(msg)) return t('login.errorInviteOnly')
   if (code === 'weak_password' || msg.includes('Password should be')) return t('login.errorWeakPassword')
   if (code === 'email_address_invalid' || code === 'validation_failed' || msg.includes('Unable to validate email')) return t('login.errorBadEmail')
   if (code === 'email_not_confirmed' || msg.includes('Email not confirmed')) return t('login.errorEmailNotConfirmed')
