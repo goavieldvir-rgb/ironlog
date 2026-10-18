@@ -241,7 +241,7 @@ export default function PersonDetail() {
             >
               <div className="h-36 lg:h-56 -mx-1">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data.weights.filter((w) => w.date >= shiftDay(today, -182)).map((w) => ({ ...w, weight: Number(w.weight), label: shortDate(lang, w.date) }))}>
+                  <LineChart data={data.weights.filter((w) => w.date >= shiftDay(today, -182) && w.unit === derived.lastWeight.unit).map((w) => ({ ...w, weight: Number(w.weight), label: shortDate(lang, w.date) }))}>
                     <XAxis dataKey="label" stroke={CHALKDIM} fontSize={10} tickLine={false} axisLine={false} minTickGap={24} reversed={lang === 'he'} />
                     <YAxis
                       hide
@@ -299,7 +299,7 @@ export default function PersonDetail() {
           )}
 
           <GoalForm
-            key={p.id}
+            key={`goal-${p.id}`}
             traineeId={p.id}
             goal={data.goal}
             scheduled={derived.scheduled}
@@ -311,7 +311,7 @@ export default function PersonDetail() {
           />
 
           <Notes
-            key={p.id}
+            key={`notes-${p.id}`}
             traineeId={p.id}
             notes={data.notes}
             t={t}
@@ -405,7 +405,7 @@ function GoalForm({ traineeId, goal, scheduled, today, t, lang, onSaved, onError
       const row = await saveCoachGoal(traineeId, {
         goal: text.trim() || null,
         target_weight: num(target),
-        sessions_per_week: num(perWeek),
+        sessions_per_week: perWeek === '' ? null : Math.min(14, Math.max(1, Math.round(Number(perWeek)))),
         next_checkin: checkin || null,
         ...overrides,
       })
@@ -437,7 +437,7 @@ function GoalForm({ traineeId, goal, scheduled, today, t, lang, onSaved, onError
           </div>
         ) : (
           <Field label={t('person.perWeek')}>
-            <input type="number" inputMode="numeric" min="1" max="14" value={perWeek} onChange={(e) => setPerWeek(e.target.value)} />
+            <input type="number" inputMode="numeric" min="1" max="14" step="1" value={perWeek} onChange={(e) => setPerWeek(e.target.value)} />
           </Field>
         )}
       </div>

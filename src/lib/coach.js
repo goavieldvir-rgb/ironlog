@@ -33,7 +33,7 @@ export async function fetchRecentPrs(today = toLocalISODate()) {
       .from('admin_notifications')
       .select('trainee_id, detail, sent_at')
       .eq('type', 'pr')
-      .gte('sent_at', shiftDay(today, -6))
+      .gte('sent_at', new Date(shiftDay(today, -6) + 'T00:00:00').toISOString())
       .order('sent_at', { ascending: false })
       .limit(20),
   )
@@ -102,7 +102,13 @@ export async function fetchTraineeDetail(uid, today = toLocalISODate()) {
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
       .then(check),
-    supabase.from('body_weight_logs').select('date, weight, unit').eq('user_id', uid).order('date', { ascending: true }).then(check),
+    supabase
+      .from('body_weight_logs')
+      .select('date, weight, unit')
+      .eq('user_id', uid)
+      .order('date', { ascending: true })
+      .order('created_at', { ascending: true })
+      .then(check),
     supabase
       .from('admin_notifications')
       .select('detail, sent_at')
