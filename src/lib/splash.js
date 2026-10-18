@@ -28,5 +28,5 @@ export function hideSplash() {
   if (!el) return
   el.classList.add('is-out')
   // transitionend doesn't fire if the tab is hidden, so don't rely on it.
-  setTimeout(() => el.remove(), 400)
+  setTimeout(() => el.remove(), 250)
 }
