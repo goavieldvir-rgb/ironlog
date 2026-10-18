@@ -1,6 +1,7 @@
 import React from 'react'
 import { supabase } from '../supabase.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { hideSplash } from '../lib/splash.js'
 
 // Catches any uncaught error anywhere in the app so a single broken page
 // shows a friendly recovery screen instead of a blank white page — and logs
@@ -25,6 +26,8 @@ class ErrorBoundaryInner extends React.Component {
 
   componentDidCatch(error, info) {
     console.error(error, info)
+    // The launch screen would otherwise sit on top of the recovery screen.
+    hideSplash()
     this.logError(error, info)
   }
 

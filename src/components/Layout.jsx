@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import React, { Suspense, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom'
+import { PageLoader } from './Loading.jsx'
 import { Dumbbell, LayoutDashboard, ListChecks, History, Library, LogOut, X, Users, UserCheck, BarChart3, Scale, FileText, HelpCircle, CircleUser, Bell, Apple, Home, Ellipsis } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
@@ -280,7 +281,9 @@ export default function Layout() {
         className={`flex-1 max-w-5xl mx-auto w-full px-5 md:px-4 pt-6 ${showTabs ? 'pb-[calc(env(safe-area-inset-bottom,0px)+7.5rem)]' : 'pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]'} md:pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]`}
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1.5rem)' }}
       >
-        <Outlet />
+        <Suspense fallback={<PageLoader />}>
+          <Outlet />
+        </Suspense>
       </main>
 
       {showTabs && (

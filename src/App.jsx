@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useState } from 'react'
+import React, { lazy, useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext.jsx'
 import { useLanguage } from './context/LanguageContext.jsx'
@@ -13,19 +13,22 @@ import WorkoutSession from './components/WorkoutSession.jsx'
 import History from './components/History.jsx'
 import SessionDetail from './components/SessionDetail.jsx'
 import EditSession from './components/EditSession.jsx'
-import People from './components/People.jsx'
-import ErrorLogs from './components/ErrorLogs.jsx'
-import Stats from './components/Stats.jsx'
-import BodyWeight from './components/BodyWeight.jsx'
-import WeeklySummary from './components/WeeklySummary.jsx'
-import Help from './components/Help.jsx'
-import Notifications from './components/Notifications.jsx'
-import Account from './components/Account.jsx'
 import ResetPassword from './components/ResetPassword.jsx'
 import ConsentGate from './components/ConsentGate.jsx'
 import Privacy from './components/Privacy.jsx'
-// Admin-only beta screen: loaded on demand so trainees never download it.
+import { ScreenLoader } from './components/Loading.jsx'
+// Screens that aren't on the way to logging a workout load on demand, so
+// launch only waits for what the first screen needs. Charts (recharts) are
+// the bulk of what this keeps out.
 const Nutrition = lazy(() => import('./components/Nutrition.jsx'))
+const People = lazy(() => import('./components/People.jsx'))
+const ErrorLogs = lazy(() => import('./components/ErrorLogs.jsx'))
+const Stats = lazy(() => import('./components/Stats.jsx'))
+const BodyWeight = lazy(() => import('./components/BodyWeight.jsx'))
+const WeeklySummary = lazy(() => import('./components/WeeklySummary.jsx'))
+const Help = lazy(() => import('./components/Help.jsx'))
+const Notifications = lazy(() => import('./components/Notifications.jsx'))
+const Account = lazy(() => import('./components/Account.jsx'))
 
 export default function App() {
   const { user, loading, recovery } = useAuth()
@@ -43,13 +46,7 @@ export default function App() {
     })
   }, [])
 
-  if (loading) {
-    return (
-      <div className="min-h-dvh flex items-center justify-center" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
-        <p className="eyebrow animate-pulse">{t('common.loading')}</p>
-      </div>
-    )
-  }
+  if (loading) return <ScreenLoader />
 
   // The privacy notice has to be readable before anyone signs in.
   if (!user && location.pathname === '/privacy') return <Privacy standalone />
@@ -73,7 +70,7 @@ export default function App() {
         <Route path="/history/:id/edit" element={<EditSession />} />
         <Route path="/people" element={<People />} />
         <Route path="/errors" element={<ErrorLogs />} />
-        <Route path="/nutrition" element={<Suspense fallback={null}><Nutrition /></Suspense>} />
+        <Route path="/nutrition" element={<Nutrition />} />
         <Route path="/stats" element={<Stats />} />
         <Route path="/weight" element={<BodyWeight />} />
         <Route path="/summary" element={<WeeklySummary />} />
