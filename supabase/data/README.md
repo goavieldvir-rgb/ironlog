@@ -51,7 +51,14 @@ Read from search.openfoodfacts.org in October 2026 and mapped with the app's
 30% off 4/4/9, protein powders under 45% protein, names in other scripts, and
 repeats of the same brand and name.
 
-Load it like Tzameret (pg_net), as source 'off' with no `created_by`:
+`off-products-2.json` adds every other product with an Israeli barcode
+(729...) and popular overseas brands: sports brands in full (Prozis, Bulk,
+Isopure, Ghost, Premier Protein, Fulfil, Oikos, Kind, Clif and more, up to
+300 each) and well-known food brands (Nutella, Kinder, Lotus, Oreo, Milka,
+Pringles, Kellogg's, Alpro, Barilla and more, the 50 most popular each, English
+names only). Same filters, minus anything already in the first file.
+
+Load each like Tzameret (pg_net), as source 'off' with no `created_by`:
 
 ```sql
 select net.http_get('https://raw.githubusercontent.com/goavieldvir-rgb/ironlog/main/supabase/data/off-products.json', timeout_milliseconds => 60000);

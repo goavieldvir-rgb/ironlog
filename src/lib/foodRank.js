@@ -84,6 +84,59 @@ export const STAPLES = new Set(
   ].map(String),
 )
 
+// Brands are typed in either script and with or without spaces ("All in",
+// "allin", "אול אין"), so a brand also answers to its joined form and its
+// spelling in the other script.
+const BRAND_ALIASES = [
+  ['all in', 'allin', 'אול אין', 'אולאין'],
+  ['alfa', 'אלפא'],
+  ['myprotein', 'my protein', 'מיי פרוטאין', 'מייפרוטאין'],
+  ['optimum nutrition', 'אופטימום'],
+  ['dymatize', 'דיימטייז'],
+  ['muscletech', 'מאסלטק'],
+  ['scitec nutrition', 'סייטק'],
+  ['quest', 'קווסט'],
+  ['barebells', 'בארבלס', 'בר בלס'],
+  ['grenade', 'גרנייד'],
+  ['yotvata', 'יטבתה'],
+  ['tnuva', 'תנובה'],
+  ['strauss', 'שטראוס'],
+  ['elite', 'עלית'],
+  ['osem', 'אסם'],
+  ['danone', 'דנונה'],
+  ['muller', 'mueller', 'מולר'],
+  ['tara', 'טרה'],
+  ['nestle', 'נסטלה'],
+  ['quaker', 'קוואקר'],
+  ['tivall', 'טבעול'],
+  ['of tov', 'עוף טוב'],
+  ['willi food', 'ויליפוד'],
+  ['shufersal', 'שופרסל'],
+  ['prozis', 'פרוזיס'],
+  ['kinder', 'קינדר'],
+  ['nutella', 'נוטלה'],
+  ['lotus', 'לוטוס'],
+  ['milka', 'מילקה'],
+  ['oreo', 'אוראו'],
+  ['alpro', 'אלפרו'],
+].map((group) => group.map((b) => words(b)))
+
+function brandWords(brand) {
+  if (!brand) return []
+  const own = words(brand)
+  const extra = new Set(own.length > 1 ? [own.join('')] : [])
+  const key = own.join(' ')
+  for (const group of BRAND_ALIASES) {
+    if (group.some((ws) => ws.join(' ') === key || ws.join('') === own.join(''))) {
+      for (const ws of group) {
+        ws.forEach((w) => extra.add(w))
+        if (ws.length > 1) extra.add(ws.join(''))
+      }
+    }
+  }
+  return [...own, ...[...extra].filter((w) => !own.includes(w))]
+}
+
 // One name, prepared once per food.
 function prepName(name) {
   const norm = normalizeHe(name)
@@ -107,11 +160,42 @@ const prepared = new WeakMap()
 function prep(food) {
   let p = prepared.get(food)
   if (!p) {
-    p = { he: prepName(food.name_he), en: prepName(food.name_en), brand: food.brand ? words(food.brand) : [] }
+    p = { he: prepName(food.name_he), en: prepName(food.name_en), brand: brandWords(food.brand) }
+    // Every word of the food in one string, for a cheap first pass.
+    p.hay = [...(p.he?.toks || []), ...(p.en?.toks || []), ...p.brand].join(' ')
     prepared.set(food, p)
   }
   return p
 }
+
+// Product words in the other script, so "אלפא חלבון" finds "Alfa Whey" and
+// "protein bar" finds "חטיף חלבון". Only for words that recur on labels.
+const TERMS = Object.fromEntries(
+  [
+    ['חלבון', 'protein', 'whey'],
+    ['חטיף', 'bar'],
+    ['אבקה', 'powder'],
+    ['אבקת', 'powder'],
+    ['שייק', 'shake'],
+    ['משקה', 'drink', 'shake'],
+    ['שוקולד', 'chocolate', 'choco'],
+    ['וניל', 'vanilla'],
+    ['עוגיות', 'cookies', 'cookie'],
+    ['קרמל', 'caramel'],
+    ['בננה', 'banana'],
+    ['תות', 'strawberry'],
+    ['קפה', 'coffee'],
+    ['בוטנים', 'peanut'],
+    ['יוגורט', 'yogurt', 'yoghurt'],
+    ['פודינג', 'pudding'],
+    ['קריספי', 'crispy'],
+    ['פריכיות', 'rice cakes'],
+  ].flatMap((group) => {
+    const g = group.map((w) => normalizeHe(w))
+    // Only across scripts: "whey" and "protein" stay different words.
+    return g.map((w) => [w, g.filter((x) => HEBREW.test(x) !== HEBREW.test(w) && !x.includes(' '))])
+  }),
+)
 
 export function prepareQuery(query) {
   const ws = words(query)
@@ -119,7 +203,7 @@ export function prepareQuery(query) {
     norm: ws.join(' '),
     he: HEBREW.test(query),
     words: ws.map((w) => {
-      const exact = [...new Set([w, stripPrefix(w)])]
+      const exact = [...new Set([w, stripPrefix(w), ...(TERMS[w] || []), ...(TERMS[stripPrefix(w)] || [])])]
       return { w, exact, stems: [...new Set(exact.map(stem))].filter((s) => s.length >= 2) }
     }),
     wantsNoise: ws.some((w) => NOISE_WORDS.has(w) || NOISE_WORDS.has(stripPrefix(w))),
@@ -183,6 +267,9 @@ const SOURCE_BONUS = { coach: 30, moh: 15, usda: 12, off: 0, user: -10 }
 // history: Map food_id -> { count } of the user's own logs.
 export function scoreFood(food, pq, history) {
   const p = prep(food)
+  // Any match needs each query word (or its stem or alias) inside some word
+  // of the food; skip the full scoring for the many foods that fail that.
+  if (!pq.words.every((qw) => qw.exact.some((x) => p.hay.includes(x)) || qw.stems.some((x) => p.hay.includes(x)))) return null
   const primary = pq.he ? p.he : p.en
   const secondary = pq.he ? p.en : p.he
   // A packaged product named just "Milk" or "טונה" should not beat the
