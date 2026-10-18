@@ -41,10 +41,23 @@ export async function fetchRecentPrs(today = toLocalISODate()) {
 
 // Share of planned sessions done over the last four full weeks (this week is
 // still running). week_counts is oldest first, the last one is this week.
-export function adherence(weekCounts, planned) {
+// Weeks before the account existed don't count against anyone, so a trainee
+// who joined two weeks ago is measured on those two weeks only.
+export function adherence(weekCounts, planned, createdAt, today = toLocalISODate()) {
   if (!planned || !weekCounts?.length) return null
-  const done = weekCounts.slice(-5, -1).reduce((a, b) => a + b, 0)
-  return Math.min(100, Math.round((done / (planned * 4)) * 100))
+  let weeks = 4
+  if (createdAt) {
+    const joinedWeek = weekStartOf(toLocalISODate(new Date(createdAt)))
+    const thisWeek = weekStartOf(today)
+    // Full weeks between the week they joined (counted only if they joined on
+    // its first day) and this week.
+    const full = Math.round((new Date(thisWeek + 'T00:00:00') - new Date(joinedWeek + 'T00:00:00')) / (7 * 86400000))
+    const joinedMidWeek = toLocalISODate(new Date(createdAt)) > joinedWeek
+    weeks = Math.min(4, full - (joinedMidWeek ? 1 : 0))
+  }
+  if (weeks <= 0) return null
+  const done = weekCounts.slice(-1 - weeks, -1).reduce((a, b) => a + b, 0)
+  return Math.min(100, Math.round((done / (planned * weeks)) * 100))
 }
 
 // Everything worth a coach's attention on one trainee, most urgent first.
@@ -52,7 +65,7 @@ export function adherence(weekCounts, planned) {
 export function rosterFlags(p, today = toLocalISODate()) {
   const flags = []
   const quietDays = daysSince(p.last_session, today)
-  const adh = adherence(p.week_counts, p.planned_per_week)
+  const adh = adherence(p.week_counts, p.planned_per_week, p.created_at, today)
   if (p.last_session && quietDays >= (p.inactivity_alert_days || 5)) {
     flags.push({ key: 'quiet', tone: 'warn', score: 3, n: quietDays })
   }

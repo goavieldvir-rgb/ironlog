@@ -43,6 +43,13 @@ export default function PersonDetail() {
   const [reload, setReload] = useState(0)
   const today = toLocalISODate()
 
+  // Another trainee's page reuses this component: drop the previous one's
+  // data so their numbers never show under the new name.
+  useEffect(() => {
+    setData(null)
+    setLoadError(null)
+  }, [id])
+
   useEffect(() => {
     let cancelled = false
     fetchTraineeDetail(id, today)
@@ -79,7 +86,7 @@ export default function PersonDetail() {
       scheduled,
       weeks,
       thisWeek: counts.at(-1),
-      adh: adherence(counts, planned),
+      adh: adherence(counts, planned, data.profile.created_at, today),
       lastSession: data.sessions[0]?.date || null,
       toReview: data.sessions.filter((s) => needsReview(s, today)),
       lastWeight,
@@ -292,6 +299,7 @@ export default function PersonDetail() {
           )}
 
           <GoalForm
+            key={p.id}
             traineeId={p.id}
             goal={data.goal}
             scheduled={derived.scheduled}
@@ -303,6 +311,7 @@ export default function PersonDetail() {
           />
 
           <Notes
+            key={p.id}
             traineeId={p.id}
             notes={data.notes}
             t={t}

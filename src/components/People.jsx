@@ -58,7 +58,7 @@ export default function People() {
         .filter((p) => p.id !== user.uid)
         .map((p) => {
           const flags = rosterFlags(p, today)
-          return { ...p, flags, score: attentionScore(flags), adh: adherence(p.week_counts, p.planned_per_week) }
+          return { ...p, flags, score: attentionScore(flags), adh: adherence(p.week_counts, p.planned_per_week, p.created_at, today) }
         }),
     [rows, user.uid, today],
   )
