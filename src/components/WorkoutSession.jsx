@@ -470,6 +470,10 @@ export default function WorkoutSession() {
           videoUrl: e.videoUrl,
           notes: e.notes || '',
           ...(e.coachNote ? { coachNote: e.coachNote } : {}),
+          // The routine's target rides along so the coach reviewing the
+          // session sees what was asked for, even after the routine changes.
+          ...(e.targetSets ? { targetSets: e.targetSets } : {}),
+          ...(e.targetReps != null && e.targetReps !== '' ? { targetReps: e.targetReps } : {}),
           ...(e.targetRir != null ? { targetRir: e.targetRir } : {}),
           // `done` is only the on-screen tick; it isn't part of a saved set.
           sets: e.sets.map(({ done, ...set }) => set),

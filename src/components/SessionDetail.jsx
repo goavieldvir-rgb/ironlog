@@ -1,7 +1,8 @@
 import ExerciseVideo from './ExerciseVideo.jsx'
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { Pencil, MessageSquareText, Check, Trash2 } from 'lucide-react'
+import { Pencil, MessageSquareText, Check, Trash2, TrendingUp, TrendingDown, Minus, Target } from 'lucide-react'
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts'
 import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -16,6 +17,8 @@ import { isWarmup, workingSets } from '../lib/warmup.js'
 import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
 import { formatPace } from '../lib/cardio.js'
 import CardioTotals from './CardioTotals.jsx'
+import { sameKindSessions, matchingEntry, targetFor, entryStats, trend, sessionVolume } from '../lib/sessionCompare.js'
+import { ACCENT, CHALK, CHALKDIM, MUTED, SURFACE } from '../theme.js'
 
 function formatDate(lang, iso) {
   if (!iso) return ''
@@ -84,8 +87,15 @@ export default function SessionDetail() {
   const [rawSessions, loading, refresh] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const sessions = useMemo(() => applyCurrentTimed(rawSessions, exercises), [rawSessions, exercises])
+  const [routines] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const exById = useMemo(() => exerciseMap(exercises), [exercises])
   const session = sessions.find((s) => s.id === id)
+  const routine = routines.find((r) => r.id === session?.routine_id)
+  // Earlier workouts of the same routine, newest first, and how many of them
+  // to lay beside this one (0 = not comparing).
+  const previous = useMemo(() => sameKindSessions(session, sessions), [session, sessions])
+  const [compareCount, setCompareCount] = useState(0)
+  const compared = previous.slice(0, compareCount)
 
   // The coach opening a trainee's workout clears it from their "to review"
   // list on the People page.
@@ -150,8 +160,23 @@ export default function SessionDetail() {
 
       {session.notes && <p className="text-chalkdim text-[15px] px-1">{session.notes}</p>}
 
+      {previous.length > 0 && (
+        <ComparePanel
+          session={session}
+          previous={previous}
+          compared={compared}
+          count={compareCount}
+          setCount={setCompareCount}
+          exById={exById}
+          lang={lang}
+          t={t}
+        />
+      )}
+
       {(session.entries || []).map((entry, i) => {
         const prIdx = prSetIndex(entry, session, sessions)
+        const target = targetFor(entry, routine)
+        const doneSets = workingSets(entry.sets).length
         let n = 0
         return (
           <section key={i} className="bg-surface rounded-[20px] overflow-hidden">
@@ -170,6 +195,22 @@ export default function SessionDetail() {
                 className="text-xs shrink-0"
               />
             </div>
+            {target && (
+              <p className="flex items-center gap-1.5 flex-wrap px-4 pb-2 -mt-1 text-[13px] text-chalkdim tabular-nums">
+                <Target size={13} className="shrink-0" aria-hidden="true" />
+                <span>
+                  {t('workout.targetLine')}{' '}
+                  <bdi dir="ltr" className="text-chalk">
+                    {target.sets}
+                    {target.reps != null ? `×${target.reps}${entry.timed ? 's' : ''}` : ` ${t('history.setsLabel')}`}
+                    {target.rir != null ? ` · RIR ${target.rir}` : ''}
+                  </bdi>
+                </span>
+                <span aria-hidden="true">·</span>
+                <span className={doneSets < target.sets ? 'text-accent' : ''}>{t('sessionDetail.setsDone')(doneSets, target.sets)}</span>
+                {target.fromRoutine && <InfoTip text={t('sessionDetail.targetFromRoutineTip')} />}
+              </p>
+            )}
             <div>
               {(entry.sets || []).map((s, j) => (
                 <div
@@ -194,6 +235,7 @@ export default function SessionDetail() {
               </p>
             )}
             {entry.notes && <p className="text-chalkdim text-sm px-4 py-3 border-t border-white/[0.06]">{entry.notes}</p>}
+            {compared.length > 0 && <PreviousRows entry={entry} compared={compared} lang={lang} t={t} />}
           </section>
         )
       })}
@@ -276,6 +318,187 @@ function TrainerComment({ session, effectiveUid, isAdmin, isNew, onSaved, t }) {
         <button onClick={() => setEditing(true)} aria-label={t('common.edit')} className="text-chalkdim hover:text-chalk shrink-0 min-w-[44px] min-h-[44px] -m-2 inline-flex items-center justify-center">
           <Pencil size={14} />
         </button>
+      )}
+    </Card>
+  )
+}
+
+function shortDate(lang, iso) {
+  return fmtDate(lang, new Date(iso + 'T00:00:00'), { month: 'short', day: 'numeric' })
+}
+
+const fmtNum = (v) => (Math.round(Number(v) * 100) / 100).toString()
+
+// A workout's sets for one exercise in a single short line, e.g.
+// "60×10 · 60×9 · 57.5×10". Working sets only.
+function compactSets(entry, t) {
+  const sets = workingSets(entry.sets)
+  if (entry.category === 'cardio') {
+    return sets
+      .map((s) => `${fmtNum(s.duration || 0)} ${t('sessionCard.minUnit')}${s.distance !== '' && s.distance != null ? ` / ${fmtNum(s.distance)}${entry.unit}` : ''}`)
+      .join(' · ')
+  }
+  if (entry.timed) return sets.map((s) => `${Number(s.weight) > 0 ? `+${fmtNum(s.weight)}·` : ''}${formatSeconds(s.reps) || '0s'}`).join(' · ')
+  if (entry.bodyweight) return sets.map((s) => `${Number(s.weight) > 0 ? `+${fmtNum(s.weight)}×` : ''}${fmtNum(s.reps || 0)}`).join(' · ')
+  return sets.map((s) => `${fmtNum(s.weight || 0)}×${fmtNum(s.reps || 0)}`).join(' · ')
+}
+
+function TrendMark({ dir, t }) {
+  if (!dir) return <span className="w-4 shrink-0" />
+  const Icon = dir === 'up' ? TrendingUp : dir === 'down' ? TrendingDown : Minus
+  const tone = dir === 'up' ? 'text-good' : dir === 'down' ? 'text-irontext' : 'text-chalkdim'
+  const label = t(`sessionDetail.trend_${dir}`)
+  return (
+    <span role="img" aria-label={label} title={label} className={`shrink-0 inline-flex ${tone}`}>
+      <Icon size={15} />
+    </span>
+  )
+}
+
+// Under each exercise: what the trainee did on it in the compared workouts,
+// with an arrow for whether today beat that day.
+function PreviousRows({ entry, compared, lang, t }) {
+  const now = entryStats(entry)
+  return (
+    <div className="border-t border-white/[0.06] px-4 py-2 bg-white/[0.02]">
+      <div className="eyebrow mb-1">{t('sessionDetail.previously')}</div>
+      <ul className="flex flex-col">
+        {compared.map((o) => {
+          const e = matchingEntry(entry, o)
+          return (
+            <li key={o.id} className="flex items-center gap-3 min-h-[32px] text-[13px] tabular-nums">
+              <span className="w-14 shrink-0 text-chalkdim">{shortDate(lang, o.date)}</span>
+              <bdi dir="ltr" className="flex-1 min-w-0 truncate text-start" style={{ textAlign: 'start' }}>
+                {e ? compactSets(e, t) : <span className="text-chalkdim">{t('sessionDetail.notDoneThen')}</span>}
+              </bdi>
+              {e && (
+                <span className="text-chalkdim shrink-0">
+                  {e.category === 'cardio' ? '' : t('sessionDetail.setsShort')(workingSets(e.sets).length)}
+                </span>
+              )}
+              <TrendMark dir={e ? trend(now, entryStats(e)) : null} t={t} />
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+// The big picture: pick how many earlier workouts of this routine to compare
+// with, then follow total volume, or one exercise's top set, across them.
+function ComparePanel({ session, previous, compared, count, setCount, exById, lang, t }) {
+  const options = [
+    [0, t('sessionDetail.compareOff')],
+    [1, t('sessionDetail.compareLast')],
+    ...(previous.length > 1 ? [[Math.min(3, previous.length), t('sessionDetail.compareLastN')(Math.min(3, previous.length))]] : []),
+    ...(previous.length > 3 ? [[previous.length, t('sessionDetail.compareAll')(previous.length)]] : []),
+  ]
+  const series = [...compared].reverse().concat(session)
+  const hasVolume = series.some((s) => sessionVolume(s))
+  const metrics = [
+    ...(hasVolume ? [{ key: 'volume', label: t('sessionDetail.metricVolume') }] : []),
+    ...(session.entries || [])
+      .filter((e) => entryStats(e))
+      .map((e, i) => ({ key: `e${i}`, entry: e, label: entryName(e, exById, lang) })),
+  ]
+  const [metricKey, setMetricKey] = useState(null)
+  const metric = metrics.find((m) => m.key === metricKey) || metrics[0]
+
+  const unitOf = (m) => {
+    if (!m) return ''
+    if (m.key === 'volume') return sessionVolume(session)?.unit || series.map(sessionVolume).find(Boolean)?.unit || ''
+    const st = entryStats(m.entry)
+    return st.kind === 'weight' ? m.entry.unit : st.kind === 'cardio' ? t('sessionCard.minUnit') : st.kind === 'timed' ? 's' : t('sessionCard.reps')
+  }
+  const points = metric
+    ? series.map((s) => {
+        let value = null
+        if (metric.key === 'volume') value = sessionVolume(s)?.value ?? null
+        else value = entryStats(s === session ? metric.entry : matchingEntry(metric.entry, s))?.top ?? null
+        return { id: s.id, label: shortDate(lang, s.date), value, current: s === session }
+      })
+    : []
+  const first = points.find((p) => p.value != null)
+  const change = first && !first.current && points[points.length - 1].value != null ? points[points.length - 1].value - first.value : null
+
+  return (
+    <Card className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h2 className="text-base text-chalk">{t('sessionDetail.compareTitle')}</h2>
+        <span className="text-xs text-chalkdim">{t('sessionDetail.compareCount')(previous.length)}</span>
+      </div>
+      <div role="tablist" className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1">
+        {options.map(([n, label]) => (
+          <button
+            key={n}
+            type="button"
+            role="tab"
+            aria-selected={count === n}
+            onClick={() => setCount(n)}
+            className={`press shrink-0 rounded-full px-3 min-h-9 text-xs font-medium ${count === n ? 'bg-chalk text-ink' : 'bg-surface2 text-chalkdim'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {count > 0 && metric && (
+        <>
+          <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1">
+            {metrics.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                aria-pressed={m.key === metric.key}
+                onClick={() => setMetricKey(m.key)}
+                className={`press shrink-0 rounded-full px-3 min-h-9 text-xs font-medium max-w-[180px] truncate ${
+                  m.key === metric.key ? 'bg-accentsoft text-accent' : 'bg-surface2 text-chalkdim'
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-chalkdim">
+            {metric.key === 'volume' ? t('sessionDetail.metricVolumeHint') : t('sessionDetail.metricTopHint')}
+            {change != null && (
+              <>
+                {' · '}
+                <span className={change > 0 ? 'text-good' : change < 0 ? 'text-irontext' : ''}>
+                  <bdi dir="ltr">{`${change > 0 ? '+' : ''}${fmtNum(change)}${unitOf(metric) ? ` ${unitOf(metric)}` : ''}`}</bdi>
+                </span>{' '}
+                {t('sessionDetail.sinceFirst')(points.find((p) => p.value != null).label)}
+              </>
+            )}
+          </p>
+          <div className="h-40 -mx-1">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={points} margin={{ top: 8, right: 12, left: 12, bottom: 0 }}>
+                <XAxis dataKey="label" stroke={CHALKDIM} fontSize={10} tickLine={false} axisLine={false} minTickGap={16} reversed={lang === 'he'} />
+                <YAxis hide domain={['dataMin', 'dataMax']} />
+                <Tooltip
+                  contentStyle={{ background: SURFACE, border: 0, borderRadius: 12, fontSize: 13 }}
+                  labelStyle={{ color: CHALK }}
+                  formatter={(v) => [`${fmtNum(v)} ${unitOf(metric)}`, metric.label]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="value"
+                  stroke={MUTED}
+                  strokeWidth={2}
+                  connectNulls
+                  isAnimationActive={false}
+                  dot={(props) => {
+                    const { cx, cy, payload } = props
+                    if (cx == null || cy == null || payload.value == null) return <g key={payload.id} />
+                    return <circle key={payload.id} cx={cx} cy={cy} r={payload.current ? 5 : 3.5} fill={payload.current ? ACCENT : CHALKDIM} />
+                  }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </>
       )}
     </Card>
   )

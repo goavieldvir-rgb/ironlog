@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Play, Pencil, Trash2, Dumbbell, Copy, Send } from 'lucide-react'
+import { Plus, Play, Pencil, Trash2, Dumbbell, Copy, Send, Eye } from 'lucide-react'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
@@ -11,6 +11,7 @@ import { Button, Card, CategoryTag, EmptyState, LoadError } from './ui.jsx'
 import { Tabs } from './ExerciseLibrary.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
+import { itemTarget } from './RoutineView.jsx'
 
 export default function RoutineList() {
   const { effectiveUid, isAdmin } = useAdmin()
@@ -88,7 +89,9 @@ export default function RoutineList() {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-lg leading-tight">{r.name}</h2>
+                  <h2 className="text-lg leading-tight">
+                    <Link to={`/routines/${r.id}`} className="hover:text-accent">{r.name}</Link>
+                  </h2>
                   <CategoryTag category={r.category} />
                 </div>
                 <p className="text-chalkdim text-xs mt-1">
@@ -96,6 +99,9 @@ export default function RoutineList() {
                 </p>
               </div>
               <div className="flex gap-1 shrink-0">
+                <Link to={`/routines/${r.id}`} title={t('routines.view')} aria-label={t('routines.view')} className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-surface2 text-chalkdim hover:text-chalk">
+                  <Eye size={15} />
+                </Link>
                 <button
                   className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-surface2 text-chalkdim hover:text-chalk"
                   onClick={() => duplicateRoutine(r)}
@@ -141,9 +147,7 @@ export default function RoutineList() {
                 <li key={i} className="flex justify-between gap-2">
                   <span className="text-chalk truncate min-w-0">{exerciseNameById[e.exerciseId] || e.name}</span>
                   <span className="num shrink-0">
-                    {r.category === 'cardio'
-                      ? `${e.targetSets ?? e.targetDuration ?? ''}${e.targetSets != null ? ' min' : ''}`
-                      : `${e.targetSets}${e.targetReps !== '' && e.targetReps != null ? `×${e.targetReps}${e.timed ? 's' : ''}` : ''}${e.targetRir != null ? ` · RIR ${e.targetRir}` : ''}`}
+                    <bdi dir="ltr">{itemTarget(r, e, t)}</bdi>
                   </span>
                 </li>
               ))}

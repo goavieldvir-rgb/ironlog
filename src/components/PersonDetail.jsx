@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ResponsiveContainer, BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts'
-import { Apple, Pin, PinOff, Trash2, CheckCheck, Trophy } from 'lucide-react'
+import { Apple, Pin, PinOff, Trash2, CheckCheck, Trophy, ChevronDown, Pencil } from 'lucide-react'
 import { BackChevron, ForwardChevron, ForwardArrow } from './DirectionalIcon.jsx'
 import { supabase } from '../supabase.js'
 import { useAdmin } from '../context/AdminContext.jsx'
@@ -12,6 +12,7 @@ import { TERMS_VERSION } from '../legal/terms.js'
 import { Card, Badge, Button, Field, LoadError } from './ui.jsx'
 import { PageLoader } from './Loading.jsx'
 import ProgressPhotos from './ProgressPhotos.jsx'
+import { RoutineExercises } from './RoutineView.jsx'
 import {
   fetchTraineeDetail,
   weeklyCounts,
@@ -267,6 +268,12 @@ export default function PersonDetail() {
             </Section>
           )}
 
+          {data.routines.length > 0 && (
+            <Section title={t('person.routines')} hint={t('person.routinesHint')}>
+              <RoutineListView routines={data.routines} t={t} onEdit={(r) => openAccount(`/routines/${r.id}/edit`)} />
+            </Section>
+          )}
+
           {recent.length > 0 && (
             <Section title={t('person.recentSessions')}>
               <SessionList sessions={recent} lang={lang} t={t} today={today} onOpen={(s) => openAccount(`/history/${s.id}`)} showReviewed />
@@ -389,6 +396,44 @@ function SessionList({ sessions, lang, t, today, onOpen, showReviewed }) {
           </button>
         </li>
       ))}
+    </ul>
+  )
+}
+
+// The trainee's routines, read-only: tap one to see every exercise and its
+// target right here, without opening their account or the editor.
+function RoutineListView({ routines, t, onEdit }) {
+  const [open, setOpen] = useState(null)
+  return (
+    <ul className="flex flex-col -my-1">
+      {routines.map((r) => {
+        const isOpen = open === r.id
+        return (
+          <li key={r.id} className="border-t border-white/[0.06] first:border-t-0">
+            <button
+              onClick={() => setOpen(isOpen ? null : r.id)}
+              aria-expanded={isOpen}
+              className="press-row w-full flex items-center gap-3 py-2 text-start min-h-[44px]"
+            >
+              <span className="flex-1 min-w-0">
+                <span className="block truncate text-sm">{r.name}</span>
+                <span className="block text-xs text-chalkdim">
+                  {r.exercises?.length || 0} {t('routines.exercisesCount')}
+                </span>
+              </span>
+              <ChevronDown size={15} className={`text-chalkdim shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isOpen && (
+              <div className="pb-3">
+                <RoutineExercises routine={r} nameOf={(it) => it.name} t={t} compact />
+                <button onClick={() => onEdit(r)} className="mt-1 text-xs text-chalkdim hover:text-chalk inline-flex items-center gap-1 min-h-9">
+                  <Pencil size={13} /> {t('person.editRoutine')}
+                </button>
+              </div>
+            )}
+          </li>
+        )
+      })}
     </ul>
   )
 }
