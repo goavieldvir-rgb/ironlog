@@ -2,31 +2,54 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { supabase } from '../supabase.js'
+import { supabase, resetRedirect } from '../supabase.js'
+import { MailCheck } from 'lucide-react'
 import { Button, Field } from './ui.jsx'
 import { friendlyAuthError } from '../lib/authErrors.js'
 import Captcha, { CAPTCHA_SITE_KEY } from './Captcha.jsx'
+import { reloadIfStale } from '../lib/freshness.js'
 
-export default function Login({ resetLinkError }) {
-  const { login, signup } = useAuth()
+export default function Login({ linkProblem }) {
+  const { login, signup, resendConfirmation } = useAuth()
   const { t, lang, setLang } = useLanguage()
   const [mode, setMode] = useState('login')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  // A good-news line, such as "your email is confirmed".
+  const [notice, setNotice] = useState('')
+  const [resent, setResent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [resetSent, setResetSent] = useState(false)
   const [invited, setInvited] = useState(false)
   const [captchaToken, setCaptchaToken] = useState('')
   const captcha = useRef(null)
 
+  // Opened from an email link that couldn't sign them in.
   useEffect(() => {
-    if (resetLinkError) {
+    if (!linkProblem) return
+    if (linkProblem.kind === 'signup') {
+      setMode('login')
+      // Supabase confirms the email before handing over the code, so a code
+      // this browser can't use (the link opened on another device) still
+      // means a confirmed email.
+      if (linkProblem.expired) setError(t('login.confirmLinkExpired'))
+      else setNotice(t('login.emailConfirmed'))
+    } else {
       setMode('reset')
-      setError(resetLinkError)
+      setError(t('login.resetLinkInvalid'))
     }
-  }, [resetLinkError])
+  }, [linkProblem])
+
+  // An installed app left open for days may be an older copy than the one
+  // live now, missing steps the server requires.
+  useEffect(() => {
+    reloadIfStale()
+    const onShow = () => document.visibilityState === 'visible' && reloadIfStale()
+    document.addEventListener('visibilitychange', onShow)
+    return () => document.removeEventListener('visibilitychange', onShow)
+  }, [])
 
   // A link generated from People → "Invite someone" pre-fills the sign-up
   // form so whoever opens it just needs to pick a password.
@@ -45,22 +68,29 @@ export default function Login({ resetLinkError }) {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+    setNotice('')
     setBusy(true)
     try {
       if (mode === 'login') {
         await login(email, password, captchaToken)
       } else if (mode === 'signup') {
-        await signup(email, password, name, captchaToken)
+        if (await signup(email, password, name, captchaToken)) setMode('confirm')
       } else if (mode === 'reset') {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: window.location.origin + window.location.pathname,
+          redirectTo: resetRedirect(),
           captchaToken,
         })
         if (error) throw error
         setResetSent(true)
       }
     } catch (err) {
-      setError(friendlyAuthError(err, t))
+      if (err?.code === 'email_not_confirmed' || /email not confirmed/i.test(err?.message || '')) {
+        setMode('confirm')
+      } else {
+        // Rejected for a missing captcha: this copy of the app may be out of date.
+        if (err?.code === 'captcha_failed') reloadIfStale()
+        setError(friendlyAuthError(err, t))
+      }
     } finally {
       // A captcha token works once.
       captcha.current?.reset()
@@ -71,8 +101,26 @@ export default function Login({ resetLinkError }) {
   function switchMode(next) {
     setMode(next)
     setError('')
+    setNotice('')
     setResetSent(false)
+    setResent(false)
   }
+
+  async function resend() {
+    setError('')
+    setBusy(true)
+    try {
+      await resendConfirmation(email, captchaToken)
+      setResent(true)
+    } catch (err) {
+      setError(friendlyAuthError(err, t))
+    } finally {
+      captcha.current?.reset()
+      setBusy(false)
+    }
+  }
+
+  const waitingForCaptcha = !!CAPTCHA_SITE_KEY && !captchaToken
 
   return (
     <div
@@ -97,7 +145,7 @@ export default function Login({ resetLinkError }) {
         </div>
 
         <div className="card p-6">
-          {mode !== 'reset' && (
+          {(mode === 'login' || mode === 'signup') && (
             <div className="flex mb-6 rounded-md bg-surface2 p-1 text-sm">
               <button
                 type="button"
@@ -116,7 +164,33 @@ export default function Login({ resetLinkError }) {
             </div>
           )}
 
-          {mode === 'reset' && resetSent ? (
+          {mode === 'confirm' ? (
+            <div className="flex flex-col gap-4 text-center py-2">
+              <MailCheck size={36} className="text-brass mx-auto" />
+              <h2 className="text-xl">{t('login.confirmTitle')}</h2>
+              <p className="text-chalkdim text-sm">{t('login.confirmBody')}</p>
+              {email && <p className="text-chalk text-sm"><bdi>{email}</bdi></p>}
+              <p className="text-chalkdim text-xs">{t('login.confirmHint')}</p>
+              {error && <p className="text-irontext text-sm">{error}</p>}
+              {resent ? (
+                <p className="text-good text-sm">{t('login.confirmResent')}</p>
+              ) : (
+                <>
+                  <Captcha ref={captcha} onToken={setCaptchaToken} />
+                  <Button type="button" variant="ghost" onClick={resend} disabled={busy || waitingForCaptcha || !email}>
+                    {busy ? t('login.oneMoment') : t('login.confirmResend')}
+                  </Button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => switchMode('login')}
+                className="text-brass text-sm hover:underline w-fit mx-auto"
+              >
+                {t('login.backToLogin')}
+              </button>
+            </div>
+          ) : mode === 'reset' && resetSent ? (
             <div className="flex flex-col gap-4 text-center py-2">
               <p className="text-chalk">{t('login.resetSentTitle')}</p>
               <p className="text-chalkdim text-sm">
@@ -188,12 +262,13 @@ export default function Login({ resetLinkError }) {
                 </button>
               )}
 
+              {notice && <p className="text-good text-sm">{notice}</p>}
               {error && <p className="text-irontext text-sm">{error}</p>}
 
-              <Captcha ref={captcha} onToken={setCaptchaToken} lang={lang} />
+              <Captcha ref={captcha} onToken={setCaptchaToken} />
 
-              <Button type="submit" disabled={busy || (!!CAPTCHA_SITE_KEY && !captchaToken)} className="mt-2 w-full">
-                {busy || (CAPTCHA_SITE_KEY && !captchaToken)
+              <Button type="submit" disabled={busy || waitingForCaptcha} className="mt-2 w-full">
+                {busy
                   ? t('login.oneMoment')
                   : mode === 'login'
                     ? t('login.logIn')
