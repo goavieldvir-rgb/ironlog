@@ -11,6 +11,7 @@ import { Button, Card, CategoryTag, EmptyState, LoadError } from './ui.jsx'
 import { Tabs } from './ExerciseLibrary.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
+import { itemTarget } from './RoutineView.jsx'
 
 export default function RoutineList() {
   const { effectiveUid, isAdmin } = useAdmin()
@@ -146,9 +147,7 @@ export default function RoutineList() {
                 <li key={i} className="flex justify-between gap-2">
                   <span className="text-chalk truncate min-w-0">{exerciseNameById[e.exerciseId] || e.name}</span>
                   <span className="num shrink-0">
-                    {r.category === 'cardio'
-                      ? `${e.targetSets ?? e.targetDuration ?? ''}${e.targetSets != null ? ' min' : ''}`
-                      : `${e.targetSets}${e.targetReps !== '' && e.targetReps != null ? `×${e.targetReps}${e.timed ? 's' : ''}` : ''}${e.targetRir != null ? ` · RIR ${e.targetRir}` : ''}`}
+                    <bdi dir="ltr">{itemTarget(r, e, t)}</bdi>
                   </span>
                 </li>
               ))}
