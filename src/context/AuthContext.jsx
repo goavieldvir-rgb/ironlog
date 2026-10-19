@@ -68,15 +68,15 @@ export function AuthProvider({ children }) {
       clearPasswordRecovery()
       setRecovery(false)
     },
-    login: async (email, password) => {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+    login: async (email, password, captchaToken) => {
+      const { error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken } })
       if (error) throw error
     },
-    signup: async (email, password, displayName) => {
+    signup: async (email, password, displayName, captchaToken) => {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { full_name: displayName } },
+        options: { data: { full_name: displayName }, captchaToken },
       })
       if (error) throw error
     },
