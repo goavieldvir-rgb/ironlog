@@ -9,6 +9,19 @@ export const openedFromAuthLink =
   typeof window !== 'undefined' &&
   /[?&#](code|error_description)=/.test(window.location.search + window.location.hash)
 
+// Which email the link came from ('signup' or 'reset', set in the link's
+// redirect address below), and whether Supabase already said it had expired.
+// An expired link carries an error; a confirm link opened on another phone
+// carries a code this browser can't use, though the email is confirmed.
+export const authLinkKind =
+  typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('auth') : null
+export const authLinkExpired =
+  typeof window !== 'undefined' && /[?&#]error_description=/.test(window.location.search + window.location.hash)
+
+const appAddress = () => window.location.origin + window.location.pathname
+export const signupRedirect = () => `${appAddress()}?auth=signup`
+export const resetRedirect = () => `${appAddress()}?auth=reset`
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: { flowType: 'pkce' },
 })

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { supabase, isPasswordRecovery, clearPasswordRecovery } from '../supabase.js'
+import { supabase, isPasswordRecovery, clearPasswordRecovery, signupRedirect } from '../supabase.js'
 import { removeDeviceReminder } from '../lib/push.js'
 import { clearAllDrafts } from '../lib/draft.js'
 import { assurance } from '../lib/mfa.js'
@@ -72,11 +72,21 @@ export function AuthProvider({ children }) {
       const { error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken } })
       if (error) throw error
     },
+    // Resolves true when the account still needs its email confirmed.
     signup: async (email, password, displayName, captchaToken) => {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { full_name: displayName }, captchaToken },
+        options: { data: { full_name: displayName }, captchaToken, emailRedirectTo: signupRedirect() },
+      })
+      if (error) throw error
+      return !data?.session
+    },
+    resendConfirmation: async (email, captchaToken) => {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: signupRedirect(), captchaToken },
       })
       if (error) throw error
     },

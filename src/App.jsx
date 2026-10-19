@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext.jsx'
 import { useLanguage } from './context/LanguageContext.jsx'
 import { useAdmin } from './context/AdminContext.jsx'
-import { supabase, openedFromAuthLink } from './supabase.js'
+import { supabase, openedFromAuthLink, authLinkKind, authLinkExpired } from './supabase.js'
 import Login from './components/Login.jsx'
 import Layout from './components/Layout.jsx'
 import Dashboard from './components/Dashboard.jsx'
@@ -39,15 +39,24 @@ export default function App() {
   const { isAdmin, profile, loadingProfile } = useAdmin()
   const { t } = useLanguage()
   const location = useLocation()
-  const [resetLinkError, setResetLinkError] = useState(false)
+  const [linkProblem, setLinkProblem] = useState(null)
 
-  // Supabase reads a reset link's code (or its "expired" error) from the URL
-  // by itself while it starts up. If that failed, say so on the login screen
+  // Supabase reads an email link's code (or its "expired" error) from the URL
+  // by itself while it starts up. If that failed, say why on the login screen
   // instead of silently showing an empty form.
   useEffect(() => {
-    if (!openedFromAuthLink) return
-    supabase.auth.initialize().then(({ error }) => {
-      if (error) setResetLinkError(true)
+    if (!openedFromAuthLink && !authLinkKind) return
+    supabase.auth.initialize().then(async ({ error }) => {
+      // A link opened in a different browser than the one that asked for it
+      // carries a code this browser can't use: Supabase ignores it quietly,
+      // so no error, but no session either.
+      const { data } = await supabase.auth.getSession()
+      if (error || !data.session) setLinkProblem({ kind: authLinkKind || 'reset', expired: authLinkExpired })
+      // The link has done its job; a reload shouldn't repeat the message.
+      const url = new URL(window.location.href)
+      for (const k of ['auth', 'code', 'error', 'error_code', 'error_description']) url.searchParams.delete(k)
+      if (/error/.test(url.hash)) url.hash = ''
+      window.history.replaceState(null, '', url)
     })
   }, [])
 
@@ -56,7 +65,7 @@ export default function App() {
   // The privacy notice has to be readable before anyone signs in.
   if (!user && location.pathname === '/privacy') return <Privacy standalone />
 
-  if (!user) return <Login resetLinkError={resetLinkError ? t('login.resetLinkInvalid') : ''} />
+  if (!user) return <Login linkProblem={linkProblem} />
 
   // A password alone (or a reset link) is not enough for an account with
   // two-step verification on. The database enforces this too.
