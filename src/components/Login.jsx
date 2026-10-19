@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { supabase } from '../supabase.js'
 import { Button, Field } from './ui.jsx'
 import { friendlyAuthError } from '../lib/authErrors.js'
+import Captcha, { CAPTCHA_SITE_KEY } from './Captcha.jsx'
 
 export default function Login({ resetLinkError }) {
   const { login, signup } = useAuth()
@@ -17,6 +18,8 @@ export default function Login({ resetLinkError }) {
   const [busy, setBusy] = useState(false)
   const [resetSent, setResetSent] = useState(false)
   const [invited, setInvited] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const captcha = useRef(null)
 
   useEffect(() => {
     if (resetLinkError) {
@@ -45,12 +48,13 @@ export default function Login({ resetLinkError }) {
     setBusy(true)
     try {
       if (mode === 'login') {
-        await login(email, password)
+        await login(email, password, captchaToken)
       } else if (mode === 'signup') {
-        await signup(email, password, name)
+        await signup(email, password, name, captchaToken)
       } else if (mode === 'reset') {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: window.location.origin + window.location.pathname,
+          captchaToken,
         })
         if (error) throw error
         setResetSent(true)
@@ -58,6 +62,8 @@ export default function Login({ resetLinkError }) {
     } catch (err) {
       setError(friendlyAuthError(err, t))
     } finally {
+      // A captcha token works once.
+      captcha.current?.reset()
       setBusy(false)
     }
   }
@@ -184,8 +190,10 @@ export default function Login({ resetLinkError }) {
 
               {error && <p className="text-irontext text-sm">{error}</p>}
 
-              <Button type="submit" disabled={busy} className="mt-2 w-full">
-                {busy
+              <Captcha ref={captcha} onToken={setCaptchaToken} lang={lang} />
+
+              <Button type="submit" disabled={busy || (!!CAPTCHA_SITE_KEY && !captchaToken)} className="mt-2 w-full">
+                {busy || (CAPTCHA_SITE_KEY && !captchaToken)
                   ? t('login.oneMoment')
                   : mode === 'login'
                     ? t('login.logIn')
