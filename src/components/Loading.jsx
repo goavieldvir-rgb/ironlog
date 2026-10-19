@@ -39,6 +39,21 @@ function Mark() {
   )
 }
 
+// The same dumbbell, still and small, beside the name: the sign-in screens'
+// header.
+export function BrandMark() {
+  return (
+    <div className="flex items-center gap-2.5" dir="ltr">
+      <svg viewBox="0 0 100 48" width="30" height="15" fill="rgb(255 91 58)" aria-hidden="true">
+        {PLATES.map(([, x, y, width, height, rx], i) => (
+          <rect key={i} x={x} y={y} width={width} height={height} rx={rx} />
+        ))}
+      </svg>
+      <span className="text-[17px] font-semibold tracking-[-0.01em] text-chalk">Ironlog</span>
+    </div>
+  )
+}
+
 export function Loader({ mark = false }) {
   const { t } = useLanguage()
   return (

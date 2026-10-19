@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { confirmedApps, startSetup, verifyCode } from '../lib/mfa.js'
 import { Button, Field } from './ui.jsx'
+import { BrandMark } from './Loading.jsx'
 
 function codeError(err, t) {
   const code = err?.code || ''
@@ -35,18 +36,23 @@ function Gate({ title, children }) {
   const { user, logout } = useAuth()
   const { t } = useLanguage()
   return (
-    <div className="min-h-dvh flex items-center justify-center px-4" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
-      <div className="w-full max-w-sm flex flex-col gap-5">
-        <div>
-          <div className="eyebrow mb-1">Ironlog</div>
-          <h1 className="text-3xl">{title}</h1>
-          {user?.email && <p className="text-sm text-chalkdim mt-1"><bdi>{user.email}</bdi></p>}
-        </div>
-        <div className="card p-6">{children}</div>
-        <button type="button" onClick={logout} className="text-chalkdim text-xs hover:text-chalk w-fit mx-auto">
+    <div
+      className="min-h-dvh flex flex-col px-5"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)' }}
+    >
+      <div className="w-full max-w-sm mx-auto flex items-center justify-between">
+        <BrandMark />
+        <button type="button" onClick={logout} className="text-chalkdim text-sm hover:text-chalk min-h-[44px]">
           {t('twoStep.signOut')}
         </button>
       </div>
+      <main className="w-full max-w-sm mx-auto flex-1 flex flex-col justify-center gap-6 py-10">
+        <header className="flex flex-col gap-2">
+          <h1 className="text-[30px] leading-9">{title}</h1>
+          {user?.email && <p className="text-chalkdim text-[15px]"><bdi>{user.email}</bdi></p>}
+        </header>
+        {children}
+      </main>
     </div>
   )
 }

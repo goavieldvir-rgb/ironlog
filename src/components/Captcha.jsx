@@ -96,14 +96,14 @@ const Captcha = forwardRef(function Captcha({ onToken }, ref) {
     <div className="flex flex-col gap-2">
       <div ref={box} className="empty:hidden" />
       {status === 'checking' && (
-        <p className="flex items-center justify-center gap-1.5 text-chalkdim text-xs">
+        <p className="flex items-center gap-1.5 text-chalkdim text-xs">
           <ShieldCheck size={14} className="animate-pulse" /> {t('login.checking')}
         </p>
       )}
       {status === 'failed' && (
-        <div className="flex flex-col items-center gap-1 text-center">
+        <div className="flex flex-col items-start gap-1">
           <p className="text-irontext text-xs">{t('login.captchaFailed')}</p>
-          <button type="button" onClick={() => setAttempt((n) => n + 1)} className="text-brass text-xs hover:underline">
+          <button type="button" onClick={() => setAttempt((n) => n + 1)} className="text-accent text-xs font-medium hover:text-chalk">
             {t('login.captchaRetry')}
           </button>
         </div>
