@@ -9,6 +9,7 @@ import Layout from './components/Layout.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import RoutineList from './components/RoutineList.jsx'
 import RoutineBuilder from './components/RoutineBuilder.jsx'
+import RoutineView from './components/RoutineView.jsx'
 import ExerciseLibrary from './components/ExerciseLibrary.jsx'
 import WorkoutSession from './components/WorkoutSession.jsx'
 import History from './components/History.jsx'
@@ -76,6 +77,7 @@ export default function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/routines" element={<RoutineList />} />
         <Route path="/routines/new" element={<RoutineBuilder />} />
+        <Route path="/routines/:id" element={<RoutineView />} />
         <Route path="/routines/:id/edit" element={<RoutineBuilder />} />
         <Route path="/exercises" element={<ExerciseLibrary />} />
         <Route path="/workout/:routineId" element={<WorkoutSession />} />

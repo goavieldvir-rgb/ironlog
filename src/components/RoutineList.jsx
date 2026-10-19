@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Play, Pencil, Trash2, Dumbbell, Copy, Send } from 'lucide-react'
+import { Plus, Play, Pencil, Trash2, Dumbbell, Copy, Send, Eye } from 'lucide-react'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
@@ -88,7 +88,9 @@ export default function RoutineList() {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-lg leading-tight">{r.name}</h2>
+                  <h2 className="text-lg leading-tight">
+                    <Link to={`/routines/${r.id}`} className="hover:text-accent">{r.name}</Link>
+                  </h2>
                   <CategoryTag category={r.category} />
                 </div>
                 <p className="text-chalkdim text-xs mt-1">
@@ -96,6 +98,9 @@ export default function RoutineList() {
                 </p>
               </div>
               <div className="flex gap-1 shrink-0">
+                <Link to={`/routines/${r.id}`} title={t('routines.view')} aria-label={t('routines.view')} className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-surface2 text-chalkdim hover:text-chalk">
+                  <Eye size={15} />
+                </Link>
                 <button
                   className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-surface2 text-chalkdim hover:text-chalk"
                   onClick={() => duplicateRoutine(r)}

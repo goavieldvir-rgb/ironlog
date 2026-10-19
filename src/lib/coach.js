@@ -92,7 +92,7 @@ export function attentionScore(flags) {
 
 export async function fetchTraineeDetail(uid, today = toLocalISODate()) {
   const since = shiftDay(today, -7 * 26)
-  const [profile, sessions, weights, prs, notes, goal, schedule, consent, food, targets] = await Promise.all([
+  const [profile, sessions, weights, prs, notes, goal, schedule, consent, food, targets, routines] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', uid).single().then(check),
     supabase
       .from('sessions')
@@ -137,8 +137,9 @@ export async function fetchTraineeDetail(uid, today = toLocalISODate()) {
       .lt('date', today)
       .then(check),
     supabase.from('nutrition_targets').select('kcal, protein').eq('user_id', uid).maybeSingle().then(check),
+    supabase.from('routines').select('id, name, category, exercises').eq('user_id', uid).order('created_at', { ascending: false }).then(check),
   ])
-  return { profile, sessions, weights, prs, notes, goal, schedule, consent: consent[0] || null, food, targets }
+  return { profile, sessions, weights, prs, notes, goal, schedule, consent: consent[0] || null, food, targets, routines }
 }
 
 // Sessions per week for the last `n` weeks, oldest first.
