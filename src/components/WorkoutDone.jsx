@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Share2, Trophy, Check, ImagePlus, Copy, Download } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
-import { Button, Card } from './ui.jsx'
+import { Button } from './ui.jsx'
 import { dateLocale } from '../lib/dates.js'
 import { prepareCard, shareFile, loadPhoto, downloadFile, copyImage, canCopyImage, isIOS, shareFontsReady, shareFontsLoaded } from '../lib/shareCard.js'
 
@@ -160,13 +160,23 @@ export default function WorkoutDone({ summary, onDone }) {
     }
   }
 
-  const stats = [
-    summary.durationMinutes && [t('share.duration'), `${summary.durationMinutes} ${t('share.min')}`],
-    summary.volume > 0 && [t('share.volume'), `${summary.volume.toLocaleString('en-US')} ${summary.volumeUnit}`],
-    summary.cardioMinutes > 0 && [t('share.cardio'), `${summary.cardioMinutes} ${t('share.min')}`],
-    summary.cardioDistance != null && [t('share.distance'), `${Math.round(summary.cardioDistance * 100) / 100} ${summary.cardioUnit}`],
-    [t('share.sets'), String(summary.setCount)],
-  ].filter(Boolean)
+  // One number leads (volume, else cardio distance, else time); the rest sit
+  // quietly underneath. Records take the accent, as they do mid-workout.
+  const dist = summary.cardioDistance != null ? Math.round(summary.cardioDistance * 100) / 100 : null
+  const all = {
+    volume: summary.volume > 0 && { label: t('share.volume'), value: summary.volume.toLocaleString('en-US'), unit: summary.volumeUnit },
+    distance: dist > 0 && { label: t('share.distance'), value: String(dist), unit: summary.cardioUnit },
+    duration: summary.durationMinutes && { label: t('share.duration'), value: String(summary.durationMinutes), unit: t('share.min') },
+    cardio: summary.cardioMinutes > 0 && { label: t('share.cardio'), value: String(summary.cardioMinutes), unit: t('share.min') },
+    sets: { label: t('share.sets'), value: String(summary.setCount) },
+    records: summary.prCount > 0 && { label: t('share.records'), value: String(summary.prCount), accent: true },
+  }
+  const heroKey = ['volume', 'distance', 'duration', 'cardio'].find((k) => all[k])
+  const hero = heroKey && all[heroKey]
+  const rest = ['duration', 'cardio', 'sets', 'records']
+    .filter((k) => k !== heroKey && all[k])
+    .map((k) => all[k])
+    .slice(0, 3)
 
   const tabs = [
     ['plain', t('share.tabPlain')],
@@ -175,31 +185,41 @@ export default function WorkoutDone({ summary, onDone }) {
   ]
 
   return (
-    <div className="flex flex-col gap-5 max-w-2xl" data-testid="workout-done">
+    <div className="flex flex-col gap-6 max-w-2xl" data-testid="workout-done">
       <div>
-        <div className="inline-flex items-center gap-2 text-good">
-          <Check size={18} /> <span className="eyebrow">{t('share.subtitle')}</span>
-        </div>
-        <h1 className="text-3xl mt-1">{t('share.title')}</h1>
-        <p className="text-chalkdim text-sm mt-1">
+        <p className="eyebrow inline-flex items-center gap-1.5">
+          <Check size={15} strokeWidth={2.5} className="text-good" /> {t('share.subtitle')}
+        </p>
+        <h1 className="text-[28px] leading-tight mt-1.5">{t('share.title')}</h1>
+        <p className="text-chalkdim text-[15px] mt-1">
           <bdi>{summary.routineName}</bdi> · <bdi>{dateText}</bdi>
         </p>
       </div>
 
-      <div className="flex gap-3">
-        {stats.slice(0, 3).map(([label, value]) => (
-          <Card key={label} className="text-center !p-3 flex-1 min-w-0">
-            <div className="num text-base font-semibold whitespace-nowrap">{iso(value)}</div>
-            <div className="text-chalkdim text-xs mt-0.5">{label}</div>
-          </Card>
-        ))}
+      <div className="card p-5" data-testid="recap-stats">
+        {hero && (
+          <div>
+            <p className="eyebrow">{hero.label}</p>
+            <p className="mt-2 flex items-baseline gap-1.5">
+              <span className="stat-number">{iso(hero.value)}</span>
+              {hero.unit && <span className="text-chalkdim text-lg font-medium">{hero.unit}</span>}
+            </p>
+          </div>
+        )}
+        {rest.length > 0 && (
+          <div className={`grid grid-cols-3 gap-3 ${hero ? 'mt-5 pt-4 border-t border-white/[0.06]' : ''}`}>
+            {rest.map((s) => (
+              <div key={s.label} className="min-w-0">
+                <p className="eyebrow truncate">{s.label}</p>
+                <p className={`num text-xl font-semibold mt-0.5 whitespace-nowrap ${s.accent ? 'text-accent' : ''}`}>
+                  {iso(s.value)}
+                  {s.unit && <span className="text-chalkdim text-sm font-medium ms-1">{s.unit}</span>}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-
-      {summary.prCount > 0 && (
-        <p className="inline-flex items-center gap-2 text-brass text-sm">
-          <Trophy size={16} /> {t('share.records')}: <span className="num">{iso(String(summary.prCount))}</span>
-        </p>
-      )}
 
       {failed && (
         <p className="text-chalkdim text-sm" role="alert" data-testid="card-failed">
@@ -208,8 +228,8 @@ export default function WorkoutDone({ summary, onDone }) {
       )}
 
       {!failed && (
-        <div className="flex flex-col gap-3" data-testid="share-section">
-          <div role="tablist" className="grid grid-cols-3 gap-1 bg-surface2 rounded-lg p-1">
+        <div className="flex flex-col gap-4" data-testid="share-section">
+          <div role="tablist" className="grid grid-cols-3 gap-0.5 p-[3px] rounded-[12px] bg-surface">
             {tabs.map(([key, label]) => (
               <button
                 key={key}
@@ -220,7 +240,9 @@ export default function WorkoutDone({ summary, onDone }) {
                   // first visit to the photo tab: go straight to the picker
                   if (key === 'photo' && !made.photo && !photoBusy) fileInput.current?.click()
                 }}
-                className={`min-h-[44px] rounded-md text-sm font-medium ${variant === key ? 'bg-brass text-ink' : 'text-chalkdim'}`}
+                className={`min-h-[44px] rounded-[9px] text-sm font-medium transition-colors duration-200 ${
+                  variant === key ? 'bg-[#2A2A2E] text-chalk' : 'bg-transparent text-chalkdim'
+                }`}
               >
                 {label}
               </button>
@@ -233,7 +255,7 @@ export default function WorkoutDone({ summary, onDone }) {
                 src={current.url}
                 alt=""
                 data-testid={`preview-${variant}`}
-                className={`rounded-xl shadow-lg shadow-black/40 border border-line max-h-[420px] w-auto ${variant === 'sticker' ? 'bg-[#6b7280]' : ''}`}
+                className={`rounded-[20px] shadow-2xl shadow-black/60 ring-1 ring-white/[0.06] max-h-[420px] w-auto ${variant === 'sticker' ? 'bg-surface2 p-3' : ''}`}
               />
             ) : variant === 'photo' ? (
               <p className="text-chalkdim text-sm text-center py-6">{t('share.photoHint')}</p>
@@ -251,10 +273,10 @@ export default function WorkoutDone({ summary, onDone }) {
 
           {variant === 'sticker' && (
             <>
-              <p className="text-chalkdim text-xs">{t('share.stickerHelp')}</p>
+              <p className="text-chalkdim text-[13px] leading-relaxed">{t('share.stickerHelp')}</p>
               <div className="flex gap-3">
                 {canCopyImage() && (
-                  <Button variant="brass" className="flex-1" onClick={handleCopy} disabled={!current}>
+                  <Button variant="primary" className="flex-1" onClick={handleCopy} disabled={!current}>
                     <Copy size={16} /> {t('share.copySticker')}
                   </Button>
                 )}
@@ -269,12 +291,12 @@ export default function WorkoutDone({ summary, onDone }) {
 
       <div className="flex gap-3">
         {!failed && variant === 'photo' && !made.photo && (
-          <Button variant="brass" className="flex-1" onClick={() => fileInput.current?.click()} disabled={photoBusy}>
+          <Button variant="primary" className="flex-1" onClick={() => fileInput.current?.click()} disabled={photoBusy}>
             <ImagePlus size={16} /> {photoBusy ? t('share.sharing') : t('share.choosePhoto')}
           </Button>
         )}
         {!failed && variant !== 'sticker' && !(variant === 'photo' && !made.photo) && (
-          <Button variant="brass" className="flex-1" onClick={handleShare} disabled={busy || !current}>
+          <Button variant="primary" className="flex-1" onClick={handleShare} disabled={busy || !current}>
             <Share2 size={16} /> {busy || !current ? t('share.sharing') : t('share.share')}
           </Button>
         )}
@@ -283,21 +305,24 @@ export default function WorkoutDone({ summary, onDone }) {
         </Button>
       </div>
 
-      <Card className="flex flex-col gap-2">
-        {summary.rows.map((r, i) => (
-          <div key={i} className="flex items-baseline justify-between gap-3 text-sm">
-            <span className="min-w-0 flex items-center gap-2">
-              <span className="truncate">{r.name}</span>
-              {r.prKind && (
-                <span className="shrink-0 text-xs bg-brass text-ink rounded-full px-2 py-0.5 font-semibold">
-                  {r.prKind === 'reps' ? t('sessionCard.repsPrBadge') : r.single ? t('sessionCard.prBadge') : t('sessionCard.weightPrBadge')}
-                </span>
-              )}
-            </span>
-            <span className="num text-chalkdim shrink-0">{iso(r.text)}</span>
-          </div>
-        ))}
-      </Card>
+      {summary.rows.length > 0 && (
+        <div className="card overflow-hidden">
+          {summary.rows.map((r, i) => (
+            <div key={i} className={`flex items-center justify-between gap-3 min-h-[48px] px-4 text-[15px] ${i ? 'border-t border-white/[0.06]' : ''}`}>
+              <span className="min-w-0 flex items-center gap-2">
+                <span className="truncate">{r.name}</span>
+                {r.prKind && (
+                  <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-accentsoft text-accent px-2 h-[22px] text-xs font-semibold">
+                    <Trophy size={12} />
+                    {r.prKind === 'reps' ? t('sessionCard.repsPrBadge') : r.single ? t('sessionCard.prBadge') : t('sessionCard.weightPrBadge')}
+                  </span>
+                )}
+              </span>
+              <span className="num text-chalkdim shrink-0">{iso(r.text)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
