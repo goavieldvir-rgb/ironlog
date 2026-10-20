@@ -41,6 +41,7 @@ export default function WorkoutDone({ summary, onDone }) {
     streak: t('share.streak'),
     weekUnit: t('share.weekUnit'),
     min: t('share.min'),
+    records: t('share.records'),
   }
   // the photo version is a JPEG, the others PNG (the sticker needs see-through)
   const fileName = (v) => `ironlog-${summary.date || 'workout'}${v === 'sticker' ? '-sticker' : ''}.${v === 'photo' ? 'jpg' : 'png'}`

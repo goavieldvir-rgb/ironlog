@@ -9,41 +9,38 @@
 //
 // Three looks: a plain Ironlog card, the stats designed into the trainee's
 // own photo, and a see-through sticker (the photo look without the photo).
-// Colours come from the app's Tailwind theme. The poster fonts are our own
-// copies under public/fonts/share, loaded only when the workout screen opens
-// so the rest of the app doesn't get heavier. Cards are a 1080 x 1920
-// Instagram story; everything stays between y=250 and y=1670 because
-// Instagram puts its own buttons at the top and bottom. Photos are only ever
-// drawn on this phone.
+// They follow the app's own look: one typeface, sentence-case labels, the
+// neutral ladder from the Tailwind theme, and the accent used once. The
+// fonts are our own copies under public/fonts/share, loaded only when the
+// workout screen opens so the rest of the app doesn't get heavier. Cards are
+// a 1080 x 1920 Instagram story; everything stays between y=250 and y=1670
+// because Instagram puts its own buttons at the top and bottom. Photos are
+// only ever drawn on this phone.
 import tailwind from '../../tailwind.config.js'
+import { ACCENT } from '../theme.js'
 
 const W = 1080
 const H = 1920
 const M = 96 // side margin
 const T = tailwind.theme.extend.colors
-const C = { ink: T.ink, chalk: T.chalk, dim: T.chalkdim, brass: T.brass, line: T.line }
-const GOLD = '#F0CF7A' // lighter than the app's brass so it still reads on pale photos
+const C = { ink: T.ink, chalk: T.chalk, dim: T.chalkdim, line: T.line, accent: ACCENT }
+const WHITE_DIM = 'rgba(255,255,255,0.78)' // labels and units over a photo
 
-// Numbers are always the tall condensed face (the same Barlow Condensed the
-// app uses for headings); English words use it too, Hebrew words use
-// Karantina (same proportions, real Hebrew letters). The families carry an
-// "IL " prefix so the card never depends on the app's own font stylesheet.
-const NUM = '"IL Barlow Condensed", "Barlow Condensed", sans-serif'
-const HEB_DISPLAY = '"IL Karantina", "Rubik", sans-serif'
-const LBL_EN = '"IL Inter", Inter, system-ui, sans-serif'
-const LBL_HE = '"IL Heebo", Heebo, "Rubik", system-ui, sans-serif'
+// The app's own pair: Geist for Latin and numbers, IBM Plex Sans Hebrew for
+// Hebrew letters (the browser picks per letter, so mixed names just work).
+// The families carry an "IL " prefix so the card never depends on the app's
+// Google Fonts stylesheet having loaded.
+const SANS = '"IL Geist", "IL Plex Hebrew", Geist, "IBM Plex Sans Hebrew", system-ui, sans-serif'
 
-// Self-hosted woff2 files (Google Fonts latin / hebrew subsets). Heebo and
-// Inter are variable fonts, so one file covers both weights.
+// Self-hosted woff2 files (latin / hebrew subsets). Geist is a variable
+// font, so one file covers every weight.
 const LATIN = 'U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD'
 const HEBREW = 'U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F'
 const FACES = [
-  ['IL Barlow Condensed', 'barlow-condensed-latin', '800', LATIN],
-  ['IL Karantina', 'karantina-latin', '700', LATIN],
-  ['IL Karantina', 'karantina-hebrew', '700', HEBREW],
-  ['IL Heebo', 'heebo-latin', '600 700', LATIN],
-  ['IL Heebo', 'heebo-hebrew', '600 700', HEBREW],
-  ['IL Inter', 'inter-latin', '600 700', LATIN],
+  ['IL Geist', 'geist-latin', '100 900', LATIN],
+  ['IL Plex Hebrew', 'plex-hebrew-500', '500', HEBREW],
+  ['IL Plex Hebrew', 'plex-hebrew-600', '600', HEBREW],
+  ['IL Plex Hebrew', 'plex-hebrew-700', '700', HEBREW],
 ]
 
 // All the faces load once; everyone waits on the same promise (true when
@@ -134,23 +131,6 @@ function put(ctx, text, x, y) {
   ctx.restore()
 }
 
-// A filled bar; on the sticker it gets the same dark outline as the text.
-function bar(ctx, x, y, w, h, color) {
-  ctx.save()
-  if (FX?.sticker && PASS === 'stroke') {
-    ctx.lineJoin = 'round'
-    ctx.lineWidth = 5
-    ctx.strokeStyle = 'rgba(0,0,0,0.4)'
-    setShadow(ctx, 'rgba(0,0,0,0.45)', 24)
-    ctx.strokeRect(x, y, w, h)
-  } else {
-    if (FX?.sticker) setShadow(ctx, FX.shadow.color, FX.shadow.blur, FX.shadow.y)
-    ctx.fillStyle = color
-    ctx.fillRect(x, y, w, h)
-  }
-  ctx.restore()
-}
-
 // Runs the drawing once, or twice (outline, then fill) for the sticker.
 function passes(fn) {
   if (FX?.sticker) {
@@ -161,24 +141,23 @@ function passes(fn) {
   fn()
 }
 
-// Letter-spaced text (ctx.letterSpacing isn't in older Safari). Only used
-// for Latin capitals, never Hebrew.
-function tracked(ctx, text, x, y, spacing, align) {
-  const chars = [...text]
-  const widths = chars.map((c) => ctx.measureText(c).width)
-  const total = widths.reduce((a, b) => a + b, 0) + spacing * (chars.length - 1)
-  let cx = align === 'right' ? x - total : align === 'center' ? x - total / 2 : x
-  const prev = ctx.textAlign
-  ctx.textAlign = 'left'
-  chars.forEach((c, i) => {
-    put(ctx, c, cx, y)
-    cx += widths[i] + spacing
-  })
-  ctx.textAlign = prev
+// Sets the font, with optional tracking in em (negative = tighter, like the
+// app's headings). Browsers without canvas letterSpacing just draw at the
+// font's own spacing.
+function setFont(ctx, weight, px, em = 0) {
+  ctx.font = `${weight} ${px}px ${SANS}`
+  if ('letterSpacing' in ctx) ctx.letterSpacing = `${(px * em).toFixed(2)}px`
 }
 
-// The big number and the small ones. Hero: volume lifted, else cardio
-// distance, else duration, else set count. Small: duration and streak.
+// '#FF5B3A' + alpha -> 'rgba(255,91,58,a)'
+function tint(hex, a) {
+  const n = parseInt(hex.slice(1), 16)
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`
+}
+
+// The hero number and the small ones. Hero: volume lifted, else cardio
+// distance, else duration, else set count. Small: duration, streak and, when
+// the workout broke any, the number of records (drawn in the accent).
 function pickStats(summary, labels) {
   const duration = summary.durationMinutes || (summary.cardioMinutes > 0 ? summary.cardioMinutes : null)
   const dist = summary.cardioDistance != null ? Math.round(summary.cardioDistance * 100) / 100 : null
@@ -188,91 +167,71 @@ function pickStats(summary, labels) {
     duration: duration && { label: labels.duration, value: String(duration), unit: labels.min },
     sets: { label: labels.sets, value: String(summary.setCount), unit: '' },
     streak: summary.streakWeeks > 0 && { label: labels.streak, value: String(summary.streakWeeks), unit: labels.weekUnit },
+    records: summary.prCount > 0 && labels.records && { label: labels.records, value: String(summary.prCount), unit: '', accent: true },
   }
   const heroKey = ['volume', 'distance', 'duration', 'sets'].find((k) => stats[k])
-  const small = ['duration', 'streak'].filter((k) => k !== heroKey && stats[k]).map((k) => stats[k])
+  const small = ['duration', 'streak', 'records'].filter((k) => k !== heroKey && stats[k]).map((k) => stats[k])
   return { hero: stats[heroKey], small, heroKey }
 }
 
 const isHeb = (s) => /[֐-׿]/.test(s)
 
-// Letter-spaced width, matching tracked().
-function trackedWidth(ctx, text, spacing) {
-  const chars = [...text]
-  return chars.reduce((a, c) => a + ctx.measureText(c).width, 0) + spacing * Math.max(0, chars.length - 1)
-}
-
-// A small caption in the label font: tracked capitals in English, plain
-// text in Hebrew. `x` is the edge on the reading-start side (or the end side
-// when `end` is set); long captions are cut with an ellipsis to fit `maxW`.
-function drawLabel(ctx, text, x, y, { rtl, size, weight = 600, color, spacing, maxW = W, end = false }) {
+// A small sentence-case caption. `x` is the edge on the reading-start side
+// (or the end side when `end` is set); long captions are cut to fit `maxW`.
+// Returns the width drawn.
+function drawLabel(ctx, text, x, y, { rtl, size, weight = 500, color, maxW = W, end = false }) {
+  setFont(ctx, weight, size)
   ctx.fillStyle = color
-  ctx.font = `${weight} ${size}px ${rtl ? LBL_HE : LBL_EN}`
   ctx.direction = rtl ? 'rtl' : 'ltr'
-  if (rtl) {
-    ctx.textAlign = end ? 'left' : 'right'
-    put(ctx, fit(ctx, text, maxW), x, y)
-    return
-  }
-  let t = text.toUpperCase()
-  while (t.length > 1 && trackedWidth(ctx, t, spacing) > maxW) t = t.slice(0, -2) + '…'
-  tracked(ctx, t, x, y, spacing, end ? 'right' : 'left')
-}
-
-// A stat's unit: Hebrew units use Karantina, everything else the English
-// capitals (Karantina has no Latin lowercase).
-function unitFace(unit) {
-  const heb = isHeb(unit)
-  return { text: heb ? unit : unit.toUpperCase(), font: (px) => `${heb ? 700 : 800} ${px}px ${heb ? HEB_DISPLAY : NUM}` }
+  ctx.textAlign = (rtl ? !end : end) ? 'right' : 'left'
+  const t = fit(ctx, text, maxW)
+  put(ctx, t, x, y)
+  return ctx.measureText(t).width
 }
 
 // Width of "value + gap + unit" with the value at `size` px.
-function valueWidth(ctx, st, size, unitPx, gap, valueWeight) {
-  ctx.font = `${valueWeight} ${size}px ${NUM}`
+function valueWidth(ctx, st, size, unitPx, gap) {
+  setFont(ctx, 700, size, -0.05)
   const vw = ctx.measureText(st.value).width
   if (!st.unit) return vw
-  const u = unitFace(st.unit)
-  ctx.font = u.font(unitPx)
-  return vw + gap + ctx.measureText(u.text).width
+  setFont(ctx, 600, unitPx, -0.02)
+  return vw + gap + ctx.measureText(st.unit).width
 }
 
 // Biggest size (from `max` down to `min`) at which value + unit fit `maxW`;
 // the unit scales with it. If even the smallest doesn't fit, the number is
 // cut with an ellipsis.
-function fitStat(ctx, st, { max, min, unit, gap, weight, maxW }) {
+function fitStat(ctx, st, { max, min, unit, gap, maxW }) {
   const unitAt = (s) => Math.round((s * unit) / max)
   let size = max
-  while (size > min && valueWidth(ctx, st, size, unitAt(size), gap, weight) > maxW) size -= 4
+  while (size > min && valueWidth(ctx, st, size, unitAt(size), gap) > maxW) size -= 4
   let out = st
-  if (valueWidth(ctx, st, size, unitAt(size), gap, weight) > maxW) {
+  if (valueWidth(ctx, st, size, unitAt(size), gap) > maxW) {
     let v = st.value
-    while (v.length > 1 && valueWidth(ctx, { ...st, value: `${v}…` }, size, unitAt(size), gap, weight) > maxW) v = v.slice(0, -1)
+    while (v.length > 1 && valueWidth(ctx, { ...st, value: `${v}…` }, size, unitAt(size), gap) > maxW) v = v.slice(0, -1)
     out = { ...st, value: `${v}…` }
   }
-  return { st: out, size, unitPx: unitAt(size), width: valueWidth(ctx, out, size, unitAt(size), gap, weight) }
+  return { st: out, size, unitPx: unitAt(size), width: valueWidth(ctx, out, size, unitAt(size), gap) }
 }
 
-// Value with its unit right after it (on the end side). Left to right the
-// value starts at x; in Hebrew it starts at x and the unit sits to its left.
-function drawValue(ctx, st, x, y, { rtl, size, unitPx, gap, valueWeight, color, unitColor }) {
+// Value with its unit right after it (on the end side), the unit in the
+// accent. Left to right the value starts at x; in Hebrew it starts at x and
+// the unit sits to its left.
+function drawValue(ctx, f, x, y, { rtl, gap, color, unitColor }) {
+  const { st, size, unitPx } = f
   ctx.direction = 'ltr'
   ctx.textAlign = rtl ? 'right' : 'left'
-  ctx.fillStyle = color
-  ctx.font = `${valueWeight} ${size}px ${NUM}`
+  ctx.fillStyle = st.accent ? C.accent : color
+  setFont(ctx, 700, size, -0.05)
   put(ctx, st.value, x, y)
   if (!st.unit) return
   const vw = ctx.measureText(st.value).width
-  const u = unitFace(st.unit)
   ctx.fillStyle = unitColor
-  ctx.font = u.font(unitPx)
+  setFont(ctx, 600, unitPx, -0.02)
   ctx.direction = isHeb(st.unit) ? 'rtl' : 'ltr'
-  put(ctx, u.text, rtl ? x - vw - gap : x + vw + gap, y)
+  put(ctx, st.unit, rtl ? x - vw - gap : x + vw + gap, y)
 }
 
-// Workout name at a fixed size: its face follows the letters in it, not the
-// screen's language (Barlow has no Hebrew, Karantina has no Latin
-// lowercase). Long names wrap at spaces onto at most two lines; whatever
-// still doesn't fit on line two is cut with an ellipsis.
 // Do these words fit on two lines of maxW with greedy wrapping?
 function twoLines(ctx, words, maxW) {
   let lines = 1
@@ -287,23 +246,20 @@ function twoLines(ctx, words, maxW) {
   return true
 }
 
-function layoutName(ctx, summary, { maxEn, maxHe }) {
-  const heb = isHeb(summary.routineName)
-  const text = heb ? summary.routineName : summary.routineName.toUpperCase()
-  const family = heb ? HEB_DISPLAY : NUM
-  const weight = heb ? 700 : 800
+// Workout name as the trainee typed it. Long names wrap at spaces onto at
+// most two lines (stepping down to 80% first); whatever still doesn't fit on
+// line two is cut with an ellipsis.
+function layoutName(ctx, summary, { size: top }) {
+  const text = summary.routineName.trim()
   ctx.direction = isHeb(text) ? 'rtl' : 'ltr'
   const maxW = W - M * 2
-  const words = text.trim().split(/\s+/)
-  // Fixed size, except a name too long for two lines steps down a little
-  // (to 75% at most) before anything gets cut.
-  const top = heb ? maxHe : maxEn
+  const words = text.split(/\s+/)
   let size = top
-  for (; size > top * 0.75; size -= 4) {
-    ctx.font = `${weight} ${size}px ${family}`
+  for (; size > top * 0.8; size -= 4) {
+    setFont(ctx, 700, size, -0.035)
     if (twoLines(ctx, words, maxW)) break
   }
-  ctx.font = `${weight} ${size}px ${family}`
+  setFont(ctx, 700, size, -0.035)
   let line1 = ''
   let i = 0
   while (i < words.length) {
@@ -312,68 +268,126 @@ function layoutName(ctx, summary, { maxEn, maxHe }) {
     line1 = next
     i++
   }
-  let lines
-  if (ctx.measureText(line1).width > maxW) {
-    // a single word wider than the card: cut it and show the rest below
-    lines = [fit(ctx, line1, maxW)]
-    if (i < words.length) lines.push(fitWords(ctx, words.slice(i).join(' '), maxW))
-  } else {
-    lines = [line1]
-    if (i < words.length) lines.push(fitWords(ctx, words.slice(i).join(' '), maxW))
-  }
-  return { lines, size, family, weight, lh: Math.round(size * (heb ? 1 : 0.96)) }
+  // a single word wider than the card is cut, and the rest goes below
+  const lines = [ctx.measureText(line1).width > maxW ? fit(ctx, line1, maxW) : line1]
+  if (i < words.length) lines.push(fitWords(ctx, words.slice(i).join(' '), maxW))
+  return { lines, size, lh: Math.round(size * 1.04) }
 }
 
 function drawName(ctx, nm, x, y, { rtl, color }) {
-  ctx.font = `${nm.weight} ${nm.size}px ${nm.family}`
+  setFont(ctx, 700, nm.size, -0.035)
   ctx.fillStyle = color
   ctx.direction = rtl ? 'rtl' : 'ltr'
   ctx.textAlign = rtl ? 'right' : 'left'
   nm.lines.forEach((ln, i) => put(ctx, ln, x, y + i * nm.lh))
 }
 
-function drawBrand(ctx, x, y, { rtl, color }) {
-  ctx.direction = 'ltr'
-  ctx.fillStyle = color
-  ctx.font = `800 34px ${NUM}`
-  tracked(ctx, 'IRONLOG', x, y, 10, rtl ? 'right' : 'left')
+// The wordmark: a small accent square (the app's "logged" mark) and the name.
+function drawBrand(ctx, x, y, { rtl, color, size = 44 }) {
+  setFont(ctx, 700, size, -0.03)
+  const tw = ctx.measureText('Ironlog').width
+  const s = Math.round(size * 0.62)
+  const gap = Math.round(size * 0.3)
+  const total = s + gap + tw
+  const left = rtl ? x - total : x
+  passes(() => {
+    if (!(FX?.sticker && PASS === 'stroke')) {
+      ctx.save()
+      if (FX?.shadow) setShadow(ctx, FX.shadow.color, FX.shadow.blur, FX.shadow.y)
+      ctx.fillStyle = C.accent
+      roundRect(ctx, left, y - s, s, s, Math.round(s * 0.28))
+      ctx.fill()
+      ctx.restore()
+    }
+    ctx.direction = 'ltr'
+    ctx.textAlign = 'left'
+    ctx.fillStyle = color
+    setFont(ctx, 700, size, -0.03)
+    put(ctx, 'Ironlog', left + s + gap, y)
+  })
 }
 
-// Name, brass rule, the hero stat on its own line, then time and streak side
-// by side underneath. Used for both the photo picture and the sticker so
-// they are one design. Anchored by the name's first baseline (`top`) or by
-// the bottom of the numbers (`bottom`); a two-line name grows away from the
-// anchor. Returns the baseline of the last row.
-function drawOverlayBlock(ctx, summary, { rtl, labels, top, bottom, accent, labelColor }) {
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath()
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r)
+  else ctx.rect(x, y, w, h)
+}
+
+// The accent pill ("Workout complete"). `top` is its top edge; returns its
+// height. It sits on the reading-start side.
+function drawPill(ctx, text, x, top, { rtl, size = 30 }) {
+  if (!text) return 0
+  setFont(ctx, 600, size, -0.01)
+  const h = Math.round(size * 2.1)
+  const pad = Math.round(size * 0.9)
+  const dot = Math.round(size * 0.32)
+  const tw = Math.min(ctx.measureText(text).width, W - M * 2 - pad * 2 - dot * 3)
+  const w = tw + pad * 2 + dot * 2 + Math.round(size * 0.45)
+  const left = rtl ? x - w : x
+  passes(() => {
+    ctx.save()
+    if (FX?.sticker && PASS === 'stroke') {
+      setShadow(ctx, 'rgba(0,0,0,0.45)', 24)
+    } else if (FX?.shadow) setShadow(ctx, FX.shadow.color, FX.shadow.blur, FX.shadow.y)
+    ctx.fillStyle = C.accent
+    roundRect(ctx, left, top, w, h, h / 2)
+    ctx.fill()
+    ctx.restore()
+    if (FX?.sticker && PASS === 'stroke') return
+    // a small ink dot, then the words, in ink on the accent
+    ctx.fillStyle = C.ink
+    const cx = rtl ? left + w - pad - dot : left + pad + dot
+    ctx.beginPath()
+    ctx.arc(cx, top + h / 2, dot, 0, Math.PI * 2)
+    ctx.fill()
+    setFont(ctx, 600, size, -0.01)
+    ctx.direction = rtl ? 'rtl' : 'ltr'
+    ctx.textAlign = rtl ? 'right' : 'left'
+    const tx = rtl ? cx - dot - Math.round(size * 0.45) : cx + dot + Math.round(size * 0.45)
+    ctx.fillText(fit(ctx, text, tw + 1), tx, top + h / 2 + Math.round(size * 0.36))
+  })
+  return h
+}
+
+// Pill, name, the hero number with its label under it, then the small
+// numbers in a row. Used for both the photo picture and the sticker so they
+// are one design. Anchored by the pill's top (`top`) or by the last label's
+// baseline (`bottom`); a two-line name grows away from the anchor. Returns
+// the baseline of the last row.
+function drawOverlayBlock(ctx, summary, { rtl, labels, top, bottom, labelColor }) {
   const x0 = rtl ? W - M : M
   const full = W - M * 2
   const { hero, small } = pickStats(summary, labels)
-  const nm = layoutName(ctx, summary, { maxEn: 88, maxHe: 110 })
-  const extra = (nm.lines.length - 1) * nm.lh
-  const heroLabelOff = 112
-  const heroValueOff = heroLabelOff + 148
-  const smallLabelOff = heroValueOff + 90
-  const smallValueOff = smallLabelOff + 82
-  const rel = small.length ? smallValueOff : heroValueOff
-  const base = top != null ? top : bottom - rel - extra // first baseline of the name
-  const last = base + extra // last baseline of the name
+  const cols = Math.max(1, small.length)
+  const colW = full / cols
+  const nm = layoutName(ctx, summary, { size: 84 })
+  const heroFit = fitStat(ctx, hero, { max: 220, min: 120, unit: 64, gap: 14, maxW: full })
+  const smallFits = small.map((st) => fitStat(ctx, st, { max: 96, min: 56, unit: 34, gap: 8, maxW: colW - 24 }))
+  const smallSize = Math.max(0, ...smallFits.map((f) => f.size))
 
-  const heroFit = fitStat(ctx, hero, { max: 170, min: 110, unit: 60, gap: 14, weight: 800, maxW: full })
-  const half = full / 2
-  const smallFits = small.slice(0, 2).map((st) => fitStat(ctx, st, { max: 90, min: 60, unit: 36, gap: 10, weight: 800, maxW: half - 24 }))
+  // positions relative to the pill's top
+  const pillH = Math.round(28 * 2.1)
+  const nameY = pillH + 36 + Math.round(nm.size * 0.74)
+  const lastName = nameY + (nm.lines.length - 1) * nm.lh
+  const heroY = lastName + 40 + Math.round(heroFit.size * 0.72)
+  const heroLabelY = heroY + Math.round(heroFit.size * 0.16) + 50 // clears the comma's tail
+  const smallY = heroLabelY + 48 + Math.round(smallSize * 0.72)
+  const smallLabelY = smallY + 46
+  const rel = small.length ? smallLabelY : heroLabelY
+  const base = top != null ? top : bottom - rel
 
+  drawPill(ctx, labels.eyebrow, x0, base, { rtl, size: 28 })
   passes(() => {
-    drawName(ctx, nm, x0, base, { rtl, color: '#FFFFFF' })
-    bar(ctx, rtl ? W - M - 56 : M, last + 32, 56, 5, accent)
-    drawLabel(ctx, hero.label, x0, last + heroLabelOff, { rtl, size: 26, color: labelColor, spacing: 5, maxW: full })
-    drawValue(ctx, heroFit.st, x0, last + heroValueOff, { rtl, size: heroFit.size, unitPx: heroFit.unitPx, gap: 14, valueWeight: 800, color: '#FFFFFF', unitColor: accent })
+    drawName(ctx, nm, x0, base + nameY, { rtl, color: '#FFFFFF' })
+    drawValue(ctx, heroFit, x0, base + heroY, { rtl, gap: 14, color: '#FFFFFF', unitColor: C.accent })
+    drawLabel(ctx, hero.label, x0, base + heroLabelY, { rtl, size: 30, color: labelColor, maxW: full })
     smallFits.forEach((f, i) => {
-      const x = rtl ? W - M - i * half : M + i * half
-      drawLabel(ctx, f.st.label, x, last + smallLabelOff, { rtl, size: 24, color: labelColor, spacing: 4, maxW: half - 24 })
-      drawValue(ctx, f.st, x, last + smallValueOff, { rtl, size: f.size, unitPx: f.unitPx, gap: 10, valueWeight: 800, color: '#FFFFFF', unitColor: accent })
+      const x = rtl ? W - M - i * colW : M + i * colW
+      drawValue(ctx, f, x, base + smallY, { rtl, gap: 8, color: '#FFFFFF', unitColor: C.accent })
+      drawLabel(ctx, f.st.label, x, base + smallLabelY, { rtl, size: 26, color: labelColor, maxW: colW - 24 })
     })
   })
-  return last + rel
+  return base + rel
 }
 
 // Fill-and-crop a photo to cover the whole story.
@@ -384,94 +398,129 @@ function drawPhoto(ctx, photo) {
   ctx.drawImage(photo.source, (W - dw) / 2, (H - dh) / 2, dw, dh)
 }
 
-// Soft darkening at the top and bottom only, so the middle of the photo stays
-// as it was and white text stays readable on bright photos. The bottom one
-// starts higher than the numbers block, which is now taller.
+// A faint top fade for the wordmark, and a bottom fade that starts below the
+// middle and eases in, so a face or body in the frame stays bright while the
+// numbers stay readable. Below ~1670 Instagram covers the picture anyway.
 function drawScrims(ctx) {
-  // Light touch: the photo is the point. A faint top fade for the brand mark,
-  // and a bottom fade that only starts below the middle and eases in, so a
-  // face or body in the frame stays bright. Below ~1670 Instagram covers the
-  // picture with its own controls, so it never needs to go near black.
-  const top = ctx.createLinearGradient(0, 0, 0, 380)
-  top.addColorStop(0, 'rgba(10,11,13,0.32)')
-  top.addColorStop(1, 'rgba(10,11,13,0)')
+  const top = ctx.createLinearGradient(0, 0, 0, 420)
+  top.addColorStop(0, 'rgba(11,11,12,0.4)')
+  top.addColorStop(1, 'rgba(11,11,12,0)')
   ctx.fillStyle = top
-  ctx.fillRect(0, 0, W, 380)
-  const y0 = 960
+  ctx.fillRect(0, 0, W, 420)
+  const y0 = 860
   const bot = ctx.createLinearGradient(0, y0, 0, H)
-  const at = (y, a) => bot.addColorStop((y - y0) / (H - y0), `rgba(10,11,13,${a})`)
-  at(960, 0)
-  at(1100, 0.16)
-  at(1240, 0.4)
-  at(1400, 0.58)
-  at(1700, 0.68)
-  at(H, 0.72)
+  const at = (y, a) => bot.addColorStop((y - y0) / (H - y0), `rgba(11,11,12,${a})`)
+  at(860, 0)
+  at(1040, 0.22)
+  at(1220, 0.5)
+  at(1420, 0.7)
+  at(1700, 0.8)
+  at(H, 0.84)
   ctx.fillStyle = bot
   ctx.fillRect(0, y0, W, H - y0)
 }
 
+// Fine film grain over the plain card, so the glow reads as light rather
+// than a flat gradient. Seeded, so the same workout always draws the same.
+function drawGrain(ctx) {
+  const n = document.createElement('canvas')
+  n.width = n.height = 192
+  const nctx = n.getContext('2d')
+  const img = nctx.createImageData(192, 192)
+  let seed = 7
+  for (let i = 0; i < img.data.length; i += 4) {
+    seed = (seed * 16807) % 2147483647
+    const v = seed % 256
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v
+    img.data[i + 3] = 255
+  }
+  nctx.putImageData(img, 0, 0)
+  ctx.save()
+  ctx.globalAlpha = 0.05
+  ctx.globalCompositeOperation = 'overlay'
+  ctx.fillStyle = ctx.createPattern(n, 'repeat')
+  ctx.fillRect(0, 0, W, H)
+  ctx.restore()
+}
+
+// The plain card: a dark story lit by the accent from below, the workout's
+// name, one huge number, and the rest on frosted tiles.
 function drawPlain(ctx, summary, { rtl, labels }) {
   const x0 = rtl ? W - M : M
   const xEnd = rtl ? M : W - M
+  const full = W - M * 2
   ctx.fillStyle = C.ink
   ctx.fillRect(0, 0, W, H)
-  // a faint warm light from the top end corner
-  const gx = rtl ? 0 : W
-  const glow = ctx.createRadialGradient(gx, 0, 0, gx, 0, 1300)
-  glow.addColorStop(0, 'rgba(201,162,75,0.16)')
-  glow.addColorStop(1, 'rgba(201,162,75,0)')
-  ctx.fillStyle = glow
+  // accent light rising from the bottom end corner, and a softer one at the
+  // top start corner so the card isn't lopsided
+  const ex = rtl ? 0 : W
+  const g1 = ctx.createRadialGradient(ex, H + 120, 0, ex, H + 120, 1500)
+  g1.addColorStop(0, tint(C.accent, 0.75))
+  g1.addColorStop(0.35, tint(C.accent, 0.28))
+  g1.addColorStop(1, tint(C.accent, 0))
+  ctx.fillStyle = g1
   ctx.fillRect(0, 0, W, H)
+  const sx = rtl ? W : 0
+  const g2 = ctx.createRadialGradient(sx, -100, 0, sx, -100, 1000)
+  g2.addColorStop(0, tint(C.accent, 0.16))
+  g2.addColorStop(1, tint(C.accent, 0))
+  ctx.fillStyle = g2
+  ctx.fillRect(0, 0, W, H)
+  drawGrain(ctx)
   ctx.textBaseline = 'alphabetic'
 
-  // brand row
-  drawBrand(ctx, x0, 310, { rtl, color: C.brass })
-  drawLabel(ctx, labels.eyebrow || '', xEnd, 310, { rtl, size: 26, color: C.dim, spacing: 5, end: true })
+  // top row: wordmark at the start, the date at the end
+  drawBrand(ctx, x0, 316, { rtl, color: C.chalk })
+  if (summary.date) {
+    const d = new Date(`${summary.date}T00:00:00`)
+    const text = d.toLocaleDateString(rtl ? 'he-IL' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+    drawLabel(ctx, text, xEnd, 314, { rtl, size: 30, color: C.dim, end: true, maxW: full / 2 })
+  }
 
   const { hero, small, heroKey } = pickStats(summary, labels)
   const heroLabel = heroKey === 'volume' && labels.totalVolume ? labels.totalVolume : hero.label
-  const nm = layoutName(ctx, summary, { maxEn: 120, maxHe: 150 })
-  const full = W - M * 2
-  const half = full / 2
-  // the big number: sized so the value and its unit fit the width together
-  const heroFit = fitStat(ctx, hero, { max: 300, min: 160, unit: 96, gap: 20, weight: 800, maxW: full })
-  const smallFits = small.slice(0, 2).map((st) => fitStat(ctx, st, { max: 170, min: 90, unit: 60, gap: 14, weight: 800, maxW: half - 40 }))
+  const nm = layoutName(ctx, summary, { size: 112 })
+  const heroFit = fitStat(ctx, hero, { max: 330, min: 170, unit: 92, gap: 18, maxW: full })
+  const cols = Math.max(1, small.length)
+  const tileGap = 20
+  const tileW = (full - tileGap * (cols - 1)) / cols
+  const smallFits = small.map((st) => fitStat(ctx, st, { max: 112, min: 64, unit: 38, gap: 8, maxW: tileW - 64 }))
+  const smallSize = Math.max(0, ...smallFits.map((f) => f.size))
 
-  // Positions relative to the name's first baseline, then the whole block is
-  // centred in the story's safe area (y 250-1670).
-  const last = (nm.lines.length - 1) * nm.lh
-  const ruleY = last + 40
-  const heroLabelY = ruleY + 90
-  const heroValueY = heroLabelY + 38 + Math.round(heroFit.size * 0.7)
-  const divY = heroValueY + 70
-  const smallLabelY = divY + 80
-  const smallValueY = smallLabelY + 36 + 119
-  const bottom = small.length ? smallValueY : heroValueY
-  const blockTop = -Math.round(nm.size * 0.74)
-  // centred a little below the safe area's middle: the brand row already
-  // weighs on the top
-  const dy = Math.max(Math.round(1010 - (blockTop + bottom) / 2), 400 - blockTop)
+  // Positions relative to the pill's top, then the whole block is centred
+  // between the top row and the bottom of the story's safe area.
+  const pillH = Math.round(30 * 2.1)
+  const nameY = pillH + 44 + Math.round(nm.size * 0.74)
+  const lastName = nameY + (nm.lines.length - 1) * nm.lh
+  const heroY = lastName + 56 + Math.round(heroFit.size * 0.72)
+  const heroLabelY = heroY + Math.round(heroFit.size * 0.16) + 56 // clears the comma's tail
+  const tilesTop = heroLabelY + 68
+  const tileH = 64 + Math.round(smallSize * 0.72) + 72
+  const bottom = small.length ? tilesTop + tileH : heroLabelY
+  const dy = Math.max(Math.round((430 + 1650) / 2 - bottom / 2), 430)
 
-  drawName(ctx, nm, x0, dy, { rtl, color: C.chalk })
-  bar(ctx, rtl ? W - M - 64 : M, ruleY + dy, 64, 6, C.brass)
-  drawLabel(ctx, heroLabel, x0, heroLabelY + dy, { rtl, size: 30, color: C.dim, spacing: 6, maxW: full })
-  drawValue(ctx, heroFit.st, x0, heroValueY + dy, { rtl, size: heroFit.size, unitPx: heroFit.unitPx, gap: 20, valueWeight: 800, color: C.chalk, unitColor: C.brass })
+  drawPill(ctx, labels.eyebrow, x0, dy, { rtl, size: 30 })
+  drawName(ctx, nm, x0, dy + nameY, { rtl, color: C.chalk })
+  drawValue(ctx, heroFit, x0, dy + heroY, { rtl, gap: 18, color: C.chalk, unitColor: C.accent })
+  drawLabel(ctx, heroLabel, x0, dy + heroLabelY, { rtl, size: 34, color: C.dim, maxW: full })
 
-  if (small.length) {
-    ctx.fillStyle = C.line
-    ctx.fillRect(M, divY + dy, full, 2)
-    smallFits.forEach((f, i) => {
-      const last2 = i === 1 // the second stat hangs off the end margin
-      const x = last2 ? xEnd : rtl ? W - M : M
-      drawLabel(ctx, f.st.label, x, smallLabelY + dy, { rtl, size: 28, color: C.dim, spacing: 5, maxW: half - 40, end: last2 })
-      const vx = last2 ? (rtl ? M + f.width : W - M - f.width) : x
-      drawValue(ctx, f.st, vx, smallValueY + dy, { rtl, size: f.size, unitPx: f.unitPx, gap: 14, valueWeight: 800, color: C.chalk, unitColor: C.brass })
-    })
-  }
+  smallFits.forEach((f, i) => {
+    const left = rtl ? W - M - (i + 1) * tileW - i * tileGap : M + i * (tileW + tileGap)
+    const top = dy + tilesTop
+    ctx.fillStyle = 'rgba(255,255,255,0.06)'
+    roundRect(ctx, left, top, tileW, tileH, 28)
+    ctx.fill()
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)'
+    ctx.lineWidth = 2
+    ctx.stroke()
+    const x = rtl ? left + tileW - 32 : left + 32
+    drawValue(ctx, f, x, top + 52 + Math.round(smallSize * 0.72), { rtl, gap: 8, color: C.chalk, unitColor: C.accent })
+    drawLabel(ctx, f.st.label, x, top + tileH - 36, { rtl, size: 28, color: C.dim, maxW: tileW - 64 })
+  })
 }
 
 // variant: 'plain' (default), 'photo' (needs `photo`) or 'sticker'.
-// labels: { eyebrow, totalVolume, duration, volume, distance, sets, streak, weekUnit, min }
+// labels: { eyebrow, totalVolume, duration, volume, distance, sets, streak, weekUnit, min, records }
 export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo = null }) {
   const canvas = document.createElement('canvas')
   canvas.width = W
@@ -483,11 +532,10 @@ export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo
     if (variant === 'photo' && photo) {
       drawPhoto(ctx, photo)
       drawScrims(ctx)
-      // white, not brass: the top of a photo is often bright sky or gym lights
-      FX = { shadow: { color: 'rgba(0,0,0,0.5)', blur: 12, y: 0 } }
-      passes(() => drawBrand(ctx, rtl ? W - M : M, 310, { rtl, color: 'rgba(255,255,255,0.95)' }))
-      FX = { shadow: { color: 'rgba(0,0,0,0.35)', blur: 12, y: 2 } }
-      drawOverlayBlock(ctx, summary, { rtl, labels, bottom: 1640, accent: GOLD, labelColor: 'rgba(255,255,255,0.78)' })
+      FX = { shadow: { color: 'rgba(0,0,0,0.45)', blur: 12, y: 0 } }
+      drawBrand(ctx, rtl ? W - M : M, 316, { rtl, color: '#FFFFFF' })
+      FX = { shadow: { color: 'rgba(0,0,0,0.35)', blur: 14, y: 2 } }
+      drawOverlayBlock(ctx, summary, { rtl, labels, bottom: 1640, labelColor: WHITE_DIM })
       return canvas
     }
     FX = null
@@ -505,12 +553,13 @@ function renderSticker(summary, { rtl, labels }) {
   const PAD = 40
   const scratch = document.createElement('canvas')
   scratch.width = W
-  scratch.height = 1100
+  scratch.height = 1200
   const sctx = scratch.getContext('2d', { willReadFrequently: true })
   sctx.textBaseline = 'alphabetic'
   FX = { sticker: true, shadow: { color: 'rgba(0,0,0,0.6)', blur: 4, y: 0 } }
-  const bottom = drawOverlayBlock(sctx, summary, { rtl, labels, top: 200, accent: GOLD, labelColor: '#FFFFFF' })
-  passes(() => drawBrand(sctx, rtl ? W - M : M, bottom + 84, { rtl, color: GOLD }))
+  // labels stay near-white here: the sticker can land on anything
+  const bottom = drawOverlayBlock(sctx, summary, { rtl, labels, top: 120, labelColor: 'rgba(255,255,255,0.9)' })
+  drawBrand(sctx, rtl ? W - M : M, bottom + 100, { rtl, color: '#FFFFFF', size: 38 })
 
   const { data, width, height } = sctx.getImageData(0, 0, scratch.width, scratch.height)
   let x0 = width
