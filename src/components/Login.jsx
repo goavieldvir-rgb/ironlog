@@ -8,6 +8,7 @@ import { Button, Field } from './ui.jsx'
 import { friendlyAuthError } from '../lib/authErrors.js'
 import Captcha, { CAPTCHA_SITE_KEY } from './Captcha.jsx'
 import { reloadIfStale } from '../lib/freshness.js'
+import { BrandMark } from './Loading.jsx'
 
 export default function Login({ linkProblem }) {
   const { login, signup, resendConfirmation } = useAuth()
@@ -122,100 +123,102 @@ export default function Login({ linkProblem }) {
 
   const waitingForCaptcha = !!CAPTCHA_SITE_KEY && !captchaToken
 
+  const heading = {
+    login: [t('login.welcomeTitle'), t('login.subtitle')],
+    signup: [t('login.signupTitle'), t('login.subtitle')],
+    reset: [t('login.resetTitle'), t('login.resetSubtitle')],
+  }[mode]
+
   return (
     <div
-      className="min-h-dvh flex items-center justify-center px-4 relative"
-      style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      className="min-h-dvh flex flex-col px-5"
+      style={{
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
+      }}
     >
-      <button
-        onClick={() => setLang(lang === 'en' ? 'he' : 'en')}
-        className="hit absolute end-4 flex rounded-md bg-surface2 p-0.5 text-xs num"
-        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}
-        title={t('layout.language')} aria-label={t('layout.language')}
-      >
-        <span className={`px-2 py-1 rounded ${lang === 'en' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>EN</span>
-        <span className={`px-2 py-1 rounded ${lang === 'he' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>עב</span>
-      </button>
-
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <div className="eyebrow mb-2">Ironlog</div>
-          <h1 className="text-4xl tracking-wide">{t('login.tagline')}</h1>
-          <p className="text-chalkdim text-sm mt-2">{t('login.subtitle')}</p>
+      <div className="w-full max-w-sm mx-auto flex items-center justify-between">
+        <BrandMark />
+        <div role="group" aria-label={t('layout.language')} className="flex p-[3px] rounded-[12px] bg-surface text-xs num">
+          {[['en', 'EN'], ['he', 'עב']].map(([code, label]) => (
+            <button
+              key={code}
+              type="button"
+              onClick={() => setLang(code)}
+              aria-pressed={lang === code}
+              className={`min-w-[40px] min-h-[32px] rounded-[9px] font-medium transition-colors ${lang === code ? 'bg-[#2A2A2E] text-chalk' : 'text-chalkdim'}`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
+      </div>
 
-        <div className="card p-6">
-          {(mode === 'login' || mode === 'signup') && (
-            <div className="flex mb-6 rounded-md bg-surface2 p-1 text-sm">
-              <button
-                type="button"
-                onClick={() => switchMode('login')}
-                className={`flex-1 rounded min-h-11 transition-colors ${mode === 'login' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}
-              >
-                {t('login.logIn')}
-              </button>
-              <button
-                type="button"
-                onClick={() => switchMode('signup')}
-                className={`flex-1 rounded min-h-11 transition-colors ${mode === 'signup' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}
-              >
-                {t('login.createAccount')}
-              </button>
-            </div>
-          )}
-
-          {mode === 'confirm' ? (
-            <div className="flex flex-col gap-4 text-center py-2">
-              <MailCheck size={36} className="text-brass mx-auto" />
-              <h2 className="text-xl">{t('login.confirmTitle')}</h2>
-              <p className="text-chalkdim text-sm">{t('login.confirmBody')}</p>
-              {email && <p className="text-chalk text-sm"><bdi>{email}</bdi></p>}
-              <p className="text-chalkdim text-xs">{t('login.confirmHint')}</p>
-              {error && <p className="text-irontext text-sm">{error}</p>}
-              {resent ? (
-                <p className="text-good text-sm">{t('login.confirmResent')}</p>
-              ) : (
-                <>
-                  <Captcha ref={captcha} onToken={setCaptchaToken} />
-                  <Button type="button" variant="ghost" onClick={resend} disabled={busy || waitingForCaptcha || !email}>
-                    {busy ? t('login.oneMoment') : t('login.confirmResend')}
-                  </Button>
-                </>
-              )}
-              <button
-                type="button"
-                onClick={() => switchMode('login')}
-                className="text-brass text-sm hover:underline w-fit mx-auto"
-              >
-                {t('login.backToLogin')}
-              </button>
-            </div>
-          ) : mode === 'reset' && resetSent ? (
-            <div className="flex flex-col gap-4 text-center py-2">
-              <p className="text-chalk">{t('login.resetSentTitle')}</p>
-              <p className="text-chalkdim text-sm">
-                {t('login.resetSentTo')} {email}
+      <main className="w-full max-w-sm mx-auto flex-1 flex flex-col justify-center gap-6 py-10">
+        {mode === 'confirm' ? (
+          <section className="flex flex-col gap-5">
+            <span className="w-12 h-12 rounded-full bg-accentsoft text-accent flex items-center justify-center">
+              <MailCheck size={22} strokeWidth={1.75} />
+            </span>
+            <div className="flex flex-col gap-2">
+              <h1 className="text-[30px] leading-9">{t('login.confirmTitle')}</h1>
+              <p className="text-chalkdim text-[15px]">
+                {t('login.confirmBody')} {email && <bdi className="text-chalk">{email}</bdi>}
               </p>
-              <button
-                type="button"
-                onClick={() => switchMode('login')}
-                className="text-brass text-sm hover:underline w-fit mx-auto"
-              >
-                {t('login.backToLogin')}
-              </button>
             </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              {mode === 'reset' && (
-                <div>
-                  <h2 className="text-xl mb-1">{t('login.resetTitle')}</h2>
-                  <p className="text-chalkdim text-sm">{t('login.resetSubtitle')}</p>
-                </div>
-              )}
+            <p className="text-chalkdim text-sm">{t('login.confirmHint')}</p>
+            {error && <p className="text-irontext text-sm">{error}</p>}
+            {resent ? (
+              <p className="text-good text-sm">{t('login.confirmResent')}</p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <Captcha ref={captcha} onToken={setCaptchaToken} />
+                <Button type="button" variant="ghost" onClick={resend} disabled={busy || waitingForCaptcha || !email} className="w-full min-h-[48px]">
+                  {busy ? t('login.oneMoment') : t('login.confirmResend')}
+                </Button>
+              </div>
+            )}
+            <TextLink onClick={() => switchMode('login')}>{t('login.backToLogin')}</TextLink>
+          </section>
+        ) : mode === 'reset' && resetSent ? (
+          <section className="flex flex-col gap-5">
+            <span className="w-12 h-12 rounded-full bg-accentsoft text-accent flex items-center justify-center">
+              <MailCheck size={22} strokeWidth={1.75} />
+            </span>
+            <div className="flex flex-col gap-2">
+              <h1 className="text-[30px] leading-9">{t('login.confirmTitle')}</h1>
+              <p className="text-chalkdim text-[15px]">
+                {t('login.resetSentTitle')} <bdi className="text-chalk">{email}</bdi>
+              </p>
+            </div>
+            <TextLink onClick={() => switchMode('login')}>{t('login.backToLogin')}</TextLink>
+          </section>
+        ) : (
+          <>
+            <header className="flex flex-col gap-2">
+              <h1 className="text-[30px] leading-9">{heading[0]}</h1>
+              <p className="text-chalkdim text-[15px]">{heading[1]}</p>
+            </header>
 
-              {mode === 'signup' && invited && (
-                <p className="text-brass text-sm -mt-2">{t('login.invitedNote')}</p>
-              )}
+            {(mode === 'login' || mode === 'signup') && (
+              <div role="tablist" className="grid grid-cols-2 gap-0.5 p-[3px] rounded-[12px] bg-surface">
+                {[['login', t('login.logIn')], ['signup', t('login.createAccount')]].map(([m, label]) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === m}
+                    onClick={() => switchMode(m)}
+                    className={`min-h-[44px] rounded-[9px] text-sm font-medium transition-colors duration-200 ${mode === m ? 'bg-[#2A2A2E] text-chalk' : 'text-chalkdim'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              {mode === 'signup' && invited && <p className="text-accent text-sm">{t('login.invitedNote')}</p>}
 
               {mode === 'signup' && (
                 <Field label={t('login.name')}>
@@ -223,6 +226,7 @@ export default function Login({ linkProblem }) {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder={t('login.namePlaceholder')}
+                    autoComplete="name"
                     required
                   />
                 </Field>
@@ -235,6 +239,7 @@ export default function Login({ linkProblem }) {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
+                  autoComplete="email"
                   required
                 />
               </Field>
@@ -246,6 +251,7 @@ export default function Login({ linkProblem }) {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
+                    autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                     minLength={mode === 'signup' ? 8 : undefined}
                     required
                   />
@@ -253,13 +259,7 @@ export default function Login({ linkProblem }) {
               )}
 
               {mode === 'login' && (
-                <button
-                  type="button"
-                  onClick={() => switchMode('reset')}
-                  className="text-chalkdim text-xs hover:text-brass w-fit -mt-1"
-                >
-                  {t('login.forgotPassword')}
-                </button>
+                <TextLink onClick={() => switchMode('reset')} className="-mt-1">{t('login.forgotPassword')}</TextLink>
               )}
 
               {notice && <p className="text-good text-sm">{notice}</p>}
@@ -267,7 +267,7 @@ export default function Login({ linkProblem }) {
 
               <Captcha ref={captcha} onToken={setCaptchaToken} />
 
-              <Button type="submit" disabled={busy || waitingForCaptcha} className="mt-2 w-full">
+              <Button type="submit" disabled={busy || waitingForCaptcha} className="mt-1 w-full min-h-[52px] text-base">
                 {busy
                   ? t('login.oneMoment')
                   : mode === 'login'
@@ -277,24 +277,25 @@ export default function Login({ linkProblem }) {
                       : t('login.sendResetLink')}
               </Button>
 
-              {mode === 'reset' && (
-                <button
-                  type="button"
-                  onClick={() => switchMode('login')}
-                  className="text-chalkdim text-xs hover:text-chalk w-fit mx-auto"
-                >
-                  {t('login.backToLogin')}
-                </button>
-              )}
+              {mode === 'reset' && <TextLink onClick={() => switchMode('login')}>{t('login.backToLogin')}</TextLink>}
             </form>
-          )}
-        </div>
+          </>
+        )}
+      </main>
 
-        <p className="text-chalkdim text-xs text-center mt-6">{t('login.footerNote')}</p>
-        <Link to="/privacy" className="block text-chalkdim text-xs hover:text-brass text-center mt-2">
-          {t('privacy.link')}
-        </Link>
-      </div>
+      <footer className="w-full max-w-sm mx-auto flex flex-col items-center gap-1.5 text-chalkdim text-xs text-center">
+        <p>{t('login.footerNote')}</p>
+        <Link to="/privacy" className="hover:text-chalk">{t('privacy.link')}</Link>
+      </footer>
     </div>
+  )
+}
+
+// A quiet text action: "Forgot password?", "Back to log in".
+function TextLink({ onClick, children, className = '' }) {
+  return (
+    <button type="button" onClick={onClick} className={`text-chalkdim text-sm hover:text-chalk w-fit ${className}`}>
+      {children}
+    </button>
   )
 }
