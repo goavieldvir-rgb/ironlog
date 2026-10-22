@@ -11,6 +11,7 @@ import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, updateTrainerComment, deleteSession, hasUnreadFeedback, markFeedbackSeen } from '../lib/db.js'
 import { markSessionsReviewed } from '../lib/coach.js'
 import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
+import { useGyms, sessionGymId, gymLabel } from '../lib/gyms.js'
 import { Card, CategoryTag, Badge, Button } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { isWarmup, workingSets } from '../lib/warmup.js'
@@ -91,9 +92,16 @@ export default function SessionDetail() {
   const exById = useMemo(() => exerciseMap(exercises), [exercises])
   const session = sessions.find((s) => s.id === id)
   const routine = routines.find((r) => r.id === session?.routine_id)
-  // Earlier workouts of the same routine, newest first, and how many of them
-  // to lay beside this one (0 = not comparing).
-  const previous = useMemo(() => sameKindSessions(session, sessions), [session, sessions])
+  const { gyms, mainName, enabled: gymsOn } = useGyms(effectiveUid)
+  // Earlier workouts of the same routine (at the same gym, for someone with
+  // several), newest first, and how many of them to lay beside this one
+  // (0 = not comparing).
+  const previous = useMemo(() => {
+    const same = sameKindSessions(session, sessions)
+    if (!gymsOn || !session) return same
+    const here = sessionGymId(session, gyms)
+    return same.filter((s) => sessionGymId(s, gyms) === here)
+  }, [session, sessions, gymsOn, gyms])
   const [compareCount, setCompareCount] = useState(0)
   const compared = previous.slice(0, compareCount)
 
@@ -130,6 +138,7 @@ export default function SessionDetail() {
   const totalSets = (session.entries || []).reduce((n, e) => n + workingSets(e.sets).length, 0)
   const meta = [
     formatDate(lang, session.date),
+    gymsOn ? gymLabel(sessionGymId(session, gyms), gyms, mainName, t) : null,
     session.duration_minutes ? t('workout.durationShort', { min: session.duration_minutes }) : null,
     totalSets > 0 ? `${totalSets} ${t('history.setsLabel')}` : null,
   ].filter(Boolean)

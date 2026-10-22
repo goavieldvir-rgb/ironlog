@@ -297,7 +297,7 @@ export async function deleteRoutine(uid, id) {
 // A completed set/interval: strength & mobility need reps (weight optional
 // for bodyweight exercises); cardio needs a duration (intensity/distance
 // optional).
-function isCompletedSet(entry, s) {
+export function isCompletedSet(entry, s) {
   if (entry.category === 'cardio') {
     return s.duration !== '' && s.duration !== null && s.duration !== undefined
   }
@@ -330,6 +330,9 @@ export async function logSession(uid, session) {
     date: session.date,
     notes: session.notes || '',
     entries: session.entries,
+    // Only sent for an extra gym, so someone with one gym never needs the
+    // gyms migration to log a workout.
+    ...(session.gymId ? { gym_id: session.gymId } : {}),
     ...(session.startedAt ? { started_at: session.startedAt } : {}),
     ...(session.durationMinutes != null ? { duration_minutes: session.durationMinutes } : {}),
   })
@@ -506,6 +509,7 @@ export async function updateSession(uid, id, patch) {
   if (patch.date !== undefined) row.date = patch.date
   if (patch.notes !== undefined) row.notes = patch.notes
   if (patch.entries !== undefined) row.entries = cleanEntries(patch.entries)
+  if (patch.gymId !== undefined) row.gym_id = patch.gymId || null
 
   // Exercises in the session before the edit, so one removed by the edit
   // still gets its hint recalculated.

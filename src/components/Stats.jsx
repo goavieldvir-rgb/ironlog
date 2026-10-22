@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { useGyms, sessionGymId } from '../lib/gyms.js'
 import {
   ResponsiveContainer,
   BarChart,
@@ -49,6 +50,14 @@ export default function Stats() {
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const sessions = useMemo(() => applyCurrentTimed(rawSessions, exercises), [rawSessions, exercises])
   const [exerciseId, setExerciseId] = useState('')
+  // Progress and records for one gym, or 'all'. Only shown to someone who
+  // trains at several gyms; '' is the main gym.
+  const { gyms, mainName, enabled: gymsOn } = useGyms(effectiveUid)
+  const [gymFilter, setGymFilter] = useState('all')
+  const gymSessions = useMemo(
+    () => (!gymsOn || gymFilter === 'all' ? sessions : sessions.filter((s) => (sessionGymId(s, gyms) || '') === gymFilter)),
+    [sessions, gymsOn, gyms, gymFilter],
+  )
   const [cardioMetric, setCardioMetric] = useState('duration')
 
   const weeks = useMemo(() => last12WeekStarts(), [])
@@ -110,7 +119,7 @@ export default function Stats() {
     const recMap = {}
     const progMap = {}
 
-    for (const s of sessions) {
+    for (const s of gymSessions) {
       for (const entry of s.entries || []) {
         if (!entry.exerciseId) continue
 
@@ -216,7 +225,7 @@ export default function Stats() {
     }
 
     return { records, exerciseOptions, progressByExercise: progMap }
-  }, [sessions, exercises, lang])
+  }, [gymSessions, exercises, lang])
 
   // If two exercises share a name (possible now that tracking method can
   // differ between "variants" of the same movement), append a short
@@ -314,6 +323,20 @@ export default function Stats() {
               yWidth={36}
               tooltipFormatter={(value) => [`${value} km`, t('stats.cardioTooltipLabel')]}
             />
+          )}
+
+          {gymsOn && (
+            <Field label={t('gyms.statsFilter')}>
+              <select value={gymFilter} onChange={(e) => setGymFilter(e.target.value)} className="w-full sm:w-72">
+                <option value="all">{t('gyms.allGyms')}</option>
+                <option value="">{mainName || t('gyms.mainDefault')}</option>
+                {gyms.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
           )}
 
           <section className="bg-surface rounded-[22px] p-[18px] flex flex-col gap-3">
