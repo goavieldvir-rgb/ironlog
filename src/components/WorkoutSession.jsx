@@ -307,6 +307,7 @@ export default function WorkoutSession() {
   const [currentInView, setCurrentInView] = useState(true)
   const [currentAbove, setCurrentAbove] = useState(false)
   const [glowIdx, setGlowIdx] = useState(null)
+  const [jumpLeaving, setJumpLeaving] = useState(false)
   const anyDone = entries.some((e) => workingSets(e.sets).some((s) => s.done))
   const currentIdx = anyDone ? entries.findIndex((e) => workingSets(e.sets).some((s) => !s.done)) : -1
 
@@ -338,8 +339,12 @@ export default function WorkoutSession() {
 
   function jumpToCurrent() {
     const el = entryRefs.current[currentIdx]
-    if (!el) return
+    if (!el || jumpLeaving) return
+    // Let the tap ripple play out before the button goes, even if the card
+    // scrolls into view (and disarms it) first.
+    setJumpLeaving(true)
     setJumpArmed(false)
+    setTimeout(() => setJumpLeaving(false), 420)
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
     setGlowIdx(currentIdx)
@@ -875,13 +880,13 @@ export default function WorkoutSession() {
         />
       )}
 
-      {jumpArmed && !currentInView && currentIdx >= 0 && (
+      {((jumpArmed && !currentInView) || jumpLeaving) && currentIdx >= 0 && (
         <button
           type="button"
           onClick={jumpToCurrent}
           aria-label={t('workout.jumpToCurrent', { name: liveName(entries[currentIdx]) })}
           title={t('workout.jumpToCurrent', { name: liveName(entries[currentIdx]) })}
-          className="jump-pill press fixed inset-x-0 mx-auto z-30 w-12 h-12 flex items-center justify-center rounded-full bg-[#242428]/85 backdrop-blur-xl text-accent shadow-[inset_0_0.5px_0_rgba(255,255,255,0.14),0_8px_24px_rgba(0,0,0,0.45)]"
+          className={`jump-pill ${jumpLeaving ? 'jump-leave' : 'press'} fixed inset-x-0 mx-auto z-30 w-12 h-12 flex items-center justify-center rounded-full bg-[#242428]/85 backdrop-blur-xl text-accent shadow-[inset_0_0.5px_0_rgba(255,255,255,0.14),0_8px_24px_rgba(0,0,0,0.45)]`}
           // Sits just above where the rest timer opens, so the two never overlap.
           style={{ bottom: 'calc(max(24px, calc(env(safe-area-inset-bottom, 0px) + 12px)) + 80px)' }}
         >
