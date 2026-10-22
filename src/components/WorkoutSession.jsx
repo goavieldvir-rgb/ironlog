@@ -879,15 +879,13 @@ export default function WorkoutSession() {
         <button
           type="button"
           onClick={jumpToCurrent}
-          className="jump-pill press fixed inset-x-0 mx-auto w-max max-w-[calc(100vw-32px)] z-30 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-[#242428]/85 backdrop-blur-xl text-[13px] font-medium text-chalk shadow-[inset_0_0.5px_0_rgba(255,255,255,0.14),0_8px_24px_rgba(0,0,0,0.45)]"
-          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
+          aria-label={t('workout.jumpToCurrent', { name: liveName(entries[currentIdx]) })}
+          title={t('workout.jumpToCurrent', { name: liveName(entries[currentIdx]) })}
+          className="jump-pill press fixed inset-x-0 mx-auto z-30 w-12 h-12 flex items-center justify-center rounded-full bg-[#242428]/85 backdrop-blur-xl text-accent shadow-[inset_0_0.5px_0_rgba(255,255,255,0.14),0_8px_24px_rgba(0,0,0,0.45)]"
+          // Sits just above where the rest timer opens, so the two never overlap.
+          style={{ bottom: 'calc(max(24px, calc(env(safe-area-inset-bottom, 0px) + 12px)) + 80px)' }}
         >
-          {currentAbove ? (
-            <ArrowUp size={14} className="text-accent shrink-0" aria-hidden="true" />
-          ) : (
-            <ArrowDown size={14} className="text-accent shrink-0" aria-hidden="true" />
-          )}
-          <span className="truncate">{t('workout.jumpToCurrent', { name: liveName(entries[currentIdx]) })}</span>
+          {currentAbove ? <ArrowUp size={22} aria-hidden="true" /> : <ArrowDown size={22} aria-hidden="true" />}
         </button>
       )}
 
