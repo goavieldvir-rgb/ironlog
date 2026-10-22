@@ -9,6 +9,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { Card, Badge, EmptyState, Button, Field, LoadError } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { PageLoader } from './Loading.jsx'
+import CoachTasks from './CoachTasks.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { fetchRoster, fetchRecentPrs, rosterFlags, attentionScore, adherence, daysSince, recordInvite } from '../lib/coach.js'
 
@@ -132,6 +133,7 @@ export default function People() {
 
       {trainees.length > 0 && (
         <>
+          <CoachTasks trainees={trainees} today={today} />
           <div className="grid grid-cols-4 lg:grid-cols-6 gap-2">
             <Tile label={t('people.tileAttention')} value={totals.attention} onClick={() => setView('attention')} active={view === 'attention'} warn={totals.attention > 0} />
             <Tile label={t('people.tileReview')} value={totals.review} onClick={() => setView('review')} active={view === 'review'} />

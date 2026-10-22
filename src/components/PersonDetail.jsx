@@ -443,13 +443,15 @@ function GoalForm({ traineeId, goal, scheduled, today, t, lang, onSaved, onError
   const [target, setTarget] = useState(goal?.target_weight ?? '')
   const [perWeek, setPerWeek] = useState(goal?.sessions_per_week ?? '')
   const [checkin, setCheckin] = useState(goal?.next_checkin || '')
+  const [birthday, setBirthday] = useState(goal?.birthday || '')
   const [saving, setSaving] = useState(false)
 
   const dirty =
     text !== (goal?.goal || '') ||
     String(target) !== String(goal?.target_weight ?? '') ||
     String(perWeek) !== String(goal?.sessions_per_week ?? '') ||
-    checkin !== (goal?.next_checkin || '')
+    checkin !== (goal?.next_checkin || '') ||
+    birthday !== (goal?.birthday || '')
 
   async function save(overrides = {}) {
     setSaving(true)
@@ -460,6 +462,7 @@ function GoalForm({ traineeId, goal, scheduled, today, t, lang, onSaved, onError
         target_weight: num(target),
         sessions_per_week: perWeek === '' ? null : Math.min(14, Math.max(1, Math.round(Number(perWeek)))),
         next_checkin: checkin || null,
+        birthday: birthday || null,
         ...overrides,
       })
       if (overrides.next_checkin !== undefined) setCheckin(overrides.next_checkin || '')
@@ -494,9 +497,14 @@ function GoalForm({ traineeId, goal, scheduled, today, t, lang, onSaved, onError
           </Field>
         )}
       </div>
-      <Field label={t('person.nextCheckin')}>
-        <input type="date" value={checkin} onChange={(e) => setCheckin(e.target.value)} className={due ? 'text-accent' : ''} />
-      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label={t('person.nextCheckin')}>
+          <input type="date" value={checkin} onChange={(e) => setCheckin(e.target.value)} className={due ? 'text-accent' : ''} />
+        </Field>
+        <Field label={t('person.birthday')}>
+          <input type="date" value={birthday} max={today} onChange={(e) => setBirthday(e.target.value)} />
+        </Field>
+      </div>
       <div className="flex gap-2 flex-wrap">
         {dirty && (
           <Button variant="brass" onClick={() => save()} disabled={saving}>

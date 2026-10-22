@@ -1,16 +1,17 @@
 // Sends the daily "you have a workout today" web push, the "your coach left
-// feedback" push, and the on-demand "send a test notification" from the
-// Notifications page.
+// feedback" push, the coach's morning "needs attention" push, and the
+// on-demand "send a test notification" from the Notifications page.
 //
 // Two ways in (deploy with verify_jwt = false, the function checks itself):
 //  - the database, with header x-cron-secret matching push_config: pg_cron
 //    every 15 minutes for reminders, or the trainer feedback trigger
-//    (supabase-coach-feedback.sql) with { feedback_session_id }.
+//    (supabase-coach-feedback.sql) with { feedback_session_id }, or the
+//    morning coach tasks job (supabase-coach-tasks.sql) with { coach_tasks }.
 //  - the app's test button: the signed-in user's own token; sends only to
 //    that user's own subscriptions, at most once a minute.
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import webpush from 'npm:web-push@3.6.7'
-import { feedbackCopy, isAllowedEndpoint, isDue, localParts, reminderKind } from './helpers.ts'
+import { coachTasksCopy, feedbackCopy, isAllowedEndpoint, isDue, localParts, reminderKind } from './helpers.ts'
 
 const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
@@ -144,6 +145,42 @@ async function runFeedback(sessionId: string) {
   return json({ sent, removed, failed })
 }
 
+// New open tasks go to every admin's devices; once one push lands they are
+// marked as sent so tomorrow's push only has the new ones.
+async function runCoachTasks() {
+  const { data: tasks, error } = await db.from('coach_tasks')
+    .select('id, kind, n, title, trainee_id').is('done_at', null).is('notified_at', null).order('created_at')
+  if (error) return json({ error: error.message }, 500)
+  if (!tasks?.length) return json({ sent: 0 })
+
+  const ids = [...new Set(tasks.map((t) => t.trainee_id).filter(Boolean))]
+  const { data: people } = ids.length ? await db.from('profiles').select('id, full_name, email').in('id', ids) : { data: [] }
+  const nameOf = Object.fromEntries((people || []).map((p) => [p.id, p.full_name || p.email?.split('@')[0] || '']))
+  const items = tasks.map((t) => ({ kind: t.kind, n: t.n, title: t.title, name: t.trainee_id ? nameOf[t.trainee_id] || '' : '' }))
+
+  const { data: admins } = await db.from('profiles').select('id').eq('is_admin', true)
+  const { data: subs } = await db.from('push_subscriptions').select('*').in('user_id', (admins || []).map((a) => a.id))
+  let sent = 0, removed = 0, failed = 0
+  for (const s of subs || []) {
+    try {
+      const r = await deliver(s, { ...coachTasksCopy(s.lang, items), url: '#/people' }, 'ironlog-coach-tasks', 43200)
+      if (r === 'sent') sent++
+      else removed++
+    } catch (e: any) {
+      console.error('coach tasks push failed', s.id, e?.message || e)
+      failed++
+    }
+  }
+  // No phone took it (subscription expired, or push failed): ntfy instead.
+  let ntfy = false
+  if (!sent) {
+    const msg = coachTasksCopy('he', items)
+    ntfy = !(await db.rpc('send_admin_push', { p_title: msg.title, p_message: msg.body })).error
+  }
+  if (sent || ntfy) await db.from('coach_tasks').update({ notified_at: new Date().toISOString() }).in('id', tasks.map((t) => t.id))
+  return json({ sent, removed, failed, ntfy })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
   if (req.method !== 'POST') return json({ error: 'method' }, 405)
@@ -156,6 +193,7 @@ Deno.serve(async (req) => {
   if (secret) {
     if (secret !== cfg.cron_secret) return json({ error: 'forbidden' }, 403)
     const body = await req.json().catch(() => ({}))
+    if (body?.coach_tasks) return runCoachTasks()
     return body?.feedback_session_id ? runFeedback(String(body.feedback_session_id)) : runReminders()
   }
   return runTest(req)
