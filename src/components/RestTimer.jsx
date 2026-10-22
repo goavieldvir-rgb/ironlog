@@ -2,6 +2,7 @@ import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } f
 import { Play, Pause, RotateCcw, Bell, BellOff } from 'lucide-react'
 import { InfoTip } from './InfoTip.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { setRestPush } from '../lib/push.js'
 
 const PRESETS = [60, 90, 120, 180]
 const DEFAULT_REST = 90
@@ -55,6 +56,28 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
   // shows how long you've rested beyond the set time, so the beep must
   // fire once at zero rather than on every overtime tick.
   const alertedRef = useRef(false)
+  // Whether the server currently holds an end time for this rest, so it can
+  // send the alert while the app is in the background.
+  const pushedRef = useRef(false)
+
+  // Tells the server when this rest ends (or that it no longer does).
+  function pushRest(end, force = false) {
+    if (end && (notifyOn || force)) {
+      pushedRef.current = true
+      setRestPush(end)
+    } else if (pushedRef.current) {
+      pushedRef.current = false
+      setRestPush(null)
+    }
+  }
+
+  // Leaving the workout mid-rest cancels the server's alert too.
+  useEffect(
+    () => () => {
+      if (pushedRef.current) setRestPush(null)
+    },
+    [],
+  )
 
   function tick() {
     if (!endTimeRef.current) return
@@ -66,6 +89,8 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
       setFinished(true)
       beep()
       if (navigator.vibrate) navigator.vibrate([200, 100, 200])
+      // Seen on screen already, so the server's push would only repeat it.
+      if (document.visibilityState === 'visible') pushRest(null)
       // Only worth a notification when you're not looking at the app —
       // otherwise the screen already shows it's done.
       if (notifyOn && document.visibilityState !== 'visible') {
@@ -105,16 +130,14 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
   async function toggleNotify() {
     if (notifyOn) {
       setNotifyOn(false)
-      return
-    }
-    if (Notification.permission === 'granted') {
-      setNotifyOn(true)
+      pushRest(null)
       return
     }
     // Must be triggered by a real tap — browsers ignore permission
     // requests that aren't tied to a user action.
-    const result = await Notification.requestPermission()
-    setNotifyOn(result === 'granted')
+    const granted = Notification.permission === 'granted' || (await Notification.requestPermission()) === 'granted'
+    setNotifyOn(granted)
+    if (granted && running && endTimeRef.current > Date.now()) pushRest(endTimeRef.current, true)
   }
 
   function start(preset) {
@@ -123,6 +146,7 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
     const duration = preset ?? (secondsLeft > 0 ? secondsLeft : lastDuration)
     if (preset != null) setLastDuration(preset)
     endTimeRef.current = Date.now() + duration * 1000
+    pushRest(endTimeRef.current)
     setSecondsLeft(duration)
     setTotalDuration(duration)
     setFinished(false)
@@ -138,6 +162,7 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
 
   function pause() {
     setRunning(false)
+    pushRest(null)
   }
 
   // Restart: go back to whichever duration was actually last used — not a
@@ -157,6 +182,7 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
     }
     const end = Math.max(Date.now() + 1000, (endTimeRef.current || Date.now()) + delta * 1000)
     endTimeRef.current = end
+    pushRest(end)
     const remaining = Math.ceil((end - Date.now()) / 1000)
     setSecondsLeft(remaining)
     setTotalDuration((d) => Math.max(d, remaining))
@@ -167,6 +193,7 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
 
   function skip() {
     endTimeRef.current = null
+    pushRest(null)
     alertedRef.current = false
     setRunning(false)
     setActive(false)

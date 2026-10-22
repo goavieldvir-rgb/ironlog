@@ -1,11 +1,13 @@
 // Sends the daily "you have a workout today" web push, the "your coach left
-// feedback" push, and the on-demand "send a test notification" from the
+// feedback" push, the "rest is over" push for a rest timer running in the
+// background, and the on-demand "send a test notification" from the
 // Notifications page.
 //
 // Two ways in (deploy with verify_jwt = false, the function checks itself):
 //  - the database, with header x-cron-secret matching push_config: pg_cron
 //    every 15 minutes for reminders, or the trainer feedback trigger
-//    (supabase-coach-feedback.sql) with { feedback_session_id }.
+//    (supabase-coach-feedback.sql) with { feedback_session_id }, or the
+//    rest timer job (supabase-rest-timer-push.sql) with { rest_alerts }.
 //  - the app's test button: the signed-in user's own token; sends only to
 //    that user's own subscriptions, at most once a minute.
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -36,6 +38,14 @@ const TEST_COPY = {
   en: { title: 'Ironlog', body: 'Test notification. Reminders are working.' },
   he: { title: 'Ironlog', body: 'התראת בדיקה. התזכורות עובדות.' },
 }
+
+const REST_DONE_COPY = {
+  en: { title: 'Rest over', body: 'Time for your next set.' },
+  he: { title: 'המנוחה נגמרה', body: 'זמן לסט הבא.' },
+}
+// A rest alert that comes much later than the rest itself (the job was down,
+// say) is no use mid-workout, so it is dropped instead of sent.
+const REST_STALE_MS = 120_000
 
 // Returns 'sent' | 'removed' (expired on the phone's side). Throws otherwise.
 async function deliver(s: any, msg: { title: string; body: string; url?: string }, tag: string, ttl = 3600) {
@@ -144,6 +154,27 @@ async function runFeedback(sessionId: string) {
   return json({ sent, removed, failed })
 }
 
+// Rests whose end time has passed. Claiming clears them in the database, so
+// each is sent once and a rest the app already skipped is never sent.
+async function runRestAlerts() {
+  const { data: due, error } = await db.rpc('claim_due_rest_alerts')
+  if (error) return json({ error: error.message }, 500)
+  let sent = 0, stale = 0, removed = 0, failed = 0
+  for (const s of due || []) {
+    if (Date.now() - new Date(s.ends_at).getTime() > REST_STALE_MS) { stale++; continue }
+    try {
+      // Same tag as the app's own alert, so the two never stack up.
+      const r = await deliver(s, REST_DONE_COPY[s.lang as 'en' | 'he'] || REST_DONE_COPY.en, 'ironlog-rest-timer', 60)
+      if (r === 'sent') sent++
+      else removed++
+    } catch (e: any) {
+      console.error('rest push failed', s.id, e?.message || e)
+      failed++
+    }
+  }
+  return json({ sent, stale, removed, failed })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
   if (req.method !== 'POST') return json({ error: 'method' }, 405)
@@ -156,6 +187,7 @@ Deno.serve(async (req) => {
   if (secret) {
     if (secret !== cfg.cron_secret) return json({ error: 'forbidden' }, 403)
     const body = await req.json().catch(() => ({}))
+    if (body?.rest_alerts) return runRestAlerts()
     return body?.feedback_session_id ? runFeedback(String(body.feedback_session_id)) : runReminders()
   }
   return runTest(req)
