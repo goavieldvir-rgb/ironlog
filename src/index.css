@@ -107,11 +107,11 @@
   .pr-pop {
     animation: prpop 320ms cubic-bezier(0.25, 1, 0.5, 1);
   }
-  /* "Back to <exercise>" pill drops in from the top; the card it jumps
+  /* The round "back to <exercise>" button rises into place; the card it jumps
      to glows once after the scroll lands. */
   @keyframes pilldrop {
     from {
-      transform: translateY(-12px);
+      transform: translateY(12px) scale(0.9);
       opacity: 0;
     }
   }
@@ -133,13 +133,51 @@
   .jump-glow {
     animation: jumpglow 1700ms ease-out;
   }
+  /* On tap: one accent ring ripples out while the button sinks away. */
+  @keyframes jumpleave {
+    0% {
+      transform: scale(0.92);
+    }
+    35% {
+      transform: scale(1.04);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(10px) scale(0.85);
+      opacity: 0;
+    }
+  }
+  @keyframes jumpring {
+    from {
+      transform: scale(1);
+      opacity: 0.6;
+    }
+    to {
+      transform: scale(1.9);
+      opacity: 0;
+    }
+  }
+  .jump-leave {
+    animation: jumpleave 420ms cubic-bezier(0.23, 1, 0.32, 1) forwards;
+    pointer-events: none;
+  }
+  .jump-leave::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    border: 1.5px solid rgb(var(--accent));
+    animation: jumpring 420ms ease-out forwards;
+  }
   @media (prefers-reduced-motion: reduce) {
     .press,
     .press-row,
     .flash-fill,
     .pr-pop,
     .jump-pill,
-    .jump-glow {
+    .jump-glow,
+    .jump-leave,
+    .jump-leave::after {
       animation: none;
       transition: none;
     }
