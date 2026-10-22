@@ -24,7 +24,6 @@ const H = 1920
 const M = 96 // side margin
 const T = tailwind.theme.extend.colors
 const C = { ink: T.ink, chalk: T.chalk, dim: T.chalkdim, line: T.line, accent: ACCENT }
-const WHITE_DIM = 'rgba(255,255,255,0.78)' // labels and units over a photo
 
 // The app's own pair: Geist for Latin and numbers, IBM Plex Sans Hebrew for
 // Hebrew letters (the browser picks per letter, so mixed names just work).
@@ -405,28 +404,6 @@ function drawPhoto(ctx, photo) {
   ctx.drawImage(photo.source, (W - dw) / 2, (H - dh) / 2, dw, dh)
 }
 
-// A faint top fade for the wordmark, and a bottom fade that starts below the
-// middle and eases in, so a face or body in the frame stays bright while the
-// numbers stay readable. Below ~1670 Instagram covers the picture anyway.
-function drawScrims(ctx) {
-  const top = ctx.createLinearGradient(0, 0, 0, 420)
-  top.addColorStop(0, 'rgba(11,11,12,0.4)')
-  top.addColorStop(1, 'rgba(11,11,12,0)')
-  ctx.fillStyle = top
-  ctx.fillRect(0, 0, W, 420)
-  const y0 = 860
-  const bot = ctx.createLinearGradient(0, y0, 0, H)
-  const at = (y, a) => bot.addColorStop((y - y0) / (H - y0), `rgba(11,11,12,${a})`)
-  at(860, 0)
-  at(1040, 0.22)
-  at(1220, 0.5)
-  at(1420, 0.7)
-  at(1700, 0.8)
-  at(H, 0.84)
-  ctx.fillStyle = bot
-  ctx.fillRect(0, y0, W, H - y0)
-}
-
 // Fine film grain over the plain card, so the glow reads as light rather
 // than a flat gradient. Seeded, so the same workout always draws the same.
 function drawGrain(ctx) {
@@ -537,12 +514,13 @@ export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo
     if (variant === 'sticker') return renderSticker(summary, { rtl, labels })
     canvas.height = H
     if (variant === 'photo' && photo) {
+      // The photo is never darkened. The text carries the same soft shadow
+      // as the sticker instead, which keeps it readable on bright photos.
       drawPhoto(ctx, photo)
-      drawScrims(ctx)
-      FX = { shadow: { color: 'rgba(0,0,0,0.45)', blur: 12, y: 0 } }
+      FX = { sticker: true, shadow: { color: 'rgba(0,0,0,0.22)', blur: 6, y: 1 } }
       drawBrand(ctx, rtl ? W - M : M, 316, { rtl, color: '#FFFFFF' })
-      FX = { shadow: { color: 'rgba(0,0,0,0.35)', blur: 14, y: 2 } }
-      drawOverlayBlock(ctx, summary, { rtl, labels, bottom: 1640, labelColor: WHITE_DIM })
+      const white = 'rgba(255,255,255,0.92)'
+      drawOverlayBlock(ctx, summary, { rtl, labels, bottom: 1640, labelColor: white, unitColor: white })
       return canvas
     }
     FX = null
