@@ -140,3 +140,28 @@ export async function removeDeviceReminder(uid) {
     console.error(e)
   }
 }
+
+// Puts the rest timer's end time on this phone's push subscription, so the
+// server sends "rest over" even while the app is in the background (iPhone
+// pauses the app, so it can't alert by itself). null cancels it. Calls run
+// one after another, so a quick burst of +15 taps ends on the last value.
+// Does nothing on a phone without a push subscription.
+let restQueue = Promise.resolve()
+export function setRestPush(endsAt) {
+  restQueue = restQueue.then(async () => {
+    try {
+      if (!('serviceWorker' in navigator)) return
+      const reg = await navigator.serviceWorker.getRegistration()
+      const sub = await reg?.pushManager.getSubscription()
+      if (!sub) return
+      const { error } = await supabase
+        .from('push_subscriptions')
+        .update({ rest_ends_at: endsAt ? new Date(endsAt).toISOString() : null })
+        .eq('endpoint', sub.endpoint)
+      if (error) console.error(error)
+    } catch (e) {
+      console.error(e)
+    }
+  })
+  return restQueue
+}
