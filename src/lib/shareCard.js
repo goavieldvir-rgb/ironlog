@@ -40,7 +40,6 @@ const FACES = [
   ['IL Geist', 'geist-latin', '100 900', LATIN],
   ['IL Plex Hebrew', 'plex-hebrew-500', '500', HEBREW],
   ['IL Plex Hebrew', 'plex-hebrew-600', '600', HEBREW],
-  ['IL Plex Hebrew', 'plex-hebrew-700', '700', HEBREW],
 ]
 
 // All the faces load once; everyone waits on the same promise (true when
@@ -119,11 +118,10 @@ function setShadow(ctx, color, blur, offsetY = 0) {
 function put(ctx, text, x, y) {
   ctx.save()
   if (FX?.sticker && PASS === 'stroke') {
-    ctx.lineJoin = 'round'
-    ctx.lineWidth = Math.max(3, fontPx(ctx) * 0.045)
-    ctx.strokeStyle = 'rgba(0,0,0,0.4)'
-    setShadow(ctx, 'rgba(0,0,0,0.45)', 24)
-    ctx.strokeText(text, x, y)
+    // no hard outline (it made the letters look cut out): a wide, soft
+    // shadow under the letters keeps them readable on light stories
+    setShadow(ctx, 'rgba(0,0,0,0.38)', Math.max(12, fontPx(ctx) * 0.35), Math.round(fontPx(ctx) * 0.04))
+    ctx.fillText(text, x, y)
   } else {
     if (FX?.shadow) setShadow(ctx, FX.shadow.color, FX.shadow.blur, FX.shadow.y)
     ctx.fillText(text, x, y)
@@ -191,10 +189,10 @@ function drawLabel(ctx, text, x, y, { rtl, size, weight = 500, color, maxW = W, 
 
 // Width of "value + gap + unit" with the value at `size` px.
 function valueWidth(ctx, st, size, unitPx, gap) {
-  setFont(ctx, 700, size, -0.05)
+  setFont(ctx, 600, size, -0.04)
   const vw = ctx.measureText(st.value).width
   if (!st.unit) return vw
-  setFont(ctx, 600, unitPx, -0.02)
+  setFont(ctx, 500, unitPx, -0.01)
   return vw + gap + ctx.measureText(st.unit).width
 }
 
@@ -222,12 +220,12 @@ function drawValue(ctx, f, x, y, { rtl, gap, color, unitColor }) {
   ctx.direction = 'ltr'
   ctx.textAlign = rtl ? 'right' : 'left'
   ctx.fillStyle = st.accent ? C.accent : color
-  setFont(ctx, 700, size, -0.05)
+  setFont(ctx, 600, size, -0.04)
   put(ctx, st.value, x, y)
   if (!st.unit) return
   const vw = ctx.measureText(st.value).width
   ctx.fillStyle = unitColor
-  setFont(ctx, 600, unitPx, -0.02)
+  setFont(ctx, 500, unitPx, -0.01)
   ctx.direction = isHeb(st.unit) ? 'rtl' : 'ltr'
   put(ctx, st.unit, rtl ? x - vw - gap : x + vw + gap, y)
 }
@@ -256,10 +254,10 @@ function layoutName(ctx, summary, { size: top }) {
   const words = text.split(/\s+/)
   let size = top
   for (; size > top * 0.8; size -= 4) {
-    setFont(ctx, 700, size, -0.035)
+    setFont(ctx, 600, size, -0.03)
     if (twoLines(ctx, words, maxW)) break
   }
-  setFont(ctx, 700, size, -0.035)
+  setFont(ctx, 600, size, -0.03)
   let line1 = ''
   let i = 0
   while (i < words.length) {
@@ -275,35 +273,36 @@ function layoutName(ctx, summary, { size: top }) {
 }
 
 function drawName(ctx, nm, x, y, { rtl, color }) {
-  setFont(ctx, 700, nm.size, -0.035)
+  setFont(ctx, 600, nm.size, -0.03)
   ctx.fillStyle = color
   ctx.direction = rtl ? 'rtl' : 'ltr'
   ctx.textAlign = rtl ? 'right' : 'left'
   nm.lines.forEach((ln, i) => put(ctx, ln, x, y + i * nm.lh))
 }
 
-// The wordmark: a small accent square (the app's "logged" mark) and the name.
+// The wordmark: a small accent dot and the name.
 function drawBrand(ctx, x, y, { rtl, color, size = 44 }) {
-  setFont(ctx, 700, size, -0.03)
+  setFont(ctx, 600, size, -0.02)
   const tw = ctx.measureText('Ironlog').width
-  const s = Math.round(size * 0.62)
-  const gap = Math.round(size * 0.3)
-  const total = s + gap + tw
+  const d = Math.round(size * 0.3) // dot diameter
+  const gap = Math.round(size * 0.24)
+  const total = d + gap + tw
   const left = rtl ? x - total : x
   passes(() => {
     if (!(FX?.sticker && PASS === 'stroke')) {
       ctx.save()
       if (FX?.shadow) setShadow(ctx, FX.shadow.color, FX.shadow.blur, FX.shadow.y)
       ctx.fillStyle = C.accent
-      roundRect(ctx, left, y - s, s, s, Math.round(s * 0.28))
+      ctx.beginPath()
+      ctx.arc(left + d / 2, y - Math.round(size * 0.34), d / 2, 0, Math.PI * 2)
       ctx.fill()
       ctx.restore()
     }
     ctx.direction = 'ltr'
     ctx.textAlign = 'left'
     ctx.fillStyle = color
-    setFont(ctx, 700, size, -0.03)
-    put(ctx, 'Ironlog', left + s + gap, y)
+    setFont(ctx, 600, size, -0.02)
+    put(ctx, 'Ironlog', left + d + gap, y)
   })
 }
 
@@ -354,37 +353,45 @@ function drawPill(ctx, text, x, top, { rtl, size = 30 }) {
 // are one design. Anchored by the pill's top (`top`) or by the last label's
 // baseline (`bottom`); a two-line name grows away from the anchor. Returns
 // the baseline of the last row.
-function drawOverlayBlock(ctx, summary, { rtl, labels, top, bottom, labelColor }) {
+function drawOverlayBlock(ctx, summary, { rtl, labels, top, bottom, labelColor, unitColor = C.accent }) {
   const x0 = rtl ? W - M : M
   const full = W - M * 2
   const { hero, small } = pickStats(summary, labels)
-  const cols = Math.max(1, small.length)
-  const colW = full / cols
-  const nm = layoutName(ctx, summary, { size: 84 })
-  const heroFit = fitStat(ctx, hero, { max: 220, min: 120, unit: 64, gap: 14, maxW: full })
-  const smallFits = small.map((st) => fitStat(ctx, st, { max: 96, min: 56, unit: 34, gap: 8, maxW: colW - 24 }))
+  const nm = layoutName(ctx, summary, { size: 68 })
+  const heroFit = fitStat(ctx, hero, { max: 176, min: 110, unit: 52, gap: 12, maxW: full })
+  const smallFits = small.map((st) => fitStat(ctx, st, { max: 76, min: 48, unit: 28, gap: 6, maxW: full / 3 - 40 }))
   const smallSize = Math.max(0, ...smallFits.map((f) => f.size))
+  // The small stats sit side by side with a fixed gap, each column as wide
+  // as its number or its label, so the block stays compact on a photo.
+  const STAT_GAP = 64
+  setFont(ctx, 500, 26)
+  const colX = []
+  let run = 0
+  smallFits.forEach((f) => {
+    colX.push(run)
+    run += Math.max(f.width, ctx.measureText(f.st.label).width) + STAT_GAP
+  })
 
   // positions relative to the pill's top
-  const pillH = Math.round(28 * 2.1)
-  const nameY = pillH + 36 + Math.round(nm.size * 0.74)
+  const pillH = Math.round(26 * 2.1)
+  const nameY = pillH + 32 + Math.round(nm.size * 0.74)
   const lastName = nameY + (nm.lines.length - 1) * nm.lh
-  const heroY = lastName + 40 + Math.round(heroFit.size * 0.72)
-  const heroLabelY = heroY + Math.round(heroFit.size * 0.16) + 50 // clears the comma's tail
-  const smallY = heroLabelY + 48 + Math.round(smallSize * 0.72)
-  const smallLabelY = smallY + 46
+  const heroY = lastName + 36 + Math.round(heroFit.size * 0.72)
+  const heroLabelY = heroY + Math.round(heroFit.size * 0.16) + 44 // clears the comma's tail
+  const smallY = heroLabelY + 44 + Math.round(smallSize * 0.72)
+  const smallLabelY = smallY + 40
   const rel = small.length ? smallLabelY : heroLabelY
   const base = top != null ? top : bottom - rel
 
-  drawPill(ctx, labels.eyebrow, x0, base, { rtl, size: 28 })
+  drawPill(ctx, labels.eyebrow, x0, base, { rtl, size: 26 })
   passes(() => {
     drawName(ctx, nm, x0, base + nameY, { rtl, color: '#FFFFFF' })
-    drawValue(ctx, heroFit, x0, base + heroY, { rtl, gap: 14, color: '#FFFFFF', unitColor: C.accent })
-    drawLabel(ctx, hero.label, x0, base + heroLabelY, { rtl, size: 30, color: labelColor, maxW: full })
+    drawValue(ctx, heroFit, x0, base + heroY, { rtl, gap: 14, color: '#FFFFFF', unitColor })
+    drawLabel(ctx, hero.label, x0, base + heroLabelY, { rtl, size: 28, color: labelColor, maxW: full })
     smallFits.forEach((f, i) => {
-      const x = rtl ? W - M - i * colW : M + i * colW
-      drawValue(ctx, f, x, base + smallY, { rtl, gap: 8, color: '#FFFFFF', unitColor: C.accent })
-      drawLabel(ctx, f.st.label, x, base + smallLabelY, { rtl, size: 26, color: labelColor, maxW: colW - 24 })
+      const x = rtl ? x0 - colX[i] : x0 + colX[i]
+      drawValue(ctx, f, x, base + smallY, { rtl, gap: 6, color: '#FFFFFF', unitColor })
+      drawLabel(ctx, f.st.label, x, base + smallLabelY, { rtl, size: 26, color: labelColor, maxW: full / 3 })
     })
   })
   return base + rel
@@ -556,9 +563,10 @@ function renderSticker(summary, { rtl, labels }) {
   scratch.height = 1200
   const sctx = scratch.getContext('2d', { willReadFrequently: true })
   sctx.textBaseline = 'alphabetic'
-  FX = { sticker: true, shadow: { color: 'rgba(0,0,0,0.6)', blur: 4, y: 0 } }
+  FX = { sticker: true, shadow: { color: 'rgba(0,0,0,0.22)', blur: 6, y: 1 } }
   // labels stay near-white here: the sticker can land on anything
-  const bottom = drawOverlayBlock(sctx, summary, { rtl, labels, top: 120, labelColor: 'rgba(255,255,255,0.9)' })
+  // units in white too: the accent can vanish on a light story
+  const bottom = drawOverlayBlock(sctx, summary, { rtl, labels, top: 120, labelColor: 'rgba(255,255,255,0.9)', unitColor: 'rgba(255,255,255,0.9)' })
   drawBrand(sctx, rtl ? W - M : M, bottom + 100, { rtl, color: '#FFFFFF', size: 38 })
 
   const { data, width, height } = sctx.getImageData(0, 0, scratch.width, scratch.height)
