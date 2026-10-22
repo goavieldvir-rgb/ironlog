@@ -7,6 +7,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { fmtDate, dateLocale } from '../lib/dates.js'
 import { useCollection, hasUnreadFeedback } from '../lib/db.js'
 import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
+import { useGyms, sessionGymId, gymLabel } from '../lib/gyms.js'
 import { EmptyState, LoadError, Button, Field, FeedbackDot } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { workingSets } from '../lib/warmup.js'
@@ -31,7 +32,8 @@ function monthLabel(lang, iso) {
 
 // Sets, minutes and volume for lifting sessions; minutes and distance for
 // cardio. Each piece is left out when there is nothing to say.
-function sessionMeta(s, t, lang) {
+// gym: the workout's gym name, only for someone who trains at several.
+function sessionMeta(s, t, lang, gym) {
   const lifts = (s.entries || []).filter((e) => e.category !== 'cardio')
   const sets = lifts.reduce((n, e) => n + workingSets(e.sets).length, 0)
   const volume = lifts.reduce(
@@ -56,6 +58,7 @@ function sessionMeta(s, t, lang) {
     if (c && c.distance != null) km += toKm(c.distance, e.unit)
   }
   const parts = []
+  if (gym) parts.push(gym)
   if (sets > 0) parts.push(`${sets} ${t(sets === 1 ? 'history.setLabelOne' : 'history.setsLabel')}`)
   if (s.duration_minutes) parts.push(t('workout.durationShort', { min: s.duration_minutes }))
   if (volume > 0) parts.push(`${Math.round(volume).toLocaleString(dateLocale(lang))} ${unit}`)
@@ -87,6 +90,7 @@ export default function History() {
   const { effectiveUid, actingAs } = useAdmin()
   const { t, lang } = useLanguage()
   const [sessions, loading, refresh, loadError] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const { gyms, mainName, enabled: gymsOn } = useGyms(effectiveUid)
   const loadFailed = !!loadError && sessions.length === 0
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const exById = useMemo(() => exerciseMap(exercises), [exercises])
@@ -258,7 +262,7 @@ export default function History() {
                       {!actingAs && hasUnreadFeedback(s) && <FeedbackDot label={t('history.newFeedback')} />}
                       {sessionTitle(s, t)}
                     </span>
-                    <span className="text-[13px] leading-[18px] text-chalkdim truncate tabular-nums">{sessionMeta(s, t, lang)}</span>
+                    <span className="text-[13px] leading-[18px] text-chalkdim truncate tabular-nums">{sessionMeta(s, t, lang, gymsOn ? gymLabel(sessionGymId(s, gyms), gyms, mainName, t) : null)}</span>
                   </div>
                   <ForwardChevron size={16} strokeWidth={2} className="text-[#5E5E64] shrink-0" />
                 </Link>

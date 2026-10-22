@@ -9,6 +9,7 @@ import { useCollection, updateSession } from '../lib/db.js'
 import { Button, Card, CategoryTag, Field } from './ui.jsx'
 import SessionEntryCard from './SessionEntryCard.jsx'
 import { exerciseMap } from '../lib/names.js'
+import { useGyms, sessionGymId, gymLabel } from '../lib/gyms.js'
 
 function emptySet(category) {
   return category === 'cardio' ? { duration: '', intensity: '', distance: '' } : { weight: '', reps: '', rir: '' }
@@ -25,7 +26,10 @@ export default function EditSession() {
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const exById = exerciseMap(exercises)
 
+  const { gyms, mainName, enabled: gymsOn } = useGyms(effectiveUid)
   const [date, setDate] = useState('')
+  // undefined until changed here, so saving never touches the gym otherwise.
+  const [gymId, setGymId] = useState(undefined)
   const [notes, setNotes] = useState('')
   const [entries, setEntries] = useState([])
   const [saving, setSaving] = useState(false)
@@ -82,7 +86,7 @@ export default function EditSession() {
   async function handleSave() {
     setSaving(true)
     try {
-      await updateSession(effectiveUid, id, { date, notes, entries })
+      await updateSession(effectiveUid, id, { date, notes, entries, ...(gymId !== undefined ? { gymId } : {}) })
       setSaved(true)
       setTimeout(() => navigate(`/history/${id}`), 700)
     } catch (err) {
@@ -107,9 +111,27 @@ export default function EditSession() {
           <h1 className="text-3xl">{t('editSession.title')}</h1>
           <CategoryTag category={session.category} />
         </div>
-        <Field label={t('workout.date')}>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-fit" />
-        </Field>
+        <div className="flex flex-wrap gap-3">
+          {gymsOn && (
+            <Field label={t('gyms.pickerLabel')}>
+              <select
+                value={(gymId !== undefined ? gymId : sessionGymId(session, gyms)) || ''}
+                onChange={(e) => setGymId(e.target.value || null)}
+                className="w-fit"
+              >
+                <option value="">{gymLabel(null, gyms, mainName, t)}</option>
+                {gyms.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          <Field label={t('workout.date')}>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-fit" />
+          </Field>
+        </div>
       </div>
 
       {entries.map((entry, i) => (

@@ -11,12 +11,13 @@ import { supabase } from '../supabase.js'
 import { deleteAllPhotos } from '../lib/photos.js'
 import { confirmedApps, removeApp } from '../lib/mfa.js'
 import { TwoStepSetup } from './TwoStep.jsx'
+import GymSettings from './GymSettings.jsx'
 import { Button, Card, Field } from './ui.jsx'
 
 // Everything a person has in Ironlog, read fresh from the database (not
 // from whatever a page happened to have loaded).
 async function fetchAllData(uid) {
-  const tables = ['exercises', 'routines', 'sessions', 'body_weight_logs', 'weekly_schedule', 'progress_photos']
+  const tables = ['exercises', 'routines', 'sessions', 'body_weight_logs', 'weekly_schedule', 'progress_photos', 'gyms']
   const results = await Promise.all(tables.map((tb) => supabase.from(tb).select('*').eq('user_id', uid)))
   const { data: profile, error: pErr } = await supabase.from('profiles').select('*').eq('id', uid).single()
   if (pErr) throw pErr
@@ -216,6 +217,8 @@ export default function Account() {
         <h1 className="text-3xl">{t('account.title')}</h1>
         <p className="text-chalkdim text-sm mt-1">{who}</p>
       </div>
+
+      <GymSettings uid={effectiveUid} />
 
       <Card className="flex flex-col gap-3">
         <h2 className="eyebrow">{t('account.exportTitle')}</h2>

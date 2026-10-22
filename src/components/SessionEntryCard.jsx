@@ -148,6 +148,9 @@ export default function SessionEntryCard({
   removable = false,
   // 'start' | 'mid' | 'end' when this card is part of a superset chain.
   supersetPos = null,
+  // Gym name when the previous numbers come from another gym (this
+  // exercise hasn't been done at the current gym yet).
+  previousFrom = null,
 }) {
   const { t, lang } = useLanguage()
   // Follow the current language (switching mid-workout updates the name).
@@ -516,6 +519,9 @@ export default function SessionEntryCard({
             <p className="num text-[13px] leading-[18px] text-chalkdim">
               {t('workout.targetLine')} <bdi dir="ltr">{targetBody}</bdi>
             </p>
+          )}
+          {previousFrom && (
+            <p className="text-[13px] leading-[18px] text-chalkdim">{t('gyms.previousFrom', { gym: previousFrom })}</p>
           )}
           {/* The last note written on this exercise — "seat on 4", "left
               knee sore" — resurfaced the next time it comes up, which is

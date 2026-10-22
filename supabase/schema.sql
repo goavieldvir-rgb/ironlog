@@ -541,6 +541,9 @@ begin
         jsonb_array_elements(e.entry_elem -> 'sets') as s(set_elem)
       where sess.user_id = NEW.user_id
         and sess.id != NEW.id
+        -- Records count per gym: a machine at one gym isn't the same weight
+        -- as at another. No gym (null) is the person's main gym.
+        and sess.gym_id is not distinct from NEW.gym_id
         and e.entry_elem ->> 'exerciseId' = ex_id
         and (
           case
@@ -550,7 +553,13 @@ begin
           end
         ) ~ numeric_pattern;
 
-      if prev_best is null or this_top > prev_best then
+      -- First time at this gym but done before at another: no record to
+      -- beat yet, the same as the workout screen shows.
+      if (prev_best is null and not exists (
+            select 1 from sessions sess
+            where sess.user_id = NEW.user_id and sess.id != NEW.id
+              and sess.entries @> jsonb_build_array(jsonb_build_object('exerciseId', ex_id))))
+        or this_top > prev_best then
         select coalesce(full_name, email) into trainee_name from profiles where id = NEW.user_id;
 
         -- Build a full description of the actual set, not just the one
@@ -613,6 +622,7 @@ begin
             jsonb_array_elements(e.entry_elem -> 'sets') as s(set_elem)
           where sess.user_id = NEW.user_id
             and sess.id != NEW.id
+            and sess.gym_id is not distinct from NEW.gym_id
             and e.entry_elem ->> 'exerciseId' = ex_id
             and coalesce(s.set_elem->>'warmup', '') <> 'true'
             and coalesce(case when (s.set_elem->>'weight') ~ numeric_pattern
@@ -1580,8 +1590,55 @@ $function$;
 revoke execute on function public.hook_signup_invite_only(jsonb) from public, anon, authenticated;
 grant execute on function public.hook_signup_invite_only(jsonb) to supabase_auth_admin;
 
+-- ===== 6d. Gym profiles (supabase-gyms.sql) =====
+-- The PR alert above compares against the same gym only.
+-- The extra gyms a person trains at. The main gym is not a row: it is the
+-- "no gym" (null) on a workout, and its name lives on the profile.
+create table if not exists public.gyms (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null check (char_length(btrim(name)) between 1 and 60),
+  created_at timestamptz not null default now()
+);
+create index if not exists gyms_user_idx on public.gyms (user_id);
+
+alter table public.gyms enable row level security;
+drop policy if exists "own or admin gyms" on public.gyms;
+create policy "own or admin gyms" on public.gyms
+  as permissive
+  for all
+  using ((auth.uid() = user_id) OR is_admin())
+  with check ((auth.uid() = user_id) OR is_admin());
+
+-- Which gym a workout was at (null = main gym). Removing a gym moves its
+-- workouts back to the main gym rather than deleting them.
+alter table public.sessions add column if not exists gym_id uuid references public.gyms(id) on delete set null;
+
+-- The main gym's name; null shows as "Main gym".
+alter table public.profiles add column if not exists main_gym_name text check (main_gym_name is null or char_length(main_gym_name) <= 60);
+
+-- A workout can only point at one of its owner's own gyms.
+create or replace function public.check_session_gym()
+ returns trigger
+ language plpgsql
+ security definer
+ set search_path to 'public'
+as $function$
+begin
+  if NEW.gym_id is not null
+    and not exists (select 1 from gyms where id = NEW.gym_id and user_id = NEW.user_id) then
+    raise exception 'gym does not belong to this person';
+  end if;
+  return NEW;
+end;
+$function$;
+drop trigger if exists trg_check_session_gym on public.sessions;
+create trigger trg_check_session_gym before insert or update of gym_id on public.sessions
+  for each row execute function public.check_session_gym();
+
+
 -- ===== 7. Verification (read-only) =====
--- RLS must be enabled on all 21 tables (rowsecurity = true on every row).
+-- RLS must be enabled on all 24 tables (rowsecurity = true on every row).
 select tablename, rowsecurity
 from pg_tables
 where schemaname = 'public'

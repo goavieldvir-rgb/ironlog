@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { Plus, Library, X } from 'lucide-react'
+import { Plus, Library, X, MapPin, ChevronDown } from 'lucide-react'
 import { InfoTip } from './InfoTip.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, logSession, addExercise, clearExerciseNote } from '../lib/db.js'
+import { useGyms, sessionGymId, gymHistory, exerciseAtGym, gymLabel } from '../lib/gyms.js'
 import { saveDraft, loadDraft, clearDraft, FREESTYLE_KEY } from '../lib/draft.js'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
 import { Button, Card, Field } from './ui.jsx'
@@ -65,14 +66,43 @@ export default function WorkoutSession() {
   const [pastSessions, pastLoading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const liveName = (entry) => entryName(entry, exerciseMap(exercises), lang)
 
-  // All-time best per exercise, from every session already saved. Same
-  // rule the admin PR alert uses — heaviest weight for strength, most
-  // reps for a bodyweight move, longest interval for cardio — so what the
-  // lifter sees and what the coach gets notified about never disagree.
+  // Which gym this workout is at. Only someone who has added a gym gets a
+  // choice; it starts at the gym of their last workout. null = main gym.
+  // The gym is settled once, after gyms and past workouts have loaded, and
+  // kept in the draft, so it never changes under someone mid-workout.
+  const { gyms, mainName, enabled: gymsOn, loading: gymsLoading } = useGyms(effectiveUid)
+  const [gymChoice, setGymChoice] = useState(undefined)
+  const gymsReady = !gymsLoading && !pastLoading
+  useEffect(() => {
+    if (!gymsReady || !gymsOn) return
+    // A gym removed since the draft was saved counts as the main gym, as
+    // its workouts do.
+    if (gymChoice === undefined) setGymChoice(pastSessions.length ? sessionGymId(pastSessions[0], gyms) : null)
+    else if (gymChoice && !gyms.some((g) => g.id === gymChoice)) setGymChoice(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gymsReady, gymsOn, gyms, gymChoice])
+  const gymId = gymsOn && gymChoice && gyms.some((g) => g.id === gymChoice) ? gymChoice : null
+  // Sessions that count for records: the current gym's only.
+  const recordSessions = useMemo(
+    () => (gymsOn ? pastSessions.filter((s) => sessionGymId(s, gyms) === gymId) : pastSessions),
+    [pastSessions, gymsOn, gyms, gymId],
+  )
+  // Exercises with their "previous" numbers taken from the current gym.
+  const history = useMemo(() => (gymsOn ? gymHistory(pastSessions, gyms) : null), [gymsOn, pastSessions, gyms])
+  const gymExercises = useMemo(
+    () => (history && !pastLoading ? exercises.map((e) => exerciseAtGym(e, history, gymId)) : exercises),
+    [exercises, history, pastLoading, gymId],
+  )
+
+  // All-time best per exercise, from every session already saved (at this
+  // gym, for someone with several). Same rule the admin PR alert uses —
+  // heaviest weight for strength, most reps for a bodyweight move, longest
+  // interval for cardio — so what the lifter sees and what the coach gets
+  // notified about never disagree.
   const { personalBests, pastStrengthSets } = useMemo(() => {
     const best = {}
     const past = {}
-    for (const s of pastSessions) {
+    for (const s of recordSessions) {
       for (const e of s.entries || []) {
         if (!e.exerciseId) continue
         for (const set of e.sets || []) {
@@ -88,7 +118,7 @@ export default function WorkoutSession() {
       }
     }
     return { personalBests: best, pastStrengthSets: past }
-  }, [pastSessions])
+  }, [recordSessions])
   const routine = useMemo(() => routines.find((r) => r.id === routineId), [routines, routineId])
   // Each routine keeps its own in-progress workout, so starting a second
   // one never overwrites an unfinished first.
@@ -165,6 +195,7 @@ export default function WorkoutSession() {
         setDate(draft.date || todayISO())
         setNotes(draft.notes || '')
         setStartedAt(draft.startedAt || null)
+        if (draft.gymId !== undefined) setGymChoice(draft.gymId)
         setReady(true)
         return
       }
@@ -180,6 +211,7 @@ export default function WorkoutSession() {
         setDate(draft.date || todayISO())
         setNotes(draft.notes || '')
         setStartedAt(draft.startedAt || null)
+        if (draft.gymId !== undefined) setGymChoice(draft.gymId)
         setReady(true)
         return
       }
@@ -255,9 +287,10 @@ export default function WorkoutSession() {
       notes,
       entries,
       startedAt,
+      ...(gymChoice !== undefined ? { gymId: gymChoice } : {}),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries, date, notes, ready, startedAt])
+  }, [entries, date, notes, ready, startedAt, gymChoice])
 
   // Ticks the elapsed-time display. Once a minute is plenty for a workout.
   useEffect(() => {
@@ -323,14 +356,14 @@ export default function WorkoutSession() {
   }
 
   function addFreestyleExercise() {
-    const ex = exercises.find((e) => e.id === pickId)
+    const ex = gymExercises.find((e) => e.id === pickId)
     if (!ex) return
     setEntries([...entries, buildEntryFromExercise(ex)])
     setPickId('')
   }
 
   function performSwap() {
-    const ex = exercises.find((e) => e.id === swapPickId)
+    const ex = gymExercises.find((e) => e.id === swapPickId)
     if (!ex || swapIndex == null) return
     // Keep whatever number of sets the original exercise had planned —
     // swapping shouldn't also reset how many sets you meant to do.
@@ -457,6 +490,7 @@ export default function WorkoutSession() {
         notes,
         startedAt: isLive ? new Date(startedAt).toISOString() : null,
         durationMinutes: finalDuration(),
+        gymId,
         entries: entries.map((e) => ({
           exerciseId: e.exerciseId,
           name: e.name,
@@ -578,12 +612,33 @@ export default function WorkoutSession() {
           <button
             type="button"
             onClick={handleFinish}
-            disabled={saving || saved || entries.length === 0}
+            disabled={saving || saved || entries.length === 0 || (gymsOn && gymChoice === undefined)}
             className="press justify-self-end h-11 px-3 text-[15px] font-semibold text-accent disabled:opacity-40 disabled:pointer-events-none"
           >
             {saved ? t('workout.saved') : saving ? t('workout.saving') : t('workout.finish')}
           </button>
         </header>
+
+        {gymsOn && gymChoice !== undefined && (
+          <label className="relative self-center inline-flex items-center gap-1.5 h-9 ps-3 pe-2.5 rounded-full bg-surface2 text-[13px] font-medium text-chalk focus-within:ring-2 focus-within:ring-accent">
+            <MapPin size={14} className="text-accent" aria-hidden="true" />
+            <span className="sr-only">{t('gyms.pickerLabel')}</span>
+            <span className="truncate max-w-[60vw]">{gymLabel(gymId, gyms, mainName, t)}</span>
+            <ChevronDown size={14} className="text-chalkdim" aria-hidden="true" />
+            <select
+              value={gymId || ''}
+              onChange={(e) => setGymChoice(e.target.value || null)}
+              className="absolute inset-0 opacity-0 cursor-pointer"
+            >
+              <option value="">{gymLabel(null, gyms, mainName, t)}</option>
+              {gyms.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <div className="h-[3px] rounded-full bg-surface2 overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={allWorking.length} aria-valuenow={doneCount}>
           <div className="h-full rounded-full bg-accent transition-[width] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none" style={{ width: `${progressPct}%` }} />
@@ -593,7 +648,11 @@ export default function WorkoutSession() {
           <SessionEntryCard
             key={entry.exerciseId + i}
             entry={entry}
-            liveExercise={exercises.find((e) => e.id === entry.exerciseId)}
+            liveExercise={gymExercises.find((e) => e.id === entry.exerciseId)}
+            previousFrom={(() => {
+              const from = gymExercises.find((e) => e.id === entry.exerciseId)?.fromGymId
+              return from !== undefined && from !== gymId ? gymLabel(from, gyms, mainName, t) : null
+            })()}
             personalBest={personalBests[entry.exerciseId]}
             pastSets={pastStrengthSets[entry.exerciseId]}
             removable
