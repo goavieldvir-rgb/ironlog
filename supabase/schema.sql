@@ -553,7 +553,13 @@ begin
           end
         ) ~ numeric_pattern;
 
-      if prev_best is null or this_top > prev_best then
+      -- First time at this gym but done before at another: no record to
+      -- beat yet, the same as the workout screen shows.
+      if (prev_best is null and not exists (
+            select 1 from sessions sess
+            where sess.user_id = NEW.user_id and sess.id != NEW.id
+              and sess.entries @> jsonb_build_array(jsonb_build_object('exerciseId', ex_id))))
+        or this_top > prev_best then
         select coalesce(full_name, email) into trainee_name from profiles where id = NEW.user_id;
 
         -- Build a full description of the actual set, not just the one

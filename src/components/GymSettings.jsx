@@ -12,7 +12,7 @@ import { Button, Card, Field } from './ui.jsx'
 export default function GymSettings({ uid }) {
   const { t } = useLanguage()
   const { confirm, toast } = useFeedback()
-  const { gyms, mainName, enabled, refresh } = useGyms(uid)
+  const { gyms, mainName, enabled, available, refresh } = useGyms(uid)
   // { id: 'main' | gym id | 'new', value, mainValue }
   const [editing, setEditing] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -107,18 +107,23 @@ export default function GymSettings({ uid }) {
         >
           <Pencil size={16} />
         </button>
-        {onRemove && (
+        {onRemove ? (
           <button
             type="button"
             className="press w-10 h-10 flex items-center justify-center text-chalkdim hover:text-irontext"
-            aria-label={t('gyms.removeTitle', { gym: name })}
+            aria-label={t('gyms.removeAria', { gym: name })}
             onClick={onRemove}
           >
             <Trash2 size={16} />
           </button>
+        ) : (
+          // Keeps the pencils lined up with the rows that can be removed.
+          <span className="w-10" aria-hidden="true" />
         )}
       </li>
     )
+
+  if (!available) return null
 
   return (
     <Card className="flex flex-col gap-3">

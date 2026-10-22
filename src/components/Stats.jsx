@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { useGyms, sessionGymId } from '../lib/gyms.js'
+import { useGyms, sessionGymId, gymLabel } from '../lib/gyms.js'
 import {
   ResponsiveContainer,
   BarChart,
@@ -55,7 +55,11 @@ export default function Stats() {
   const { gyms, mainName, enabled: gymsOn } = useGyms(effectiveUid)
   const [gymFilter, setGymFilter] = useState('all')
   const gymSessions = useMemo(
-    () => (!gymsOn || gymFilter === 'all' ? sessions : sessions.filter((s) => (sessionGymId(s, gyms) || '') === gymFilter)),
+    () =>
+      // A gym removed while selected falls back to all gyms.
+      !gymsOn || gymFilter === 'all' || (gymFilter && !gyms.some((g) => g.id === gymFilter))
+        ? sessions
+        : sessions.filter((s) => (sessionGymId(s, gyms) || '') === gymFilter),
     [sessions, gymsOn, gyms, gymFilter],
   )
   const [cardioMetric, setCardioMetric] = useState('duration')
@@ -327,9 +331,9 @@ export default function Stats() {
 
           {gymsOn && (
             <Field label={t('gyms.statsFilter')}>
-              <select value={gymFilter} onChange={(e) => setGymFilter(e.target.value)} className="w-full sm:w-72">
+              <select value={gymFilter && !gyms.some((g) => g.id === gymFilter) ? 'all' : gymFilter} onChange={(e) => setGymFilter(e.target.value)} className="w-full sm:w-72">
                 <option value="all">{t('gyms.allGyms')}</option>
-                <option value="">{mainName || t('gyms.mainDefault')}</option>
+                <option value="">{gymLabel(null, gyms, mainName, t)}</option>
                 {gyms.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.name}

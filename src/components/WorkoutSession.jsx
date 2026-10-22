@@ -6,7 +6,7 @@ import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, logSession, addExercise, clearExerciseNote } from '../lib/db.js'
-import { useGyms, sessionGymId, exerciseAtGym, gymLabel } from '../lib/gyms.js'
+import { useGyms, sessionGymId, gymHistory, exerciseAtGym, gymLabel } from '../lib/gyms.js'
 import { saveDraft, loadDraft, clearDraft, FREESTYLE_KEY } from '../lib/draft.js'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
 import { Button, Card, Field } from './ui.jsx'
@@ -68,24 +68,30 @@ export default function WorkoutSession() {
 
   // Which gym this workout is at. Only someone who has added a gym gets a
   // choice; it starts at the gym of their last workout. null = main gym.
-  const { gyms, mainName, enabled: gymsOn } = useGyms(effectiveUid)
+  // The gym is settled once, after gyms and past workouts have loaded, and
+  // kept in the draft, so it never changes under someone mid-workout.
+  const { gyms, mainName, enabled: gymsOn, loading: gymsLoading } = useGyms(effectiveUid)
   const [gymChoice, setGymChoice] = useState(undefined)
-  const gymId = !gymsOn
-    ? null
-    : gymChoice === null || gyms.some((g) => g.id === gymChoice)
-      ? gymChoice
-      : pastSessions.length
-        ? sessionGymId(pastSessions[0], gyms)
-        : null
+  const gymsReady = !gymsLoading && !pastLoading
+  useEffect(() => {
+    if (!gymsReady || !gymsOn) return
+    // A gym removed since the draft was saved counts as the main gym, as
+    // its workouts do.
+    if (gymChoice === undefined) setGymChoice(pastSessions.length ? sessionGymId(pastSessions[0], gyms) : null)
+    else if (gymChoice && !gyms.some((g) => g.id === gymChoice)) setGymChoice(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gymsReady, gymsOn, gyms, gymChoice])
+  const gymId = gymsOn && gymChoice && gyms.some((g) => g.id === gymChoice) ? gymChoice : null
   // Sessions that count for records: the current gym's only.
   const recordSessions = useMemo(
     () => (gymsOn ? pastSessions.filter((s) => sessionGymId(s, gyms) === gymId) : pastSessions),
     [pastSessions, gymsOn, gyms, gymId],
   )
   // Exercises with their "previous" numbers taken from the current gym.
+  const history = useMemo(() => (gymsOn ? gymHistory(pastSessions, gyms) : null), [gymsOn, pastSessions, gyms])
   const gymExercises = useMemo(
-    () => (gymsOn && !pastLoading ? exercises.map((e) => exerciseAtGym(e, pastSessions, gymId, gyms)) : exercises),
-    [exercises, pastSessions, pastLoading, gymsOn, gyms, gymId],
+    () => (history && !pastLoading ? exercises.map((e) => exerciseAtGym(e, history, gymId)) : exercises),
+    [exercises, history, pastLoading, gymId],
   )
 
   // All-time best per exercise, from every session already saved (at this
@@ -606,15 +612,15 @@ export default function WorkoutSession() {
           <button
             type="button"
             onClick={handleFinish}
-            disabled={saving || saved || entries.length === 0}
+            disabled={saving || saved || entries.length === 0 || (gymsOn && gymChoice === undefined)}
             className="press justify-self-end h-11 px-3 text-[15px] font-semibold text-accent disabled:opacity-40 disabled:pointer-events-none"
           >
             {saved ? t('workout.saved') : saving ? t('workout.saving') : t('workout.finish')}
           </button>
         </header>
 
-        {gymsOn && (
-          <label className="relative self-center inline-flex items-center gap-1.5 h-9 ps-3 pe-2.5 rounded-full bg-surface2 text-[13px] font-medium text-chalk">
+        {gymsOn && gymChoice !== undefined && (
+          <label className="relative self-center inline-flex items-center gap-1.5 h-9 ps-3 pe-2.5 rounded-full bg-surface2 text-[13px] font-medium text-chalk focus-within:ring-2 focus-within:ring-accent">
             <MapPin size={14} className="text-accent" aria-hidden="true" />
             <span className="sr-only">{t('gyms.pickerLabel')}</span>
             <span className="truncate max-w-[60vw]">{gymLabel(gymId, gyms, mainName, t)}</span>
