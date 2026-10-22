@@ -66,3 +66,31 @@ export function feedbackCopy(lang: string, routineName: string | null, comment: 
     ? { title: name ? `משוב מהמאמן על ${name}` : 'משוב מהמאמן', body }
     : { title: name ? `Coach feedback on ${name}` : 'Feedback from your coach', body }
 }
+
+// The coach's morning "needs attention" push: a count in the title, then one
+// short line per task, as many as fit a lock screen.
+export type CoachTask = { kind: string; name: string; n: number | null; title: string | null }
+
+export function coachTaskLine(lang: string, t: CoachTask) {
+  const he = lang === 'he'
+  switch (t.kind) {
+    case 'quiet': return he ? `${t.name} לא התאמן/ה ${t.n} ימים` : `${t.name}: no workout in ${t.n} days`
+    case 'food': return he ? `${t.name} לא רשם/ה אוכל${t.n ? ` ${t.n} ימים` : ''}` : `${t.name}: no food logged${t.n ? ` in ${t.n} days` : ''}`
+    case 'birthday': return he ? `🎂 יום הולדת ל${t.name}${t.n ? ` (${t.n})` : ''}` : `🎂 ${t.name}'s birthday${t.n ? ` (${t.n})` : ''}`
+    case 'checkin': return he ? `צ׳ק-אין עם ${t.name}` : `Check-in with ${t.name}`
+    case 'weigh': return he ? `${t.name} לא נשקל/ה ${t.n} ימים` : `${t.name}: no weigh-in in ${t.n} days`
+    case 'welcome': return he ? `לבדוק איך עובר השבוע הראשון של ${t.name}` : `See how ${t.name}'s first week is going`
+    default: return t.name ? `${t.title} (${t.name})` : (t.title || '')
+  }
+}
+
+export function coachTasksCopy(lang: string, tasks: CoachTask[], max = 4) {
+  const he = lang === 'he'
+  const lines = tasks.slice(0, max).map((t) => coachTaskLine(lang, t))
+  const more = tasks.length - lines.length
+  if (more > 0) lines.push(he ? `ועוד ${more}` : `and ${more} more`)
+  const title = tasks.length === 1
+    ? (he ? 'משימה אחת למאמן' : '1 thing needs you')
+    : (he ? `${tasks.length} משימות למאמן` : `${tasks.length} things need you`)
+  return { title, body: lines.join('\n') }
+}
