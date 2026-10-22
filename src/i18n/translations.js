@@ -459,6 +459,7 @@ export const translations = {
       supersetLabel: 'Superset',
       targetLine: 'Target',
       finish: 'Finish',
+      jumpToCurrent: 'Back to {name}',
     },
     sessionCard: {
       prBadge: 'PR',
@@ -1772,6 +1773,7 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       supersetLabel: 'סופר-סט',
       targetLine: 'יעד',
       finish: 'סיום',
+      jumpToCurrent: 'חזרה אל {name}',
     },
     sessionCard: {
       prBadge: 'שיא',
