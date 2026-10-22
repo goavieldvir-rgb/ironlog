@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { Plus, Library, X, MapPin, ChevronDown } from 'lucide-react'
+import { Plus, Library, X, MapPin, ChevronDown, ArrowDown, ArrowUp } from 'lucide-react'
 import { InfoTip } from './InfoTip.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -297,6 +297,54 @@ export default function WorkoutSession() {
     const id = setInterval(() => setNow(Date.now()), 30000)
     return () => clearInterval(id)
   }, [])
+
+  // iOS often reopens the PWA at the top of the page (or reloads it) after
+  // a trip to another app. Coming back mid-workout, offer a one-tap jump to
+  // the exercise in progress: the first one with a working set not ticked yet.
+  const entryRefs = useRef([])
+  const currentInViewRef = useRef(false)
+  const [jumpArmed, setJumpArmed] = useState(true)
+  const [currentInView, setCurrentInView] = useState(true)
+  const [currentAbove, setCurrentAbove] = useState(false)
+  const [glowIdx, setGlowIdx] = useState(null)
+  const anyDone = entries.some((e) => workingSets(e.sets).some((s) => s.done))
+  const currentIdx = anyDone ? entries.findIndex((e) => workingSets(e.sets).some((s) => !s.done)) : -1
+
+  useEffect(() => {
+    const arm = () => {
+      if (document.visibilityState === 'visible' && !currentInViewRef.current) setJumpArmed(true)
+    }
+    document.addEventListener('visibilitychange', arm)
+    window.addEventListener('pageshow', arm)
+    return () => {
+      document.removeEventListener('visibilitychange', arm)
+      window.removeEventListener('pageshow', arm)
+    }
+  }, [])
+
+  useEffect(() => {
+    const el = entryRefs.current[currentIdx]
+    if (!el) return
+    const io = new IntersectionObserver(([e]) => {
+      currentInViewRef.current = e.isIntersecting
+      setCurrentInView(e.isIntersecting)
+      setCurrentAbove(e.boundingClientRect.top < 0)
+      // Seeing it once, however you got there, retires the button.
+      if (e.isIntersecting) setJumpArmed(false)
+    })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [currentIdx, entries.length])
+
+  function jumpToCurrent() {
+    const el = entryRefs.current[currentIdx]
+    if (!el) return
+    setJumpArmed(false)
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+    setGlowIdx(currentIdx)
+    setTimeout(() => setGlowIdx(null), 1800)
+  }
 
   // Duration only means something for a workout logged live today — not
   // one being backfilled for a past date, and not a draft abandoned
@@ -645,8 +693,12 @@ export default function WorkoutSession() {
         </div>
 
         {entries.map((entry, i) => (
-          <SessionEntryCard
+          <div
             key={entry.exerciseId + i}
+            ref={(el) => (entryRefs.current[i] = el)}
+            className={`scroll-mt-4 rounded-[22px] ${glowIdx === i ? 'jump-glow' : ''}`}
+          >
+          <SessionEntryCard
             entry={entry}
             liveExercise={gymExercises.find((e) => e.id === entry.exerciseId)}
             previousFrom={(() => {
@@ -672,6 +724,7 @@ export default function WorkoutSession() {
               setSwapPickId('')
             }}
           />
+          </div>
         ))}
 
         {/* Also available inside a planned routine: adding here affects
@@ -820,6 +873,22 @@ export default function WorkoutSession() {
             setCreatingCustom(false)
           }}
         />
+      )}
+
+      {jumpArmed && !currentInView && currentIdx >= 0 && (
+        <button
+          type="button"
+          onClick={jumpToCurrent}
+          className="jump-pill press fixed inset-x-0 mx-auto w-max max-w-[calc(100vw-32px)] z-30 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-[#242428]/85 backdrop-blur-xl text-[13px] font-medium text-chalk shadow-[inset_0_0.5px_0_rgba(255,255,255,0.14),0_8px_24px_rgba(0,0,0,0.45)]"
+          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
+        >
+          {currentAbove ? (
+            <ArrowUp size={14} className="text-accent shrink-0" aria-hidden="true" />
+          ) : (
+            <ArrowDown size={14} className="text-accent shrink-0" aria-hidden="true" />
+          )}
+          <span className="truncate">{t('workout.jumpToCurrent', { name: liveName(entries[currentIdx]) })}</span>
+        </button>
       )}
 
       <RestTimer ref={restRef} />

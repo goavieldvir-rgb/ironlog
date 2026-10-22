@@ -107,11 +107,39 @@
   .pr-pop {
     animation: prpop 320ms cubic-bezier(0.25, 1, 0.5, 1);
   }
+  /* "Back to <exercise>" pill drops in from the top; the card it jumps
+     to glows once after the scroll lands. */
+  @keyframes pilldrop {
+    from {
+      transform: translateY(-12px);
+      opacity: 0;
+    }
+  }
+  .jump-pill {
+    animation: pilldrop 260ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  @keyframes jumpglow {
+    0%,
+    25% {
+      box-shadow: 0 0 0 0 rgb(var(--accent) / 0);
+    }
+    45% {
+      box-shadow: 0 0 0 2px rgb(var(--accent) / 0.55);
+    }
+    100% {
+      box-shadow: 0 0 0 2px rgb(var(--accent) / 0);
+    }
+  }
+  .jump-glow {
+    animation: jumpglow 1700ms ease-out;
+  }
   @media (prefers-reduced-motion: reduce) {
     .press,
     .press-row,
     .flash-fill,
-    .pr-pop {
+    .pr-pop,
+    .jump-pill,
+    .jump-glow {
       animation: none;
       transition: none;
     }
