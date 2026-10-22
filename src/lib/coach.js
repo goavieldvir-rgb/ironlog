@@ -88,6 +88,50 @@ export function attentionScore(flags) {
   return flags.reduce((s, f) => s + (f.tone === 'warn' ? f.score : 0), 0)
 }
 
+// ---- Coach tasks (supabase-coach-tasks.sql) ----
+
+// Adds today's tasks first (the morning job does the same), then loads every
+// open task plus what was done in the last week, so ticking one off can be undone.
+export async function fetchCoachTasks(today = toLocalISODate()) {
+  check(await supabase.rpc('refresh_coach_tasks', { p_today: today }))
+  const since = new Date(shiftDay(today, -7) + 'T00:00:00').toISOString()
+  return check(
+    await supabase
+      .from('coach_tasks')
+      .select('id, trainee_id, kind, title, n, due, done_at, auto_done, created_at')
+      .or(`done_at.is.null,done_at.gte.${since}`)
+      .order('due', { ascending: true })
+      .order('created_at', { ascending: true })
+      .limit(200),
+  )
+}
+
+export async function setCoachTaskDone(id, done) {
+  return check(
+    await supabase
+      .from('coach_tasks')
+      .update({ done_at: done ? new Date().toISOString() : null, auto_done: false })
+      .eq('id', id)
+      .select('id, trainee_id, kind, title, n, due, done_at, auto_done, created_at')
+      .single(),
+  )
+}
+
+export async function addCoachTask(title, traineeId = null, due = toLocalISODate()) {
+  return check(
+    await supabase
+      .from('coach_tasks')
+      // Hand-written tasks are never pushed: the coach just wrote them.
+      .insert({ kind: 'custom', title, trainee_id: traineeId, due, notified_at: new Date().toISOString() })
+      .select('id, trainee_id, kind, title, n, due, done_at, auto_done, created_at')
+      .single(),
+  )
+}
+
+export async function deleteCoachTask(id) {
+  check(await supabase.from('coach_tasks').delete().eq('id', id))
+}
+
 // ---- One trainee ----
 
 export async function fetchTraineeDetail(uid, today = toLocalISODate()) {
