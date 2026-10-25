@@ -249,7 +249,13 @@ export default function RoutineBuilder() {
 
         <div className="flex flex-col gap-2">
           {items.map((it, i) => (
-            <div key={i} className="flex flex-col gap-1 bg-surface2 rounded-md p-2.5">
+            <div
+              key={i}
+              className={`flex flex-col gap-1 bg-surface2 rounded-md p-2.5 ${
+                // Exercises linked as a superset share an edge, so the group reads at a glance.
+                (it.supersetWithNext && i < items.length - 1) || items[i - 1]?.supersetWithNext ? 'border-s-[3px] border-s-brass/60' : ''
+              }`}
+            >
               {/* Name and video button on their own line, so a long exercise
                   name wraps instead of being cut to a few letters. */}
               <div className="flex items-center gap-2">

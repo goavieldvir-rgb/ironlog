@@ -457,6 +457,7 @@ export const translations = {
       sessionNotesTip: "This is for the whole workout — how it felt overall, energy levels, anything general. If it's about one specific exercise instead, use “Add a note for this exercise” in the three-dot menu on that exercise's card so it stays attached to the right one.",
       coachLabel: 'Coach:',
       supersetLabel: 'Superset',
+      supersetNextUp: 'Superset: now {name}',
       targetLine: 'Target',
       finish: 'Finish',
       jumpToCurrent: 'Back to {name}',
@@ -481,6 +482,8 @@ export const translations = {
       clearNote: 'Remove saved note',
       clearNoteFailed: "Couldn't remove the note. Try again.",
       swapExercise: 'Swap this exercise for today',
+      supersetOn: 'Superset with next exercise',
+      supersetOff: 'Unlink superset',
       example: 'Example',
       exampleOf: 'Example video: {name}',
       soundOn: 'Sound on',
@@ -728,7 +731,7 @@ Many exercises have a short demo video. When there is one, you'll see an "Exampl
       s4title: 'Routines — your workout plans',
       s4body: `A routine is a saved plan — a specific list of exercises you do together, like "Push Day" or "Leg Day". You build it once, then reuse it every time instead of picking exercises from scratch.
 
-To build one: give it a name, pick a category (Strength, Mobility or Cardio), then add exercises — from your own list, or tap "Add from catalogue" to pull more in from the shared list without leaving the page. For each exercise you can set a target, like "3 sets of 10 reps". That's a goal to aim for, not a strict rule. You can always log something different on the day. You can also add a coach note (a cue the trainee sees while logging), a target RIR, and link an exercise to the next one as a superset.
+To build one: give it a name, pick a category (Strength, Mobility or Cardio), then add exercises — from your own list, or tap "Add from catalogue" to pull more in from the shared list without leaving the page. For each exercise you can set a target, like "3 sets of 10 reps". That's a goal to aim for, not a strict rule. You can always log something different on the day. You can also add a coach note (a cue the trainee sees while logging), a target RIR, and link an exercise to the next one as a superset. In a superset you go straight from one exercise to the next without resting, and the rest timer starts only after the last exercise in the group.
 
 Tap "Save routine" and you'll see a green "Routine saved" message.
 
@@ -1771,6 +1774,7 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       swapConfirm: 'החלף',
       coachLabel: 'מאמן:',
       supersetLabel: 'סופר-סט',
+      supersetNextUp: 'סופר-סט: עכשיו {name}',
       targetLine: 'יעד',
       finish: 'סיום',
       jumpToCurrent: 'חזרה אל {name}',
@@ -1795,6 +1799,8 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       clearNote: 'הסרת ההערה השמורה',
       clearNoteFailed: 'לא הצלחנו להסיר את ההערה. נסו שוב.',
       swapExercise: 'החלפת התרגיל הזה להיום',
+      supersetOn: 'סופר-סט עם התרגיל הבא',
+      supersetOff: 'ביטול הסופר-סט',
       example: 'הדגמה',
       exampleOf: 'סרטון הדגמה: {name}',
       soundOn: 'הפעלת קול',
@@ -2040,7 +2046,7 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       s4title: 'תוכניות אימון — התוכניות שלכם',
       s4body: `תוכנית היא תבנית שמורה — רשימה מסוימת של תרגילים שאתם עושים ביחד, כמו "יום דחיפה" או "יום רגליים". בונים אותה פעם אחת, ואז משתמשים בה שוב בכל פעם במקום לבחור תרגילים מאפס.
 
-כדי לבנות אחת: תנו לה שם, בחרו קטגוריה (כוח, מוביליטי או קרדיו), ואז הוסיפו תרגילים — מהרשימה שלכם, או הקישו "הוספה מהקטלוג" כדי למשוך עוד תרגילים מהרשימה המשותפת בלי לעזוב את הדף. לכל תרגיל אפשר להגדיר יעד — כמו "3 סטים של 10 חזרות" — זו מטרה לשאוף אליה, לא כלל נוקשה. תמיד אפשר לתעד משהו אחר ביום עצמו. אפשר גם להוסיף הערת מאמן (רמז שהמתאמן רואה בזמן התיעוד), RIR יעד, ולקשור תרגיל לתרגיל הבא בסופר-סט.
+כדי לבנות אחת: תנו לה שם, בחרו קטגוריה (כוח, מוביליטי או קרדיו), ואז הוסיפו תרגילים — מהרשימה שלכם, או הקישו "הוספה מהקטלוג" כדי למשוך עוד תרגילים מהרשימה המשותפת בלי לעזוב את הדף. לכל תרגיל אפשר להגדיר יעד — כמו "3 סטים של 10 חזרות" — זו מטרה לשאוף אליה, לא כלל נוקשה. תמיד אפשר לתעד משהו אחר ביום עצמו. אפשר גם להוסיף הערת מאמן (רמז שהמתאמן רואה בזמן התיעוד), RIR יעד, ולקשור תרגיל לתרגיל הבא בסופר-סט. בסופר-סט עוברים ישר מתרגיל לתרגיל בלי מנוחה, וטיימר המנוחה מתחיל רק אחרי התרגיל האחרון בקבוצה.
 
 הקישו "שמירת תוכנית" ותראו הודעה ירוקה "התוכנית נשמרה".
 
