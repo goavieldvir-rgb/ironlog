@@ -96,7 +96,7 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
   function showLock(remaining, alert = false) {
     const end = endTimeRef.current
     if (!notifyOn || !end) return
-    const at = new Date(end).toLocaleTimeString(lang === 'he' ? 'he-IL' : undefined, { hour: '2-digit', minute: '2-digit' })
+    const at = new Date(end).toLocaleTimeString(lang === 'he' ? 'he-IL' : 'en-US', { hour: 'numeric', minute: '2-digit' })
     const over = remaining <= 0
     let title
     let body
@@ -121,11 +121,14 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
       setFinished(true)
       beep()
       if (navigator.vibrate) navigator.vibrate([200, 100, 200])
-      // Seen on screen already, so the server's push would only repeat it.
-      if (document.visibilityState === 'visible') pushRest(null)
+      // Seen on screen already, or about to sound from the live lock screen
+      // card below, so the server's push would only repeat it.
+      if (!away || (liveLockScreen && notifyOn)) pushRest(null)
       // Only worth a notification when you're not looking at the app —
       // otherwise the screen already shows it's done.
-      if (away) showLock(remaining, true)
+      // Woken long after the end (the phone froze the app), the server's
+      // push has sounded already: update the card quietly.
+      if (away) showLock(remaining, remaining > -15)
     } else if (away && liveLockScreen) {
       showLock(remaining)
     }

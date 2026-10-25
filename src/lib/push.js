@@ -200,6 +200,7 @@ export function showRestNotification({ title, body, endsAt, alert = false, lang 
         body,
         tag: REST_TAG,
         icon: './apple-touch-icon.png',
+        badge: './notification-badge.png',
         lang,
         dir: lang === 'he' ? 'rtl' : 'ltr',
         // Updates replace it quietly; only the moment the rest ends sounds.

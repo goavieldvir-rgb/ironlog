@@ -12,7 +12,12 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(title, {
       body: data.body || '',
       icon: './apple-touch-icon.png',
+      // The small white dumbbell Android shows in the status bar.
+      badge: './notification-badge.png',
       tag: data.tag || 'ironlog-reminder',
+      // "Rest over" replaces the rest timer's quiet lock screen card, and
+      // must still sound and vibrate when it does.
+      renotify: data.tag === 'ironlog-rest-timer',
       lang: data.lang,
       dir: data.lang === 'he' ? 'rtl' : 'ltr',
       // A screen inside the app to open on tap, such as '#/history/<id>'.
