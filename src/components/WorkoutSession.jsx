@@ -348,13 +348,18 @@ export default function WorkoutSession() {
     scrollToEntry(currentIdx)
   }
 
+  // Supersets call this on every round, so a new glow replaces the last one
+  // (restarting the animation) instead of an old timer cutting it short.
+  const glowTimer = useRef(null)
   function scrollToEntry(idx) {
     const el = entryRefs.current[idx]
     if (!el) return
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
-    setGlowIdx(idx)
-    setTimeout(() => setGlowIdx(null), 1800)
+    clearTimeout(glowTimer.current)
+    setGlowIdx(null)
+    requestAnimationFrame(() => setGlowIdx(idx))
+    glowTimer.current = setTimeout(() => setGlowIdx(null), 1800)
   }
 
   // A ticked working set inside a superset moves straight on to the next
