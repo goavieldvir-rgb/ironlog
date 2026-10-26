@@ -165,3 +165,68 @@ export function setRestPush(endsAt) {
   })
   return restQueue
 }
+
+// The app's service worker, registered on first use. Notifications shown from
+// the page must go through it: Android only allows those, and iPhone only
+// shows them for a Home Screen app.
+let swPromise = null
+export function swRegistration() {
+  if (!('serviceWorker' in navigator)) return Promise.resolve(null)
+  if (!swPromise) {
+    swPromise = navigator.serviceWorker
+      .getRegistration()
+      .then((reg) => reg || registration())
+      .catch((e) => {
+        swPromise = null
+        console.error(e)
+        return null
+      })
+  }
+  return swPromise
+}
+
+// The rest timer's notification on the lock screen and in the notification
+// shade. Same tag as the server's "rest over" push, so there is only ever one
+// and the push replaces it. Calls run one after another, so a clear that
+// follows a show is never overtaken by it.
+const REST_TAG = 'ironlog-rest-timer'
+let lockQueue = Promise.resolve()
+export function showRestNotification({ title, body, endsAt, alert = false, lang }) {
+  lockQueue = lockQueue.then(async () => {
+    try {
+      const reg = await swRegistration()
+      if (!reg || Notification.permission !== 'granted') return
+      await reg.showNotification(title, {
+        body,
+        tag: REST_TAG,
+        icon: './apple-touch-icon.png',
+        badge: './notification-badge.png',
+        lang,
+        dir: lang === 'he' ? 'rtl' : 'ltr',
+        // Updates replace it quietly; only the moment the rest ends sounds.
+        silent: !alert,
+        renotify: alert,
+        // Android shows this as the notification's time, so once the rest is
+        // over it reads "2m" and keeps telling how long ago it ended.
+        timestamp: endsAt,
+        data: { url: '' },
+      })
+    } catch (e) {
+      console.error(e)
+    }
+  })
+  return lockQueue
+}
+
+export function clearRestNotification() {
+  lockQueue = lockQueue.then(async () => {
+    try {
+      const reg = await swRegistration()
+      const list = (await reg?.getNotifications({ tag: REST_TAG })) || []
+      list.forEach((n) => n.close())
+    } catch (e) {
+      console.error(e)
+    }
+  })
+  return lockQueue
+}
