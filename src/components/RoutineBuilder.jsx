@@ -249,7 +249,16 @@ export default function RoutineBuilder() {
 
         <div className="flex flex-col gap-2">
           {items.map((it, i) => (
-            <div key={i} className="flex flex-col gap-1 bg-surface2 rounded-md p-2.5">
+            <div
+              key={i}
+              className={`relative flex flex-col gap-1 bg-surface2 rounded-md p-2.5 ${
+                // Same edge and connector as superset cards on the workout screen.
+                (it.supersetWithNext && i < items.length - 1) || items[i - 1]?.supersetWithNext ? 'border-s-[3px] border-s-chalkdim/50' : ''
+              }`}
+            >
+              {it.supersetWithNext && i < items.length - 1 && (
+                <span className="absolute -start-[3px] top-full w-[3px] h-2 bg-chalkdim/50" aria-hidden="true" />
+              )}
               {/* Name and video button on their own line, so a long exercise
                   name wraps instead of being cut to a few letters. */}
               <div className="flex items-center gap-2">

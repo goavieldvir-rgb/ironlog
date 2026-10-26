@@ -345,10 +345,65 @@ export default function WorkoutSession() {
     setJumpLeaving(true)
     setJumpArmed(false)
     setTimeout(() => setJumpLeaving(false), 420)
+    scrollToEntry(currentIdx)
+  }
+
+  // Supersets call this on every round, so a new glow replaces the last one
+  // (restarting the animation) instead of an old timer cutting it short.
+  const glowTimer = useRef(null)
+  function scrollToEntry(idx) {
+    const el = entryRefs.current[idx]
+    if (!el) return
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
-    setGlowIdx(currentIdx)
-    setTimeout(() => setGlowIdx(null), 1800)
+    clearTimeout(glowTimer.current)
+    setGlowIdx(null)
+    requestAnimationFrame(() => setGlowIdx(idx))
+    glowTimer.current = setTimeout(() => setGlowIdx(null), 1800)
+  }
+
+  // A ticked working set inside a superset moves straight on to the next
+  // exercise in the group that still has sets left, with no rest. Only the
+  // last exercise of a round starts the rest timer, and the page then goes
+  // back to the first exercise of the group for the next round. Warm-ups
+  // and exercises outside a superset rest as usual.
+  function handleSetDone(entryIdx, setIdx) {
+    const entry = entries[entryIdx]
+    if (!supersetPos(entries, entryIdx) || isWarmup(entry.sets[setIdx])) {
+      restRef.current?.start()
+      return
+    }
+    let first = entryIdx
+    while (first > 0 && entries[first - 1].supersetWithNext) first--
+    let last = entryIdx
+    while (last < entries.length - 1 && entries[last].supersetWithNext) last++
+    // The tick that triggered this hasn't reached `entries` yet.
+    const hasSetsLeft = (k) =>
+      entries[k].sets.some((x, j) => !(k === entryIdx && j === setIdx) && !isWarmup(x) && !x.done)
+    for (let k = entryIdx + 1; k <= last; k++) {
+      if (hasSetsLeft(k)) {
+        scrollToEntry(k)
+        toast(t('workout.supersetNextUp', { name: liveName(entries[k]) }))
+        return
+      }
+    }
+    restRef.current?.start()
+    for (let k = first; k <= last; k++) {
+      if (hasSetsLeft(k)) {
+        if (k !== entryIdx) scrollToEntry(k)
+        return
+      }
+    }
+  }
+
+  function toggleSuperset(entryIdx) {
+    setEntries((prev) =>
+      prev.map((e, i) => {
+        if (i !== entryIdx) return e
+        const { supersetWithNext, ...rest } = e
+        return supersetWithNext ? rest : { ...rest, supersetWithNext: true }
+      }),
+    )
   }
 
   // Duration only means something for a workout logged live today — not
@@ -722,7 +777,8 @@ export default function WorkoutSession() {
             onRemoveSet={(setIdx) => removeSet(i, setIdx)}
             onRemoveEntry={() => removeEntry(i)}
             onUpdateNote={(text) => updateNote(i, text)}
-            onSetDone={() => restRef.current?.start()}
+            onSetDone={(setIdx) => handleSetDone(i, setIdx)}
+            onToggleSuperset={i < entries.length - 1 ? () => toggleSuperset(i) : undefined}
             onClearLastNote={() => clearLastNote(entry.exerciseId)}
             onSwapExercise={() => {
               setSwapIndex(i)

@@ -143,11 +143,14 @@ export default function SessionEntryCard({
   onSwapExercise,
   onMoveUp,
   onMoveDown,
-  // Called when a set is ticked off, so the page can start the rest timer.
+  // Called with the set's index when it's ticked off, so the page can start
+  // the rest timer (or move on to the next exercise in a superset).
   onSetDone,
   removable = false,
   // 'start' | 'mid' | 'end' when this card is part of a superset chain.
   supersetPos = null,
+  // Links/unlinks this exercise and the next one for this workout only.
+  onToggleSuperset,
   // Gym name when the previous numbers come from another gym (this
   // exercise hasn't been done at the current gym yet).
   previousFrom = null,
@@ -382,7 +385,7 @@ export default function SessionEntryCard({
     if (!complete) return
     onUpdateSet(j, patch)
     if (navigator.vibrate) navigator.vibrate(10)
-    onSetDone?.()
+    onSetDone?.(j)
   }
 
   const setMenu = (j) => (
@@ -544,6 +547,13 @@ export default function SessionEntryCard({
             { key: 'up', label: t('sessionCard.moveUp'), icon: <ArrowUp size={16} />, onClick: () => onMoveUp?.(), hidden: !onMoveUp },
             { key: 'down', label: t('sessionCard.moveDown'), icon: <ArrowDown size={16} />, onClick: () => onMoveDown?.(), hidden: !onMoveDown },
             { key: 'swap', label: t('sessionCard.swapExercise'), icon: <Repeat size={16} />, onClick: () => onSwapExercise?.(), hidden: !onSwapExercise },
+            {
+              key: 'superset',
+              label: entry.supersetWithNext ? t('sessionCard.supersetOff') : t('sessionCard.supersetOn'),
+              icon: <Link2 size={16} />,
+              onClick: () => onToggleSuperset?.(),
+              hidden: !onToggleSuperset,
+            },
             { key: 'note', label: t('sessionCard.addNote'), icon: <StickyNote size={16} />, onClick: () => setShowNote(true), hidden: !onUpdateNote || showNote },
             { key: 'clearNote', label: t('sessionCard.clearNote'), icon: <X size={16} />, onClick: () => onClearLastNote?.(), hidden: !onClearLastNote || !liveExercise?.last_note },
             { key: 'remove', label: t('sessionCard.removeExercise'), icon: <Trash2 size={16} />, onClick: () => onRemoveEntry?.(), danger: true, hidden: !removable },
