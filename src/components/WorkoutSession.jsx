@@ -18,6 +18,7 @@ import RestTimer from './RestTimer.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { isWarmup, workingSets } from '../lib/warmup.js'
 import { buildSummary } from '../lib/shareSummary.js'
+import { recordBaseline } from '../lib/records.js'
 import { entryName, exerciseMap } from '../lib/names.js'
 import { preloadShareFonts } from '../lib/shareCard.js'
 import { weeklyStreak } from '../lib/streak.js'
@@ -99,26 +100,7 @@ export default function WorkoutSession() {
   // heaviest weight for strength, most reps for a bodyweight move, longest
   // interval for cardio — so what the lifter sees and what the coach gets
   // notified about never disagree.
-  const { personalBests, pastStrengthSets } = useMemo(() => {
-    const best = {}
-    const past = {}
-    for (const s of recordSessions) {
-      for (const e of s.entries || []) {
-        if (!e.exerciseId) continue
-        for (const set of e.sets || []) {
-          if (isWarmup(set)) continue
-          const raw = e.category === 'cardio' ? set.duration : e.bodyweight ? set.reps : set.weight
-          const n = Number(raw)
-          if (e.category !== 'cardio' && !e.bodyweight && n > 0 && Number(set.reps) > 0) {
-            ;(past[e.exerciseId] ||= []).push({ weight: n, reps: Number(set.reps) })
-          }
-          if (!raw || !isFinite(n) || n <= 0) continue
-          if (best[e.exerciseId] == null || n > best[e.exerciseId]) best[e.exerciseId] = n
-        }
-      }
-    }
-    return { personalBests: best, pastStrengthSets: past }
-  }, [recordSessions])
+  const { personalBests, pastStrengthSets } = useMemo(() => recordBaseline(recordSessions), [recordSessions])
   const routine = useMemo(() => routines.find((r) => r.id === routineId), [routines, routineId])
   // Each routine keeps its own in-progress workout, so starting a second
   // one never overwrites an unfinished first.

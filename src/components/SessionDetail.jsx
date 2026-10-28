@@ -1,7 +1,7 @@
 import ExerciseVideo from './ExerciseVideo.jsx'
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { Pencil, MessageSquareText, Check, Trash2, TrendingUp, TrendingDown, Minus, Target } from 'lucide-react'
+import { Pencil, Share2, MessageSquareText, Check, Trash2, TrendingUp, TrendingDown, Minus, Target } from 'lucide-react'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts'
 import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
@@ -152,12 +152,22 @@ export default function SessionDetail() {
       <div className="flex flex-col gap-1.5">
         <div className="flex items-start justify-between gap-3">
           <h1 className="text-[30px] leading-9 min-w-0">{sessionTitle(session, t)}</h1>
-          <Link
-            to={`/history/${session.id}/edit`}
-            className="press shrink-0 inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-full bg-surface text-sm font-medium text-chalk"
-          >
-            <Pencil size={14} /> {t('sessionDetail.edit')}
-          </Link>
+          <div className="shrink-0 flex items-center gap-2">
+            <Link
+              to={`/history/${session.id}/share`}
+              aria-label={t('share.openShare')}
+              title={t('share.openShare')}
+              className="press inline-flex items-center justify-center w-11 h-11 rounded-full bg-surface text-chalk"
+            >
+              <Share2 size={16} />
+            </Link>
+            <Link
+              to={`/history/${session.id}/edit`}
+              className="press inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-full bg-surface text-sm font-medium text-chalk"
+            >
+              <Pencil size={14} /> {t('sessionDetail.edit')}
+            </Link>
+          </div>
         </div>
         <p className="text-chalkdim text-[13px] tabular-nums">{meta.join(' · ')}</p>
         <div className="mt-1">
