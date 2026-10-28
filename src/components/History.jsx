@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, X, CalendarDays, Share2 } from 'lucide-react'
+import { Search, X, CalendarDays, Share } from 'lucide-react'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -279,7 +279,7 @@ export default function History() {
                       title={t('share.openShare')}
                       className="shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-full text-chalkdim hover:text-chalk"
                     >
-                      <Share2 size={17} strokeWidth={1.75} />
+                      <Share size={17} strokeWidth={1.75} />
                     </Link>
                   )}
                   <Link to={`/history/${s.id}`} tabIndex={-1} aria-hidden="true" className="shrink-0 self-stretch inline-flex items-center pe-2">

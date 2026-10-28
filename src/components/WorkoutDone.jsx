@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Share2, Trophy, Check, ImagePlus, Copy, Download } from 'lucide-react'
+import { Share, Trophy, Check, ImagePlus, Copy, Download } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { Button, Card } from './ui.jsx'
@@ -279,7 +279,7 @@ export default function WorkoutDone({ summary, onDone, fromHistory = false }) {
         )}
         {!failed && variant !== 'sticker' && !(variant === 'photo' && !made.photo) && (
           <Button variant="brass" className="flex-1" onClick={handleShare} disabled={busy || !current}>
-            <Share2 size={16} /> {busy || !current ? t('share.sharing') : t('share.share')}
+            <Share size={16} /> {busy || !current ? t('share.sharing') : t('share.share')}
           </Button>
         )}
         <Button variant="ghost" className="flex-1" onClick={onDone}>
