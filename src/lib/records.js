@@ -43,3 +43,28 @@ export function entryPrKind(entry, set, best, past) {
   }
   return prKind(set, { single: false, best, past })
 }
+
+// All-time best per exercise from the given saved sessions (heaviest weight
+// for strength, most reps for a bodyweight move, longest interval for
+// cardio), plus every earlier weighted set for the reps-PR check. Warm-ups
+// never count.
+export function recordBaseline(sessions) {
+  const best = {}
+  const past = {}
+  for (const s of sessions || []) {
+    for (const e of s.entries || []) {
+      if (!e.exerciseId) continue
+      for (const set of e.sets || []) {
+        if (isWarmup(set)) continue
+        const raw = e.category === 'cardio' ? set.duration : e.bodyweight ? set.reps : set.weight
+        const n = Number(raw)
+        if (e.category !== 'cardio' && !e.bodyweight && n > 0 && Number(set.reps) > 0) {
+          ;(past[e.exerciseId] ||= []).push({ weight: n, reps: Number(set.reps) })
+        }
+        if (!raw || !isFinite(n) || n <= 0) continue
+        if (best[e.exerciseId] == null || n > best[e.exerciseId]) best[e.exerciseId] = n
+      }
+    }
+  }
+  return { personalBests: best, pastStrengthSets: past }
+}

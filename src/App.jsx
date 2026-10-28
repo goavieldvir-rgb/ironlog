@@ -14,6 +14,7 @@ import ExerciseLibrary from './components/ExerciseLibrary.jsx'
 import WorkoutSession from './components/WorkoutSession.jsx'
 import History from './components/History.jsx'
 import SessionDetail from './components/SessionDetail.jsx'
+import SessionShare from './components/SessionShare.jsx'
 import EditSession from './components/EditSession.jsx'
 import ResetPassword from './components/ResetPassword.jsx'
 import ConsentGate from './components/ConsentGate.jsx'
@@ -93,6 +94,7 @@ export default function App() {
         <Route path="/history" element={<History />} />
         <Route path="/history/:id" element={<SessionDetail />} />
         <Route path="/history/:id/edit" element={<EditSession />} />
+        <Route path="/history/:id/share" element={<SessionShare />} />
         <Route path="/people" element={<People />} />
         <Route path="/people/:id" element={<PersonDetail />} />
         <Route path="/errors" element={<ErrorLogs />} />
