@@ -23,10 +23,14 @@ create table if not exists public.progress_photos (
   taken_on date not null,
   angle text not null check (angle in ('front', 'side', 'back')),
   path text not null unique,
+  -- Small copy for the grid (supabase-photo-thumbs.sql); null on older photos.
+  thumb_path text,
   created_at timestamptz not null default now(),
   -- The file always lives in the owner's own folder.
-  constraint progress_photos_path_owner check (path like (user_id::text || '/%'))
+  constraint progress_photos_path_owner check (path like (user_id::text || '/%')),
+  constraint progress_photos_thumb_owner check (thumb_path is null or thumb_path like (user_id::text || '/%'))
 );
+alter table public.progress_photos add column if not exists thumb_path text;
 create index if not exists progress_photos_user_idx on public.progress_photos (user_id, taken_on desc);
 
 -- True when the signed-in person may add photos right now.

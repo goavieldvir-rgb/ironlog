@@ -9,11 +9,8 @@ import { TERMS_DOC_KEY } from '../legal/terms.js'
 
 const BUCKET = 'progress-photos'
 export const ANGLES = ['front', 'side', 'back']
-// Links to an image stop working after this long, so a copied link is useless.
-const LINK_SECONDS = 300
-// Pages re-sign their links a minute before they run out.
-export const LINK_REFRESH_MS = (LINK_SECONDS - 60) * 1000
 const MAX_SIDE = 1600
+const THUMB_SIDE = 480
 
 // { enabled, minor }: photos are on when the latest photo consent is
 // 'granted', and never offered to anyone who ever signed up as under 18
@@ -43,13 +40,82 @@ export async function listPhotos(uid) {
   return data || []
 }
 
-// path -> short-lived URL
-export async function photoUrls(paths) {
-  if (!paths.length) return {}
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrls(paths, LINK_SECONDS)
-  if (error) throw error
-  return Object.fromEntries((data || []).filter((d) => d.signedUrl).map((d) => [d.path, d.signedUrl]))
+// Images are fetched once through the signed-in session and kept in memory
+// as local object URLs, keyed by path. A path never changes its contents, so
+// a photo loads once per visit instead of again every time a link would
+// expire. A few at a time, so the photos on screen aren't stuck behind the
+// rest.
+const cache = new Map()
+const queue = []
+let active = 0
+const MAX_ACTIVE = 4
+
+function pump() {
+  while (active < MAX_ACTIVE && queue.length) {
+    const job = queue.shift()
+    active++
+    supabase.storage
+      .from(BUCKET)
+      .download(job.path)
+      .then(({ data, error }) => {
+        if (error) throw error
+        job.resolve(URL.createObjectURL(data))
+      })
+      .catch((e) => {
+        cache.delete(job.path)
+        job.reject(e)
+      })
+      .finally(() => {
+        active--
+        pump()
+      })
+  }
 }
+
+const ready = new Map()
+
+// path -> local URL (a promise; shared by everyone asking for the same path)
+export function photoSrc(path) {
+  if (!cache.has(path)) {
+    cache.set(path, new Promise((resolve, reject) => {
+      queue.push({ path, resolve, reject })
+      pump()
+    }).then((url) => {
+      ready.set(path, url)
+      return url
+    }))
+  }
+  return cache.get(path)
+}
+
+// The local URL if it's already loaded, so a page can show it straight away.
+export function photoSrcNow(path) {
+  return ready.get(path) || null
+}
+
+function seed(path, blob) {
+  const url = URL.createObjectURL(blob)
+  cache.set(path, Promise.resolve(url))
+  ready.set(path, url)
+}
+
+function forget(paths) {
+  for (const p of paths) {
+    const url = ready.get(p)
+    if (url) URL.revokeObjectURL(url)
+    cache.delete(p)
+    ready.delete(p)
+  }
+}
+
+// Nothing of one account stays in memory for whoever signs in next.
+supabase.auth.onAuthStateChange((event) => {
+  if (event === 'SIGNED_OUT') forget([...cache.keys()])
+})
+
+// The small version shown in grids; photos added before thumbnails existed
+// fall back to the full image.
+export const thumbPath = (photo) => photo.thumb_path || photo.path
 
 // Saves one photo to the device, named by date and angle.
 export async function downloadPhoto(photo) {
@@ -64,12 +130,13 @@ export async function downloadPhoto(photo) {
   a.remove()
 }
 
-// Re-encodes the picked image as a JPEG no larger than MAX_SIDE. Drawing it
-// on a canvas keeps only the pixels, so location and camera details in the
-// original file never leave the phone.
-// Browsers apply the photo's rotation when they decode it into an <img>,
-// which also works on older iPhones without createImageBitmap for files.
-function decodeImage(file) {
+// Re-encodes the picked image as a JPEG no larger than MAX_SIDE, plus a
+// small thumbnail for the grid. Drawing it on a canvas keeps only the pixels,
+// so location and camera details in the original file never leave the phone.
+// createImageBitmap decodes off the main thread (no frozen screen while a
+// 12-megapixel photo opens) and applies the photo's rotation; where it can't
+// read the file (older iPhones), an <img> does the same.
+function decodeWithImg(file) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file)
     const img = new Image()
@@ -85,11 +152,21 @@ function decodeImage(file) {
   })
 }
 
-export async function prepareImage(file) {
-  const img = await decodeImage(file)
-  const w = img.naturalWidth
-  const h = img.naturalHeight
-  const scale = Math.min(1, MAX_SIDE / Math.max(w, h))
+async function decodeImage(file) {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' })
+      return { source: bmp, w: bmp.width, h: bmp.height, done: () => bmp.close?.() }
+    } catch {
+      // fall through to <img>
+    }
+  }
+  const img = await decodeWithImg(file)
+  return { source: img, w: img.naturalWidth, h: img.naturalHeight, done: () => {} }
+}
+
+function encode(source, w, h, maxSide, quality) {
+  const scale = Math.min(1, maxSide / Math.max(w, h))
   const canvas = document.createElement('canvas')
   canvas.width = Math.round(w * scale)
   canvas.height = Math.round(h * scale)
@@ -97,31 +174,65 @@ export async function prepareImage(file) {
   // JPEG has no transparency; without this a see-through PNG turns black.
   ctx.fillStyle = '#fff'
   ctx.fillRect(0, 0, canvas.width, canvas.height)
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85))
-  if (!blob) throw new Error('IMAGE_ENCODE_FAILED')
-  return blob
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height)
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('IMAGE_ENCODE_FAILED'))), 'image/jpeg', quality),
+  )
 }
 
-export async function addPhoto(uid, file, takenOn, angle) {
-  const blob = await prepareImage(file)
-  const path = `${uid}/${crypto.randomUUID()}.jpg`
-  const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: 'image/jpeg', upsert: false })
-  if (upErr) throw upErr
-  const { error } = await supabase.from('progress_photos').insert({ user_id: uid, taken_on: takenOn, angle, path })
-  if (error) {
-    await supabase.storage.from(BUCKET).remove([path])
-    throw error
+export async function prepareImage(file) {
+  const { source, w, h, done } = await decodeImage(file)
+  try {
+    const full = await encode(source, w, h, MAX_SIDE, 0.85)
+    const thumb = await encode(source, w, h, THUMB_SIDE, 0.75)
+    return { full, thumb }
+  } finally {
+    done()
   }
+}
+
+// Returns the saved row. The files are put in the in-memory cache straight
+// away, so the new photo shows without downloading it back.
+export async function addPhoto(uid, file, takenOn, angle) {
+  const { full, thumb } = await prepareImage(file)
+  const id = crypto.randomUUID()
+  const path = `${uid}/${id}.jpg`
+  const thumb_path = `${uid}/${id}_thumb.jpg`
+  const [up, upThumb] = await Promise.all([
+    supabase.storage.from(BUCKET).upload(path, full, { contentType: 'image/jpeg', upsert: false }),
+    supabase.storage.from(BUCKET).upload(thumb_path, thumb, { contentType: 'image/jpeg', upsert: false }),
+  ])
+  const uploaded = [path, thumb_path].filter((_, i) => ![up, upThumb][i].error)
+  if (up.error || upThumb.error) {
+    if (uploaded.length) await supabase.storage.from(BUCKET).remove(uploaded)
+    throw up.error || upThumb.error
+  }
+  let res = await supabase.from('progress_photos').insert({ user_id: uid, taken_on: takenOn, angle, path, thumb_path }).select().single()
+  // Before supabase-progress-photos-thumbs.sql is run there's no thumb_path
+  // column: save the photo anyway, without a thumbnail.
+  if (res.error && /thumb_path/.test(res.error.message || '')) {
+    await supabase.storage.from(BUCKET).remove([thumb_path])
+    res = await supabase.from('progress_photos').insert({ user_id: uid, taken_on: takenOn, angle, path }).select().single()
+  }
+  if (res.error) {
+    await supabase.storage.from(BUCKET).remove([path, thumb_path])
+    throw res.error
+  }
+  seed(path, full)
+  if (res.data.thumb_path) seed(thumb_path, thumb)
+  return res.data
 }
 
 // File first: a row without a file is harmless, a file without a row is not
 // visible to anyone to delete.
 export async function deletePhoto(photo) {
-  const { error: rmErr } = await supabase.storage.from(BUCKET).remove([photo.path])
+  const paths = [photo.path, photo.thumb_path].filter(Boolean)
+  const { error: rmErr } = await supabase.storage.from(BUCKET).remove(paths)
   if (rmErr) throw rmErr
   const { error } = await supabase.from('progress_photos').delete().eq('id', photo.id)
   if (error) throw error
+  forget(paths)
 }
 
 // Every file in the person's folder, including any whose row is missing.
@@ -129,7 +240,7 @@ export async function deleteAllPhotos(uid) {
   const rows = await listPhotos(uid)
   const { data: files, error: listErr } = await supabase.storage.from(BUCKET).list(uid, { limit: 1000 })
   if (listErr) throw listErr
-  const paths = [...new Set([...rows.map((r) => r.path), ...(files || []).filter((f) => f.id).map((f) => `${uid}/${f.name}`)])]
+  const paths = [...new Set([...rows.flatMap((r) => [r.path, r.thumb_path].filter(Boolean)), ...(files || []).filter((f) => f.id).map((f) => `${uid}/${f.name}`)])]
   for (let i = 0; i < paths.length; i += 100) {
     const { error } = await supabase.storage.from(BUCKET).remove(paths.slice(i, i + 100))
     if (error) throw error
@@ -138,6 +249,7 @@ export async function deleteAllPhotos(uid) {
     const { error } = await supabase.from('progress_photos').delete().eq('user_id', uid)
     if (error) throw error
   }
+  forget(paths)
 }
 
 export async function turnPhotosOn(uid, lang) {

@@ -28,6 +28,18 @@ create table if not exists public.body_weight_logs (
   constraint body_weight_logs_pkey PRIMARY KEY (id),
   constraint body_weight_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
+create table if not exists public.waist_logs (
+  id uuid default gen_random_uuid() not null,
+  user_id uuid not null,
+  date date not null,
+  waist numeric not null,
+  unit text default 'cm'::text not null,
+  created_at timestamp with time zone default now() not null,
+  constraint waist_logs_pkey PRIMARY KEY (id),
+  constraint waist_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
+  constraint waist_logs_waist_check CHECK ((waist > 0 AND waist < 400)),
+  constraint waist_logs_unit_check CHECK ((unit = ANY (ARRAY['cm'::text, 'in'::text])))
+);
 create table if not exists public.consents (
   id uuid default gen_random_uuid() not null,
   user_id uuid not null,
@@ -721,6 +733,7 @@ grant execute on function public.nutrition_allowed() to authenticated;
 -- ===== 3. Row level security =====
 alter table public.admin_notifications enable row level security;
 alter table public.body_weight_logs enable row level security;
+alter table public.waist_logs enable row level security;
 alter table public.consents enable row level security;
 alter table public.error_logs enable row level security;
 alter table public.exercises enable row level security;
@@ -740,6 +753,13 @@ create policy "admins can read notification log" on public.admin_notifications
 
 drop policy if exists "own or admin body weight" on public.body_weight_logs;
 create policy "own or admin body weight" on public.body_weight_logs
+  as permissive
+  for all
+  using ((auth.uid() = user_id) OR is_admin())
+  with check ((auth.uid() = user_id) OR is_admin());
+
+drop policy if exists "own or admin waist" on public.waist_logs;
+create policy "own or admin waist" on public.waist_logs
   as permissive
   for all
   using ((auth.uid() = user_id) OR is_admin())
@@ -1029,6 +1049,7 @@ alter table public.sessions add column if not exists reviewed_at timestamptz;
 -- these tables had an index for it.
 create index if not exists sessions_user_date on public.sessions (user_id, date desc);
 create index if not exists body_weight_logs_user_date on public.body_weight_logs (user_id, date desc);
+create index if not exists waist_logs_user_date on public.waist_logs (user_id, date desc);
 create index if not exists exercises_user_idx on public.exercises (user_id);
 create index if not exists routines_user_idx on public.routines (user_id);
 create index if not exists weekly_schedule_user_idx on public.weekly_schedule (user_id);
@@ -1199,9 +1220,11 @@ create table if not exists public.progress_photos (
   taken_on date not null,
   angle text not null check (angle in ('front', 'side', 'back')),
   path text not null unique,
+  thumb_path text,
   created_at timestamptz not null default now(),
   -- The file always lives in the owner's own folder.
-  constraint progress_photos_path_owner check (path like (user_id::text || '/%'))
+  constraint progress_photos_path_owner check (path like (user_id::text || '/%')),
+  constraint progress_photos_thumb_owner check (thumb_path is null or thumb_path like (user_id::text || '/%'))
 );
 create index if not exists progress_photos_user_idx on public.progress_photos (user_id, taken_on desc);
 
