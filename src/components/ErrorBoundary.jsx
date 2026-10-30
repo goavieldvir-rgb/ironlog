@@ -80,6 +80,14 @@ class ErrorBoundaryInner extends React.Component {
             >
               {t(chunk ? 'errorBoundary.offlineRetry' : 'errorBoundary.reload')}
             </button>
+            {/* HashRouter keeps the failing route across a reload, so offer a
+                way out to the home screen as well. */}
+            <button
+              onClick={() => { window.location.hash = '#/'; window.location.reload() }}
+              className="text-chalkdim text-sm underline underline-offset-4 min-h-[44px] mx-auto"
+            >
+              {t('errorBoundary.goHome')}
+            </button>
           </div>
         </div>
       )

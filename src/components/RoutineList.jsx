@@ -22,6 +22,7 @@ export default function RoutineList() {
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [tab, setTab] = useState('all')
   const [copyTarget, setCopyTarget] = useState(null)
+  const [busyId, setBusyId] = useState(null)
 
   const exerciseNameById = useMemo(
     () => Object.fromEntries(exercises.map((e) => [e.id, (lang === 'he' && e.name_he) || e.name])),
@@ -34,6 +35,8 @@ export default function RoutineList() {
   )
 
   async function duplicateRoutine(r) {
+    if (busyId) return // a double-tap would create two copies
+    setBusyId(r.id)
     try {
       await addRoutine(effectiveUid, {
         name: `${r.name} ${t('routines.copySuffix')}`,
@@ -45,6 +48,8 @@ export default function RoutineList() {
     } catch (err) {
       console.error(err)
       toast(t('feedback.saveFailed'), 'error')
+    } finally {
+      setBusyId(null)
     }
   }
 
@@ -58,27 +63,35 @@ export default function RoutineList() {
             <InfoTip text={t('routines.cardActionsTip')} />
           </h1>
         </div>
-        <Link to="/routines/new">
-          <Button>
-            <Plus size={16} /> {t('routines.buildRoutine')}
-          </Button>
-        </Link>
+        <Button to="/routines/new">
+          <Plus size={16} /> {t('routines.buildRoutine')}
+        </Button>
       </div>
 
       <Tabs tab={tab} setTab={setTab} />
 
       {!loading && loadFailed && <LoadError onRetry={refresh} />}
 
-      {!loading && !loadFailed && filtered.length === 0 && (
+      {!loading && !loadFailed && routines.length === 0 && (
         <EmptyState
           title={t('routines.emptyTitle')}
           body={t('routines.emptyBody')}
           action={
-            <Link to="/routines/new">
-              <Button variant="brass">
-                <Plus size={16} /> {t('routines.buildFirst')}
-              </Button>
-            </Link>
+            <Button to="/routines/new" variant="brass">
+              <Plus size={16} /> {t('routines.buildFirst')}
+            </Button>
+          }
+        />
+      )}
+
+      {!loading && !loadFailed && routines.length > 0 && filtered.length === 0 && (
+        <EmptyState
+          title={t('common.noMatches')}
+          body={t('routines.noMatchesFiltered')}
+          action={
+            <Button type="button" variant="ghost" onClick={() => setTab('all')}>
+              {t('routines.clearFilters')}
+            </Button>
           }
         />
       )}
@@ -95,7 +108,7 @@ export default function RoutineList() {
                   <CategoryTag category={r.category} />
                 </div>
                 <p className="text-chalkdim text-xs mt-1">
-                  {r.exercises?.length || 0} {t('routines.exercisesCount')}
+                  {t('routines.exerciseCount')(r.exercises?.length || 0)}
                 </p>
               </div>
               <div className="flex gap-1 shrink-0">
@@ -103,8 +116,9 @@ export default function RoutineList() {
                   <Eye size={15} />
                 </Link>
                 <button
-                  className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-surface2 text-chalkdim hover:text-chalk"
+                  className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-surface2 text-chalkdim hover:text-chalk disabled:opacity-40"
                   onClick={() => duplicateRoutine(r)}
+                  disabled={busyId === r.id}
                   title={t('routines.duplicate')} aria-label={t('routines.duplicate')}
                 >
                   <Copy size={15} />
@@ -154,11 +168,9 @@ export default function RoutineList() {
               {(r.exercises?.length || 0) > 4 && <li>{t('routines.moreCount')(r.exercises.length - 4)}</li>}
             </ul>
 
-            <Link to={`/workout/${r.id}`} className="mt-1">
-              <Button variant="brass" className="w-full">
-                <Play size={15} /> {loadDraft(effectiveUid, r.id) ? t('routines.resumeSession') : t('routines.startSession')}
-              </Button>
-            </Link>
+            <Button to={`/workout/${r.id}`} variant="brass" className="w-full mt-1">
+              <Play size={15} /> {loadDraft(effectiveUid, r.id) ? t('routines.resumeSession') : t('routines.startSession')}
+            </Button>
           </Card>
         ))}
       </div>
@@ -179,26 +191,38 @@ function CopyToPersonModal({ routine, onClose }) {
   const [people, setPeople] = useState([])
   const [loading, setLoading] = useState(true)
   const [copiedTo, setCopiedTo] = useState(null)
+  const [busyId, setBusyId] = useState(null)
+  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
+    setLoading(true)
+    setFailed(false)
     supabase
       .from('profiles')
       .select('*')
       .order('email', { ascending: true })
       .then(({ data, error }) => {
-        if (error) console.error(error)
+        if (error) {
+          console.error(error)
+          setFailed(true)
+        }
         setPeople(data || [])
         setLoading(false)
       })
-  }, [])
+  }, [attempt])
 
   async function copyTo(person) {
+    if (busyId) return // a double-tap would send two copies
+    setBusyId(person.id)
     try {
       await copyRoutineToUser(person.id, routine)
       setCopiedTo(person.id)
     } catch (err) {
       console.error(err)
       toast(t('feedback.saveFailed'), 'error')
+    } finally {
+      setBusyId(null)
     }
   }
 
@@ -210,11 +234,19 @@ function CopyToPersonModal({ routine, onClose }) {
 
         <div className="flex flex-col gap-1 max-h-72 overflow-y-auto">
           {loading && <p className="text-chalkdim text-sm py-2">{t('common.loading')}</p>}
+          {!loading && failed && (
+            <div role="alert" className="flex flex-col items-start gap-2 py-2">
+              <p className="text-chalk text-sm">{t('routines.profilesFailed')}</p>
+              <Button type="button" variant="ghost" onClick={() => setAttempt((n) => n + 1)}>
+                {t('common.tryAgain')}
+              </Button>
+            </div>
+          )}
           {people.map((p) => (
             <button
               key={p.id}
               onClick={() => copyTo(p)}
-              disabled={copiedTo === p.id}
+              disabled={copiedTo === p.id || !!busyId}
               className="flex items-center justify-between gap-2 px-2 py-2 rounded-md hover:bg-surface2 text-start disabled:opacity-50"
             >
               <span className="truncate min-w-0">{p.full_name || p.email}</span>

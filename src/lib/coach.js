@@ -69,6 +69,12 @@ export function rosterFlags(p, today = toLocalISODate()) {
   if (p.last_session && quietDays >= (p.inactivity_alert_days || 5)) {
     flags.push({ key: 'quiet', tone: 'warn', score: 3, n: quietDays })
   }
+  // Signed up and never trained: the trainee who most needs a nudge, and the
+  // one the other flags (they all need a first session) can't see.
+  if (!p.last_session && p.created_at) {
+    const age = daysSince(toLocalISODate(new Date(p.created_at)), today)
+    if (age > 3) flags.push({ key: 'never', tone: 'warn', score: 2, n: age })
+  }
   if (adh != null && adh < 60 && (p.week_counts || []).slice(0, -1).some((n) => n > 0)) {
     flags.push({ key: 'behind', tone: 'warn', score: 2, n: adh })
   }
@@ -140,7 +146,7 @@ export async function fetchTraineeDetail(uid, today = toLocalISODate()) {
     supabase.from('profiles').select('*').eq('id', uid).single().then(check),
     supabase
       .from('sessions')
-      .select('id, date, routine_name, category, trainer_comment, reviewed_at, duration_minutes, created_at')
+      .select('id, date, routine_id, routine_name, category, trainer_comment, reviewed_at, duration_minutes, created_at')
       .eq('user_id', uid)
       .gte('date', since)
       .order('date', { ascending: false })

@@ -113,11 +113,9 @@ export default function People() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Link to="/errors">
-            <Button variant="ghost">
-              <AlertTriangle size={16} /> {t('people.errorLogs')}
-            </Button>
-          </Link>
+          <Button variant="ghost" to="/errors">
+            <AlertTriangle size={16} /> {t('people.errorLogs')}
+          </Button>
           <Button variant="brass" onClick={() => setInviting(true)}>
             <UserPlus size={16} /> {t('people.inviteSomeone')}
           </Button>
@@ -158,12 +156,12 @@ export default function People() {
                 />
               </label>
             )}
-            <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1" role="tablist">
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1">
               {views.map(([key, label]) => (
                 <button
                   key={key}
-                  role="tab"
-                  aria-selected={view === key}
+                  type="button"
+                  aria-pressed={view === key}
                   onClick={() => setView(key)}
                   className={`press shrink-0 rounded-full px-3 min-h-9 text-xs font-medium ${
                     view === key ? 'bg-chalk text-ink' : 'bg-surface2 text-chalkdim'

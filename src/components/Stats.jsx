@@ -498,7 +498,7 @@ export default function Stats() {
                           if (metric === 'effort') return [Math.round(value * 10) / 10, metricLabel.effort]
                           return [`${formatDistance(value)} min`, t('stats.duration')]
                         }
-                        if (selectedProgress.timed) return [formatSeconds(value), t('stats.longestHold')]
+                        if (selectedProgress.timed) return [formatSeconds(value, t('dashboard.secShort')), t('stats.longestHold')]
                         if (selectedProgress.bodyweight) return [`${value} reps`, t('stats.topSet')]
                         if (lift === 'e1rm') return [`${value}${selectedProgress.unit}`, t('stats.e1rmLabel')]
                         if (lift === 'volume') return [`${value.toLocaleString(dateLocale(lang))}${selectedProgress.unit}`, t('stats.volumeLabel')]
@@ -559,7 +559,7 @@ export default function Stats() {
                             r.distance != null ? ` · ${r.distance}${r.unit}` : ''
                           }`
                         : r.timed
-                          ? `${r.weight > 0 ? `+${r.weight}${r.unit} · ` : ''}${formatSeconds(r.reps)}`
+                          ? `${r.weight > 0 ? `+${r.weight}${r.unit} · ` : ''}${formatSeconds(r.reps, t('dashboard.secShort'))}`
                           : r.bodyweight
                             ? `${r.weight > 0 ? `+${r.weight}${r.unit} ` : ''}${t('sessionCard.bwShort')} × ${r.reps}`
                             : `${r.weight}${r.unit} × ${r.reps}`}

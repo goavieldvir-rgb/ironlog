@@ -28,6 +28,9 @@ function formatDate(lang, iso) {
   return fmtDate(lang, d, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
 }
 
+// Distance unit as the UI language writes it (stored value is 'km' | 'mi').
+const unitLabel = (unit, t) => (unit === 'mi' ? t('sessionCard.miUnit') : unit === 'km' ? t('sessionCard.kmUnit') : unit)
+
 function formatSet(entry, s, t) {
   if (entry.category === 'cardio') {
     const intensityLabel = entry.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe')
@@ -35,13 +38,13 @@ function formatSet(entry, s, t) {
     // Each piece is isolated left-to-right (U+2066 ... U+2069) so a Hebrew
     // unit label can't reorder the numbers around it.
     const parts = [`${s.duration || 0} ${t('sessionCard.minUnit')}`, `${intensityLabel} ${s.intensity || 0}`]
-    if (s.distance !== '' && s.distance != null) parts.push(`${s.distance}${entry.unit}`)
-    if (sd > 0 && sm > 0) parts.push(`${formatPace(sm / sd)}/${entry.unit === 'mi' ? 'mi' : 'km'}`)
+    if (s.distance !== '' && s.distance != null) parts.push(`${s.distance}${unitLabel(entry.unit, t)}`)
+    if (sd > 0 && sm > 0) parts.push(`${formatPace(sm / sd)}${entry.unit === 'mi' ? t('sessionCard.paceMi') : t('sessionCard.paceKm')}`)
     return parts.map((p) => `⁦${p}⁩`).join(' · ')
   }
   if (entry.timed) {
     const added = Number(s.weight) > 0 ? `+${s.weight}${entry.unit} · ` : ''
-    return `${added}${formatSeconds(s.reps) || '0s'}`
+    return `${added}${formatSeconds(s.reps, t('dashboard.secShort')) || `0${t('dashboard.secShort')}`}`
   }
   if (entry.bodyweight) {
     const added = Number(s.weight) > 0 ? `+${s.weight}${entry.unit} ` : ''
@@ -385,10 +388,10 @@ function compactSets(entry, t) {
   const sets = workingSets(entry.sets)
   if (entry.category === 'cardio') {
     return sets
-      .map((s) => `${fmtNum(s.duration || 0)} ${t('sessionCard.minUnit')}${s.distance !== '' && s.distance != null ? ` / ${fmtNum(s.distance)}${entry.unit}` : ''}`)
+      .map((s) => `${fmtNum(s.duration || 0)} ${t('sessionCard.minUnit')}${s.distance !== '' && s.distance != null ? ` / ${fmtNum(s.distance)}${unitLabel(entry.unit, t)}` : ''}`)
       .join(' · ')
   }
-  if (entry.timed) return sets.map((s) => `${Number(s.weight) > 0 ? `+${fmtNum(s.weight)}·` : ''}${formatSeconds(s.reps) || '0s'}`).join(' · ')
+  if (entry.timed) return sets.map((s) => `${Number(s.weight) > 0 ? `+${fmtNum(s.weight)}·` : ''}${formatSeconds(s.reps, t('dashboard.secShort')) || `0${t('dashboard.secShort')}`}`).join(' · ')
   if (entry.bodyweight) return sets.map((s) => `${Number(s.weight) > 0 ? `+${fmtNum(s.weight)}×` : ''}${fmtNum(s.reps || 0)}`).join(' · ')
   return sets.map((s) => `${fmtNum(s.weight || 0)}×${fmtNum(s.reps || 0)}`).join(' · ')
 }

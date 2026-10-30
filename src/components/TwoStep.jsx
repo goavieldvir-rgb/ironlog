@@ -3,6 +3,7 @@ import { Copy, Check, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { confirmedApps, startSetup, verifyCode } from '../lib/mfa.js'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 import { Button, Field } from './ui.jsx'
 import { BrandMark } from './Loading.jsx'
 
@@ -104,12 +105,16 @@ export function TwoStepChallenge() {
 export function TwoStepSetup({ onDone, onCancel }) {
   const { t } = useLanguage()
   const { refreshMfa } = useAuth()
+  const { toast } = useFeedback()
   const [setup, setSetup] = useState(null)
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
 
+  const [attempt, setAttempt] = useState(0)
+
+  // `attempt` re-runs the enrolment, so a network blip is not a dead end.
   useEffect(() => {
     let live = true
     startSetup()
@@ -118,7 +123,13 @@ export function TwoStepSetup({ onDone, onCancel }) {
     return () => {
       live = false
     }
-  }, [])
+  }, [attempt])
+
+  function retry() {
+    setError('')
+    setSetup(null)
+    setAttempt((n) => n + 1)
+  }
 
   async function submit(e) {
     e.preventDefault()
@@ -137,9 +148,14 @@ export function TwoStepSetup({ onDone, onCancel }) {
   }
 
   async function copySecret() {
-    await navigator.clipboard.writeText(setup.secret)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    try {
+      await navigator.clipboard.writeText(setup.secret)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch (err) {
+      console.error(err)
+      toast(t('people.copyFailed'), 'error')
+    }
   }
 
   return (
@@ -165,8 +181,13 @@ export function TwoStepSetup({ onDone, onCancel }) {
       ) : (
         !error && <p className="text-chalkdim text-sm">{t('login.oneMoment')}</p>
       )}
-      {error && <p className="text-irontext text-sm">{error}</p>}
+      {error && <p role="alert" className="text-irontext text-sm">{error}</p>}
       <div className="flex gap-2 justify-end">
+        {!setup && error && (
+          <Button type="button" variant="ghost" onClick={retry}>
+            {t('common.tryAgain')}
+          </Button>
+        )}
         {onCancel && (
           <Button type="button" variant="ghost" onClick={onCancel}>
             {t('common.cancel')}

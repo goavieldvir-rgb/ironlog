@@ -406,7 +406,9 @@ export default function WorkoutSession() {
   // Autosave every change to local storage so a backgrounded-tab reload
   // never wipes out what's already been logged.
   useEffect(() => {
-    if (!ready || entries.length === 0) return
+    // Once the workout is saved, a late change (an Undo tapped on the recap)
+    // must not bring the draft back for a session that's already logged.
+    if (!ready || saved || entries.length === 0) return
     saveDraft(effectiveUid, draftKey, {
       routineId: isFreestyle ? null : routine?.id || null,
       // Canonical name; the UI shows the translated label at display time.
@@ -421,7 +423,7 @@ export default function WorkoutSession() {
       ...(gymChoice !== undefined ? { gymId: gymChoice } : {}),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries, date, notes, ready, startedAt, gymChoice, sessionId])
+  }, [entries, date, notes, ready, saved, startedAt, gymChoice, sessionId])
 
   // Ticks the elapsed-time display. Once a minute is plenty for a workout.
   useEffect(() => {
@@ -466,7 +468,10 @@ export default function WorkoutSession() {
     })
     io.observe(el)
     return () => io.disconnect()
-  }, [currentIdx, entries.length])
+    // The card order too: cards are keyed by uid, so a move changes which
+    // node sits at an index. Typing in a set doesn't change the order.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIdx, entries.map((e) => e.uid).join()])
 
   function jumpToCurrent() {
     const el = entryRefs.current[currentIdx]

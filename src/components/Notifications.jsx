@@ -39,10 +39,13 @@ export default function Notifications() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Read at unmount, so the save uses the current language, not the first render's.
+  const latest = useRef({})
+  latest.current = { uid: user.uid, lang }
   // Save a pending time change if the page is left before the debounce fires.
   useEffect(() => () => {
     clearTimeout(saveTimer.current)
-    if (pendingTime.current) updateReminder(user.uid, pendingTime.current, lang).catch(console.error)
+    if (pendingTime.current) updateReminder(latest.current.uid, pendingTime.current, latest.current.lang).catch(console.error)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

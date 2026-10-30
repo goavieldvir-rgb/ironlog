@@ -5,8 +5,8 @@ import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
-import { useCollection, updateSession } from '../lib/db.js'
-import { Button, Card, CategoryTag, Field } from './ui.jsx'
+import { useCollection, updateSession, cleanEntries } from '../lib/db.js'
+import { Button, Card, CategoryTag, Field, LoadError } from './ui.jsx'
 import SessionEntryCard from './SessionEntryCard.jsx'
 import { exerciseMap } from '../lib/names.js'
 import { useGyms, sessionGymId, gymLabel } from '../lib/gyms.js'
@@ -21,7 +21,7 @@ export default function EditSession() {
   const { toast } = useFeedback()
   const { id } = useParams()
   const navigate = useNavigate()
-  const [sessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const [sessions, loading, refresh, loadError] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const session = sessions.find((s) => s.id === id)
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const exById = exerciseMap(exercises)
@@ -83,7 +83,12 @@ export default function EditSession() {
     setEntries((prev) => prev.map((e, i) => (i !== entryIdx ? e : { ...e, notes: text })))
   }
 
+  // updateSession drops emptied sets silently, so block a save that would
+  // leave an undated or empty workout behind.
+  const canSave = !!date && cleanEntries(entries).length > 0
+
   async function handleSave() {
+    if (!canSave) return
     setSaving(true)
     try {
       await updateSession(effectiveUid, id, { date, notes, entries, ...(gymId !== undefined ? { gymId } : {}) })
@@ -97,12 +102,14 @@ export default function EditSession() {
     }
   }
 
+  // A failed load isn't "deleted": offer a retry instead.
+  if (!loading && !session && loadError) return <LoadError onRetry={refresh} />
   if (!loading && !session) return <p className="text-chalkdim">{t('sessionDetail.notFound')}</p>
   if (!session) return null
 
   return (
     <div className="flex flex-col gap-5 max-w-2xl">
-      <Link to={`/history/${id}`} className="text-chalkdim text-sm inline-flex items-center gap-1 hover:text-chalk w-fit">
+      <Link to={`/history/${id}`} className="text-chalkdim text-sm inline-flex items-center gap-1 hover:text-chalk w-fit min-h-[44px]">
         <BackChevron size={15} /> {t('editSession.backToSession')}
       </Link>
 
@@ -129,7 +136,7 @@ export default function EditSession() {
             </Field>
           )}
           <Field label={t('workout.date')}>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-fit" />
+            <input type="date" value={date} required onChange={(e) => setDate(e.target.value)} className="w-fit" />
           </Field>
         </div>
       </div>
@@ -153,8 +160,13 @@ export default function EditSession() {
         </Field>
       </Card>
 
-      <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={saving || saved} variant={saved ? 'subtle' : 'primary'}>
+      <div className="flex items-center justify-end gap-3 flex-wrap">
+        {!canSave && !saved && (
+          <p className="text-chalkdim text-sm" data-testid="save-hint">
+            {t('editSession.saveHint')}
+          </p>
+        )}
+        <Button onClick={handleSave} disabled={saving || saved || !canSave} variant={saved ? 'subtle' : 'primary'}>
           {saved ? (
             <>
               <Check size={16} /> {t('workout.saved')}

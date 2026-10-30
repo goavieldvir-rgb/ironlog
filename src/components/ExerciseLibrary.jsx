@@ -30,11 +30,11 @@ function formatLast(ex, t) {
   if (ex.category === 'cardio') {
     const dist = ex.last_distance != null ? ` · ${ex.last_distance}${ex.unit}` : ''
     const intensityLabel = ex.intensity_type === 'hr_zone' ? `${t('exercises.hrZone')} ${ex.last_reps}` : `${t('exercises.rpe')} ${ex.last_reps}`
-    return `${t('exercises.lastPrefix')} ${ex.last_weight} min · ${intensityLabel}${dist}`
+    return `${t('exercises.lastPrefix')} ${ex.last_weight} ${t('sessionCard.minUnit')} · ${intensityLabel}${dist}`
   }
   if (ex.timed) {
     const added = Number(ex.last_weight) > 0 ? `+${ex.last_weight}${ex.unit} · ` : ''
-    return `${t('exercises.lastPrefix')} ${added}${formatSeconds(ex.last_reps)}`
+    return `${t('exercises.lastPrefix')} ${added}${formatSeconds(ex.last_reps, t('dashboard.secShort'))}`
   }
   if (ex.bodyweight) {
     const added = Number(ex.last_weight) > 0 ? `+${ex.last_weight}${ex.unit} ` : ''
@@ -78,6 +78,7 @@ export default function ExerciseLibrary() {
   const [editing, setEditing] = useState(null)
   const [picking, setPicking] = useState(false)
   const [q, setQ] = useState('')
+  const query = q.trim().toLowerCase()
 
   // An exercise is "locked" (its tracking method can't change) once it's
   // actually been logged at least once — that's what makes past numbers
@@ -96,10 +97,10 @@ export default function ExerciseLibrary() {
   const filtered = useMemo(() => {
     return exercises.filter((e) => {
       if (tab !== 'all' && e.category !== tab) return false
-      if (q && ![e.name, e.name_he].some((n) => n && n.toLowerCase().includes(q.toLowerCase()))) return false
+      if (query && ![e.name, e.name_he].some((n) => n && n.toLowerCase().includes(query))) return false
       return true
     })
-  }, [exercises, tab, q])
+  }, [exercises, tab, query])
 
   return (
     <div className="flex flex-col gap-5">
@@ -125,7 +126,19 @@ export default function ExerciseLibrary() {
 
       {!loading && loadFailed && <LoadError onRetry={refresh} />}
 
-      {!loading && !loadFailed && filtered.length === 0 && (
+      {!loading && !loadFailed && exercises.length > 0 && filtered.length === 0 && (
+        <EmptyState
+          title={t('common.noMatches')}
+          body={t('exercises.noMatchesFiltered')}
+          action={
+            <Button type="button" variant="ghost" onClick={() => { setQ(''); setTab('all') }}>
+              {t('exercises.clearFilters')}
+            </Button>
+          }
+        />
+      )}
+
+      {!loading && !loadFailed && exercises.length === 0 && (
         <EmptyState
           title={t('exercises.emptyTitle')}
           body={t('exercises.emptyBody')}
@@ -150,7 +163,7 @@ export default function ExerciseLibrary() {
                     <Badge tone="cardio">{ex.intensity_type === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe')}</Badge>
                   )}
                 </div>
-                {formatLast(ex, t) && <p className="num text-chalkdim text-xs mt-1">{formatLast(ex, t)}</p>}
+                {formatLast(ex, t) && <p className="num text-chalkdim text-xs mt-1"><bdi dir="ltr">{formatLast(ex, t)}</bdi></p>}
               </div>
               <div className="flex gap-1 shrink-0">
                 <button
@@ -262,6 +275,8 @@ export function Tabs({ tab, setTab }) {
       {opts.map((o) => (
         <button
           key={o.id}
+          type="button"
+          aria-pressed={tab === o.id}
           onClick={() => setTab(o.id)}
           className={`px-3 min-h-[44px] rounded transition-colors ${
             tab === o.id ? 'bg-ink text-chalk' : 'text-chalkdim'
@@ -287,6 +302,8 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
   const { confirm, toast } = useFeedback()
   const [form, setForm] = useState({ ...emptyExerciseForm, ...initial })
   const [saving, setSaving] = useState(false)
+  // A stray backdrop tap must not throw away typed input.
+  const dirty = JSON.stringify({ ...emptyExerciseForm, ...initial }) !== JSON.stringify(form)
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -298,8 +315,9 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
     // before creating one — but still allow it, since sometimes it's
     // deliberate (e.g. same movement tracked in kg and in lb).
     const target = normalizeName(cleanName)
+    const targetHe = normalizeName(form.nameHe)
     const clash = existingExercises.find(
-      (ex) => ex.id !== initial.id && (normalizeName(ex.name) === target || normalizeName(ex.name_he) === target),
+      (ex) => ex.id !== initial.id && [target, targetHe].filter(Boolean).some((n) => normalizeName(ex.name) === n || normalizeName(ex.name_he) === n),
     )
     if (clash) {
       const ok = await confirm({
@@ -332,7 +350,7 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
   const locked = hasHistory && !!initial.id
 
   return (
-    <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }} onClick={onClose}>
+    <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }} onClick={() => { if (!dirty) onClose() }}>
       <div className="card p-6 w-full max-w-md max-h-[85dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-2xl mb-4">{initial.id ? t('exercises.editExercise') : t('exercises.newExercise')}</h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">

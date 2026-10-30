@@ -29,6 +29,7 @@ import {
   daysSince,
   shiftDay,
 } from '../lib/coach.js'
+import { sessionTitle } from '../lib/names.js'
 import { ACCENT, CHALK, CHALKDIM, MUTED, SURFACE } from '../theme.js'
 
 function shortDate(lang, iso) {
@@ -79,6 +80,13 @@ export default function PersonDetail() {
     const baseline = lastWeight
       ? [...data.weights].reverse().find((w) => w.unit === lastWeight.unit && w.date <= shiftDay(lastWeight.date, -21))
       : null
+    // The chart only draws the last six months in the latest unit, so judge
+    // "enough points" on that series, not on everything ever logged.
+    const weightSeries = lastWeight
+      ? data.weights
+          .filter((w) => w.date >= shiftDay(today, -182) && w.unit === lastWeight.unit)
+          .map((w) => ({ ...w, weight: Number(w.weight), label: shortDate(lang, w.date) }))
+      : []
     const foodDays = {}
     for (const f of data.food) {
       foodDays[f.date] ??= { kcal: 0, protein: 0 }
@@ -96,10 +104,12 @@ export default function PersonDetail() {
       lastSession: data.sessions[0]?.date || null,
       toReview: data.sessions.filter((s) => needsReview(s, today)),
       lastWeight,
+      weightSeries,
+      baselineDays: baseline ? daysSince(lastWeight.date, today) - daysSince(baseline.date, today) : null,
       weightChange: baseline ? Math.round((lastWeight.weight - baseline.weight) * 10) / 10 : null,
       food: { days: days.length, kcal: avg('kcal'), protein: avg('protein') },
     }
-  }, [data, today])
+  }, [data, today, lang])
 
   if (!isAdmin) return null
   if (loadError && !data) return <LoadError onRetry={() => setReload((r) => r + 1)} />
@@ -151,7 +161,7 @@ export default function PersonDetail() {
       value: derived.lastWeight ? `${Number(derived.lastWeight.weight)}${derived.lastWeight.unit}` : '—',
       sub:
         derived.weightChange != null
-          ? `\u2066${derived.weightChange > 0 ? '+' : ''}${derived.weightChange}\u2069 ${t('person.inThreeWeeks')}`
+          ? `\u2066${derived.weightChange > 0 ? '+' : ''}${derived.weightChange}\u2069 ${t('person.vsBaseline')(derived.baselineDays)}`
           : null,
     },
   ]
@@ -218,7 +228,11 @@ export default function PersonDetail() {
           </Section>
 
           <Section title={t('person.consistency')} hint={derived.planned ? t('person.planLine')(derived.planned, !!derived.scheduled) : t('person.noPlan')}>
-            <div className="h-36 lg:h-56 -mx-1">
+            <div
+              className="h-36 lg:h-56 -mx-1"
+              role="img"
+              aria-label={t('person.consistencyAria')(derived.weeks.length, derived.weeks.reduce((a, w) => a + w.count, 0), derived.thisWeek)}
+            >
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={derived.weeks.map((w) => ({ ...w, label: shortDate(lang, w.week) }))}>
                   <XAxis dataKey="label" stroke={CHALKDIM} fontSize={10} tickLine={false} axisLine={false} interval={2} reversed={lang === 'he'} />
@@ -245,9 +259,16 @@ export default function PersonDetail() {
               title={t('person.bodyWeight')}
               hint={data.goal?.target_weight ? t('person.targetWeight')(Number(data.goal.target_weight), derived.lastWeight.unit) : null}
             >
-              <div className="h-36 lg:h-56 -mx-1">
+              {derived.weightSeries.length < 2 ? (
+                <p className="text-sm text-chalkdim">{t('person.weightFew')}</p>
+              ) : (
+              <div
+                className="h-36 lg:h-56 -mx-1"
+                role="img"
+                aria-label={t('person.weightAria')(derived.weightSeries[0].weight, derived.weightSeries.at(-1).weight, derived.lastWeight.unit, derived.weightSeries.length)}
+              >
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data.weights.filter((w) => w.date >= shiftDay(today, -182) && w.unit === derived.lastWeight.unit).map((w) => ({ ...w, weight: Number(w.weight), label: shortDate(lang, w.date) }))}>
+                  <LineChart data={derived.weightSeries}>
                     <XAxis dataKey="label" stroke={CHALKDIM} fontSize={10} tickLine={false} axisLine={false} minTickGap={24} reversed={lang === 'he'} />
                     <YAxis
                       hide
@@ -262,6 +283,7 @@ export default function PersonDetail() {
                   </LineChart>
                 </ResponsiveContainer>
               </div>
+              )}
             </Section>
           )}
 
@@ -375,7 +397,7 @@ function GiveRoutine({ personId, t, onGiven }) {
       </Button>
       {open && (
         <GiveRoutineSheet
-          uid={user?.id}
+          uid={user?.uid}
           t={t}
           busyId={busyId}
           given={given}
@@ -402,7 +424,7 @@ function GiveRoutine({ personId, t, onGiven }) {
 
 function GiveRoutineSheet({ uid, t, busyId, given, onClose, onPick }) {
   useScrollLock(true)
-  const [routines, loading] = useCollection(uid, 'routines', 'created_at', 'desc')
+  const [routines, loading, refresh, loadError] = useCollection(uid, 'routines', 'created_at', 'desc')
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)
@@ -421,7 +443,8 @@ function GiveRoutineSheet({ uid, t, busyId, given, onClose, onPick }) {
         <p className="text-chalkdim text-sm mb-4">{t('person.giveRoutineHint')}</p>
         <div className="flex flex-col gap-1 max-h-72 overflow-y-auto">
           {loading && <p className="text-chalkdim text-sm py-2">{t('common.loading')}</p>}
-          {!loading && routines.length === 0 && <p className="text-chalkdim text-sm py-2">{t('person.noOwnRoutines')}</p>}
+          {!loading && loadError && routines.length === 0 && <LoadError onRetry={refresh} />}
+          {!loading && !loadError && routines.length === 0 && <p className="text-chalkdim text-sm py-2">{t('person.noOwnRoutines')}</p>}
           {routines.map((r) => {
             const done = given.includes(r.id)
             return (
@@ -493,7 +516,7 @@ function SessionList({ sessions, lang, t, today, onOpen, showReviewed }) {
         <li key={s.id}>
           <button onClick={() => onOpen(s)} className="press-row w-full flex items-center gap-3 py-2 text-start">
             <span className="flex-1 min-w-0">
-              <span className="block truncate text-sm">{s.routine_name}</span>
+              <span className="block truncate text-sm">{sessionTitle(s, t)}</span>
               <span className="block text-xs text-chalkdim num">
                 {fmtDate(lang, new Date(s.date + 'T00:00:00'), { weekday: 'short', month: 'short', day: 'numeric' })}
                 {s.duration_minutes ? ` · ${t('person.minutes')(s.duration_minutes)}` : ''}

@@ -14,6 +14,7 @@ import { listDrafts, clearDraft } from '../lib/draft.js'
 import { Button, Card, LoadError, FeedbackDot } from './ui.jsx'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import WeeklySchedule from './WeeklySchedule.jsx'
+import { itemTarget } from './RoutineView.jsx'
 
 // Was hard-coded English ("5m ago") even with the app in Hebrew.
 function timeAgo(ts, t) {
@@ -21,15 +22,26 @@ function timeAgo(ts, t) {
   if (mins < 60) return t('dashboard.minutesAgo', { n: mins })
   const hrs = Math.round(mins / 60)
   if (hrs < 24) return t('dashboard.hoursAgo', { n: hrs })
-  return t('dashboard.daysAgo', { n: Math.round(hrs / 24) })
+  return t('dashboard.daysAgo')(Math.round(hrs / 24))
 }
 
 function greetingKey(hour) {
+  // Not "Good night": that's a farewell, and this is someone opening the app.
   if (hour < 5) return 'dashboard.greetingNight'
   if (hour < 12) return 'dashboard.greetingMorning'
   if (hour < 17) return 'dashboard.greetingAfternoon'
   if (hour < 22) return 'dashboard.greetingEvening'
   return 'dashboard.greetingNight'
+}
+
+// "Not today" on the weight card hides it for the rest of the day only.
+const weightHiddenKey = (uid) => `ironlog:weightCardHidden:${uid}`
+function readWeightHidden(uid, todayIso) {
+  try {
+    return localStorage.getItem(weightHiddenKey(uid)) === todayIso
+  } catch {
+    return false
+  }
 }
 
 const numLocale = (lang) => (lang === 'he' ? 'he-IL' : 'en-US')
@@ -81,6 +93,16 @@ export default function Dashboard() {
   // Hides the quick weight card right after saving, before the list refetches.
   const [weightSaved, setWeightSaved] = useState(false)
   useEffect(() => setWeightSaved(false), [effectiveUid])
+  const [weightHidden, setWeightHidden] = useState(() => readWeightHidden(effectiveUid, toLocalISODate(new Date())))
+  useEffect(() => setWeightHidden(readWeightHidden(effectiveUid, toLocalISODate(new Date()))), [effectiveUid])
+  function hideWeightCard() {
+    setWeightHidden(true)
+    try {
+      localStorage.setItem(weightHiddenKey(effectiveUid), toLocalISODate(new Date()))
+    } catch {
+      /* storage blocked: it just hides until the next load */
+    }
+  }
   const exById = useMemo(() => exerciseMap(exercises), [exercises])
   // Lets the rest-day card open today's panel inside WeeklySchedule.
   const [panelReq, setPanelReq] = useState(null)
@@ -230,7 +252,7 @@ export default function Dashboard() {
             </div>
             <p className="text-[20px] font-semibold leading-tight">{isFreestyleSession(draft) ? t('workout.freestyleSession') : draft.routineName}</p>
             <p className="text-chalkdim text-[13px] mt-1">
-              {timeAgo(draft.savedAt, t)} · {draft.entries?.length || 0} {t('dashboard.exerciseLoggedSoFar')}
+              {timeAgo(draft.savedAt, t)} · {t('dashboard.exerciseLoggedSoFar')(draft.entries?.length || 0)}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -301,10 +323,11 @@ export default function Dashboard() {
       )}
 
       {/* A morning weigh-in is the person's own; a coach viewing their account doesn't get it. */}
-      {!actingAs && !weightSaved && !weightsLoading && !weightsError && !loadFailed && !weights.some((w) => w.date === todayIso) && (
+      {!actingAs && !weightSaved && !weightHidden && !weightsLoading && !weightsError && !loadFailed && !weights.some((w) => w.date === todayIso) && (
         <WeightQuickCard
           last={weights[0]}
           t={t}
+          onHide={hideWeightCard}
           onSave={async (weight, unit) => {
             try {
               await addBodyWeightEntry(effectiveUid, { date: todayIso, weight, unit })
@@ -380,7 +403,7 @@ export default function Dashboard() {
         <span className="text-[15px]">
           {t('dashboard.navRoutines')}{' '}
           <span className="text-chalkdim">
-            · {routines.length} {t('dashboard.routinesCount')}
+            · {t('dashboard.routinesCount')(routines.length)}
           </span>
         </span>
         <ForwardChevron size={16} className="text-chalkdim/70 shrink-0" />
@@ -396,7 +419,7 @@ function TodayHero({ routine, others, eyebrow = null, othersLabel = null, sessio
   const last = sessions.find((x) => x.routine_id === routine.id)
   const items = routine.exercises || []
   const shown = items.slice(0, 6)
-  const parts = [`${items.length} ${t('dashboard.exercisesCount')}`]
+  const parts = [t('dashboard.exercisesCount')(items.length)]
   if (last?.duration_minutes) parts.push(t('dashboard.aboutMin', { min: last.duration_minutes }))
   if (last?.date) parts.push(t('dashboard.lastDone', { day: fmtDate(lang, new Date(last.date + 'T00:00:00'), { weekday: 'long' }) }))
   return (
@@ -411,11 +434,10 @@ function TodayHero({ routine, others, eyebrow = null, othersLabel = null, sessio
           {shown.map((it, i) => (
             <div key={i} className="flex items-center justify-between gap-3 py-3 border-t border-white/[0.07]">
               <span className="text-[15px] leading-5 truncate">{entryName(it, exById, lang)}</span>
-              <span className="text-[14px] text-chalkdim whitespace-nowrap">
-                {it.targetSets
-                  ? `${it.targetSets}${it.targetReps && it.category !== 'cardio' ? ` × ${it.targetReps}${it.timed ? t('dashboard.secShort') : ''}` : ''}`
-                  : ''}
-              </span>
+              {/* Same text as the routine list and view (cardio gets its unit). */}
+              <bdi dir="ltr" className="num text-[14px] text-chalkdim whitespace-nowrap">
+                {it.targetSets || it.targetDuration ? itemTarget(routine, it, t) : ''}
+              </bdi>
             </div>
           ))}
           {items.length > shown.length && (
@@ -478,16 +500,26 @@ function OnboardingChecklist({ steps, t }) {
 }
 
 // One number, one tap: today's weight without leaving the home screen.
-// Only shown while today has no entry; the unit follows the last entry.
-function WeightQuickCard({ last, t, onSave }) {
+// Only shown while today has no entry. The unit follows the last entry;
+// a first-time user picks kg or lb here instead of being stuck with kg.
+const WEIGHT_RANGE = { kg: [20, 400], lb: [44, 880] }
+function WeightQuickCard({ last, t, onSave, onHide }) {
   const [value, setValue] = useState('')
   const [saving, setSaving] = useState(false)
-  const unit = last?.unit || 'kg'
+  const [pickedUnit, setPickedUnit] = useState('kg')
+  const [rangeError, setRangeError] = useState(false)
+  const unit = last?.unit || pickedUnit
+  const [min, max] = WEIGHT_RANGE[unit] || WEIGHT_RANGE.kg
   const num = Number(value.replace(',', '.'))
   const valid = value.trim() !== '' && Number.isFinite(num) && num > 0
   async function submit(e) {
     e.preventDefault()
     if (!valid || saving) return
+    // A slip like 800 would poison every later "last weight" and chart.
+    if (num < min || num > max) {
+      setRangeError(true)
+      return
+    }
     setSaving(true)
     await onSave(num, unit)
     setSaving(false)
@@ -505,9 +537,13 @@ function WeightQuickCard({ last, t, onSave }) {
               type="text"
               inputMode="decimal"
               value={value}
-              onChange={(e) => setValue(e.target.value)}
+              onChange={(e) => {
+                setValue(e.target.value)
+                setRangeError(false)
+              }}
               placeholder={last ? String(last.weight) : ''}
               aria-label={t('dashboard.logWeightLabel')}
+              aria-invalid={rangeError || undefined}
               className="w-full num pe-12 min-h-[44px]"
             />
             <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-chalkdim text-sm">{unit}</span>
@@ -515,6 +551,38 @@ function WeightQuickCard({ last, t, onSave }) {
           <Button type="submit" disabled={!valid || saving} className="min-h-[44px]">
             {t('dashboard.logWeightSave')}
           </Button>
+        </div>
+        {rangeError && (
+          <p role="alert" className="text-[13px] text-red-400">
+            {t('dashboard.logWeightRange', { min, max, unit })}
+          </p>
+        )}
+        <div className="flex items-center justify-between gap-2">
+          {last?.unit ? (
+            <span />
+          ) : (
+            <div role="group" aria-label={t('dashboard.logWeightUnit')} dir="ltr" className="inline-flex rounded-[10px] bg-surface2 p-0.5">
+              {['kg', 'lb'].map((u) => (
+                <button
+                  key={u}
+                  type="button"
+                  aria-pressed={pickedUnit === u}
+                  onClick={() => {
+                    setPickedUnit(u)
+                    setRangeError(false)
+                  }}
+                  className={`press min-h-[44px] min-w-[52px] rounded-[8px] text-[13px] ${
+                    pickedUnit === u ? 'bg-chalk text-ink font-semibold' : 'text-chalkdim hover:text-chalk'
+                  }`}
+                >
+                  {u}
+                </button>
+              ))}
+            </div>
+          )}
+          <button type="button" onClick={onHide} className="press text-chalkdim text-[13px] hover:text-chalk min-h-[44px] px-2">
+            {t('dashboard.logWeightHide')}
+          </button>
         </div>
       </form>
     </Card>

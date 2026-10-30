@@ -186,6 +186,10 @@ export default function SessionEntryCard({
     const id = setInterval(() => setTick((n) => n + 1), 250)
     return () => clearInterval(id)
   }, [hold])
+  // The clock is tied to a set by position, so adding or removing a set
+  // mid-hold stops it rather than writing the seconds into the wrong row.
+  const setCount = (entry.sets || []).length
+  useEffect(() => { setHold(null) }, [setCount])
   const isCardio = entry.category === 'cardio'
   // Timed holds (plank, wall sit) are bodyweight-style sets whose "reps"
   // field holds seconds, so everything else about them carries over.
@@ -357,7 +361,7 @@ export default function SessionEntryCard({
     }
     if (isTimed) {
       const added = Number(data.weight) > 0 ? `+${data.weight} · ` : ''
-      return `${added}${formatSeconds(data.reps)}`
+      return `${added}${formatSeconds(data.reps, t('dashboard.secShort'))}`
     }
     if (entry.bodyweight) return Number(data.weight) > 0 ? `+${data.weight} × ${data.reps}` : `${data.reps}`
     return `${data.weight} × ${data.reps}`

@@ -34,20 +34,26 @@ self.addEventListener('activate', (e) =>
 
 function pageResponse(request, event) {
   const key = SCOPE // every navigation is the same single-page shell
-  const network = fetch(request).then((res) => {
-    if (res.ok) {
-      const copy = res.clone()
-      event.waitUntil(caches.open(CACHE).then((c) => c.put(key, copy)))
-    }
-    return res
-  })
+  const network = fetch(request)
+  // Registered now, while the event is still open: calling waitUntil later,
+  // after the timeout has already answered from cache, throws and the cache
+  // would never refresh. The copy is taken before the page reads the body.
+  event.waitUntil(
+    network
+      .then((res) => {
+        if (!res.ok) return
+        const copy = res.clone()
+        return caches.open(CACHE).then((c) => c.put(key, copy))
+      })
+      .catch(() => {}),
+  )
   const fallback = () => caches.match(key).then((hit) => hit || caches.match(SCOPE + 'index.html'))
   const timeout = new Promise((resolve) => setTimeout(() => resolve(null), NAV_TIMEOUT_MS))
-  // A slow network falls back to the cached shell while the fetch finishes
-  // in the background and refreshes the cache for next time.
+  // A slow network or an error page falls back to the cached shell while the
+  // fetch finishes in the background and refreshes the cache for next time.
   return Promise.race([network.catch(() => null), timeout]).then((res) => {
-    if (res) return res
-    return fallback().then((hit) => hit || network)
+    if (res && res.ok) return res
+    return fallback().then((hit) => hit || res || network)
   })
 }
 
