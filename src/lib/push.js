@@ -42,18 +42,20 @@ export function currentTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 }
 
-// This device's saved reminder row (or null).
+// This device's saved reminder row (or null). Throws if the lookup fails.
 export async function getMyReminder(uid) {
   if (pushStatus() !== 'ready' || Notification.permission !== 'granted') return null
   const reg = await navigator.serviceWorker.getRegistration()
   const sub = await reg?.pushManager.getSubscription()
   if (!sub) return null
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('push_subscriptions')
     .select('remind_time, tz')
     .eq('user_id', uid)
     .eq('endpoint', sub.endpoint)
     .maybeSingle()
+  // A failed lookup must not look like "reminders off" — the caller shows a retry.
+  if (error) throw error
   return data || null
 }
 

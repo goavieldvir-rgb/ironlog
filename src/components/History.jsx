@@ -95,10 +95,10 @@ function matchesQuery(session, q, t, exById, lang) {
 export default function History() {
   const { effectiveUid, actingAs } = useAdmin()
   const { t, lang } = useLanguage()
-  const [sessions, loading, refresh, loadError] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const [sessions, loading, refresh, loadError] = useCollection(effectiveUid, 'sessions', 'date', 'desc', { cached: true })
   const { gyms, mainName, enabled: gymsOn } = useGyms(effectiveUid)
   const loadFailed = !!loadError && sessions.length === 0
-  const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
+  const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc', { cached: true })
   const exById = useMemo(() => exerciseMap(exercises), [exercises])
   const [tab, setTab] = useState('all')
   const [q, setQ] = useState('')

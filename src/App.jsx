@@ -24,16 +24,21 @@ import { ScreenLoader } from './components/Loading.jsx'
 // Screens that aren't on the way to logging a workout load on demand, so
 // launch only waits for what the first screen needs. Charts (recharts) are
 // the bulk of what this keeps out.
-const Nutrition = lazy(() => import('./components/Nutrition.jsx'))
-const People = lazy(() => import('./components/People.jsx'))
-const PersonDetail = lazy(() => import('./components/PersonDetail.jsx'))
-const ErrorLogs = lazy(() => import('./components/ErrorLogs.jsx'))
-const Stats = lazy(() => import('./components/Stats.jsx'))
-const BodyWeight = lazy(() => import('./components/BodyWeight.jsx'))
-const WeeklySummary = lazy(() => import('./components/WeeklySummary.jsx'))
-const Help = lazy(() => import('./components/Help.jsx'))
-const Notifications = lazy(() => import('./components/Notifications.jsx'))
-const Account = lazy(() => import('./components/Account.jsx'))
+// A dynamic import fails when the connection drops, or when a new deploy has
+// replaced the old hashed file. Try once more before giving up; the error
+// boundary then explains it instead of showing a generic crash.
+const lazyRetry = (load) =>
+  lazy(() => load().catch(() => new Promise((r) => setTimeout(r, 800)).then(load)))
+const Nutrition = lazyRetry(() => import('./components/Nutrition.jsx'))
+const People = lazyRetry(() => import('./components/People.jsx'))
+const PersonDetail = lazyRetry(() => import('./components/PersonDetail.jsx'))
+const ErrorLogs = lazyRetry(() => import('./components/ErrorLogs.jsx'))
+const Stats = lazyRetry(() => import('./components/Stats.jsx'))
+const BodyWeight = lazyRetry(() => import('./components/BodyWeight.jsx'))
+const WeeklySummary = lazyRetry(() => import('./components/WeeklySummary.jsx'))
+const Help = lazyRetry(() => import('./components/Help.jsx'))
+const Notifications = lazyRetry(() => import('./components/Notifications.jsx'))
+const Account = lazyRetry(() => import('./components/Account.jsx'))
 
 export default function App() {
   const { user, loading, recovery, needsCode, hasTwoStep } = useAuth()

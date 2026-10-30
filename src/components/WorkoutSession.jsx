@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { Plus, Library, X, MapPin, ChevronDown, ArrowDown, ArrowUp } from 'lucide-react'
+import { Plus, Library, X, MapPin, ChevronDown, ArrowDown, ArrowUp, Search } from 'lucide-react'
 import { InfoTip } from './InfoTip.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -11,7 +11,7 @@ import { saveDraft, loadDraft, clearDraft, FREESTYLE_KEY } from '../lib/draft.js
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
 import { Button, Card, Field, LoadError } from './ui.jsx'
 import SessionEntryCard from './SessionEntryCard.jsx'
-import ExercisePicker from './ExercisePicker.jsx'
+import ExercisePicker, { useDialog } from './ExercisePicker.jsx'
 import ExerciseSelect from './ExerciseSelect.jsx'
 import { ExerciseModal, emptyExerciseForm } from './ExerciseLibrary.jsx'
 import RestTimer, { clearSavedRest } from './RestTimer.jsx'
@@ -52,6 +52,14 @@ function newSessionId() {
   }
 }
 
+// Each entry carries a client-only `uid` used as its React key, so a card's
+// local state (open note, menu) follows it when the exercise is moved. Drafts
+// saved before this existed get one on load. It is never saved with a session:
+// handleFinish builds each saved entry from an explicit list of fields.
+function withKeys(list) {
+  return list.map((e) => (e.uid ? e : { ...e, uid: newSessionId() }))
+}
+
 // A set that has been ticked or has numbers in it (cardio starts with its
 // duration pre-filled, so only a typed distance counts there).
 function setHasLogged(entry, s) {
@@ -73,6 +81,109 @@ function supersetPos(entries, i) {
   if (next) return 'start'
   if (prev) return 'end'
   return null
+}
+
+// A resumed draft older than this gets a "still the same workout?" note.
+const STALE_DRAFT_MS = 12 * 60 * 60 * 1000
+
+// Modal shell for the swap dialog and the add sheet: dialog semantics, Escape,
+// focus in on open and back to the trigger on close, page scroll locked.
+// `sheet` anchors it to the bottom of the screen instead of centring it.
+function ModalShell({ onClose, label, sheet, children }) {
+  const ref = useRef(null)
+  useDialog(ref, onClose)
+  useScrollLock(true)
+  return (
+    <div
+      ref={ref}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={label}
+      className={`fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex justify-center outline-none ${sheet ? 'items-end' : 'items-center p-4'}`}
+      style={sheet ? undefined : { paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}
+      onClick={onClose}
+    >
+      {children}
+    </div>
+  )
+}
+
+// Bottom sheet for adding an exercise in one tap: search on top, the lifter's
+// most-used exercises first, then everything else that matches.
+function AddExerciseSheet({ options, recentIds, onPick, onBrowse, onClose, t }) {
+  const titleId = useId()
+  const [q, setQ] = useState('')
+  const inputRef = useRef(null)
+  // Explicit, because the sheet's focus handling runs after this and would
+  // otherwise land on the dialog itself.
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+  const needle = q.trim().toLowerCase()
+  const match = (o) => !needle || o.label.toLowerCase().includes(needle) || (o.alt && o.alt.toLowerCase().includes(needle))
+  const recentSet = new Set(recentIds)
+  const recent = recentIds.map((id) => options.find((o) => o.id === id)).filter((o) => o && match(o))
+  const rest = options.filter((o) => !recentSet.has(o.id) && match(o))
+  const row = (o) => (
+    <button
+      key={o.id}
+      type="button"
+      onClick={() => onPick(o.id)}
+      className="press-row w-full text-start px-3 min-h-[48px] text-[15px] text-chalk hover:bg-surface2 rounded-md flex items-center"
+    >
+      <span className="truncate">{o.label}</span>
+    </button>
+  )
+  return (
+    <ModalShell onClose={onClose} label={titleId} sheet>
+      <div
+        className="card w-full max-w-lg max-h-[85dvh] flex flex-col rounded-b-none px-4 pt-4"
+        style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h2 id={titleId} className="text-xl">{t('workout.addExercise')}</h2>
+          <button type="button" onClick={onClose} aria-label={t('common.close')} title={t('common.close')} className="press w-11 h-11 -me-2 flex items-center justify-center text-chalkdim hover:text-chalk">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="relative mb-2">
+          <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-chalkdim pointer-events-none" aria-hidden="true" />
+          <input
+            ref={inputRef}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={t('common.searchExercises')}
+            aria-label={t('common.searchExercises')}
+            className="w-full ps-9"
+          />
+        </div>
+        <div className="flex-1 overflow-y-auto -mx-2 px-2 min-h-[160px]">
+          {recent.length > 0 && (
+            <section aria-label={t('workout.addSheetRecent')}>
+              <p className="px-3 pt-1 pb-1 text-[11px] uppercase tracking-wide text-chalkdim" aria-hidden="true">{t('workout.addSheetRecent')}</p>
+              {recent.map(row)}
+            </section>
+          )}
+          {rest.length > 0 && (
+            <section aria-label={t('workout.addSheetAll')}>
+              {recent.length > 0 && <p className="px-3 pt-3 pb-1 text-[11px] uppercase tracking-wide text-chalkdim" aria-hidden="true">{t('workout.addSheetAll')}</p>}
+              {rest.map(row)}
+            </section>
+          )}
+          {recent.length === 0 && rest.length === 0 && (
+            <p className="text-chalkdim text-sm px-3 py-3">{options.length === 0 ? t('workout.addSheetNone') : t('common.noMatches')}</p>
+          )}
+        </div>
+        <div className="pt-3 mt-2 border-t border-line">
+          <button type="button" onClick={onBrowse} className="press min-h-[44px] text-brass text-sm inline-flex items-center gap-1.5">
+            <Library size={16} /> {t('routines.browseLibrary')}
+          </button>
+        </div>
+      </div>
+    </ModalShell>
+  )
 }
 
 export default function WorkoutSession() {
@@ -130,7 +241,6 @@ export default function WorkoutSession() {
   const [date, setDate] = useState(todayISO())
   const [notes, setNotes] = useState('')
   const [entries, setEntries] = useState([])
-  const [pickId, setPickId] = useState('')
   // A one-time, this-session-only substitution — e.g. a machine is broken
   // at the gym today. Only the local `entries` state changes; the routine
   // document itself is never touched, so next time this routine is
@@ -143,8 +253,12 @@ export default function WorkoutSession() {
   // instead of duplicating them.
   const [showLibraryPicker, setShowLibraryPicker] = useState(false)
   const [creatingCustom, setCreatingCustom] = useState(false)
+  // The "+ Add exercise" bottom sheet.
+  const [showAddSheet, setShowAddSheet] = useState(false)
+  // Set when a resumed draft was started long ago: when it was started.
+  const [staleSince, setStaleSince] = useState(null)
   const [saving, setSaving] = useState(false)
-  useScrollLock(swapIndex != null || showLibraryPicker || creatingCustom)
+  useScrollLock(showLibraryPicker || creatingCustom)
   const [saved, setSaved] = useState(false)
   const [summary, setSummary] = useState(null)
   // Screen stays on for the whole workout; the summary screen lets it sleep.
@@ -185,47 +299,10 @@ export default function WorkoutSession() {
     })
   }
 
-  // On open: if there's a matching in-progress draft for this exact routine
-  // (or this exact freestyle session) sitting in local storage, restore it
-  // instead of starting fresh — this is what makes "Resume workout" work,
-  // and also what saves you if Safari reloads the tab mid-session.
-  // Fetch the share picture's fonts now so they're ready when the workout ends.
-  useEffect(() => {
-    preloadShareFonts()
-  }, [])
-
-  useEffect(() => {
-    if (isFreestyle) {
-      const draft = loadDraft(effectiveUid, draftKey)
-      if (draft && draft.routineId === null) {
-        setEntries(refreshLastKnownData(draft.entries || [], exercises))
-        setDate(draft.date || todayISO())
-        setNotes(draft.notes || '')
-        setStartedAt(draft.startedAt || null)
-        if (draft.sessionId) setSessionId(draft.sessionId)
-        if (draft.gymId !== undefined) setGymChoice(draft.gymId)
-        setReady(true)
-        return
-      }
-      setEntries([])
-      setStartedAt(Date.now())
-      setReady(true)
-      return
-    }
-    if (routine) {
-      const draft = loadDraft(effectiveUid, draftKey)
-      if (draft && draft.routineId === routine.id) {
-        setEntries(refreshLastKnownData(draft.entries || [], exercises))
-        setDate(draft.date || todayISO())
-        setNotes(draft.notes || '')
-        setStartedAt(draft.startedAt || null)
-        if (draft.sessionId) setSessionId(draft.sessionId)
-        if (draft.gymId !== undefined) setGymChoice(draft.gymId)
-        setReady(true)
-        return
-      }
-      setEntries(
-        routine.exercises.map((it) => {
+  // A fresh set of entries from the routine template.
+  function buildRoutineEntries(r) {
+    return withKeys(
+        r.exercises.map((it) => {
           const full = exercises.find((e) => e.id === it.exerciseId)
           const category = it.category || full?.category || 'strength'
           if (category === 'cardio') {
@@ -273,7 +350,51 @@ export default function WorkoutSession() {
             sets: Array.from({ length: it.targetSets || 3 }, () => ({ weight: '', reps: '', rir: '' })),
           }
         }),
-      )
+    )
+  }
+
+  // On open: if there's a matching in-progress draft for this exact routine
+  // (or this exact freestyle session) sitting in local storage, restore it
+  // instead of starting fresh — this is what makes "Resume workout" work,
+  // and also what saves you if Safari reloads the tab mid-session.
+  // Fetch the share picture's fonts now so they're ready when the workout ends.
+  useEffect(() => {
+    preloadShareFonts()
+  }, [])
+
+  useEffect(() => {
+    if (isFreestyle) {
+      const draft = loadDraft(effectiveUid, draftKey)
+      if (draft && draft.routineId === null) {
+        setEntries(withKeys(refreshLastKnownData(draft.entries || [], exercises)))
+        if (draft.startedAt && Date.now() - draft.startedAt > STALE_DRAFT_MS) setStaleSince(draft.startedAt)
+        setDate(draft.date || todayISO())
+        setNotes(draft.notes || '')
+        setStartedAt(draft.startedAt || null)
+        if (draft.sessionId) setSessionId(draft.sessionId)
+        if (draft.gymId !== undefined) setGymChoice(draft.gymId)
+        setReady(true)
+        return
+      }
+      setEntries([])
+      setStartedAt(Date.now())
+      setReady(true)
+      return
+    }
+    if (routine) {
+      const draft = loadDraft(effectiveUid, draftKey)
+      if (draft && draft.routineId === routine.id) {
+        setEntries(withKeys(refreshLastKnownData(draft.entries || [], exercises)))
+        if (draft.startedAt && Date.now() - draft.startedAt > STALE_DRAFT_MS) setStaleSince(draft.startedAt)
+        setDate(draft.date || todayISO())
+        setNotes(draft.notes || '')
+        setStartedAt(draft.startedAt || null)
+        if (draft.sessionId) setSessionId(draft.sessionId)
+        if (draft.gymId !== undefined) setGymChoice(draft.gymId)
+        setReady(true)
+        return
+      }
+      setEntries(buildRoutineEntries(routine))
       setStartedAt(Date.now())
       setReady(true)
     }
@@ -434,6 +555,7 @@ export default function WorkoutSession() {
   function buildEntryFromExercise(ex, targetSets = 3) {
     if (ex.category === 'cardio') {
       return {
+        uid: newSessionId(),
         exerciseId: ex.id,
         name: (lang === 'he' && ex.name_he) || ex.name,
         nameEn: ex.name,
@@ -451,6 +573,7 @@ export default function WorkoutSession() {
       }
     }
     return {
+      uid: newSessionId(),
       exerciseId: ex.id,
       name: (lang === 'he' && ex.name_he) || ex.name,
       nameEn: ex.name,
@@ -473,11 +596,29 @@ export default function WorkoutSession() {
     return { ...buildEntryFromExercise(ex, targetSets), ...(old.supersetWithNext ? { supersetWithNext: true } : {}) }
   }
 
-  function addFreestyleExercise() {
-    const ex = gymExercises.find((e) => e.id === pickId)
+  // One tap in the add sheet: the exercise goes to the end, the sheet closes.
+  function addFromSheet(id) {
+    const ex = gymExercises.find((e) => e.id === id)
     if (!ex) return
-    setEntries([...entries, buildEntryFromExercise(ex)])
-    setPickId('')
+    const entry = buildEntryFromExercise(ex)
+    const at = entries.length
+    setEntries((prev) => [...prev, entry])
+    setShowAddSheet(false)
+    toast(t('workout.exerciseAdded', { name: liveName(entry) }))
+    // After the sheet has unlocked the page, bring the new card into view.
+    setTimeout(() => scrollToEntry(at), 150)
+  }
+
+  // Start over from the routine template (or empty, for a freestyle session).
+  function startFresh() {
+    clearDraft(effectiveUid, draftKey)
+    clearSavedRest()
+    setStaleSince(null)
+    setDate(todayISO())
+    setNotes('')
+    setSessionId(newSessionId())
+    setStartedAt(Date.now())
+    setEntries(isFreestyle || !routine ? [] : buildRoutineEntries(routine))
   }
 
   // Swapping keeps what was logged when the new exercise takes the same kind
@@ -530,7 +671,6 @@ export default function WorkoutSession() {
     } else {
       setEntries((prev) => [...prev, buildEntryFromExercise(ex)])
     }
-    setPickId('')
     setSwapPickId('')
     return true
   }
@@ -756,6 +896,23 @@ export default function WorkoutSession() {
   if (summary) return <WorkoutDone summary={summary} onDone={() => navigate('/history', { replace: true })} />
 
   const availableToAdd = exercises.filter((e) => !entries.some((en) => en.exerciseId === e.id))
+  const exerciseOptions = availableToAdd.map((e) => ({
+    id: e.id,
+    label: `${(lang === 'he' && e.name_he) || e.name}${e.category !== 'strength' ? ` (${e.category})` : ''}`,
+    // The other language's name, so English terms still find it in Hebrew.
+    alt: (lang === 'he' ? e.name : e.name_he) || '',
+  }))
+  // Most-used first, counted per past workout; only ones not in this workout.
+  const recentIds = (() => {
+    const counts = new Map()
+    for (const s of pastSessions) for (const en of s.entries || []) counts.set(en.exerciseId, (counts.get(en.exerciseId) || 0) + 1)
+    return availableToAdd
+      .filter((e) => counts.has(e.id))
+      .sort((a, b) => counts.get(b.id) - counts.get(a.id))
+      .slice(0, 8)
+      .map((e) => e.id)
+  })()
+  const recentGroups = recentIds.length ? [{ label: t('workout.addSheetRecent'), ids: recentIds }] : undefined
 
   const allWorking = entries.flatMap((e) => workingSets(e.sets))
   const doneCount = allWorking.filter((x) => x.done).length
@@ -827,6 +984,30 @@ export default function WorkoutSession() {
           </button>
         </header>
 
+        {staleSince && (
+          <div className="rounded-xl bg-surface2 px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]" role="status">
+            <p className="text-chalk flex-1 min-w-[200px]">
+              {t('workout.staleDraft', { date: fmtDate(lang, new Date(staleSince), { day: 'numeric', month: 'short' }) })}
+            </p>
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  // Time since now, so a long-abandoned start doesn't skew the duration.
+                  setStartedAt(Date.now())
+                  setStaleSince(null)
+                }}
+                className="press min-h-[44px] px-3 font-semibold text-accent"
+              >
+                {t('workout.staleKeep')}
+              </button>
+              <button type="button" onClick={startFresh} className="press min-h-[44px] px-3 text-chalkdim hover:text-chalk">
+                {t('workout.staleFresh')}
+              </button>
+            </div>
+          </div>
+        )}
+
         {gymsOn && gymChoice !== undefined && (
           <label className="relative self-center inline-flex items-center gap-1.5 h-9 ps-3 pe-2.5 rounded-full bg-surface2 text-[13px] font-medium text-chalk focus-within:ring-2 focus-within:ring-accent">
             <MapPin size={14} className="text-accent" aria-hidden="true" />
@@ -835,7 +1016,12 @@ export default function WorkoutSession() {
             <ChevronDown size={14} className="text-chalkdim" aria-hidden="true" />
             <select
               value={gymId || ''}
-              onChange={(e) => setGymChoice(e.target.value || null)}
+              onChange={(e) => {
+                const next = e.target.value || null
+                setGymChoice(next)
+                // The Previous numbers change under the lifter's feet; say so.
+                toast(t('workout.gymPreviousFrom', { gym: gymLabel(next, gyms, mainName, t) }))
+              }}
               className="absolute inset-0 opacity-0 cursor-pointer"
             >
               <option value="">{gymLabel(null, gyms, mainName, t)}</option>
@@ -854,7 +1040,7 @@ export default function WorkoutSession() {
 
         {entries.map((entry, i) => (
           <div
-            key={entry.exerciseId + i}
+            key={entry.uid || entry.exerciseId + i}
             ref={(el) => (entryRefs.current[i] = el)}
             className={`scroll-mt-4 rounded-[22px] ${glowIdx === i ? 'jump-glow' : ''}`}
           >
@@ -891,29 +1077,12 @@ export default function WorkoutSession() {
         {/* Also available inside a planned routine: adding here affects
             THIS session only — the routine itself is untouched, same as
             swapping. */}
-        <Card className="flex flex-col gap-2">
-          <div className="flex items-end gap-2 flex-wrap">
-            <Field label={t('workout.addExercise')}>
-              <ExerciseSelect
-                value={pickId}
-                onChange={setPickId}
-                options={availableToAdd.map((e) => ({
-                  id: e.id,
-                  label: `${(lang === 'he' && e.name_he) || e.name}${e.category !== 'strength' ? ` (${e.category})` : ''}`,
-                }))}
-                placeholder={t('workout.chooseFromLibrary')}
-                className="w-full sm:w-72"
-              />
-            </Field>
-            <Button type="button" variant="ghost" onClick={addFreestyleExercise} disabled={!pickId}>
-              <Plus size={16} /> {t('common.add')}
-            </Button>
-            <Button type="button" variant="ghost" onClick={() => setShowLibraryPicker(true)}>
-              <Library size={16} /> {t('routines.browseLibrary')}
-            </Button>
-          </div>
-          {!isFreestyle && <p className="text-chalkdim text-xs">{t('workout.addOneOffNote')}</p>}
-        </Card>
+        <div className="flex flex-col gap-2">
+          <Button type="button" variant="ghost" className="w-full min-h-[48px]" onClick={() => setShowAddSheet(true)}>
+            <Plus size={16} /> {t('workout.addExercise')}
+          </Button>
+          {!isFreestyle && <p className="text-chalkdim text-xs text-center">{t('workout.addOneOffNote')}</p>}
+        </div>
 
         <Card>
           <Field
@@ -952,13 +1121,9 @@ export default function WorkoutSession() {
       </div>
 
       {swapIndex != null && !showLibraryPicker && !creatingCustom && (
-        <div
-          className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4"
-          style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}
-          onClick={() => setSwapIndex(null)}
-        >
+        <ModalShell onClose={() => setSwapIndex(null)} label="swap-title">
           <div className="card p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl mb-2">{t('workout.swapTitle')}</h2>
+            <h2 id="swap-title" className="text-2xl mb-2">{t('workout.swapTitle')}</h2>
             <p className="text-chalkdim text-sm mb-4">
               {t('workout.swapSubtitle', { name: swapIndex != null ? liveName(entries[swapIndex]) : '' })}
             </p>
@@ -966,10 +1131,9 @@ export default function WorkoutSession() {
               <ExerciseSelect
                 value={swapPickId}
                 onChange={setSwapPickId}
-                options={availableToAdd.map((e) => ({
-                  id: e.id,
-                  label: `${(lang === 'he' && e.name_he) || e.name}${e.category !== 'strength' ? ` (${e.category})` : ''}`,
-                }))}
+                options={exerciseOptions}
+                groups={recentGroups}
+                restLabel={t('workout.addSheetAll')}
                 placeholder={t('workout.chooseFromLibrary')}
               />
             </Field>
@@ -999,7 +1163,21 @@ export default function WorkoutSession() {
               </Button>
             </div>
           </div>
-        </div>
+        </ModalShell>
+      )}
+
+      {showAddSheet && (
+        <AddExerciseSheet
+          options={exerciseOptions}
+          recentIds={recentIds}
+          onPick={addFromSheet}
+          onBrowse={() => {
+            setShowAddSheet(false)
+            setShowLibraryPicker(true)
+          }}
+          onClose={() => setShowAddSheet(false)}
+          t={t}
+        />
       )}
 
       {showLibraryPicker && (

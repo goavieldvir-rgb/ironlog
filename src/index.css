@@ -55,6 +55,17 @@
   select {
     min-height: 44px;
   }
+  /* Spin arrows eat a third of the narrow weight and reps boxes, so a
+     3-digit weight got cut off. Phones have their own number keyboard. */
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
   h1, h2, h3, h4 {
     @apply font-display font-semibold;
     letter-spacing: -0.02em;

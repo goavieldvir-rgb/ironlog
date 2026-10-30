@@ -56,6 +56,17 @@ function fullDate(lang, iso) {
 // since yesterday, and the unit follows the person's last entry.
 const emptyForm = (unit = 'kg') => ({ date: todayISO(), weight: '', unit })
 
+const RANGES = [
+  { id: '1m', days: 30, key: 'bodyWeight.range1m' },
+  { id: '3m', days: 90, key: 'bodyWeight.range3m' },
+  { id: '1y', days: 365, key: 'bodyWeight.range1y' },
+  { id: 'all', days: null, key: 'bodyWeight.rangeAll' },
+]
+const LIST_LIMIT = 20
+const DAY_MS = 86400000
+const dayNum = (iso) => Math.round(new Date(iso + 'T00:00:00').getTime() / DAY_MS)
+const round1 = (n) => Math.round(n * 10) / 10
+
 export default function BodyWeight() {
   const { effectiveUid, actingAs } = useAdmin()
   const { t, lang } = useLanguage()
@@ -65,6 +76,8 @@ export default function BodyWeight() {
   const [form, setForm] = useState(() => emptyForm())
   const [editingId, setEditingId] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [range, setRange] = useState('all')
+  const [showAllEntries, setShowAllEntries] = useState(false)
 
   const sorted = useMemo(() => [...entries].sort((a, b) => (a.date < b.date ? 1 : -1)), [entries])
   const latest = sorted[0]
@@ -76,15 +89,52 @@ export default function BodyWeight() {
     if (!latest?.unit) return
     setForm((f) => (editingId || f.weight || f.unit === latest.unit ? f : { ...f, unit: latest.unit }))
   }, [latest?.unit, editingId])
-  const chartData = useMemo(
-    () =>
-      [...entries]
-        .sort((a, b) => (a.date > b.date ? 1 : -1))
-        .map((e) => ({ ...e, label: shortDate(lang, e.date), weightDisplay: Math.round(fromKg(toKg(e.weight, e.unit), displayUnit) * 10) / 10 })),
-    [entries, displayUnit, lang],
-  )
+  // 7-day moving average is computed over every entry (so the first points of
+  // a short range are still averaged against the week before), then the range
+  // only trims what's drawn.
+  const fullData = useMemo(() => {
+    const asc = [...entries]
+      .sort((a, b) => (a.date > b.date ? 1 : -1))
+      .map((e) => ({ ...e, day: dayNum(e.date), kg: toKg(e.weight, e.unit) }))
+    return asc.map((e, i) => {
+      let sum = 0
+      let n = 0
+      for (let j = i; j >= 0 && e.day - asc[j].day < 7; j--) { sum += asc[j].kg; n++ }
+      return {
+        ...e,
+        label: shortDate(lang, e.date),
+        weightDisplay: round1(fromKg(e.kg, displayUnit)),
+        avg7: round1(fromKg(sum / n, displayUnit)),
+      }
+    })
+  }, [entries, displayUnit, lang])
+  const chartData = useMemo(() => {
+    const days = RANGES.find((r) => r.id === range)?.days
+    if (!days) return fullData
+    const cutoff = dayNum(todayISO()) - days
+    return fullData.filter((e) => e.day >= cutoff)
+  }, [fullData, range])
 
-  const first = chartData[0]
+  const first = fullData[0]
+  // Change over the last 7 days: the latest entry against the newest one from a
+  // week or more before it, or failing that the oldest one inside that week.
+  const change7 = useMemo(() => {
+    const last = fullData[fullData.length - 1]
+    if (!last || fullData.length < 2) return null
+    const before = [...fullData].reverse().find((e) => e.day <= last.day - 7)
+    const ref = before || fullData.find((e) => e.day > last.day - 7 && e !== last)
+    if (!ref) return null
+    if (!before && last.day - ref.day < 1) return null
+    return round1(fromKg(last.kg - ref.kg, displayUnit))
+  }, [fullData, displayUnit])
+  const signed = (n) => `${n > 0 ? '+' : ''}${n}${displayUnit}`
+  const chartLabel =
+    latest && change7 != null
+      ? t('bodyWeight.chartAria', {
+          latest: `${latest.weight} ${latest.unit}`,
+          change: change7 === 0 ? t('bodyWeight.chgFlat') : t(change7 > 0 ? 'bodyWeight.chgUp' : 'bodyWeight.chgDown', { v: `${Math.abs(change7)} ${displayUnit}` }),
+        })
+      : t('bodyWeight.chartAriaNoChange', { latest: latest ? `${latest.weight} ${latest.unit}` : '' })
   const change =
     latest && first0 && latest.id !== first0.id
       ? Math.round(fromKg(toKg(latest.weight, latest.unit) - toKg(first0.weight, first0.unit), displayUnit) * 10) / 10
@@ -132,17 +182,33 @@ export default function BodyWeight() {
       </div>
 
       {!loading && entries.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Stat label={t('bodyWeight.current')} value={latest ? `${latest.weight}${latest.unit}` : '—'} />
           <Stat label={t('bodyWeight.firstLogged')} value={first ? `${first.weight}${first.unit}` : '—'} />
-          <Stat label={t('bodyWeight.change')} value={change != null ? `${change > 0 ? '+' : ''}${change}${displayUnit}` : '—'} />
+          <Stat label={t('bodyWeight.change')} value={change != null ? signed(change) : '—'} />
+          <Stat label={t('bodyWeight.last7')} value={change7 != null ? signed(change7) : '—'} />
         </div>
       )}
 
       {!loading && entries.length > 1 && (
         <Card>
-          <h2 className="eyebrow mb-4">{t('bodyWeight.overTime')}</h2>
-          <div dir="ltr">
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+            <h2 className="eyebrow">{t('bodyWeight.overTime')}</h2>
+            <div role="group" aria-label={t('bodyWeight.rangeLabel')} className="flex rounded-md bg-surface2 p-1 text-sm w-fit">
+              {RANGES.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => setRange(r.id)}
+                  aria-pressed={range === r.id}
+                  className={`px-3 min-h-11 rounded transition-colors ${range === r.id ? 'bg-ink text-chalk' : 'text-chalkdim'}`}
+                >
+                  {t(r.key)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div dir="ltr" role="img" aria-label={chartLabel}>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
@@ -158,11 +224,16 @@ export default function BodyWeight() {
                 <Tooltip
                   contentStyle={{ background: SURFACE, border: 0, borderRadius: 12, fontSize: 13 }}
                   labelStyle={{ color: COLORS.chalk }}
-                  formatter={(value) => [`${value}${displayUnit}`, t('bodyWeight.weightTooltipLabel')]}
+                  formatter={(value, name) => [`${value}${displayUnit}`, name]}
                 />
-                <Line type="monotone" dataKey="weightDisplay" stroke={COLORS.iron} strokeWidth={2.5} dot={{ fill: COLORS.iron, r: 3 }} />
+                <Line type="monotone" name={t('bodyWeight.weightTooltipLabel')} dataKey="weightDisplay" stroke={COLORS.iron} strokeWidth={2.5} dot={chartData.length > 60 ? false : { fill: COLORS.iron, r: 3 }} isAnimationActive={false} />
+                <Line type="monotone" name={t('bodyWeight.avg7')} dataKey="avg7" stroke={COLORS.chalk} strokeWidth={2} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
+          </div>
+          <div className="flex items-center gap-4 flex-wrap mt-3 text-xs text-chalkdim">
+            <span className="inline-flex items-center gap-1.5"><span className="w-4 h-0.5 rounded" style={{ background: COLORS.iron }} />{t('bodyWeight.weightTooltipLabel')}</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-4 border-t-2 border-dashed" style={{ borderColor: COLORS.chalk }} />{t('bodyWeight.avg7')}</span>
           </div>
         </Card>
       )}
@@ -213,7 +284,7 @@ export default function BodyWeight() {
 
       {sorted.length > 0 && (
         <Card className="flex flex-col divide-y divide-line">
-          {sorted.map((e) => (
+          {(showAllEntries ? sorted : sorted.slice(0, LIST_LIMIT)).map((e) => (
             <div key={e.id} className="flex items-center justify-between py-2.5">
               <div className="flex items-center gap-2">
                 <Scale size={14} className="text-chalkdim" />
@@ -246,6 +317,15 @@ export default function BodyWeight() {
               </div>
             </div>
           ))}
+          {sorted.length > LIST_LIMIT && (
+            <button
+              type="button"
+              onClick={() => setShowAllEntries((v) => !v)}
+              className="min-h-11 pt-2.5 text-sm text-chalkdim hover:text-chalk"
+            >
+              {showAllEntries ? t('bodyWeight.showFewer') : t('bodyWeight.showAllEntries')(sorted.length)}
+            </button>
+          )}
         </Card>
       )}
 

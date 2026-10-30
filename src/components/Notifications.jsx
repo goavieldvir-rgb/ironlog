@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Bell, Share, SquarePlus, Smartphone, Send } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -10,24 +10,45 @@ export default function Notifications() {
   const { user } = useAuth()
   const { t, lang } = useLanguage()
   const { toast } = useFeedback()
+  // Bumped after a permission prompt so pushStatus() is read again and a
+  // denied answer shows the blocked card right away.
+  const [, setStatusTick] = useState(0)
   const status = pushStatus()
   const [on, setOn] = useState(false)
   const [time, setTime] = useState(DEFAULT_REMIND_TIME)
   const [busy, setBusy] = useState(false)
   const [loaded, setLoaded] = useState(status !== 'ready')
+  const [loadError, setLoadError] = useState(false)
+  const saveTimer = useRef(null)
+  const pendingTime = useRef(null)
 
-  useEffect(() => {
-    if (status !== 'ready') return
+  function load() {
+    if (pushStatus() !== 'ready') { setLoaded(true); return }
+    setLoaded(false)
+    setLoadError(false)
     getMyReminder(user.uid)
       .then((r) => {
         if (r) { setOn(true); setTime(String(r.remind_time).slice(0, 5)) }
       })
-      .catch(console.error)
+      .catch((e) => { console.error(e); setLoadError(true) })
       .finally(() => setLoaded(true))
+  }
+
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Save a pending time change if the page is left before the debounce fires.
+  useEffect(() => () => {
+    clearTimeout(saveTimer.current)
+    if (pendingTime.current) updateReminder(user.uid, pendingTime.current, lang).catch(console.error)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function toggle() {
+    clearTimeout(saveTimer.current)
+    pendingTime.current = null
     setBusy(true)
     try {
       if (on) {
@@ -44,6 +65,7 @@ export default function Notifications() {
       toast(e.message === 'denied' ? t('notifications.denied') : e.message === 'unsupported-service' ? t('notifications.unsupported') : t('notifications.failed'), 'error')
     } finally {
       setBusy(false)
+      setStatusTick((n) => n + 1)
     }
   }
 
@@ -57,8 +79,11 @@ export default function Notifications() {
     }
   }
 
-  async function changeTime(v) {
-    setTime(v)
+  // The time picker fires onChange on every wheel tick, so the save waits for
+  // the person to stop (800ms) or leave the field, and toasts once.
+  async function commitTime(v) {
+    clearTimeout(saveTimer.current)
+    pendingTime.current = null
     if (!on || !v) return
     try {
       await updateReminder(user.uid, v, lang)
@@ -67,6 +92,14 @@ export default function Notifications() {
       console.error(e)
       toast(t('notifications.failed'), 'error')
     }
+  }
+
+  function changeTime(v) {
+    setTime(v)
+    clearTimeout(saveTimer.current)
+    if (!on || !v) { pendingTime.current = null; return }
+    pendingTime.current = v
+    saveTimer.current = setTimeout(() => commitTime(v), 800)
   }
 
   return (
@@ -103,7 +136,14 @@ export default function Notifications() {
         <Card><p className="text-sm text-chalkdim">{t('notifications.blocked')}</p></Card>
       )}
 
-      {status === 'ready' && (
+      {status === 'ready' && loadError && (
+        <Card className="flex flex-col items-start gap-3">
+          <p role="alert" className="text-sm text-chalk">{t('notifications.loadFailed')}</p>
+          <Button variant="brass" onClick={load}>{t('common.tryAgain')}</Button>
+        </Card>
+      )}
+
+      {status === 'ready' && !loadError && (
         <Card className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -132,6 +172,7 @@ export default function Notifications() {
               dir="ltr"
               value={time}
               onChange={(e) => changeTime(e.target.value)}
+              onBlur={(e) => { if (pendingTime.current) commitTime(e.target.value) }}
               className="num bg-surface2 rounded-md px-3 min-h-[44px] text-chalk"
             />
           </label>

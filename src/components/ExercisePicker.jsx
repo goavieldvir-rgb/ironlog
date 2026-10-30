@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, Plus, Check } from 'lucide-react'
 import { useGlobalExercises } from '../lib/db.js'
 import { disambiguateLabels } from '../lib/disambiguate.js'
@@ -7,12 +7,42 @@ import { useFeedback } from '../context/FeedbackContext.jsx'
 import { Button, CategoryTag, Badge, LoadError } from './ui.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 
+// Dialog behaviour shared by the picker, the swap dialog and the add sheet:
+// Escape closes (only for the top-most dialog, so a confirm on top gets the
+// key first), focus moves in on open (unless something inside already took it,
+// like an autofocused search box) and goes back to the trigger on close.
+export function useDialog(ref, onClose) {
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
+  // Read during the first render, before an autofocused field can take focus.
+  const triggerRef = useRef(undefined)
+  if (triggerRef.current === undefined) triggerRef.current = document.activeElement
+  useEffect(() => {
+    const trigger = triggerRef.current
+    const el = ref.current
+    if (el && !el.contains(document.activeElement)) el.focus()
+    const onKey = (e) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      const open = document.querySelectorAll('[aria-modal="true"]')
+      if (open.length && open[open.length - 1] !== el) return
+      closeRef.current?.()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      if (trigger && trigger.isConnected && typeof trigger.focus === 'function') trigger.focus()
+    }
+  }, [ref])
+}
+
 export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, onClose, lockCategory }) {
   const { t, lang } = useLanguage()
   const { toast } = useFeedback()
   const [globalExercises, loading, refreshGlobal, loadError] = useGlobalExercises()
   const loadFailed = !!loadError && globalExercises.length === 0
   useScrollLock(true)
+  const dialogRef = useRef(null)
+  useDialog(dialogRef, onClose)
   const [q, setQ] = useState('')
   const [tab, setTab] = useState(lockCategory || 'all')
   const [addedIds, setAddedIds] = useState(new Set())
@@ -69,9 +99,9 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
   ]
 
   return (
-    <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }} onClick={onClose}>
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="picker-title" className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4 outline-none" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }} onClick={onClose}>
       <div className="card p-6 w-full max-w-lg max-h-[85dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-2xl mb-1">{t('exercises.pickerTitle')}</h2>
+        <h2 id="picker-title" className="text-2xl mb-1">{t('exercises.pickerTitle')}</h2>
         <p className="text-chalkdim text-sm mb-4">
           {lockCategory ? t('exercises.pickerLockedSubtitle')(categoryLabels[lockCategory]) : t('exercises.pickerSubtitle')}
         </p>

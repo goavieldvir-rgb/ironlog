@@ -1,10 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ResponsiveContainer, BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts'
-import { Apple, Pin, PinOff, Trash2, CheckCheck, Trophy, ChevronDown, Pencil } from 'lucide-react'
+import { Apple, Pin, PinOff, Trash2, CheckCheck, Trophy, ChevronDown, Pencil, Plus, Check } from 'lucide-react'
 import { BackChevron, ForwardChevron, ForwardArrow } from './DirectionalIcon.jsx'
 import { supabase } from '../supabase.js'
 import { useAdmin } from '../context/AdminContext.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
+import { useCollection, copyRoutineToUser } from '../lib/db.js'
+import { useScrollLock } from '../lib/scrollLock.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
@@ -268,9 +271,15 @@ export default function PersonDetail() {
             </Section>
           )}
 
-          {data.routines.length > 0 && (
-            <Section title={t('person.routines')} hint={t('person.routinesHint')}>
-              <RoutineListView routines={data.routines} t={t} onEdit={(r) => openAccount(`/routines/${r.id}/edit`)} />
+          {!p.is_admin && (
+            <Section
+              title={t('person.routines')}
+              hint={data.routines.length > 0 ? t('person.routinesHint') : t('person.noRoutinesYet')}
+              action={<GiveRoutine personId={p.id} t={t} onGiven={() => setReload((r) => r + 1)} />}
+            >
+              {data.routines.length > 0 && (
+                <RoutineListView routines={data.routines} t={t} onEdit={(r) => openAccount(`/routines/${r.id}/edit`)} />
+              )}
             </Section>
           )}
 
@@ -346,6 +355,105 @@ export default function PersonDetail() {
             : t('people.termsAccepted', { date: fmtDate(lang, new Date(consent.accepted_at)) })}
         {consent?.variant === 'minor' && consent.guardian_name ? ` · ${t('people.guardian', { name: consent.guardian_name })}` : ''}
       </p>
+    </div>
+  )
+}
+
+// Give this trainee a copy of one of the coach's own routines, from their
+// page, without switching into their account. Uses the same copy as
+// Routines → "Copy to…", which also brings the exercises across.
+function GiveRoutine({ personId, t, onGiven }) {
+  const { user } = useAuth()
+  const { toast } = useFeedback()
+  const [open, setOpen] = useState(false)
+  const [busyId, setBusyId] = useState(null)
+  const [given, setGiven] = useState([])
+  return (
+    <>
+      <Button type="button" variant="ghost" className="shrink-0" onClick={() => setOpen(true)}>
+        <Plus size={16} /> {t('person.giveRoutine')}
+      </Button>
+      {open && (
+        <GiveRoutineSheet
+          uid={user?.id}
+          t={t}
+          busyId={busyId}
+          given={given}
+          onClose={() => setOpen(false)}
+          onPick={async (r) => {
+            setBusyId(r.id)
+            try {
+              await copyRoutineToUser(personId, r)
+              setGiven((g) => [...g, r.id])
+              toast(t('person.routineGiven', { name: r.name }))
+              onGiven()
+            } catch (err) {
+              console.error(err)
+              toast(t('feedback.saveFailed'), 'error')
+            } finally {
+              setBusyId(null)
+            }
+          }}
+        />
+      )}
+    </>
+  )
+}
+
+function GiveRoutineSheet({ uid, t, busyId, given, onClose, onPick }) {
+  useScrollLock(true)
+  const [routines, loading] = useCollection(uid, 'routines', 'created_at', 'desc')
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('person.giveRoutine')}
+      className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div className="card p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-xl mb-1">{t('person.giveRoutine')}</h2>
+        <p className="text-chalkdim text-sm mb-4">{t('person.giveRoutineHint')}</p>
+        <div className="flex flex-col gap-1 max-h-72 overflow-y-auto">
+          {loading && <p className="text-chalkdim text-sm py-2">{t('common.loading')}</p>}
+          {!loading && routines.length === 0 && <p className="text-chalkdim text-sm py-2">{t('person.noOwnRoutines')}</p>}
+          {routines.map((r) => {
+            const done = given.includes(r.id)
+            return (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => onPick(r)}
+                disabled={done || busyId != null}
+                className="flex items-center justify-between gap-2 px-3 min-h-[48px] rounded-[12px] hover:bg-surface2 text-start disabled:opacity-60"
+              >
+                <span className="truncate min-w-0">{r.name}</span>
+                <span className="text-xs text-brass shrink-0 inline-flex items-center gap-1">
+                  {done ? (
+                    <>
+                      <Check size={14} /> {t('routines.copiedLabel')}
+                    </>
+                  ) : busyId === r.id ? (
+                    t('common.saving')
+                  ) : (
+                    t('routines.copyHereLabel')
+                  )}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        <div className="flex justify-end mt-4 pt-4 border-t border-line">
+          <Button variant="ghost" onClick={onClose}>
+            {t('common.done')}
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }

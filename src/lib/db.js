@@ -2,11 +2,22 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../supabase.js'
 import { workingSets } from './warmup.js'
 
+// The last rows loaded per query, so a screen opened again (switching tabs,
+// back from a workout's page) shows its list at once while it re-checks.
+// Only for callers that ask for it, since `loading` still means "not
+// re-checked yet". Writes to a table drop its entries (forgetCollection).
+const collectionCache = new Map()
+export function forgetCollection(table) {
+  for (const key of collectionCache.keys()) if (key.split('|')[1] === table) collectionCache.delete(key)
+}
+
 // Generic live-ish collection hook: fetches rows owned by `uid` from `table`,
 // ordered by `orderField`. Call the returned refresh() after any mutation
-// made from the same screen so the list updates immediately.
-export function useCollection(uid, table, orderField = 'created_at', direction = 'desc') {
-  const [data, setData] = useState([])
+// made from the same screen so the list updates immediately. With
+// { cached: true } the rows from the last visit show while it reloads.
+export function useCollection(uid, table, orderField = 'created_at', direction = 'desc', { cached = false } = {}) {
+  const cacheKey = `${uid}|${table}|${orderField}|${direction}`
+  const [data, setData] = useState(() => (cached && collectionCache.get(cacheKey)) || [])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [reload, setReload] = useState(0)
@@ -19,6 +30,7 @@ export function useCollection(uid, table, orderField = 'created_at', direction =
     let cancelled = false
     const key = `${uid}|${table}|${orderField}|${direction}`
     setLoading(true)
+    if (cached && loadedKey.current !== key && collectionCache.has(key)) setData(collectionCache.get(key))
 
     supabase
       .from(table)
@@ -35,6 +47,7 @@ export function useCollection(uid, table, orderField = 'created_at', direction =
           setError(null)
           loadedKey.current = key
           setData(data || [])
+          if (cached) collectionCache.set(key, data || [])
         }
         setLoading(false)
       })
@@ -168,6 +181,7 @@ export async function setScheduleDay(uid, dayOfWeek, slot, routineId) {
 
 // ---- Exercises ----
 export async function addExercise(uid, exercise) {
+  forgetCollection('exercises')
   const { data, error } = await supabase
     .from('exercises')
     .insert({
@@ -192,6 +206,7 @@ export async function addExercise(uid, exercise) {
 }
 
 export async function updateExercise(uid, id, patch) {
+  forgetCollection('exercises')
   const row = {}
   if (patch.name !== undefined) row.name = patch.name
   if ('nameHe' in patch) row.name_he = (patch.nameHe || '').trim() || null
@@ -219,6 +234,7 @@ export async function clearExerciseNote(uid, id) {
 }
 
 export async function deleteExercise(uid, id) {
+  forgetCollection('exercises')
   const { error } = await supabase.from('exercises').delete().eq('id', id).eq('user_id', uid)
   if (error) throw error
 }
@@ -320,6 +336,8 @@ export function cleanEntries(entries) {
 
 // ---- Sessions (a completed workout log) ----
 export async function logSession(uid, session) {
+  forgetCollection('sessions')
+  forgetCollection('exercises')
   session = { ...session, entries: cleanEntries(session.entries) }
   if (session.entries.length === 0) throw new Error('EMPTY_SESSION')
   // The id is made once per workout on the client, so a Finish retried after
@@ -396,6 +414,7 @@ export async function logSession(uid, session) {
 }
 
 export async function deleteSession(uid, id) {
+  forgetCollection('sessions')
   // Note which exercises this session touched BEFORE it's gone, so their
   // "previously logged" hint can be recalculated afterwards.
   const { data: existing } = await supabase.from('sessions').select('entries').eq('id', id).eq('user_id', uid).single()
@@ -481,6 +500,7 @@ export async function recomputeLastKnown(uid, exerciseIds) {
 // the existing sessions RLS policy (admin can update any row) rather than
 // needing its own.
 export async function updateTrainerComment(uid, sessionId, comment) {
+  forgetCollection('sessions')
   const { error } = await supabase
     .from('sessions')
     .update({ trainer_comment: comment })
@@ -496,6 +516,7 @@ export function hasUnreadFeedback(s) {
 }
 
 export async function markFeedbackSeen(uid, sessionId) {
+  forgetCollection('sessions')
   const { error } = await supabase
     .from('sessions')
     .update({ trainer_comment_seen_at: new Date().toISOString() })
@@ -509,6 +530,7 @@ export async function markFeedbackSeen(uid, sessionId) {
 // exercises, since that should reflect the most recent session overall,
 // not whichever one happens to be getting corrected right now.
 export async function updateSession(uid, id, patch) {
+  forgetCollection('sessions')
   const row = {}
   if (patch.date !== undefined) row.date = patch.date
   if (patch.notes !== undefined) row.notes = patch.notes
