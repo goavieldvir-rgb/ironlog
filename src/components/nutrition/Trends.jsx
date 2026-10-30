@@ -14,7 +14,7 @@ import { ACCENT, CHALK, CHALKDIM, MUTED, GRID, SURFACE } from '../../theme.js'
 
 const COLORS = { protein: '#8A8A90', kcal: '#8A8A90', hit: ACCENT, chalkdim: CHALKDIM, grid: GRID }
 
-export default function Trends({ uid, today, targets, onBack, onClose }) {
+export default function Trends({ uid, today, targets, onBack, onClose, onPickDay }) {
   const { t, lang } = useLanguage()
   const [kind, setKind] = useState('week')
   // Opens on the period holding yesterday, the last finished day, so a
@@ -111,7 +111,7 @@ export default function Trends({ uid, today, targets, onBack, onClose }) {
                 <OnTarget stats={stats} targets={targets} waterGoal={data.waterGoal} />
               </>
             )}
-            {stats.loggedDays > 0 && <DailyChart stats={stats} kind={kind} targets={targets} metric={metric} setMetric={setMetric} />}
+            {stats.loggedDays > 0 && <DailyChart stats={stats} kind={kind} targets={targets} metric={metric} setMetric={setMetric} onPickDay={onPickDay} />}
             <p className="text-chalkdim text-xs">{t('nutrition.averagesNote')}</p>
           </>
         )}
@@ -225,15 +225,17 @@ function OnTarget({ stats, targets, waterGoal }) {
   )
 }
 
-function DailyChart({ stats, kind, targets, metric, setMetric }) {
+function DailyChart({ stats, kind, targets, metric, setMetric, onPickDay }) {
   const { t, lang } = useLanguage()
   const target = metric === 'kcal' ? targets?.kcal : targets?.protein
   const isHit = (day) => (metric === 'kcal' ? kcalOnTarget(day.kcal, target) : target > 0 && day.protein >= target)
   const rows = stats.days.map((day) => {
     const date = new Date(day.date + 'T00:00:00')
     return {
+      date: day.date,
       label: kind === 'week' ? date.toLocaleDateString(dateLocale(lang), { weekday: 'short' }) : String(date.getDate()),
       value: day.finished && day.n > 0 ? Math.round(day[metric]) : null,
+      pickable: day.finished && !day.future,
       hit: day.finished && day.n > 0 && isHit(day),
     }
   })
@@ -270,7 +272,12 @@ function DailyChart({ stats, kind, targets, metric, setMetric }) {
               formatter={(v) => [`${v} ${unit}`, metric === 'kcal' ? t('nutrition.calories') : t('nutrition.protein')]}
             />
             {target > 0 && <ReferenceLine y={target} stroke={COLORS.chalkdim} strokeDasharray="4 4" ifOverflow="extendDomain" />}
-            <Bar dataKey="value" radius={[3, 3, 0, 0]}>
+            <Bar
+              dataKey="value"
+              radius={[3, 3, 0, 0]}
+              onClick={(row) => onPickDay && row?.pickable && onPickDay(row.date)}
+              style={onPickDay ? { cursor: 'pointer' } : undefined}
+            >
               {rows.map((r, i) => (
                 <Cell key={i} fill={r.hit ? COLORS.hit : COLORS[metric]} />
               ))}

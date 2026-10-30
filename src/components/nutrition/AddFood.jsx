@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Loader2, Plus, ScanBarcode, Search, X, Zap } from 'lucide-react'
 import { useLanguage } from '../../context/LanguageContext.jsx'
+import { fmtDate } from '../../lib/dates.js'
+import { shiftDay } from '../../lib/nutritionStats.js'
 import { Button } from '../ui.jsx'
 import {
   cacheOffFood,
@@ -9,12 +11,16 @@ import {
   foodName,
   friendlyError,
   getLogHistory,
+  getPastMeals,
   historyMap,
   matchHistory,
   rankFoods,
+  recentForMeal,
   searchLocal,
   getSavedMeals,
   FAV_EVENT,
+  MEALS_EVENT,
+  LOGS_EVENT,
   getFavorites,
   parseNum,
   searchFoods,
@@ -22,6 +28,7 @@ import {
   sumLogs,
   logName,
   queryLang,
+  quickLogRow,
 } from '../../lib/nutrition.js'
 import { catalogBarcodes, catalogFood, loadCatalog } from '../../lib/foodCatalog.js'
 import { isStrongMatch } from '../../lib/foodRank.js'
@@ -44,7 +51,7 @@ function Stats({ protein, kcal, extra, source }) {
   )
 }
 
-export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, onScan, onPick, onLabel, onLog, onManageMeals }) {
+export default function AddFood({ meal, setMeal, uid, authUid, date, today, onClose, onScan, onPick, onLabel, onLog, onManageMeals }) {
   const { t, lang } = useLanguage()
   const [query, setQuery] = useState('')
   const [tab, setTab] = useState('recent')
@@ -56,10 +63,12 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
   const [searching, setSearching] = useState(false)
   const [searchErr, setSearchErr] = useState('')
   const [history, setHistory] = useState(null) // every food this diary logged, newest first
-  const recent = history && history.slice(0, 20)
+  // Foods most logged in the meal being added to come first.
+  const recent = useMemo(() => history && recentForMeal(history, meal), [history, meal])
   const hist = useMemo(() => historyMap(history), [history])
   const [catalogReady, setCatalogReady] = useState(false)
   const [meals, setMeals] = useState(null)
+  const [past, setPast] = useState(null) // meals from the last two weeks, null = not loaded
   const [favs, setFavs] = useState(null) // null = not loaded
   const [done, setDone] = useState({})
   const [online, setOnline] = useState([])
@@ -191,6 +200,33 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid])
 
+  // The sheet stays open between adds: refresh Recent, "logged before" and
+  // Past meals after each one.
+  useEffect(() => {
+    let off = false
+    const refresh = () => {
+      setPast(null)
+      getLogHistory(uid)
+        .then((r) => !off && setHistory(r))
+        .catch((err) => console.error(err))
+    }
+    window.addEventListener(LOGS_EVENT, refresh)
+    return () => {
+      off = true
+      window.removeEventListener(LOGS_EVENT, refresh)
+    }
+  }, [uid])
+
+  // Saved meals edited under "Manage meals" show here on the way back.
+  useEffect(() => {
+    const reload = () =>
+      getSavedMeals(uid)
+        .then(setMeals)
+        .catch((err) => console.error(err))
+    window.addEventListener(MEALS_EVENT, reload)
+    return () => window.removeEventListener(MEALS_EVENT, reload)
+  }, [uid])
+
   // Favorites are saved to the account; reload when the tab opens and when
   // the star on the amount screen changes one.
   const [favN, setFavN] = useState(0)
@@ -219,6 +255,35 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, uid, favN])
 
+  // Past meals load when their tab opens, again after a log or a day change.
+  useEffect(() => setPast(null), [date])
+  useEffect(() => {
+    if (tab !== 'past' || past) return
+    let off = false
+    getPastMeals(uid, date, today)
+      .then((list) => !off && setPast(list))
+      .catch((err) => {
+        console.error(err)
+        if (!off) {
+          setPast([])
+          setListErr(friendlyError(err, t, 'nutrition.loadFailed'))
+        }
+      })
+    return () => {
+      off = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, uid, date, past])
+
+  const dayName = (iso) =>
+    iso === today
+      ? t('nutrition.today')
+      : iso === shiftDay(today, -1)
+        ? t('nutrition.yesterday')
+        : iso === shiftDay(today, 1)
+          ? t('nutrition.tomorrow')
+          : fmtDate(lang, new Date(iso + 'T00:00:00'), { weekday: 'short', day: 'numeric', month: 'short' })
+
   function flash(id) {
     setDone((d) => ({ ...d, [id]: true }))
     setTimeout(() => setDone((d) => ({ ...d, [id]: false })), 2500)
@@ -229,11 +294,22 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
     if (await onLog(rows, t('nutrition.added', { name: r.name }))) flash(r.id)
   }
 
+  // One tap from search or Favorites: the last amount, else one serving.
+  async function logFood(food) {
+    const row = quickLogRow({ uid, date, meal, food, lang, t })
+    if (await onLog([row], t('nutrition.added', { name: row.name }))) flash(`food:${food.id}`)
+  }
+
   async function logMeal(m) {
     const items = Array.isArray(m.items) ? m.items : []
     if (!items.length) return
     const rows = cloneLogs(items, { uid, date, meal })
     if (await onLog(rows, t('nutrition.loggedToMeal', { meal: mealLabel(t, meal) }))) flash(m.id)
+  }
+
+  async function logPast(p) {
+    const rows = cloneLogs(p.items, { uid, date, meal })
+    if (await onLog(rows, t('nutrition.loggedToMeal', { meal: mealLabel(t, meal) }))) flash(p.key)
   }
 
   async function submitQuick(e) {
@@ -280,10 +356,11 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
   const g = t('nutrition.g')
   const tabs = [
     ['recent', t('nutrition.tabRecent')],
+    ['past', t('nutrition.tabPast')],
     ['favorites', t('nutrition.tabFavorites')],
     ['meals', t('nutrition.tabMyMeals')],
   ]
-  const hint = { recent: 'hintRecent', favorites: 'hintFavorites', meals: 'hintMeals' }[tab]
+  const hint = { recent: 'hintRecent', past: 'hintPast', favorites: 'hintFavorites', meals: 'hintMeals' }[tab]
   const addBtn = (id, label, onClick) => (
     <button
       type="button"
@@ -311,6 +388,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
         <input
           type="search"
           dir="auto"
+          autoFocus
           aria-label={t('nutrition.searchLabel')}
           placeholder={t('nutrition.searchPlaceholder')}
           value={query}
@@ -379,7 +457,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
           <>
             {logged.length > 0 && (
               <>
-                <h3 className="text-chalkdim text-xs pt-3 pb-1">{t('nutrition.loggedBefore')}</h3>
+                <h3 className="text-chalkdim text-xs pt-3 pb-1">{t('nutrition.loggedBefore')} · {t('nutrition.atLastAmount')}</h3>
                 <ul className="divide-y divide-white/[0.06] mb-1">
                   {logged.map((r) => {
                     const food = r.food_id && catalogFood(authUid, r.food_id)
@@ -398,7 +476,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
                         ) : (
                           <div className="min-w-0 flex-1">{body}</div>
                         )}
-                        {addBtn(r.id, t('nutrition.addSameAmount'), () => logRecent(r))}
+                        {addBtn(r.id, t('nutrition.addFoodLabel', { name: logName(r, qLang) }), () => logRecent(r))}
                       </li>
                     )
                   })}
@@ -412,14 +490,15 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
             )}
             <ul className="divide-y divide-white/[0.06]">
               {shownResults.map((r) => (
-                <li key={r.id || `off:${r.source_ref}`}>
-                  <button type="button" disabled={!r.id && picking} onClick={() => (r.id ? onPick(r) : pickOnline(r))} className="w-full flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
+                <li key={r.id || `off:${r.source_ref}`} className="flex items-center gap-2">
+                  <button type="button" disabled={!r.id && picking} onClick={() => (r.id ? onPick(r) : pickOnline(r))} className="min-w-0 flex-1 flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
                     <div className="min-w-0 flex-1">
                       <Name className="font-medium">{foodName(r, qLang)}</Name>
                       <Stats protein={r.protein} kcal={r.kcal} source={<>{r.brand && <>· <bdi>{r.brand}</bdi></>} · <SourceLabel food={r} /></>} />
                     </div>
-                    <Forward size={20} className="text-chalkdim shrink-0" />
+                    {!r.id && <Forward size={20} className="text-chalkdim shrink-0" />}
                   </button>
+                  {r.id && addBtn(`food:${r.id}`, t('nutrition.addFoodLabel', { name: foodName(r, qLang) }), () => logFood(r))}
                 </li>
               ))}
             </ul>
@@ -476,9 +555,32 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
                         <Name className="font-medium">{logName(r, lang)}</Name>
                         <Stats protein={r.protein} kcal={r.kcal} extra={r.grams != null ? <AmountText row={r} /> : null} />
                       </div>
-                      {addBtn(r.id, t('nutrition.add'), () => logRecent(r))}
+                      {addBtn(r.id, t('nutrition.addFoodLabel', { name: logName(r, lang) }), () => logRecent(r))}
                     </li>
                   ))}
+                </ul>
+              </>
+            )}
+            {tab === 'past' && (
+              <>
+                {listErr && <p className="text-sm py-2" role="alert">{listErr}</p>}
+                {!past && !listErr && <p className="eyebrow animate-pulse py-2">{t('common.loading')}</p>}
+                {past && past.length === 0 && !listErr && <p className="text-chalkdim text-sm py-2">{t('nutrition.emptyPast')}</p>}
+                <ul className="divide-y divide-white/[0.06]">
+                  {(past || []).map((p) => {
+                    const tot = sumLogs(p.items)
+                    const title = `${dayName(p.date)} · ${mealLabel(t, p.meal)}`
+                    return (
+                      <li key={p.key} className="flex items-center gap-3 py-2.5">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-[15px] truncate"><bdi>{title}</bdi></div>
+                          <div dir="auto" className="text-chalkdim text-[13px] truncate text-start">{p.items.map((r) => logName(r, lang)).join(', ')}</div>
+                          <Stats protein={tot.protein} kcal={tot.kcal} />
+                        </div>
+                        {addBtn(p.key, t('nutrition.addPastLabel', { title, meal: mealLabel(t, meal) }), () => logPast(p))}
+                      </li>
+                    )
+                  })}
                 </ul>
               </>
             )}
@@ -488,14 +590,14 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
                 {favs && favs.length === 0 && !listErr && <p className="text-chalkdim text-sm py-2">{t('nutrition.emptyFavorites')}</p>}
                 <ul className="divide-y divide-white/[0.06]">
                   {(favs || []).map((r) => (
-                    <li key={r.id}>
-                      <button type="button" onClick={() => onPick(r)} className="w-full flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
+                    <li key={r.id} className="flex items-center gap-2">
+                      <button type="button" onClick={() => onPick(r)} className="min-w-0 flex-1 flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
                         <div className="min-w-0 flex-1">
                           <Name className="font-medium">{foodName(r, lang)}</Name>
                           <Stats protein={r.protein} kcal={r.kcal} source={<>· <SourceLabel food={r} /></>} />
                         </div>
-                        <Forward size={20} className="text-chalkdim shrink-0" />
                       </button>
+                      {addBtn(`food:${r.id}`, t('nutrition.addFoodLabel', { name: foodName(r, lang) }), () => logFood(r))}
                     </li>
                   ))}
                 </ul>
@@ -514,7 +616,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
                           <Name className="font-medium">{m.name}</Name>
                           <Stats protein={tot.protein} kcal={tot.kcal} extra={n === 1 ? t('nutrition.itemsOne') : t('nutrition.itemsMany', { n })} />
                         </div>
-                        {addBtn(m.id, t('nutrition.add'), () => logMeal(m))}
+                        {addBtn(m.id, t('nutrition.addFoodLabel', { name: m.name }), () => logMeal(m))}
                       </li>
                     )
                   })}
