@@ -80,7 +80,7 @@ export default function CoachTasks({ trainees, today }) {
     }
   }
 
-  if (tasks === null) return null
+  if (tasks === null && !loadFailed) return null
 
   const label = (task) => {
     const name = nameOf[task.trainee_id] || ''
