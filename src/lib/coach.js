@@ -142,7 +142,7 @@ export async function deleteCoachTask(id) {
 
 export async function fetchTraineeDetail(uid, today = toLocalISODate()) {
   const since = shiftDay(today, -7 * 26)
-  const [profile, sessions, weights, prs, notes, goal, schedule, consent, food, targets, routines] = await Promise.all([
+  const [profile, sessions, weights, waists, prs, notes, goal, schedule, consent, food, targets, routines] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', uid).single().then(check),
     supabase
       .from('sessions')
@@ -159,6 +159,14 @@ export async function fetchTraineeDetail(uid, today = toLocalISODate()) {
       .order('date', { ascending: true })
       .order('created_at', { ascending: true })
       .then(check),
+    // Optional: the table may not exist until its migration has been run.
+    supabase
+      .from('waist_logs')
+      .select('date, waist, unit')
+      .eq('user_id', uid)
+      .order('date', { ascending: true })
+      .order('created_at', { ascending: true })
+      .then(({ data, error }) => (error ? [] : data || []), () => []),
     supabase
       .from('admin_notifications')
       .select('detail, sent_at')
@@ -189,7 +197,7 @@ export async function fetchTraineeDetail(uid, today = toLocalISODate()) {
     supabase.from('nutrition_targets').select('kcal, protein').eq('user_id', uid).maybeSingle().then(check),
     supabase.from('routines').select('id, name, category, exercises').eq('user_id', uid).order('created_at', { ascending: false }).then(check),
   ])
-  return { profile, sessions, weights, prs, notes, goal, schedule, consent: consent[0] || null, food, targets, routines }
+  return { profile, sessions, weights, waists, prs, notes, goal, schedule, consent: consent[0] || null, food, targets, routines }
 }
 
 // Sessions per week for the last `n` weeks, oldest first.

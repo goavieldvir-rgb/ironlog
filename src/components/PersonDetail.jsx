@@ -287,6 +287,21 @@ export default function PersonDetail() {
             </Section>
           )}
 
+          {data.waists.length > 1 && (
+            <Section title={t('person.waist')}>
+              <div className="h-36 lg:h-56 -mx-1">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={data.waists.filter((w) => w.date >= shiftDay(today, -182) && w.unit === data.waists.at(-1).unit).map((w) => ({ ...w, waist: Number(w.waist), label: shortDate(lang, w.date) }))}>
+                    <XAxis dataKey="label" stroke={CHALKDIM} fontSize={10} tickLine={false} axisLine={false} minTickGap={24} reversed={lang === 'he'} />
+                    <YAxis hide domain={[(min) => Math.floor(min - 1), (max) => Math.ceil(max + 1)]} />
+                    <Tooltip contentStyle={{ background: SURFACE, border: 0, borderRadius: 12, fontSize: 13 }} labelStyle={{ color: CHALK }} formatter={(v) => [`${v}${data.waists.at(-1).unit}`, t('person.waist')]} />
+                    <Line type="monotone" dataKey="waist" stroke={ACCENT} strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </Section>
+          )}
+
           {!p.is_admin && (
             <Section title={t('photos.title')}>
               <ProgressPhotos uid={p.id} mode="coach" />

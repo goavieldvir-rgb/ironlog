@@ -19,7 +19,7 @@ import { friendlyAuthError } from '../lib/authErrors.js'
 // from whatever a page happened to have loaded).
 async function fetchAllData(uid) {
   const tables = [
-    'exercises', 'routines', 'sessions', 'body_weight_logs', 'weekly_schedule', 'progress_photos', 'gyms',
+    'exercises', 'routines', 'sessions', 'body_weight_logs', 'waist_logs', 'weekly_schedule', 'progress_photos', 'gyms',
     'food_logs', 'nutrition_targets', 'saved_meals', 'food_favorites', 'water_logs', 'water_goals',
   ]
   const results = await Promise.all(tables.map((tb) => supabase.from(tb).select('*').eq('user_id', uid)))

@@ -21,6 +21,7 @@ import {
 } from '../lib/db.js'
 import { Button, Card, EmptyState, LoadError, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
+import WaistTracker from './WaistTracker.jsx'
 import ProgressPhotos from './ProgressPhotos.jsx'
 import { ACCENT, CHALK, CHALKDIM, MUTED, GRID, SURFACE } from '../theme.js'
 
@@ -328,6 +329,8 @@ export default function BodyWeight() {
           )}
         </Card>
       )}
+
+      <WaistTracker uid={effectiveUid} />
 
       <Card>
         <h2 className="eyebrow mb-3">{t('photos.title')}</h2>
