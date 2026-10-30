@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Share2, Trophy, Check, ImagePlus, Copy, Download } from 'lucide-react'
+import { Share, Trophy, Check, ImagePlus, Copy, Download } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { Button, Card } from './ui.jsx'
@@ -17,7 +17,8 @@ function formatDate(date, lang) {
 // Shown right after a workout is saved: a recap only the trainee sees, and
 // a way to share a trimmed-down picture (name, big total, time, streak) as
 // a plain card, over their own photo, or as a see-through sticker.
-export default function WorkoutDone({ summary, onDone }) {
+// fromHistory: opened later from a saved workout, not right after Finish.
+export default function WorkoutDone({ summary, onDone, fromHistory = false }) {
   const { t, lang, dir } = useLanguage()
   const { toast } = useFeedback()
   const [variant, setVariant] = useState('plain')
@@ -178,10 +179,12 @@ export default function WorkoutDone({ summary, onDone }) {
   return (
     <div className="flex flex-col gap-5 max-w-2xl" data-testid="workout-done">
       <div>
-        <div className="inline-flex items-center gap-2 text-good">
-          <Check size={18} /> <span className="eyebrow">{t('share.subtitle')}</span>
-        </div>
-        <h1 className="text-3xl mt-1">{t('share.title')}</h1>
+        {!fromHistory && (
+          <div className="inline-flex items-center gap-2 text-good">
+            <Check size={18} /> <span className="eyebrow">{t('share.subtitle')}</span>
+          </div>
+        )}
+        <h1 className="text-3xl mt-1">{fromHistory ? t('share.historyTitle') : t('share.title')}</h1>
         <p className="text-chalkdim text-sm mt-1">
           <bdi>{summary.routineName}</bdi> · <bdi>{dateText}</bdi>
         </p>
@@ -276,11 +279,11 @@ export default function WorkoutDone({ summary, onDone }) {
         )}
         {!failed && variant !== 'sticker' && !(variant === 'photo' && !made.photo) && (
           <Button variant="brass" className="flex-1" onClick={handleShare} disabled={busy || !current}>
-            <Share2 size={16} /> {busy || !current ? t('share.sharing') : t('share.share')}
+            <Share size={16} /> {busy || !current ? t('share.sharing') : t('share.share')}
           </Button>
         )}
         <Button variant="ghost" className="flex-1" onClick={onDone}>
-          {t('share.done')}
+          {fromHistory ? t('share.back') : t('share.done')}
         </Button>
       </div>
 

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, X, CalendarDays } from 'lucide-react'
+import { Search, X, CalendarDays, Share } from 'lucide-react'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -65,6 +65,12 @@ function sessionMeta(s, t, lang, gym) {
   if (km > 0) parts.push(`${formatDistance(km)} ${kmLabel}`)
   // Each piece is isolated left-to-right so a Hebrew unit can't reorder its number.
   return parts.map((p) => `\u2066${p}\u2069`).join(' · ')
+}
+
+// Anything logged that a share card could show; an empty workout gets no
+// share button.
+function hasLoggedSets(s) {
+  return (s.entries || []).some((e) => workingSets(e.sets).some((x) => Number(x.weight) > 0 || Number(x.reps) > 0 || Number(x.duration) > 0))
 }
 
 // A session matches a text search if the routine name, any exercise name,
@@ -246,26 +252,40 @@ export default function History() {
             {g.rows.map((s, i) => {
               const { dow, day } = dayParts(lang, s.date)
               return (
-                <Link
+                <div
                   key={s.id}
-                  to={`/history/${s.id}`}
-                  className={`press-row flex items-center gap-3.5 min-h-[64px] ps-4 pe-3.5 py-2 text-chalk hover:bg-surface2/50 transition-colors ${
+                  className={`press-row flex items-center min-h-[64px] pe-1.5 text-chalk hover:bg-surface2/50 transition-colors ${
                     i > 0 ? 'border-t border-white/[0.06]' : ''
                   }`}
                 >
-                  <div className="w-[34px] shrink-0 flex flex-col items-center">
-                    <span className="text-[11px] leading-[14px] text-chalkdim/70">{dow}</span>
-                    <span className="text-[19px] leading-6 font-semibold tabular-nums">{day}</span>
-                  </div>
-                  <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                    <span className="text-[15px] leading-5 font-medium truncate">
-                      {!actingAs && hasUnreadFeedback(s) && <FeedbackDot label={t('history.newFeedback')} />}
-                      {sessionTitle(s, t)}
-                    </span>
-                    <span className="text-[13px] leading-[18px] text-chalkdim truncate tabular-nums">{sessionMeta(s, t, lang, gymsOn ? gymLabel(sessionGymId(s, gyms), gyms, mainName, t) : null)}</span>
-                  </div>
-                  <ForwardChevron size={16} strokeWidth={2} className="text-[#5E5E64] shrink-0" />
-                </Link>
+                  <Link to={`/history/${s.id}`} className="flex-1 min-w-0 flex items-center gap-3.5 self-stretch ps-4 py-2 text-chalk">
+                    <div className="w-[34px] shrink-0 flex flex-col items-center">
+                      <span className="text-[11px] leading-[14px] text-chalkdim/70">{dow}</span>
+                      <span className="text-[19px] leading-6 font-semibold tabular-nums">{day}</span>
+                    </div>
+                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                      <span className="text-[15px] leading-5 font-medium truncate">
+                        {!actingAs && hasUnreadFeedback(s) && <FeedbackDot label={t('history.newFeedback')} />}
+                        {sessionTitle(s, t)}
+                      </span>
+                      <span className="text-[13px] leading-[18px] text-chalkdim truncate tabular-nums">{sessionMeta(s, t, lang, gymsOn ? gymLabel(sessionGymId(s, gyms), gyms, mainName, t) : null)}</span>
+                    </div>
+                  </Link>
+                  {/* Straight to the share cards, for a workout saved without sharing. */}
+                  {hasLoggedSets(s) && (
+                    <Link
+                      to={`/history/${s.id}/share`}
+                      aria-label={t('share.openShare')}
+                      title={t('share.openShare')}
+                      className="shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-full text-chalkdim hover:text-chalk"
+                    >
+                      <Share size={17} strokeWidth={1.75} />
+                    </Link>
+                  )}
+                  <Link to={`/history/${s.id}`} tabIndex={-1} aria-hidden="true" className="shrink-0 self-stretch inline-flex items-center pe-2">
+                    <ForwardChevron size={16} strokeWidth={2} className="text-[#5E5E64]" />
+                  </Link>
+                </div>
               )
             })}
           </div>
