@@ -80,6 +80,7 @@ export default function Dashboard() {
   const [weights, weightsLoading, refreshWeights, weightsError] = useCollection(effectiveUid, 'body_weight_logs', 'date', 'desc')
   // Hides the quick weight card right after saving, before the list refetches.
   const [weightSaved, setWeightSaved] = useState(false)
+  useEffect(() => setWeightSaved(false), [effectiveUid])
   const exById = useMemo(() => exerciseMap(exercises), [exercises])
   // Lets the rest-day card open today's panel inside WeeklySchedule.
   const [panelReq, setPanelReq] = useState(null)
@@ -299,7 +300,8 @@ export default function Dashboard() {
         />
       )}
 
-      {!weightSaved && !weightsLoading && !weightsError && !loadFailed && !weights.some((w) => w.date === todayIso) && (
+      {/* A morning weigh-in is the person's own; a coach viewing their account doesn't get it. */}
+      {!actingAs && !weightSaved && !weightsLoading && !weightsError && !loadFailed && !weights.some((w) => w.date === todayIso) && (
         <WeightQuickCard
           last={weights[0]}
           t={t}

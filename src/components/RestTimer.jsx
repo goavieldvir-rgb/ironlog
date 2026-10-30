@@ -26,6 +26,12 @@ function load(key) {
     return null
   }
 }
+// Called when a workout is saved or discarded, so its rest doesn't carry
+// over into the next workout opened within the same minute or two.
+export function clearSavedRest() {
+  store(KEY_ENDS, null)
+}
+
 function savedSeconds() {
   const n = Number(load(KEY_SECONDS))
   return Number.isFinite(n) && n >= 5 && n <= 3600 ? Math.round(n) : DEFAULT_REST

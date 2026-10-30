@@ -340,7 +340,7 @@ export async function logSession(uid, session) {
     ...(session.durationMinutes != null ? { duration_minutes: session.durationMinutes } : {}),
   }
   const { error: sessionError } = session.id
-    ? await supabase.from('sessions').upsert(row, { onConflict: 'id', ignoreDuplicates: true })
+    ? await supabase.from('sessions').upsert(row, { onConflict: 'id' })
     : await supabase.from('sessions').insert(row)
   if (sessionError) throw sessionError
 

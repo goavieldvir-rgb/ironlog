@@ -14,7 +14,7 @@ import SessionEntryCard from './SessionEntryCard.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
 import ExerciseSelect from './ExerciseSelect.jsx'
 import { ExerciseModal, emptyExerciseForm } from './ExerciseLibrary.jsx'
-import RestTimer from './RestTimer.jsx'
+import RestTimer, { clearSavedRest } from './RestTimer.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { useWakeLock } from '../lib/wakeLock.js'
 import { isWarmup, workingSets } from '../lib/warmup.js'
@@ -570,14 +570,16 @@ export default function WorkoutSession() {
     )
     toast(t('workout.setRemoved'), 'success', {
       label: t('workout.undo'),
+      // Back into the one card it came from: the same position if that card
+      // hasn't moved, else the first card of that exercise.
       onClick: () =>
-        setEntries((prev) =>
-          prev.map((e) =>
-            e.exerciseId !== entry.exerciseId || e.sets.includes(removed)
-              ? e
-              : { ...e, sets: [...e.sets.slice(0, setIdx), removed, ...e.sets.slice(setIdx)] },
-          ),
-        ),
+        setEntries((prev) => {
+          const i = prev[entryIdx]?.exerciseId === entry.exerciseId ? entryIdx : prev.findIndex((e) => e.exerciseId === entry.exerciseId)
+          if (i < 0 || prev[i].sets.includes(removed)) return prev
+          const sets = prev[i].sets
+          const at = Math.min(setIdx, sets.length)
+          return prev.map((e, j) => (j !== i ? e : { ...e, sets: [...sets.slice(0, at), removed, ...sets.slice(at)] }))
+        }),
     })
   }
 
@@ -611,11 +613,8 @@ export default function WorkoutSession() {
     toast(t('workout.entryRemoved', { name: liveName(entry) }), 'success', {
       label: t('workout.undo'),
       onClick: () =>
-        setEntries((prev) =>
-          prev.some((e) => e.exerciseId === entry.exerciseId)
-            ? prev
-            : [...prev.slice(0, entryIdx), entry, ...prev.slice(entryIdx)],
-        ),
+        // Tapping Undo twice must not bring the card back twice.
+        setEntries((prev) => (prev.includes(entry) ? prev : [...prev.slice(0, entryIdx), entry, ...prev.slice(entryIdx)])),
     })
   }
 
@@ -711,6 +710,7 @@ export default function WorkoutSession() {
         })),
       })
       clearDraft(effectiveUid, draftKey)
+      clearSavedRest()
       setSaved(true)
       toast(t('workout.sessionSaved'))
       // Show the recap (with Share) instead of jumping straight to History.
@@ -737,6 +737,7 @@ export default function WorkoutSession() {
     })
     if (!ok) return
     clearDraft(effectiveUid, draftKey)
+    clearSavedRest()
     navigate('/')
   }
 
