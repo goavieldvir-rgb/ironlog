@@ -230,6 +230,7 @@ create table if not exists public.food_logs (
   protein numeric not null default 0 check (protein >= 0),
   carbs numeric not null default 0 check (carbs >= 0),
   fat numeric not null default 0 check (fat >= 0),
+  fiber numeric check (fiber >= 0),
   created_at timestamptz not null default now()
 );
 
@@ -247,6 +248,8 @@ create table if not exists public.nutrition_targets (
   protein numeric(6,1) check (protein >= 0),
   carbs numeric(6,1) check (carbs >= 0),
   fat numeric(6,1) check (fat >= 0),
+  -- 'coach' targets lock the trainee out; 'self' ones are the trainee's own.
+  set_by text not null default 'coach' check (set_by in ('coach', 'self')),
   updated_at timestamptz not null default now()
 );
 
@@ -971,6 +974,16 @@ create policy "read own targets or admin" on public.nutrition_targets for select
 drop policy if exists "admin writes targets" on public.nutrition_targets;
 create policy "admin writes targets" on public.nutrition_targets for all to authenticated
   using (is_admin()) with check (is_admin());
+
+-- A trainee may set targets while there are none, or while they are their own.
+drop policy if exists "own targets while self set" on public.nutrition_targets;
+create policy "own targets while self set" on public.nutrition_targets for insert to authenticated
+  with check (auth.uid() = user_id and nutrition_allowed() and set_by = 'self');
+
+drop policy if exists "update own self set targets" on public.nutrition_targets;
+create policy "update own self set targets" on public.nutrition_targets for update to authenticated
+  using (auth.uid() = user_id and nutrition_allowed() and set_by = 'self')
+  with check (auth.uid() = user_id and nutrition_allowed() and set_by = 'self');
 
 -- Water tracker: same visibility as the food diary. The trainee or the coach sets the goal.
 alter table public.water_logs enable row level security;
