@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useLanguage } from '../../context/LanguageContext.jsx'
-import { buildUnitOptions, defaultUnitIndex, parseNum, round1, scaleMacros } from '../../lib/nutrition.js'
+import { buildUnitOptions, parseNum, round1, scaleMacros, startAmount } from '../../lib/nutrition.js'
 
 const round2 = (n) => Math.round(n * 100) / 100
 
@@ -9,8 +9,9 @@ export function useAmount(food) {
   const { t, lang } = useLanguage()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const options = useMemo(() => buildUnitOptions(food, lang, t), [food, lang])
-  const [unitIdx, setUnitIdx] = useState(() => defaultUnitIndex(options))
-  const [qty, setQty] = useState(() => String(options[defaultUnitIndex(options)].def))
+  const [start] = useState(() => startAmount(food, options))
+  const [unitIdx, setUnitIdx] = useState(start[0])
+  const [qty, setQty] = useState(start[1])
   const option = options[unitIdx] || options[0]
   const q = parseNum(qty)
   const valid = Number.isFinite(q) && q > 0 && round1(q * option.g) > 0

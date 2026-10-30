@@ -1,10 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ResponsiveContainer, BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts'
-import { Apple, Pin, PinOff, Trash2, CheckCheck, Trophy, ChevronDown, Pencil } from 'lucide-react'
+import { Apple, Pin, PinOff, Trash2, CheckCheck, Trophy, ChevronDown, Pencil, Plus, Check } from 'lucide-react'
 import { BackChevron, ForwardChevron, ForwardArrow } from './DirectionalIcon.jsx'
 import { supabase } from '../supabase.js'
 import { useAdmin } from '../context/AdminContext.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
+import { useCollection, copyRoutineToUser } from '../lib/db.js'
+import { useScrollLock } from '../lib/scrollLock.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
@@ -12,6 +15,8 @@ import { TERMS_VERSION } from '../legal/terms.js'
 import { Card, Badge, Button, Field, LoadError } from './ui.jsx'
 import { PageLoader } from './Loading.jsx'
 import ProgressPhotos from './ProgressPhotos.jsx'
+import { MessageThread } from './Messages.jsx'
+import { useMessagesAvailable } from '../lib/messages.js'
 import { RoutineExercises } from './RoutineView.jsx'
 import {
   fetchTraineeDetail,
@@ -26,6 +31,7 @@ import {
   daysSince,
   shiftDay,
 } from '../lib/coach.js'
+import { sessionTitle } from '../lib/names.js'
 import { ACCENT, CHALK, CHALKDIM, MUTED, SURFACE } from '../theme.js'
 
 function shortDate(lang, iso) {
@@ -41,6 +47,8 @@ export default function PersonDetail() {
   const { isAdmin, setActingAs } = useAdmin()
   const { t, lang } = useLanguage()
   const { toast, confirm } = useFeedback()
+  const { user: me } = useAuth()
+  const messagesOn = useMessagesAvailable()
   const [data, setData] = useState(null)
   const [loadError, setLoadError] = useState(null)
   const [reload, setReload] = useState(0)
@@ -76,6 +84,13 @@ export default function PersonDetail() {
     const baseline = lastWeight
       ? [...data.weights].reverse().find((w) => w.unit === lastWeight.unit && w.date <= shiftDay(lastWeight.date, -21))
       : null
+    // The chart only draws the last six months in the latest unit, so judge
+    // "enough points" on that series, not on everything ever logged.
+    const weightSeries = lastWeight
+      ? data.weights
+          .filter((w) => w.date >= shiftDay(today, -182) && w.unit === lastWeight.unit)
+          .map((w) => ({ ...w, weight: Number(w.weight), label: shortDate(lang, w.date) }))
+      : []
     const foodDays = {}
     for (const f of data.food) {
       foodDays[f.date] ??= { kcal: 0, protein: 0 }
@@ -93,10 +108,12 @@ export default function PersonDetail() {
       lastSession: data.sessions[0]?.date || null,
       toReview: data.sessions.filter((s) => needsReview(s, today)),
       lastWeight,
+      weightSeries,
+      baselineDays: baseline ? daysSince(lastWeight.date, today) - daysSince(baseline.date, today) : null,
       weightChange: baseline ? Math.round((lastWeight.weight - baseline.weight) * 10) / 10 : null,
       food: { days: days.length, kcal: avg('kcal'), protein: avg('protein') },
     }
-  }, [data, today])
+  }, [data, today, lang])
 
   if (!isAdmin) return null
   if (loadError && !data) return <LoadError onRetry={() => setReload((r) => r + 1)} />
@@ -148,7 +165,7 @@ export default function PersonDetail() {
       value: derived.lastWeight ? `${Number(derived.lastWeight.weight)}${derived.lastWeight.unit}` : '—',
       sub:
         derived.weightChange != null
-          ? `\u2066${derived.weightChange > 0 ? '+' : ''}${derived.weightChange}\u2069 ${t('person.inThreeWeeks')}`
+          ? `\u2066${derived.weightChange > 0 ? '+' : ''}${derived.weightChange}\u2069 ${t('person.vsBaseline')(derived.baselineDays)}`
           : null,
     },
   ]
@@ -200,6 +217,12 @@ export default function PersonDetail() {
             </div>
           ))}
 
+          {messagesOn && (
+            <Section title={t('messages.title')} hint={t('messages.coachHint')}>
+              <MessageThread traineeId={p.id} viewerId={me.uid} side="coach" />
+            </Section>
+          )}
+
           <Section title={t('person.toReview')} count={derived.toReview.length}
             action={derived.toReview.length > 1 && (
               <button onClick={markAllReviewed} className="shrink-0 whitespace-nowrap text-xs text-chalkdim inline-flex items-center gap-1 min-h-9">
@@ -215,7 +238,11 @@ export default function PersonDetail() {
           </Section>
 
           <Section title={t('person.consistency')} hint={derived.planned ? t('person.planLine')(derived.planned, !!derived.scheduled) : t('person.noPlan')}>
-            <div className="h-36 lg:h-56 -mx-1">
+            <div
+              className="h-36 lg:h-56 -mx-1"
+              role="img"
+              aria-label={t('person.consistencyAria')(derived.weeks.length, derived.weeks.reduce((a, w) => a + w.count, 0), derived.thisWeek)}
+            >
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={derived.weeks.map((w) => ({ ...w, label: shortDate(lang, w.week) }))}>
                   <XAxis dataKey="label" stroke={CHALKDIM} fontSize={10} tickLine={false} axisLine={false} interval={2} reversed={lang === 'he'} />
@@ -242,9 +269,16 @@ export default function PersonDetail() {
               title={t('person.bodyWeight')}
               hint={data.goal?.target_weight ? t('person.targetWeight')(Number(data.goal.target_weight), derived.lastWeight.unit) : null}
             >
-              <div className="h-36 lg:h-56 -mx-1">
+              {derived.weightSeries.length < 2 ? (
+                <p className="text-sm text-chalkdim">{t('person.weightFew')}</p>
+              ) : (
+              <div
+                className="h-36 lg:h-56 -mx-1"
+                role="img"
+                aria-label={t('person.weightAria')(derived.weightSeries[0].weight, derived.weightSeries.at(-1).weight, derived.lastWeight.unit, derived.weightSeries.length)}
+              >
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data.weights.filter((w) => w.date >= shiftDay(today, -182) && w.unit === derived.lastWeight.unit).map((w) => ({ ...w, weight: Number(w.weight), label: shortDate(lang, w.date) }))}>
+                  <LineChart data={derived.weightSeries}>
                     <XAxis dataKey="label" stroke={CHALKDIM} fontSize={10} tickLine={false} axisLine={false} minTickGap={24} reversed={lang === 'he'} />
                     <YAxis
                       hide
@@ -259,6 +293,22 @@ export default function PersonDetail() {
                   </LineChart>
                 </ResponsiveContainer>
               </div>
+              )}
+            </Section>
+          )}
+
+          {data.waists.length > 1 && (
+            <Section title={t('person.waist')}>
+              <div className="h-36 lg:h-56 -mx-1">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={data.waists.filter((w) => w.date >= shiftDay(today, -182) && w.unit === data.waists.at(-1).unit).map((w) => ({ ...w, waist: Number(w.waist), label: shortDate(lang, w.date) }))}>
+                    <XAxis dataKey="label" stroke={CHALKDIM} fontSize={10} tickLine={false} axisLine={false} minTickGap={24} reversed={lang === 'he'} />
+                    <YAxis hide domain={[(min) => Math.floor(min - 1), (max) => Math.ceil(max + 1)]} />
+                    <Tooltip contentStyle={{ background: SURFACE, border: 0, borderRadius: 12, fontSize: 13 }} labelStyle={{ color: CHALK }} formatter={(v) => [`${v}${data.waists.at(-1).unit}`, t('person.waist')]} />
+                    <Line type="monotone" dataKey="waist" stroke={ACCENT} strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </Section>
           )}
 
@@ -268,9 +318,15 @@ export default function PersonDetail() {
             </Section>
           )}
 
-          {data.routines.length > 0 && (
-            <Section title={t('person.routines')} hint={t('person.routinesHint')}>
-              <RoutineListView routines={data.routines} t={t} onEdit={(r) => openAccount(`/routines/${r.id}/edit`)} />
+          {!p.is_admin && (
+            <Section
+              title={t('person.routines')}
+              hint={data.routines.length > 0 ? t('person.routinesHint') : t('person.noRoutinesYet')}
+              action={<GiveRoutine personId={p.id} t={t} onGiven={() => setReload((r) => r + 1)} />}
+            >
+              {data.routines.length > 0 && (
+                <RoutineListView routines={data.routines} t={t} onEdit={(r) => openAccount(`/routines/${r.id}/edit`)} />
+              )}
             </Section>
           )}
 
@@ -350,6 +406,106 @@ export default function PersonDetail() {
   )
 }
 
+// Give this trainee a copy of one of the coach's own routines, from their
+// page, without switching into their account. Uses the same copy as
+// Routines → "Copy to…", which also brings the exercises across.
+function GiveRoutine({ personId, t, onGiven }) {
+  const { user } = useAuth()
+  const { toast } = useFeedback()
+  const [open, setOpen] = useState(false)
+  const [busyId, setBusyId] = useState(null)
+  const [given, setGiven] = useState([])
+  return (
+    <>
+      <Button type="button" variant="ghost" className="shrink-0" onClick={() => setOpen(true)}>
+        <Plus size={16} /> {t('person.giveRoutine')}
+      </Button>
+      {open && (
+        <GiveRoutineSheet
+          uid={user?.uid}
+          t={t}
+          busyId={busyId}
+          given={given}
+          onClose={() => setOpen(false)}
+          onPick={async (r) => {
+            setBusyId(r.id)
+            try {
+              await copyRoutineToUser(personId, r)
+              setGiven((g) => [...g, r.id])
+              toast(t('person.routineGiven', { name: r.name }))
+              onGiven()
+            } catch (err) {
+              console.error(err)
+              toast(t('feedback.saveFailed'), 'error')
+            } finally {
+              setBusyId(null)
+            }
+          }}
+        />
+      )}
+    </>
+  )
+}
+
+function GiveRoutineSheet({ uid, t, busyId, given, onClose, onPick }) {
+  useScrollLock(true)
+  const [routines, loading, refresh, loadError] = useCollection(uid, 'routines', 'created_at', 'desc')
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('person.giveRoutine')}
+      className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div className="card p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-xl mb-1">{t('person.giveRoutine')}</h2>
+        <p className="text-chalkdim text-sm mb-4">{t('person.giveRoutineHint')}</p>
+        <div className="flex flex-col gap-1 max-h-72 overflow-y-auto">
+          {loading && <p className="text-chalkdim text-sm py-2">{t('common.loading')}</p>}
+          {!loading && loadError && routines.length === 0 && <LoadError onRetry={refresh} />}
+          {!loading && !loadError && routines.length === 0 && <p className="text-chalkdim text-sm py-2">{t('person.noOwnRoutines')}</p>}
+          {routines.map((r) => {
+            const done = given.includes(r.id)
+            return (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => onPick(r)}
+                disabled={done || busyId != null}
+                className="flex items-center justify-between gap-2 px-3 min-h-[48px] rounded-[12px] hover:bg-surface2 text-start disabled:opacity-60"
+              >
+                <span className="truncate min-w-0">{r.name}</span>
+                <span className="text-xs text-brass shrink-0 inline-flex items-center gap-1">
+                  {done ? (
+                    <>
+                      <Check size={14} /> {t('routines.copiedLabel')}
+                    </>
+                  ) : busyId === r.id ? (
+                    t('common.saving')
+                  ) : (
+                    t('routines.copyHereLabel')
+                  )}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        <div className="flex justify-end mt-4 pt-4 border-t border-line">
+          <Button variant="ghost" onClick={onClose}>
+            {t('common.done')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function Section({ title, hint, count, action, children }) {
   return (
     <Card className="flex flex-col gap-3">
@@ -385,7 +541,7 @@ function SessionList({ sessions, lang, t, today, onOpen, showReviewed }) {
         <li key={s.id}>
           <button onClick={() => onOpen(s)} className="press-row w-full flex items-center gap-3 py-2 text-start">
             <span className="flex-1 min-w-0">
-              <span className="block truncate text-sm">{s.routine_name}</span>
+              <span className="block truncate text-sm">{sessionTitle(s, t)}</span>
               <span className="block text-xs text-chalkdim num">
                 {fmtDate(lang, new Date(s.date + 'T00:00:00'), { weekday: 'short', month: 'short', day: 'numeric' })}
                 {s.duration_minutes ? ` · ${t('person.minutes')(s.duration_minutes)}` : ''}

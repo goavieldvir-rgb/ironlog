@@ -455,7 +455,8 @@ export function UndoToast({ toast, onUndo }) {
   return createPortal(
     <div
       className="fixed inset-x-0 z-[60] flex justify-center px-4 pointer-events-none"
-      style={{ top: 'calc(0.75rem + env(safe-area-inset-top, 0px))' }}
+      // Bottom, above the tab bar: at the top it covered the sheet's close button.
+      style={{ bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}
       role="status"
       aria-live="polite"
     >

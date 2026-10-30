@@ -2,11 +2,22 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../supabase.js'
 import { workingSets } from './warmup.js'
 
+// The last rows loaded per query, so a screen opened again (switching tabs,
+// back from a workout's page) shows its list at once while it re-checks.
+// Only for callers that ask for it, since `loading` still means "not
+// re-checked yet". Writes to a table drop its entries (forgetCollection).
+const collectionCache = new Map()
+export function forgetCollection(table) {
+  for (const key of collectionCache.keys()) if (key.split('|')[1] === table) collectionCache.delete(key)
+}
+
 // Generic live-ish collection hook: fetches rows owned by `uid` from `table`,
 // ordered by `orderField`. Call the returned refresh() after any mutation
-// made from the same screen so the list updates immediately.
-export function useCollection(uid, table, orderField = 'created_at', direction = 'desc') {
-  const [data, setData] = useState([])
+// made from the same screen so the list updates immediately. With
+// { cached: true } the rows from the last visit show while it reloads.
+export function useCollection(uid, table, orderField = 'created_at', direction = 'desc', { cached = false } = {}) {
+  const cacheKey = `${uid}|${table}|${orderField}|${direction}`
+  const [data, setData] = useState(() => (cached && collectionCache.get(cacheKey)) || [])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [reload, setReload] = useState(0)
@@ -19,6 +30,7 @@ export function useCollection(uid, table, orderField = 'created_at', direction =
     let cancelled = false
     const key = `${uid}|${table}|${orderField}|${direction}`
     setLoading(true)
+    if (cached && loadedKey.current !== key && collectionCache.has(key)) setData(collectionCache.get(key))
 
     supabase
       .from(table)
@@ -35,6 +47,7 @@ export function useCollection(uid, table, orderField = 'created_at', direction =
           setError(null)
           loadedKey.current = key
           setData(data || [])
+          if (cached) collectionCache.set(key, data || [])
         }
         setLoading(false)
       })
@@ -168,6 +181,7 @@ export async function setScheduleDay(uid, dayOfWeek, slot, routineId) {
 
 // ---- Exercises ----
 export async function addExercise(uid, exercise) {
+  forgetCollection('exercises')
   const { data, error } = await supabase
     .from('exercises')
     .insert({
@@ -192,6 +206,7 @@ export async function addExercise(uid, exercise) {
 }
 
 export async function updateExercise(uid, id, patch) {
+  forgetCollection('exercises')
   const row = {}
   if (patch.name !== undefined) row.name = patch.name
   if ('nameHe' in patch) row.name_he = (patch.nameHe || '').trim() || null
@@ -219,6 +234,7 @@ export async function clearExerciseNote(uid, id) {
 }
 
 export async function deleteExercise(uid, id) {
+  forgetCollection('exercises')
   const { error } = await supabase.from('exercises').delete().eq('id', id).eq('user_id', uid)
   if (error) throw error
 }
@@ -320,9 +336,14 @@ export function cleanEntries(entries) {
 
 // ---- Sessions (a completed workout log) ----
 export async function logSession(uid, session) {
+  forgetCollection('sessions')
+  forgetCollection('exercises')
   session = { ...session, entries: cleanEntries(session.entries) }
   if (session.entries.length === 0) throw new Error('EMPTY_SESSION')
-  const { error: sessionError } = await supabase.from('sessions').insert({
+  // The id is made once per workout on the client, so a Finish retried after
+  // a timeout (the first request may have landed) can't create a second row.
+  const row = {
+    ...(session.id ? { id: session.id } : {}),
     user_id: uid,
     routine_id: session.routineId || null,
     routine_name: session.routineName || 'Freestyle',
@@ -335,7 +356,10 @@ export async function logSession(uid, session) {
     ...(session.gymId ? { gym_id: session.gymId } : {}),
     ...(session.startedAt ? { started_at: session.startedAt } : {}),
     ...(session.durationMinutes != null ? { duration_minutes: session.durationMinutes } : {}),
-  })
+  }
+  const { error: sessionError } = session.id
+    ? await supabase.from('sessions').upsert(row, { onConflict: 'id' })
+    : await supabase.from('sessions').insert(row)
   if (sessionError) throw sessionError
 
   // Only overwrite an exercise's remembered note when a new one was
@@ -345,53 +369,52 @@ export async function logSession(uid, session) {
 
   // Denormalize "last performance" onto each exercise for quick lookup
   // when building the next session.
-  for (const entry of session.entries) {
-    if (!entry.exerciseId) continue
-    const completedSets = workingSets(entry.sets).filter((s) => isCompletedSet(entry, s))
-    if (completedSets.length === 0) continue
-    const last = completedSets[completedSets.length - 1]
+  // In parallel: the session is already saved, so a failed update here only
+  // logs (the hint just stays stale) and never fails the Finish.
+  await Promise.all(
+    session.entries.map(async (entry) => {
+      if (!entry.exerciseId) return
+      const completedSets = workingSets(entry.sets).filter((s) => isCompletedSet(entry, s))
+      if (completedSets.length === 0) return
+      const last = completedSets[completedSets.length - 1]
 
-    if (entry.category === 'cardio') {
-      const { error } = await supabase
-        .from('exercises')
-        .update({
-          last_weight: Number(last.duration) || 0, // minutes
-          last_reps: Number(last.intensity) || 0,
-          last_distance: last.distance !== '' && last.distance != null ? Number(last.distance) : null,
-          last_date: session.date,
-          ...noteFields(entry),
-          last_sets: completedSets.map((s) => ({
-            duration: Number(s.duration) || 0,
-            intensity: Number(s.intensity) || 0,
-            distance: s.distance !== '' && s.distance != null ? Number(s.distance) : null,
-          })),
-        })
-        .eq('id', entry.exerciseId)
-        .eq('user_id', uid)
-      if (error) console.error(error)
-      continue
-    }
-
-    const { error } = await supabase
-      .from('exercises')
-      .update({
-        last_weight: Number(last.weight) || 0,
-        last_reps: Number(last.reps),
-        last_date: session.date,
-        ...noteFields(entry),
-        last_sets: completedSets.map((s) => ({
-          weight: Number(s.weight) || 0,
-          reps: Number(s.reps),
-          ...(s.rir !== '' && s.rir != null ? { rir: Number(s.rir) } : {}),
-        })),
-      })
-      .eq('id', entry.exerciseId)
-      .eq('user_id', uid)
-    if (error) console.error(error)
-  }
+      const fields =
+        entry.category === 'cardio'
+          ? {
+              last_weight: Number(last.duration) || 0, // minutes
+              last_reps: Number(last.intensity) || 0,
+              last_distance: last.distance !== '' && last.distance != null ? Number(last.distance) : null,
+              last_date: session.date,
+              ...noteFields(entry),
+              last_sets: completedSets.map((s) => ({
+                duration: Number(s.duration) || 0,
+                intensity: Number(s.intensity) || 0,
+                distance: s.distance !== '' && s.distance != null ? Number(s.distance) : null,
+              })),
+            }
+          : {
+              last_weight: Number(last.weight) || 0,
+              last_reps: Number(last.reps),
+              last_date: session.date,
+              ...noteFields(entry),
+              last_sets: completedSets.map((s) => ({
+                weight: Number(s.weight) || 0,
+                reps: Number(s.reps),
+                ...(s.rir !== '' && s.rir != null ? { rir: Number(s.rir) } : {}),
+              })),
+            }
+      try {
+        const { error } = await supabase.from('exercises').update(fields).eq('id', entry.exerciseId).eq('user_id', uid)
+        if (error) console.error(error)
+      } catch (err) {
+        console.error(err)
+      }
+    }),
+  )
 }
 
 export async function deleteSession(uid, id) {
+  forgetCollection('sessions')
   // Note which exercises this session touched BEFORE it's gone, so their
   // "previously logged" hint can be recalculated afterwards.
   const { data: existing } = await supabase.from('sessions').select('entries').eq('id', id).eq('user_id', uid).single()
@@ -477,6 +500,7 @@ export async function recomputeLastKnown(uid, exerciseIds) {
 // the existing sessions RLS policy (admin can update any row) rather than
 // needing its own.
 export async function updateTrainerComment(uid, sessionId, comment) {
+  forgetCollection('sessions')
   const { error } = await supabase
     .from('sessions')
     .update({ trainer_comment: comment })
@@ -492,6 +516,7 @@ export function hasUnreadFeedback(s) {
 }
 
 export async function markFeedbackSeen(uid, sessionId) {
+  forgetCollection('sessions')
   const { error } = await supabase
     .from('sessions')
     .update({ trainer_comment_seen_at: new Date().toISOString() })
@@ -505,6 +530,7 @@ export async function markFeedbackSeen(uid, sessionId) {
 // exercises, since that should reflect the most recent session overall,
 // not whichever one happens to be getting corrected right now.
 export async function updateSession(uid, id, patch) {
+  forgetCollection('sessions')
   const row = {}
   if (patch.date !== undefined) row.date = patch.date
   if (patch.notes !== undefined) row.notes = patch.notes
@@ -542,6 +568,30 @@ export async function updateBodyWeightEntry(uid, id, patch) {
   if (patch.weight !== undefined) row.weight = Number(patch.weight)
   if (patch.unit !== undefined) row.unit = patch.unit
   const { error } = await supabase.from('body_weight_logs').update(row).eq('id', id).eq('user_id', uid)
+  if (error) throw error
+}
+
+export async function addWaistEntry(uid, entry) {
+  const { error } = await supabase.from('waist_logs').insert({
+    user_id: uid,
+    date: entry.date,
+    waist: Number(entry.waist),
+    unit: entry.unit || 'cm',
+  })
+  if (error) throw error
+}
+
+export async function updateWaistEntry(uid, id, patch) {
+  const row = {}
+  if (patch.date !== undefined) row.date = patch.date
+  if (patch.waist !== undefined) row.waist = Number(patch.waist)
+  if (patch.unit !== undefined) row.unit = patch.unit
+  const { error } = await supabase.from('waist_logs').update(row).eq('id', id).eq('user_id', uid)
+  if (error) throw error
+}
+
+export async function deleteWaistEntry(uid, id) {
+  const { error } = await supabase.from('waist_logs').delete().eq('id', id).eq('user_id', uid)
   if (error) throw error
 }
 

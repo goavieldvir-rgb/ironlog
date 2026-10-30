@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { Plus, Trash2, ArrowUp, ArrowDown, Library, Video, StickyNote, Link2 } from 'lucide-react'
 import { BackChevron } from './DirectionalIcon.jsx'
@@ -18,7 +18,7 @@ import { useScrollLock } from '../lib/scrollLock.js'
 export default function RoutineBuilder() {
   const { effectiveUid } = useAdmin()
   const { t, lang } = useLanguage()
-  const { toast } = useFeedback()
+  const { toast, confirm } = useFeedback()
   const { id } = useParams()
   const navigate = useNavigate()
   const [exercises, , refreshExercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
@@ -34,13 +34,47 @@ export default function RoutineBuilder() {
   const [pickId, setPickId] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // What the form looked like when it was loaded (or empty for a new one) —
+  // anything different is an unsaved change worth a confirm before leaving.
+  const baseline = useRef(JSON.stringify({ name: '', category: 'strength', items: [] }))
+  const savedRef = useRef(false)
+
   useEffect(() => {
     if (existing) {
       setName(existing.name)
       setCategory(existing.category)
       setItems(existing.exercises || [])
+      baseline.current = JSON.stringify({ name: existing.name, category: existing.category, items: existing.exercises || [] })
     }
   }, [existing])
+
+  const dirty = !savedRef.current && JSON.stringify({ name, category, items }) !== baseline.current
+
+  // Closing the tab or reloading with unsaved work also asks first.
+  useEffect(() => {
+    if (!dirty) return
+    const onBeforeUnload = (e) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [dirty])
+
+  async function leave(e) {
+    e?.preventDefault()
+    if (dirty) {
+      const ok = await confirm({
+        title: t('routines.leaveTitle'),
+        body: t('routines.leaveBody'),
+        confirmLabel: t('routines.leaveConfirm'),
+        danger: true,
+      })
+      if (!ok) return
+    }
+    savedRef.current = true
+    navigate('/routines')
+  }
 
   const availableExercises = exercises.filter((e) => e.category === category)
   const availableExerciseLabels = disambiguateLabels(availableExercises, (e) => (lang === 'he' && e.name_he) || e.name, t)
@@ -187,6 +221,7 @@ export default function RoutineBuilder() {
         await addRoutine(effectiveUid, payload)
       }
       toast(t('routines.routineSaved'))
+      savedRef.current = true
       navigate('/routines')
     } catch (err) {
       console.error(err)
@@ -202,7 +237,7 @@ export default function RoutineBuilder() {
 
   return (
     <div className="flex flex-col gap-5 max-w-2xl">
-      <Link to="/routines" className="text-chalkdim text-sm inline-flex items-center gap-1 hover:text-chalk w-fit">
+      <Link to="/routines" onClick={leave} className="text-chalkdim text-sm inline-flex items-center gap-1 hover:text-chalk w-fit min-h-11">
         <BackChevron size={15} /> {t('routines.title')}
       </Link>
 
@@ -286,6 +321,7 @@ export default function RoutineBuilder() {
                 <>
                   <input
                     type="number"
+                    inputMode="numeric"
                     min={1}
                     value={it.targetDuration ?? 20}
                     onChange={(e) => updateItem(i, { targetDuration: Number(e.target.value) })}
@@ -295,6 +331,7 @@ export default function RoutineBuilder() {
                   <span className="text-chalkdim text-xs">{t('routines.minLabel')}</span>
                   <input
                     type="number"
+                    inputMode="numeric"
                     min={1}
                     value={it.targetIntensity ?? 5}
                     onChange={(e) => updateItem(i, { targetIntensity: Number(e.target.value) })}
@@ -307,21 +344,26 @@ export default function RoutineBuilder() {
                 <>
                   <input
                     type="number"
+                    inputMode="numeric"
                     min={1}
                     value={it.targetSets}
                     onChange={(e) => updateItem(i, { targetSets: Number(e.target.value) })}
                     className="w-14 text-center num"
                     title={t('routines.targetSets')}
+                    aria-label={t('routines.targetSets')}
                   />
-                  <span className="text-chalkdim text-xs">×</span>
+                  <span className="text-chalkdim text-xs">{t('routines.setsUnit')} ×</span>
+                  {/* Reps can be a range like 8-12, so only seconds get the digits-only keyboard. */}
                   <input
+                    inputMode={it.timed ? 'numeric' : undefined}
+                    aria-label={it.timed ? t('routines.targetSeconds') : t('routines.targetReps')}
                     value={it.targetReps}
                     onChange={(e) => updateItem(i, { targetReps: e.target.value })}
                     className="w-16 text-center num"
                     title={it.timed ? t('routines.targetSeconds') : t('routines.targetReps')}
                     placeholder={it.timed ? '30' : '10'}
                   />
-                  {it.timed && <span className="text-chalkdim text-xs">s</span>}
+                  <span className="text-chalkdim text-xs">{it.timed ? t('routines.secUnit') : t('routines.repsUnit')}</span>
                   {category === 'strength' && !it.timed && (
                     <>
                       <input
@@ -479,13 +521,14 @@ export default function RoutineBuilder() {
       )}
 
       <div className="flex justify-end gap-2">
-        <Button variant="ghost" onClick={() => navigate('/routines')}>
+        <Button variant="ghost" onClick={leave}>
           {t('common.cancel')}
         </Button>
         <Button onClick={handleSave} disabled={saving || !name.trim() || items.length === 0}>
           {saving ? t('common.saving') : t('routines.saveRoutine')}
         </Button>
       </div>
+      {(!name.trim() || items.length === 0) && <p className="text-chalkdim text-xs text-end -mt-3">{t('routines.saveHint')}</p>}
     </div>
   )
 }

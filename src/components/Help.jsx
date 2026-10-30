@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ChevronDown, HelpCircle } from 'lucide-react'
 import { Card } from './ui.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import InstallCard from './InstallCard.jsx'
 
 export default function Help() {
   const { t } = useLanguage()
@@ -25,11 +26,16 @@ export default function Help() {
         <p className="text-chalkdim text-sm mt-1">{t('help.subtitle')}</p>
       </div>
 
+      <InstallCard />
+
       <div className="flex flex-col gap-2">
         {sections.map((s, i) => (
           <Card key={i} className="!p-0 overflow-hidden">
             <button
               onClick={() => setOpenIndex(openIndex === i ? -1 : i)}
+              id={`help-h${i}`}
+              aria-expanded={openIndex === i}
+              aria-controls={`help-p${i}`}
               className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-start hover:bg-surface2"
             >
               <span className="text-chalk">{s.title}</span>
@@ -39,7 +45,7 @@ export default function Help() {
               />
             </button>
             {openIndex === i && (
-              <div className="px-4 pb-4 text-chalkdim text-sm leading-relaxed whitespace-pre-line border-t border-line pt-3">
+              <div id={`help-p${i}`} role="region" aria-labelledby={`help-h${i}`} className="px-4 pb-4 text-chalkdim text-sm leading-relaxed whitespace-pre-line border-t border-line pt-3">
                 {s.body}
               </div>
             )}

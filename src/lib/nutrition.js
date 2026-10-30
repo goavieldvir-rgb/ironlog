@@ -2,6 +2,7 @@ import { supabase } from '../supabase.js'
 import { normalizeHe, searchTextFor } from './foodText.js'
 import { isStrongMatch, rankFoods } from './foodRank.js'
 import { peekCatalog, upsertCatalogFood } from './foodCatalog.js'
+import { shiftDay } from './nutritionStats.js'
 
 // Nutrition diary: pure helpers (text normalising, macro maths) and plain
 // async data functions. Every data function throws on a Supabase error.
@@ -104,12 +105,13 @@ export function scaleMacros(per, grams) {
 }
 
 export function sumLogs(rows) {
-  const t = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+  const t = { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
   for (const r of rows) {
     t.kcal += Number(r.kcal) || 0
     t.protein += Number(r.protein) || 0
     t.carbs += Number(r.carbs) || 0
     t.fat += Number(r.fat) || 0
+    t.fiber += Number(r.fiber) || 0
   }
   return t
 }
@@ -159,6 +161,26 @@ export function defaultUnitIndex(options) {
   return i >= 0 ? i : options.findIndex((o) => o.kind === 'g')
 }
 
+// Where the amount starts for a food: the unit and quantity it was last logged
+// at, else one serving (or 100 g). Returns [option index, quantity text].
+export function startAmount(food, options) {
+  const last = lastAmountFor(food?.id)
+  if (last) {
+    const u = last.unit_label && last.unit_qty > 0 ? options.findIndex((o) => o.kind === 'unit' && o.label === last.unit_label) : -1
+    if (u >= 0) return [u, String(last.unit_qty)]
+    return [options.findIndex((o) => o.kind === 'g'), String(round1(last.grams))]
+  }
+  const i = defaultUnitIndex(options)
+  return [i, String(options[i].def)]
+}
+
+// A log row at that starting amount, for one-tap add.
+export function quickLogRow({ uid, date, meal, food, lang, t }) {
+  const options = buildUnitOptions(food, lang, t)
+  const [i, qty] = startAmount(food, options)
+  return foodLogRow({ uid, date, meal, food, lang, option: options[i], qty })
+}
+
 export function foodLogRow({ uid, date, meal, food, lang, option, qty }) {
   const q = Number(qty)
   const grams = round1(q * option.g)
@@ -173,6 +195,7 @@ export function foodLogRow({ uid, date, meal, food, lang, option, qty }) {
     unit_label: option.kind === 'unit' ? option.label : null,
     unit_qty: option.kind === 'unit' ? q : null,
     ...m,
+    fiber: food.fiber != null ? round1((Number(food.fiber) * grams) / 100) : null,
   }
 }
 
@@ -222,35 +245,113 @@ export async function getLogs(uid, date) {
   )
 }
 
-export async function insertLogs(rows) {
-  if (!rows.length) return []
-  return check(await supabase.from('food_logs').insert(rows).select(LOG_SELECT))
+// Until supabase-food-fiber-own-targets.sql runs, food_logs has no fiber
+// column: writes leave it out (PGRST204 names the missing column).
+let noFiberColumn = false
+const dropFiber = (row) => {
+  const { fiber, ...rest } = row // eslint-disable-line no-unused-vars
+  return rest
+}
+async function writeLogs(write, rows) {
+  if (noFiberColumn) rows = rows.map(dropFiber)
+  const res = await write(rows)
+  if (res.error?.code === 'PGRST204' && /fiber/.test(res.error.message || '')) {
+    noFiberColumn = true
+    return check(await write(rows.map(dropFiber)))
+  }
+  return check(res)
 }
 
+export async function insertLogs(rows) {
+  if (!rows.length) return []
+  const inserted = await writeLogs((rs) => supabase.from('food_logs').insert(rs).select(LOG_SELECT), rows)
+  for (const r of inserted) rememberAmount(r)
+  window.dispatchEvent(new Event(LOGS_EVENT))
+  return inserted
+}
+
+// Every log from `from` to `to`, both included, newest day first.
+export async function getLogsBetween(uid, from, to) {
+  return check(
+    await supabase
+      .from('food_logs')
+      .select(LOG_SELECT)
+      .eq('user_id', uid)
+      .gte('date', from)
+      .lte('date', to)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: true })
+      .limit(600),
+  )
+}
+
+// Fired after logs are written, so an open Add sheet refreshes Recent.
+export const LOGS_EVENT = 'ironlog:food-logs'
+
+// The amount each food was last logged at (food_id -> log row), so the amount
+// screen opens there instead of at 1 serving. For one diary at a time (a coach
+// switches between trainees): rebuilt by each history load, then kept up by
+// every insert, edit and delete in this app session.
+let amountsUid = null
+const lastAmounts = new Map()
+function rememberAmount(r) {
+  if (!r.food_id || !(r.grams > 0) || r.user_id !== amountsUid) return
+  lastAmounts.set(r.food_id, { id: r.id, grams: Number(r.grams), unit_label: r.unit_label, unit_qty: r.unit_qty })
+}
+function forgetAmounts(ids) {
+  for (const [food, a] of lastAmounts) if (ids.includes(a.id)) lastAmounts.delete(food)
+}
+export const lastAmountFor = (foodId) => (foodId ? lastAmounts.get(foodId) || null : null)
+
 export async function updateLog(id, patch) {
-  return check(await supabase.from('food_logs').update(patch).eq('id', id).select(LOG_SELECT).single())
+  const row = await writeLogs((rs) => supabase.from('food_logs').update(rs[0]).eq('id', id).select(LOG_SELECT).single(), [patch])
+  forgetAmounts([id])
+  rememberAmount(row)
+  return row
 }
 
 export async function deleteLogs(ids) {
   if (!ids.length) return
   check(await supabase.from('food_logs').delete().in('id', ids))
+  // A deleted (or undone) entry no longer sets the amount: next time opens at
+  // one serving rather than at a typo.
+  forgetAmounts(ids)
 }
 
 // Distinct foods this user logged (by food_id, or name for quick adds),
 // newest first, each with `uses`: how often it was logged in the last 500
-// entries. Feeds the Recent tab, "logged before" in search, and ranking.
+// entries, and `inMeal`: the same count per meal. Feeds the Recent tab,
+// "logged before" in search, and ranking.
 export async function getLogHistory(uid) {
   const rows = check(
     await supabase.from('food_logs').select(LOG_SELECT).eq('user_id', uid).order('created_at', { ascending: false }).limit(500),
   )
+  amountsUid = uid
+  lastAmounts.clear()
   const byKey = new Map()
   for (const r of rows) {
-    const key = r.food_id ? `f:${r.food_id}` : `n:${String(r.name).toLowerCase()}`
+    // Quick adds have no food: tell them apart by name and macros, so unnamed
+    // ones don't all collapse into one "Quick add" row.
+    const key = r.food_id ? `f:${r.food_id}` : `n:${String(r.name).toLowerCase()}|${r.kcal}|${r.protein}|${r.carbs}|${r.fat}`
     const hit = byKey.get(key)
     if (hit) hit.uses += 1
-    else byKey.set(key, { ...r, uses: 1 })
+    else {
+      byKey.set(key, { ...r, uses: 1, inMeal: {} })
+      if (!lastAmounts.has(r.food_id)) rememberAmount(r) // rows are newest first
+    }
+    const h = byKey.get(key)
+    h.inMeal[r.meal] = (h.inMeal[r.meal] || 0) + 1
   }
   return [...byKey.values()]
+}
+
+// Recent for one meal: foods most logged in that meal first, then newest.
+export function recentForMeal(history, meal, limit = 20) {
+  return (history || [])
+    .map((r, i) => [r, i])
+    .sort(([a, i], [b, j]) => (b.inMeal?.[meal] || 0) - (a.inMeal?.[meal] || 0) || i - j)
+    .slice(0, limit)
+    .map(([r]) => r)
 }
 
 // food_id -> { count } for ranking.
@@ -298,7 +399,47 @@ export function cloneLogs(rows, { uid, date, meal }) {
     protein: r.protein,
     carbs: r.carbs,
     fat: r.fat,
+    fiber: r.fiber ?? null,
   }))
+}
+
+// Each meal logged in the two weeks around `date`, for "Past meals" in the add
+// sheet: newest day first, breakfast to snack within a day. `date` itself is
+// left out (it's the diary on screen); days up to today are in, so planning
+// tomorrow can repeat today.
+export async function getPastMeals(uid, date, today, days = 14) {
+  // Two weeks back from the diary day; forward to today, at most two weeks,
+  // so an old day isn't crowded out by recent meals.
+  const from = shiftDay(date < today ? date : today, -days)
+  const ahead = shiftDay(date, days)
+  const to = date > today ? date : ahead < today ? ahead : today
+  const rows = check(
+    await supabase
+      .from('food_logs')
+      .select(LOG_SELECT)
+      .eq('user_id', uid)
+      .gte('date', from)
+      .lte('date', to)
+      .neq('date', date)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: true })
+      .limit(600),
+  )
+  return groupMeals(rows)
+}
+
+// Log rows -> [{ key, date, meal, items }], in the rows' day order and meal order.
+export function groupMeals(rows) {
+  const byKey = new Map()
+  for (const r of rows || []) {
+    const key = `${r.date}|${r.meal}`
+    if (!byKey.has(key)) byKey.set(key, { key, date: r.date, meal: r.meal, items: [] })
+    byKey.get(key).items.push(r)
+  }
+  const dayOrder = [...new Set((rows || []).map((r) => r.date))]
+  return [...byKey.values()].sort(
+    (a, b) => dayOrder.indexOf(a.date) - dayOrder.indexOf(b.date) || MEALS.indexOf(a.meal) - MEALS.indexOf(b.meal),
+  )
 }
 
 // ---------------------------------------------------------------- targets
@@ -307,14 +448,35 @@ export async function getTargets(uid) {
   return check(await supabase.from('nutrition_targets').select('*').eq('user_id', uid).maybeSingle())
 }
 
-export async function saveTargets(uid, t) {
+// Whether trainees can set their own targets yet: false until
+// supabase-food-fiber-own-targets.sql adds set_by (and its policies).
+let ownTargets = null
+export function ownTargetsReady() {
+  if (!ownTargets)
+    ownTargets = supabase
+      .from('nutrition_targets')
+      .select('set_by')
+      .limit(0)
+      .then(({ error }) => !error)
+  return ownTargets
+}
+
+// setBy: 'coach' when the coach saves, 'self' for a trainee's own targets.
+export async function saveTargets(uid, t, setBy = 'coach') {
+  let withSetBy = true
   const upsert = (row) =>
     supabase
       .from('nutrition_targets')
-      .upsert({ user_id: uid, ...row, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+      .upsert({ user_id: uid, ...row, ...(withSetBy ? { set_by: setBy } : {}), updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
       .select()
       .single()
-  const res = await upsert(t)
+  let res = await upsert(t)
+  // PGRST204: set_by doesn't exist yet (supabase-food-fiber-own-targets.sql
+  // not run). The coach can still save; a trainee is refused by RLS anyway.
+  if (res.error?.code === 'PGRST204' && /set_by/.test(res.error.message || '')) {
+    withSetBy = false
+    res = await upsert(t)
+  }
   // 22P02: the macro columns are still whole numbers because
   // supabase-macro-decimals.sql hasn't been run yet. Save whole grams
   // rather than failing.
@@ -342,12 +504,42 @@ export async function saveMeal(uid, name, logs) {
     protein: r.protein,
     carbs: r.carbs,
     fat: r.fat,
+    fiber: r.fiber ?? null,
   }))
-  return check(await supabase.from('saved_meals').insert({ user_id: uid, name, items }).select().single())
+  const row = check(await supabase.from('saved_meals').insert({ user_id: uid, name, items }).select().single())
+  mealsChanged()
+  return row
 }
+
+// Fired when saved meals change, so an open Add sheet reloads its list.
+export const MEALS_EVENT = 'ironlog:saved-meals'
+const mealsChanged = () => window.dispatchEvent(new Event(MEALS_EVENT))
 
 export async function deleteSavedMeal(id) {
   check(await supabase.from('saved_meals').delete().eq('id', id))
+  mealsChanged()
+}
+
+// patch: { name?, items? }. Returns the updated row.
+export async function updateSavedMeal(id, patch) {
+  const row = check(await supabase.from('saved_meals').update(patch).eq('id', id).select().single())
+  mealsChanged()
+  return row
+}
+
+// Items scaled by a portion factor (pure). Grams and macros to 1 decimal, unit_qty to 2.
+export function scaleItems(items, factor) {
+  const f = Number(factor) || 1
+  return items.map((it) => ({
+    ...it,
+    grams: it.grams == null ? it.grams : round1(it.grams * f),
+    unit_qty: it.unit_qty == null ? it.unit_qty : Math.round(it.unit_qty * f * 100) / 100,
+    kcal: round1(it.kcal * f),
+    protein: round1(it.protein * f),
+    carbs: round1(it.carbs * f),
+    fat: round1(it.fat * f),
+    ...(it.fiber != null ? { fiber: round1(it.fiber * f) } : {}),
+  }))
 }
 
 // ---------------------------------------------------------------- foods

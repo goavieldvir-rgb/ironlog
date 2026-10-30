@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { supabase, resetRedirect } from '../supabase.js'
-import { MailCheck } from 'lucide-react'
+import { MailCheck, Eye, EyeOff } from 'lucide-react'
 import { Button, Field } from './ui.jsx'
 import { friendlyAuthError } from '../lib/authErrors.js'
 import Captcha, { CAPTCHA_SITE_KEY } from './Captcha.jsx'
@@ -24,6 +24,9 @@ export default function Login({ linkProblem }) {
   const [busy, setBusy] = useState(false)
   const [resetSent, setResetSent] = useState(false)
   const [invited, setInvited] = useState(false)
+  // The invite is tied to this address, so an invited person can't change it.
+  const [inviteEmailLocked, setInviteEmailLocked] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const [captchaToken, setCaptchaToken] = useState('')
   const captcha = useRef(null)
 
@@ -61,7 +64,10 @@ export default function Login({ linkProblem }) {
     if (inviteEmail || inviteName) {
       setMode('signup')
       setInvited(true)
-      if (inviteEmail) setEmail(inviteEmail)
+      if (inviteEmail) {
+        setEmail(inviteEmail)
+        setInviteEmailLocked(true)
+      }
       if (inviteName) setName(inviteName)
     }
   }, [])
@@ -219,6 +225,8 @@ export default function Login({ linkProblem }) {
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               {mode === 'signup' && invited && <p className="text-accent text-sm">{t('login.invitedNote')}</p>}
+              {/* Sign-up is by invitation only; say so before the form is filled in, not after. */}
+              {mode === 'signup' && !invited && <p className="text-chalkdim text-sm">{t('login.inviteOnlyNote')}</p>}
 
               {mode === 'signup' && (
                 <Field label={t('login.name')}>
@@ -240,21 +248,37 @@ export default function Login({ linkProblem }) {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   autoComplete="email"
+                  readOnly={mode === 'signup' && inviteEmailLocked}
+                  className={mode === 'signup' && inviteEmailLocked ? 'opacity-70' : undefined}
                   required
                 />
               </Field>
 
               {mode !== 'reset' && (
                 <Field label={t('login.password')}>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                    minLength={mode === 'signup' ? 8 : undefined}
-                    required
-                  />
+                  {/* Passwords are typed left to right in both languages, eye button included. */}
+                  <div className="relative" dir="ltr">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                      minLength={mode === 'signup' ? 8 : undefined}
+                      className="w-full pe-12"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      aria-label={showPassword ? t('login.hidePassword') : t('login.showPassword')}
+                      aria-pressed={showPassword}
+                      className="absolute inset-y-0 end-0 w-11 flex items-center justify-center text-chalkdim hover:text-chalk"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  {mode === 'signup' && <p className="text-chalkdim text-xs">{t('login.passwordHint')}</p>}
                 </Field>
               )}
 
