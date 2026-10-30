@@ -20,6 +20,7 @@ import {
   getLogs,
   getLogsBetween,
   getTargets,
+  ownTargetsReady,
   insertLogs,
   isNotSetUp,
   saveMeal,
@@ -84,6 +85,14 @@ function Diary() {
   // The day the `logs` state belongs to, for writing edits back to dayCache.
   const logsFor = useRef('')
   const adding = useRef(false)
+  const [ownReady, setOwnReady] = useState(false)
+  useEffect(() => {
+    let off = false
+    ownTargetsReady().then((ok) => !off && setOwnReady(ok))
+    return () => {
+      off = true
+    }
+  }, [])
 
   // A PWA resumed the next morning still shows yesterday as "Today": move
   // to the new day when the app comes back, if it was showing today.
@@ -338,7 +347,8 @@ function Diary() {
   // that meal was. Usually yesterday; a skipped day falls back further.
   const lastDayOf = (rows) => (rows.length ? { date: rows[0].date, rows: rows.filter((r) => r.date === rows[0].date) } : null)
   const prevDay = lastDayOf(prevLogs)
-  const prevMeal = (m) => lastDayOf(prevLogs.filter((r) => r.meal === m))
+  const prevMeals = Object.fromEntries(MEALS.map((m) => [m, lastDayOf(prevLogs.filter((r) => r.meal === m))]))
+  const prevMeal = (m) => prevMeals[m]
   const prevTotals = sumLogs(prevDay?.rows || [])
   const isToday = date === today
   // ISO dates compare as strings, so a later day sorts after today.
@@ -370,7 +380,7 @@ function Diary() {
         : fmtDate(lang, new Date(iso + 'T00:00:00'), { weekday: 'short', day: 'numeric', month: 'short' })
   const targetsKnown = !loading && !loadError
   // The coach's targets are theirs; a trainee may set their own until then.
-  const canEditTargets = isAdmin || !targets || targets.set_by === 'self'
+  const canEditTargets = isAdmin || (ownReady && (!targets || targets.set_by === 'self'))
   const dayName = (iso) => {
     const w = sourceDay(iso)
     return w === 'today' ? t('nutrition.today') : w === 'yesterday' ? t('nutrition.yesterday') : iso === tomorrow ? t('nutrition.tomorrow') : w
@@ -466,14 +476,18 @@ function Diary() {
                   </div>
                 </>
               ) : (
-                <>
-                  <p className="text-sm text-chalkdim">{t('nutrition.coachWillSetOwn')}</p>
-                  <div>
-                    <Button variant="ghost" onClick={() => push({ type: 'targets' })}>
-                      {t('nutrition.setOwnTargets')}
-                    </Button>
-                  </div>
-                </>
+                ownReady ? (
+                  <>
+                    <p className="text-sm text-chalkdim">{t('nutrition.coachWillSetOwn')}</p>
+                    <div>
+                      <Button variant="ghost" onClick={() => push({ type: 'targets' })}>
+                        {t('nutrition.setOwnTargets')}
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-chalkdim">{t('nutrition.coachWillSet')}</p>
+                )
               )}
             </Card>
           )}

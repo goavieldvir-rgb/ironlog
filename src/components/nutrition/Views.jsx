@@ -43,7 +43,8 @@ export function EditLog({ row, maxDate, onBack, onClose, onSave, onCopy, onDelet
     ...(hasGrams ? foodUnits : []),
     { key: 'g', label: g, g: 1, step: 10 },
   ]
-  const [oi, setOi] = useState(0)
+  // Start in the unit the entry was logged in: its own unit, else grams.
+  const [oi, setOi] = useState(() => (unitG ? 0 : options.findIndex((o) => o.key === 'g')))
   const [qty, setQty] = useState(() => String(unitG ? row.unit_qty : round1(row.grams)))
   const [meal, setMeal] = useState(row.meal)
   const [day, setDay] = useState(row.date)

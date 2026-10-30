@@ -265,7 +265,8 @@ async function writeLogs(write, rows) {
 export async function insertLogs(rows) {
   if (!rows.length) return []
   const inserted = await writeLogs((rs) => supabase.from('food_logs').insert(rs).select(LOG_SELECT), rows)
-  for (const r of rows) rememberAmount(r)
+  for (const r of inserted) rememberAmount(r)
+  window.dispatchEvent(new Event(LOGS_EVENT))
   return inserted
 }
 
@@ -284,22 +285,37 @@ export async function getLogsBetween(uid, from, to) {
   )
 }
 
+// Fired after logs are written, so an open Add sheet refreshes Recent.
+export const LOGS_EVENT = 'ironlog:food-logs'
+
 // The amount each food was last logged at (food_id -> log row), so the amount
-// screen opens there instead of at 1 serving. Filled by the history load and
-// by every log written in this app session.
+// screen opens there instead of at 1 serving. For one diary at a time (a coach
+// switches between trainees): rebuilt by each history load, then kept up by
+// every insert, edit and delete in this app session.
+let amountsUid = null
 const lastAmounts = new Map()
 function rememberAmount(r) {
-  if (r.food_id && r.grams > 0) lastAmounts.set(r.food_id, { grams: Number(r.grams), unit_label: r.unit_label, unit_qty: r.unit_qty })
+  if (!r.food_id || !(r.grams > 0) || r.user_id !== amountsUid) return
+  lastAmounts.set(r.food_id, { id: r.id, grams: Number(r.grams), unit_label: r.unit_label, unit_qty: r.unit_qty })
+}
+function forgetAmounts(ids) {
+  for (const [food, a] of lastAmounts) if (ids.includes(a.id)) lastAmounts.delete(food)
 }
 export const lastAmountFor = (foodId) => (foodId ? lastAmounts.get(foodId) || null : null)
 
 export async function updateLog(id, patch) {
-  return writeLogs((rs) => supabase.from('food_logs').update(rs[0]).eq('id', id).select(LOG_SELECT).single(), [patch])
+  const row = await writeLogs((rs) => supabase.from('food_logs').update(rs[0]).eq('id', id).select(LOG_SELECT).single(), [patch])
+  forgetAmounts([id])
+  rememberAmount(row)
+  return row
 }
 
 export async function deleteLogs(ids) {
   if (!ids.length) return
   check(await supabase.from('food_logs').delete().in('id', ids))
+  // A deleted (or undone) entry no longer sets the amount: next time opens at
+  // one serving rather than at a typo.
+  forgetAmounts(ids)
 }
 
 // Distinct foods this user logged (by food_id, or name for quick adds),
@@ -310,6 +326,8 @@ export async function getLogHistory(uid) {
   const rows = check(
     await supabase.from('food_logs').select(LOG_SELECT).eq('user_id', uid).order('created_at', { ascending: false }).limit(500),
   )
+  amountsUid = uid
+  lastAmounts.clear()
   const byKey = new Map()
   for (const r of rows) {
     // Quick adds have no food: tell them apart by name and macros, so unnamed
@@ -319,7 +337,7 @@ export async function getLogHistory(uid) {
     if (hit) hit.uses += 1
     else {
       byKey.set(key, { ...r, uses: 1, inMeal: {} })
-      if (!lastAmounts.has(r.food_id)) rememberAmount(r)
+      if (!lastAmounts.has(r.food_id)) rememberAmount(r) // rows are newest first
     }
     const h = byKey.get(key)
     h.inMeal[r.meal] = (h.inMeal[r.meal] || 0) + 1
@@ -390,8 +408,11 @@ export function cloneLogs(rows, { uid, date, meal }) {
 // left out (it's the diary on screen); days up to today are in, so planning
 // tomorrow can repeat today.
 export async function getPastMeals(uid, date, today, days = 14) {
+  // Two weeks back from the diary day; forward to today, at most two weeks,
+  // so an old day isn't crowded out by recent meals.
   const from = shiftDay(date < today ? date : today, -days)
-  const to = date > today ? date : today
+  const ahead = shiftDay(date, days)
+  const to = date > today ? date : ahead < today ? ahead : today
   const rows = check(
     await supabase
       .from('food_logs')
@@ -425,6 +446,19 @@ export function groupMeals(rows) {
 
 export async function getTargets(uid) {
   return check(await supabase.from('nutrition_targets').select('*').eq('user_id', uid).maybeSingle())
+}
+
+// Whether trainees can set their own targets yet: false until
+// supabase-food-fiber-own-targets.sql adds set_by (and its policies).
+let ownTargets = null
+export function ownTargetsReady() {
+  if (!ownTargets)
+    ownTargets = supabase
+      .from('nutrition_targets')
+      .select('set_by')
+      .limit(0)
+      .then(({ error }) => !error)
+  return ownTargets
 }
 
 // setBy: 'coach' when the coach saves, 'self' for a trainee's own targets.

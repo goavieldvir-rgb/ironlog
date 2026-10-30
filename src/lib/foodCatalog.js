@@ -206,8 +206,13 @@ export function upsertCatalogFood(food) {
     stamp = `${(Number(count) || 0) + 1}|${latest}`
   }
   mem = { ...mem, foods, stamp }
-  if (stamp) idbPut(uid, { foods, stamp, savedAt: mem.savedAt })
+  // Stored once things settle, not on every add of a scanning spree.
+  clearTimeout(storeTimer)
+  storeTimer = setTimeout(() => {
+    if (mem?.uid === uid && mem.stamp) idbPut(uid, { foods: mem.foods, stamp: mem.stamp, savedAt: mem.savedAt })
+  }, 3000)
 }
+let storeTimer = 0
 
 // Barcodes already in the catalog, so live Open Food Facts hits that we hold
 // anyway are not listed twice.

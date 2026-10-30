@@ -20,6 +20,7 @@ import {
   getSavedMeals,
   FAV_EVENT,
   MEALS_EVENT,
+  LOGS_EVENT,
   getFavorites,
   parseNum,
   searchFoods,
@@ -199,6 +200,23 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, today, onCl
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid])
 
+  // The sheet stays open between adds: refresh Recent, "logged before" and
+  // Past meals after each one.
+  useEffect(() => {
+    let off = false
+    const refresh = () => {
+      setPast(null)
+      getLogHistory(uid)
+        .then((r) => !off && setHistory(r))
+        .catch((err) => console.error(err))
+    }
+    window.addEventListener(LOGS_EVENT, refresh)
+    return () => {
+      off = true
+      window.removeEventListener(LOGS_EVENT, refresh)
+    }
+  }, [uid])
+
   // Saved meals edited under "Manage meals" show here on the way back.
   useEffect(() => {
     const reload = () =>
@@ -237,7 +255,8 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, today, onCl
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, uid, favN])
 
-  // Past meals load when their tab first opens.
+  // Past meals load when their tab opens, again after a log or a day change.
+  useEffect(() => setPast(null), [date])
   useEffect(() => {
     if (tab !== 'past' || past) return
     let off = false
@@ -254,7 +273,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, today, onCl
       off = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, uid, date])
+  }, [tab, uid, date, past])
 
   const dayName = (iso) =>
     iso === today
