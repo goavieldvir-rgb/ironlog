@@ -26,6 +26,7 @@ import {
   sumLogs,
   logName,
   queryLang,
+  quickLogRow,
 } from '../../lib/nutrition.js'
 import { catalogBarcodes, catalogFood, loadCatalog } from '../../lib/foodCatalog.js'
 import { isStrongMatch } from '../../lib/foodRank.js'
@@ -263,6 +264,12 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, today, onCl
     if (await onLog(rows, t('nutrition.added', { name: r.name }))) flash(r.id)
   }
 
+  // One tap from search or Favorites: the last amount, else one serving.
+  async function logFood(food) {
+    const row = quickLogRow({ uid, date, meal, food, lang, t })
+    if (await onLog([row], t('nutrition.added', { name: row.name }))) flash(`food:${food.id}`)
+  }
+
   async function logMeal(m) {
     const items = Array.isArray(m.items) ? m.items : []
     if (!items.length) return
@@ -351,6 +358,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, today, onCl
         <input
           type="search"
           dir="auto"
+          autoFocus
           aria-label={t('nutrition.searchLabel')}
           placeholder={t('nutrition.searchPlaceholder')}
           value={query}
@@ -419,7 +427,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, today, onCl
           <>
             {logged.length > 0 && (
               <>
-                <h3 className="text-chalkdim text-xs pt-3 pb-1">{t('nutrition.loggedBefore')}</h3>
+                <h3 className="text-chalkdim text-xs pt-3 pb-1">{t('nutrition.loggedBefore')} · {t('nutrition.atLastAmount')}</h3>
                 <ul className="divide-y divide-white/[0.06] mb-1">
                   {logged.map((r) => {
                     const food = r.food_id && catalogFood(authUid, r.food_id)
@@ -452,14 +460,15 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, today, onCl
             )}
             <ul className="divide-y divide-white/[0.06]">
               {shownResults.map((r) => (
-                <li key={r.id || `off:${r.source_ref}`}>
-                  <button type="button" disabled={!r.id && picking} onClick={() => (r.id ? onPick(r) : pickOnline(r))} className="w-full flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
+                <li key={r.id || `off:${r.source_ref}`} className="flex items-center gap-2">
+                  <button type="button" disabled={!r.id && picking} onClick={() => (r.id ? onPick(r) : pickOnline(r))} className="min-w-0 flex-1 flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
                     <div className="min-w-0 flex-1">
                       <Name className="font-medium">{foodName(r, qLang)}</Name>
                       <Stats protein={r.protein} kcal={r.kcal} source={<>{r.brand && <>· <bdi>{r.brand}</bdi></>} · <SourceLabel food={r} /></>} />
                     </div>
-                    <Forward size={20} className="text-chalkdim shrink-0" />
+                    {!r.id && <Forward size={20} className="text-chalkdim shrink-0" />}
                   </button>
+                  {r.id && addBtn(`food:${r.id}`, t('nutrition.addFoodLabel', { name: foodName(r, qLang) }), () => logFood(r))}
                 </li>
               ))}
             </ul>
@@ -516,7 +525,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, today, onCl
                         <Name className="font-medium">{logName(r, lang)}</Name>
                         <Stats protein={r.protein} kcal={r.kcal} extra={r.grams != null ? <AmountText row={r} /> : null} />
                       </div>
-                      {addBtn(r.id, t('nutrition.add'), () => logRecent(r))}
+                      {addBtn(r.id, t('nutrition.addFoodLabel', { name: logName(r, lang) }), () => logRecent(r))}
                     </li>
                   ))}
                 </ul>
@@ -551,14 +560,14 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, today, onCl
                 {favs && favs.length === 0 && !listErr && <p className="text-chalkdim text-sm py-2">{t('nutrition.emptyFavorites')}</p>}
                 <ul className="divide-y divide-white/[0.06]">
                   {(favs || []).map((r) => (
-                    <li key={r.id}>
-                      <button type="button" onClick={() => onPick(r)} className="w-full flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
+                    <li key={r.id} className="flex items-center gap-2">
+                      <button type="button" onClick={() => onPick(r)} className="min-w-0 flex-1 flex items-center gap-3 py-2.5 min-h-[56px] text-start press-row">
                         <div className="min-w-0 flex-1">
                           <Name className="font-medium">{foodName(r, lang)}</Name>
                           <Stats protein={r.protein} kcal={r.kcal} source={<>· <SourceLabel food={r} /></>} />
                         </div>
-                        <Forward size={20} className="text-chalkdim shrink-0" />
                       </button>
+                      {addBtn(`food:${r.id}`, t('nutrition.addFoodLabel', { name: foodName(r, lang) }), () => logFood(r))}
                     </li>
                   ))}
                 </ul>
@@ -577,7 +586,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, today, onCl
                           <Name className="font-medium">{m.name}</Name>
                           <Stats protein={tot.protein} kcal={tot.kcal} extra={n === 1 ? t('nutrition.itemsOne') : t('nutrition.itemsMany', { n })} />
                         </div>
-                        {addBtn(m.id, t('nutrition.add'), () => logMeal(m))}
+                        {addBtn(m.id, t('nutrition.addFoodLabel', { name: m.name }), () => logMeal(m))}
                       </li>
                     )
                   })}

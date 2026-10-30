@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Check, Plus, Trash2 } from 'lucide-react'
+import { Check, CopyPlus, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useLanguage } from '../../context/LanguageContext.jsx'
 import { useFeedback } from '../../context/FeedbackContext.jsx'
 import { Button } from '../ui.jsx'
@@ -11,30 +11,42 @@ import {
   getSavedMeals,
   parseNum,
   round1,
+  scaleItems,
   sumLogs,
   logName,
   logUnit,
+  unitLabel,
+  updateSavedMeal,
 } from '../../lib/nutrition.js'
 import { MACROS, macroGrams, setMacroPct, splitFromTargets, splitTotal } from '../../lib/macroSplit.js'
 import { AmountControl, AmountText, MacroInputs, MacroPanel, MealTabs, N, Name, SheetHeader, UnitChips, mealLabel, useDirtyForm } from './parts.jsx'
 
 const round2 = (n) => Math.round(n * 100) / 100
+const FACTORS = [0.5, 1, 1.5, 2]
 
 // ------------------------------------------------------------ edit a log row
 
-export function EditLog({ row, onBack, onClose, onSave, onDelete }) {
+export function EditLog({ row, maxDate, onBack, onClose, onSave, onCopy, onDelete }) {
   const { t, lang } = useLanguage()
   const g = t('nutrition.g')
   const hasGrams = row.grams != null
-  // Units this row can be edited in: its own household unit, and grams.
+  // Units this row can be edited in: its own household unit, the food's
+  // other units, and grams.
   const unitG = row.unit_label && row.unit_qty ? Number(row.grams) / Number(row.unit_qty) : null
+  const own = unitG ? logUnit(row, lang) : null
+  const foodUnits = (Array.isArray(row.food?.units) ? row.food.units : [])
+    .filter((u) => Number(u?.g) > 0)
+    .map((u, i) => ({ key: `f${i}`, label: unitLabel(u, lang), g: Number(u.g), step: 0.5 }))
+    .filter((o) => o.label !== own)
   const options = [
-    ...(unitG ? [{ key: 'u', label: logUnit(row, lang), g: unitG, step: 0.5 }] : []),
+    ...(unitG ? [{ key: 'u', label: own, g: unitG, step: 0.5 }] : []),
+    ...(hasGrams ? foodUnits : []),
     { key: 'g', label: g, g: 1, step: 10 },
   ]
   const [oi, setOi] = useState(0)
   const [qty, setQty] = useState(() => String(unitG ? row.unit_qty : round1(row.grams)))
   const [meal, setMeal] = useState(row.meal)
+  const [day, setDay] = useState(row.date)
   const [vals, setVals] = useState({
     name: row.name,
     protein: String(row.protein),
@@ -43,8 +55,8 @@ export function EditLog({ row, onBack, onClose, onSave, onDelete }) {
     fat: String(row.fat),
   })
   const [busy, setBusy] = useState(false)
-  const [start] = useState(() => JSON.stringify({ qty, meal, vals }))
-  useDirtyForm(JSON.stringify({ qty, meal, vals }) !== start)
+  const [start] = useState(() => JSON.stringify({ qty, meal, day, vals }))
+  useDirtyForm(JSON.stringify({ qty, meal, day, vals }) !== start)
   const opt = options[oi]
   const q = parseNum(qty)
   const newGrams = hasGrams && q > 0 ? round1(q * opt.g) : 0
@@ -60,29 +72,50 @@ export function EditLog({ row, onBack, onClose, onSave, onDelete }) {
   const num = (v) => (Number.isFinite(parseNum(v)) ? Math.max(0, parseNum(v)) : 0)
   const valid = hasGrams ? newGrams > 0 : vals.kcal !== '' && Number.isFinite(parseNum(vals.kcal))
 
+  // The entry as edited. A food unit other than the logged one becomes the
+  // entry's unit.
+  function buildPatch() {
+    if (!hasGrams)
+      return {
+        meal,
+        date: day,
+        name: vals.name.trim() || row.name,
+        kcal: round1(num(vals.kcal)),
+        protein: round1(num(vals.protein)),
+        carbs: round1(num(vals.carbs)),
+        fat: round1(num(vals.fat)),
+      }
+    const food = opt.key.startsWith('f')
+    return {
+      meal,
+      date: day,
+      grams: newGrams,
+      unit_label: food ? opt.label : row.unit_label,
+      unit_qty: food || opt.key === 'u' ? q : unitG ? round2(newGrams / unitG) : row.unit_qty,
+      kcal: scaled('kcal'),
+      protein: scaled('protein'),
+      carbs: scaled('carbs'),
+      fat: scaled('fat'),
+      ...(row.fiber != null ? { fiber: scaled('fiber') } : {}),
+    }
+  }
+
   async function save() {
     if (!valid || busy) return
     setBusy(true)
-    const patch = hasGrams
-      ? {
-          meal,
-          grams: newGrams,
-          unit_qty: opt.key === 'u' ? q : unitG ? round2(newGrams / unitG) : row.unit_qty,
-          kcal: scaled('kcal'),
-          protein: scaled('protein'),
-          carbs: scaled('carbs'),
-          fat: scaled('fat'),
-        }
-      : {
-          meal,
-          name: vals.name.trim() || row.name,
-          kcal: round1(num(vals.kcal)),
-          protein: round1(num(vals.protein)),
-          carbs: round1(num(vals.carbs)),
-          fat: round1(num(vals.fat)),
-        }
     try {
-      await onSave(row.id, patch)
+      await onSave(row.id, buildPatch())
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // A copy on the chosen day and meal; the entry itself stays as it was.
+  async function copy() {
+    if (!valid || busy) return
+    setBusy(true)
+    try {
+      await onCopy(row, buildPatch())
     } finally {
       setBusy(false)
     }
@@ -100,6 +133,10 @@ export function EditLog({ row, onBack, onClose, onSave, onDelete }) {
           <bdi>{logName(row, lang)}</bdi>
         </h3>
         <MealTabs value={meal} onChange={setMeal} />
+        <label className="flex items-center justify-between gap-3">
+          <span className="text-sm text-chalkdim">{t('nutrition.day')}</span>
+          <input type="date" value={day} max={maxDate} onChange={(e) => e.target.value && setDay(e.target.value)} className="!min-h-[44px] w-auto" />
+        </label>
         {hasGrams ? (
           <>
             <div className="flex flex-col gap-4 py-1">
@@ -125,8 +162,11 @@ export function EditLog({ row, onBack, onClose, onSave, onDelete }) {
         )}
       </div>
       <div className="p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] shrink-0 flex gap-2">
-        <Button variant="danger" onClick={() => onDelete(row.id)} aria-label={t('nutrition.delete')} className="min-h-[52px] px-4">
-          <Trash2 size={18} /> {t('nutrition.delete')}
+        <Button variant="danger" onClick={() => onDelete(row)} aria-label={t('nutrition.delete')} className="min-h-[52px] px-4">
+          <Trash2 size={18} />
+        </Button>
+        <Button variant="ghost" onClick={copy} disabled={!valid || busy} className="min-h-[52px] px-4" aria-label={t('nutrition.copyEntry')}>
+          <CopyPlus size={18} /> {t('nutrition.copyShort')}
         </Button>
         <Button variant="brass" onClick={save} disabled={!valid || busy} className="flex-1 min-h-[52px] text-base">
           <Check size={20} /> {t('nutrition.save')}
@@ -138,7 +178,7 @@ export function EditLog({ row, onBack, onClose, onSave, onDelete }) {
 
 // ------------------------------------------------------------ daily targets
 
-export function TargetsView({ targets, onBack, onClose, onSave }) {
+export function TargetsView({ targets, note, onBack, onClose, onSave }) {
   const { t } = useLanguage()
   const g = t('nutrition.g')
   const [kcalText, setKcalText] = useState(targets?.kcal != null ? String(targets.kcal) : '')
@@ -177,6 +217,7 @@ export function TargetsView({ targets, onBack, onClose, onSave }) {
       <SheetHeader title={t('nutrition.targetsTitle')} onBack={onBack} onClose={onClose} />
       <form onSubmit={submit} className="flex-1 min-h-0 flex flex-col">
         <div className="flex-1 overflow-y-auto px-4 pb-4 flex flex-col gap-5">
+          {note && <p className="text-chalkdim text-sm mt-2">{note}</p>}
           <label className="flex flex-col gap-1.5 mt-2">
             <span className="eyebrow">{t('nutrition.targetKcal')}</span>
             <input
@@ -282,6 +323,9 @@ export function MyMealsView({ uid, date, meal, setMeal, onBack, onClose, onLog }
   const { confirm, toast } = useFeedback()
   const [meals, setMeals] = useState(null)
   const [error, setError] = useState('')
+  const [factors, setFactors] = useState({}) // meal id -> portion factor
+  const [renaming, setRenaming] = useState(null) // { id, name }
+  const [busy, setBusy] = useState(false)
   const g = t('nutrition.g')
 
   useEffect(() => {
@@ -306,6 +350,31 @@ export function MyMealsView({ uid, date, meal, setMeal, onBack, onClose, onLog }
     }
   }
 
+  // Save a patch, then update local state.
+  async function patchMeal(m, patch) {
+    if (busy) return false
+    setBusy(true)
+    try {
+      const row = await updateSavedMeal(m.id, patch)
+      setMeals((list) => list.map((x) => (x.id === m.id ? { ...x, ...row } : x)))
+      return true
+    } catch (err) {
+      console.error(err)
+      toast(friendlyError(err, t), 'error')
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function rename(m) {
+    const name = renaming.name.trim()
+    if (!name) return
+    if (name === m.name || (await patchMeal(m, { name }))) setRenaming(null)
+  }
+
+  const removeItem = (m, items, i) => patchMeal(m, { items: items.filter((_, j) => j !== i) })
+
   return (
     <>
       <SheetHeader title={t('nutrition.myMealsTitle')} onBack={onBack} onClose={onClose} />
@@ -317,16 +386,48 @@ export function MyMealsView({ uid, date, meal, setMeal, onBack, onClose, onLog }
         {meals && meals.length === 0 && !error && <p className="text-chalkdim text-sm">{t('nutrition.noSavedMeals')}</p>}
         {(meals || []).map((m) => {
           const items = Array.isArray(m.items) ? m.items : []
-          const tot = sumLogs(items)
+          const factor = factors[m.id] ?? 1
+          const scaled = scaleItems(items, factor)
+          const tot = sumLogs(scaled)
+          const editing = renaming?.id === m.id
           return (
             <section key={m.id} className="card overflow-hidden">
               <div className="p-4 pb-2">
-                <h3 className="text-xl leading-tight"><bdi>{m.name}</bdi></h3>
+                {editing ? (
+                  <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); rename(m) }}>
+                    <input
+                      dir="auto"
+                      className="flex-1 min-w-0"
+                      aria-label={t('nutrition.mealNameLabel')}
+                      value={renaming.name}
+                      onChange={(e) => setRenaming({ id: m.id, name: e.target.value })}
+                      autoFocus
+                    />
+                    <Button type="submit" variant="brass" className="px-3.5" disabled={!renaming.name.trim() || busy} aria-label={t('nutrition.save')}>
+                      <Check size={18} />
+                    </Button>
+                    <Button type="button" variant="ghost" className="px-3.5" onClick={() => setRenaming(null)} aria-label={t('nutrition.cancel')}>
+                      <X size={18} />
+                    </Button>
+                  </form>
+                ) : (
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-xl leading-tight min-w-0"><bdi>{m.name}</bdi></h3>
+                    <button
+                      type="button"
+                      onClick={() => setRenaming({ id: m.id, name: m.name })}
+                      className="min-h-[44px] min-w-[44px] -me-2 flex items-center justify-center text-chalkdim hover:text-chalk press shrink-0"
+                      aria-label={t('nutrition.renameMeal')}
+                    >
+                      <Pencil size={16} />
+                    </button>
+                  </div>
+                )}
                 <p className="text-chalkdim text-xs mt-0.5">{items.length === 1 ? t('nutrition.itemsOne') : t('nutrition.itemsMany', { n: items.length })}</p>
               </div>
               <ul className="divide-y divide-white/[0.06]">
-                {items.map((it, i) => (
-                  <li key={i} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                {scaled.map((it, i) => (
+                  <li key={i} className="flex items-center justify-between gap-2 ps-4 pe-1 py-1">
                     <div className="min-w-0">
                       <Name className="text-sm">{it.name}</Name>
                       {it.grams != null && <p className="text-chalkdim text-xs"><AmountText row={it} /></p>}
@@ -335,6 +436,15 @@ export function MyMealsView({ uid, date, meal, setMeal, onBack, onClose, onLog }
                       <div className="text-sm"><N mono>{fmt(it.protein, 1)}</N> <span className="text-chalkdim text-xs">{g}</span></div>
                       <div className="text-chalkdim text-xs"><N mono>{fmt(it.kcal, 0)}</N> {t('nutrition.kcalUnit')}</div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => removeItem(m, items, i)}
+                      disabled={busy}
+                      className="min-h-[44px] min-w-[44px] flex items-center justify-center text-chalkdim hover:text-chalk press shrink-0 disabled:opacity-40"
+                      aria-label={t('nutrition.removeItem', { name: it.name })}
+                    >
+                      <X size={16} />
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -351,8 +461,22 @@ export function MyMealsView({ uid, date, meal, setMeal, onBack, onClose, onLog }
                   </div>
                 ))}
               </dl>
+              <div role="radiogroup" aria-label={t('nutrition.portion')} className="px-3 pt-3 flex gap-2 justify-center">
+                {FACTORS.map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    role="radio"
+                    aria-checked={f === factor}
+                    onClick={() => setFactors((s) => ({ ...s, [m.id]: f }))}
+                    className={`min-h-[44px] px-3.5 rounded-full text-sm press ${f === factor ? 'bg-chalk text-ink font-medium' : 'bg-surface2 text-chalkdim hover:text-chalk'}`}
+                  >
+                    <N mono>×{f}</N>
+                  </button>
+                ))}
+              </div>
               <div className="p-3 flex gap-2">
-                <Button variant="ghost" className="flex-1 min-h-[48px]" onClick={() => onLog(cloneLogs(items, { uid, date, meal }), t('nutrition.loggedToMeal', { meal: mealLabel(t, meal) }))}>
+                <Button variant="ghost" className="flex-1 min-h-[48px]" disabled={!items.length} onClick={() => onLog(cloneLogs(scaled, { uid, date, meal }), t('nutrition.loggedToMeal', { meal: mealLabel(t, meal) }))}>
                   <Plus size={18} /> {t('nutrition.logToMeal', { meal: mealLabel(t, meal) })}
                 </Button>
                 <Button variant="danger" className="px-3.5 min-h-[48px]" onClick={() => remove(m)} aria-label={t('nutrition.delete')}>

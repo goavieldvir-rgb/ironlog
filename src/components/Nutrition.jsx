@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { BarChart3, Bookmark, Check, ChevronLeft, ChevronRight, Copy, CopyPlus, Pencil, Plus, Repeat, ScanBarcode } from 'lucide-react'
+import { BarChart3, Bookmark, CalendarDays, Check, ChevronLeft, ChevronRight, Copy, CopyPlus, Pencil, Plus, Repeat, ScanBarcode } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -64,7 +64,7 @@ function Diary() {
   const { t, lang } = useLanguage()
   const { user } = useAuth()
   const { isAdmin, effectiveUid, actingAs } = useAdmin()
-  const { confirm, toast } = useFeedback()
+  const { toast } = useFeedback()
   const uid = effectiveUid
   const today = toLocalISODate()
   const [date, setDate] = useState(today)
@@ -241,12 +241,15 @@ function Diary() {
       return i >= 0 ? s.slice(0, i + 1) : []
     })
 
-  async function logFood(food, option, qty, m) {
+  // From the scanner the camera stays open for the next product.
+  async function logFood(food, option, qty, m, fromScanner = false) {
     const row = foodLogRow({ uid, date, meal: m, food, lang, option, qty })
-    if (await addLogs([row], t('nutrition.added', { name: row.name }))) {
+    const ok = await addLogs([row], t('nutrition.added', { name: row.name }))
+    if (ok && !fromScanner) {
       setScanner(false)
       backToAdd()
     }
+    return ok
   }
 
   async function onLabelSaved(food) {
@@ -275,7 +278,7 @@ function Diary() {
 
   async function onSaveTargets(values) {
     try {
-      const saved = await saveTargets(uid, values)
+      const saved = await saveTargets(uid, values, isAdmin ? 'coach' : 'self')
       setTargets(saved)
       targetsCache.set(uid, saved)
       showToast(t('nutrition.targetsSaved'))
@@ -297,16 +300,25 @@ function Diary() {
     }
   }
 
-  async function onDeleteLog(id) {
-    if (!(await confirm({ title: t('nutrition.deleteTitle'), body: t('nutrition.deleteBody'), confirmLabel: t('nutrition.delete'), danger: true }))) return
+  // No confirm: the toast's Undo logs the same entry again.
+  async function onDeleteLog(row) {
     try {
-      await deleteLogs([id])
+      await deleteLogs([row.id])
       reload()
       closeAll()
+      showToast(t('nutrition.deleted', { name: logName(row, lang) }), [row.id], async () => {
+        await insertLogs(cloneLogs([row], { uid: row.user_id, date: row.date }))
+        reload()
+      })
     } catch (err) {
       console.error(err)
       toast(friendlyError(err, t), 'error')
     }
+  }
+
+  async function onCopyLog(row, patch) {
+    const [copy] = cloneLogs([{ ...row, ...patch }], { uid: row.user_id, date: patch.date })
+    if (await addLogs([copy], t('nutrition.copiedTo', { day: dayName(patch.date) }))) closeAll()
   }
 
   async function onSaveMeal(m, name) {
@@ -357,6 +369,22 @@ function Diary() {
         ? 'yesterday'
         : fmtDate(lang, new Date(iso + 'T00:00:00'), { weekday: 'short', day: 'numeric', month: 'short' })
   const targetsKnown = !loading && !loadError
+  // The coach's targets are theirs; a trainee may set their own until then.
+  const canEditTargets = isAdmin || !targets || targets.set_by === 'self'
+  const dayName = (iso) => {
+    const w = sourceDay(iso)
+    return w === 'today' ? t('nutrition.today') : w === 'yesterday' ? t('nutrition.yesterday') : iso === tomorrow ? t('nutrition.tomorrow') : w
+  }
+  const addRow = (
+    <div className="flex gap-2.5">
+      <Button variant="brass" className="flex-1 h-[52px] text-base" onClick={() => openAdd(addMeal())}>
+        <Plus size={18} strokeWidth={2.2} /> {t('nutrition.addFood')}
+      </Button>
+      <Button variant="subtle" className="w-[52px] h-[52px] !p-0 shrink-0" onClick={() => openScanner(addMeal())} aria-label={t('nutrition.scan')} title={t('nutrition.scan')}>
+        <ScanBarcode size={22} strokeWidth={1.75} />
+      </Button>
+    </div>
+  )
 
   return (
     <div className="nutrition-page flex flex-col gap-5 max-w-xl mx-auto w-full pb-[120px]">
@@ -365,7 +393,20 @@ function Diary() {
           {actingAs && <div className="eyebrow mb-1"><bdi>{actingAs.name || actingAs.email}</bdi></div>}
           <h1 className="text-[30px] leading-9 font-semibold truncate">{dayLabel}</h1>
           <p className="text-chalkdim text-[15px] flex items-center gap-2">
-            <bdi>{dateLine}</bdi>
+            <label className="relative inline-flex items-center gap-1 min-h-[32px] cursor-pointer hover:text-chalk">
+              <bdi>{dateLine}</bdi>
+              <CalendarDays size={15} aria-hidden="true" />
+              {/* The native date picker, laid over the date so a tap opens it. */}
+              <input
+                type="date"
+                aria-label={t('nutrition.pickDate')}
+                value={date}
+                max={lastDay}
+                onChange={(e) => e.target.value && setDate(e.target.value)}
+                onClick={(e) => e.currentTarget.showPicker?.()}
+                className="absolute inset-0 opacity-0 cursor-pointer !min-h-0 !p-0"
+              />
+            </label>
             {isFuture && <span className="text-xs text-chalkdim bg-surface2 rounded-full px-2 py-0.5 whitespace-nowrap">{t('nutrition.planned')}</span>}
           </p>
         </div>
@@ -386,7 +427,13 @@ function Diary() {
         </div>
       </div>
 
-      {loading && <p className="eyebrow animate-pulse">{t('common.loading')}</p>}
+      {/* Logging can start before the day has loaded (weak signal). */}
+      {loading && (
+        <>
+          {addRow}
+          <p className="eyebrow animate-pulse">{t('common.loading')}</p>
+        </>
+      )}
       {loadError && notSetUp && (
         <div className="card p-4" role="alert">
           <p className="text-sm">{t('nutrition.notSetUp')}</p>
@@ -400,7 +447,7 @@ function Diary() {
 
       {targetsKnown && (
         <>
-          <Summary totals={totals} targets={targets} isAdmin={isAdmin} onEdit={() => push({ type: 'targets' })} />
+          <Summary totals={totals} targets={targets} canEdit={canEditTargets} onEdit={() => push({ type: 'targets' })} />
           <button type="button" onClick={() => push({ type: 'trends' })} className="card w-full flex items-center gap-3 px-4 min-h-[52px] -mt-2 text-start hover:bg-surface2 press-row">
             <BarChart3 size={18} className="text-chalkdim shrink-0" aria-hidden="true" />
             <span className="flex-1 min-w-0 truncate text-sm">{t('nutrition.averagesOpen')}</span>
@@ -419,19 +466,19 @@ function Diary() {
                   </div>
                 </>
               ) : (
-                <p className="text-sm text-chalkdim">{t('nutrition.coachWillSet')}</p>
+                <>
+                  <p className="text-sm text-chalkdim">{t('nutrition.coachWillSetOwn')}</p>
+                  <div>
+                    <Button variant="ghost" onClick={() => push({ type: 'targets' })}>
+                      {t('nutrition.setOwnTargets')}
+                    </Button>
+                  </div>
+                </>
               )}
             </Card>
           )}
 
-          <div className="flex gap-2.5">
-            <Button variant="brass" className="flex-1 h-[52px] text-base" onClick={() => openAdd(addMeal())}>
-              <Plus size={18} strokeWidth={2.2} /> {t('nutrition.addFood')}
-            </Button>
-            <Button variant="subtle" className="w-[52px] h-[52px] !p-0 shrink-0" onClick={() => openScanner(addMeal())} aria-label={t('nutrition.scan')} title={t('nutrition.scan')}>
-              <ScanBarcode size={22} strokeWidth={1.75} />
-            </Button>
-          </div>
+          {addRow}
 
           {/* The whole day only copies onto an empty day, so nothing is logged
               twice; each empty meal offers its own copy below. */}
@@ -452,20 +499,17 @@ function Diary() {
             </Card>
           )}
 
-          {/* Water is logged as you drink it, so a planned day has none. */}
-          {!isFuture && <Water uid={uid} date={date} today={today} onPickDate={setDate} onToast={showToast} />}
-
           {MEALS.map((m) => {
             const rows = logs.filter((r) => r.meal === m)
-            const mk = sumLogs(rows).kcal
+            const mt = sumLogs(rows)
             return (
               <section key={m} aria-labelledby={`meal-${m}`} className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
                   <h2 id={`meal-${m}`} className="text-[17px] font-semibold flex items-baseline gap-2 min-w-0">
                     <span className="truncate">{t(MEAL_KEY[m])}</span>
-                    {mk > 0 && (
+                    {rows.length > 0 && (
                       <span className="text-chalkdim text-sm font-normal whitespace-nowrap">
-                        <N mono>{fmt(mk, 0)}</N> {k}
+                        <N mono>{fmt(mt.protein, 0)}</N> {g} {t('nutrition.proteinWord')} · <N mono>{fmt(mt.kcal, 0)}</N> {k}
                       </span>
                     )}
                   </h2>
@@ -518,6 +562,10 @@ function Diary() {
               </section>
             )
           })}
+
+          {/* Water sits below the meals, so food stays above the fold. Logged
+              as you drink it, so a planned day has none. */}
+          {!isFuture && <Water uid={uid} date={date} today={today} onPickDate={setDate} onToast={showToast} />}
         </>
       )}
 
@@ -563,10 +611,10 @@ function Diary() {
                 )
                 break
               case 'edit':
-                body = <EditLog {...common} row={v.row} onSave={onSaveEdit} onDelete={onDeleteLog} />
+                body = <EditLog {...common} row={v.row} maxDate={lastDay} onSave={onSaveEdit} onCopy={onCopyLog} onDelete={onDeleteLog} />
                 break
               case 'targets':
-                body = <TargetsView {...common} targets={targets} onSave={onSaveTargets} />
+                body = <TargetsView {...common} targets={targets} note={isAdmin ? '' : t('nutrition.ownTargetsNote')} onSave={onSaveTargets} />
                 break
               case 'saveMeal':
                 body = (
@@ -579,7 +627,18 @@ function Diary() {
                 )
                 break
               case 'trends':
-                body = <Trends {...common} uid={uid} today={today} targets={targets} />
+                body = (
+                  <Trends
+                    {...common}
+                    uid={uid}
+                    today={today}
+                    targets={targets}
+                    onPickDay={(d) => {
+                      setDate(d)
+                      closeAll()
+                    }}
+                  />
+                )
                 break
               case 'meals':
                 body = <MyMealsView {...common} uid={uid} date={date} meal={meal} setMeal={setMeal} onLog={addLogs} />
@@ -609,7 +668,7 @@ function Diary() {
             const view = { type: 'label', barcode: code, prefill }
             setStack((s) => (s.length ? [...s, view] : [view]))
           }}
-          onAdd={logFood}
+          onAdd={(food, option, qty, m) => logFood(food, option, qty, m, true)}
         />
       )}
 
@@ -656,7 +715,7 @@ function RepeatMeal({ rows, day, meal, onClick }) {
   )
 }
 
-function Summary({ totals, targets, isAdmin, onEdit }) {
+function Summary({ totals, targets, canEdit, onEdit }) {
   const { t } = useLanguage()
   const g = t('nutrition.g')
   const k = t('nutrition.kcalUnit')
@@ -695,7 +754,7 @@ function Summary({ totals, targets, isAdmin, onEdit }) {
                 )}
               </span>
             )}
-            {isAdmin && targets && (
+            {canEdit && targets && (
               <button type="button" onClick={onEdit} aria-label={t('nutrition.editTargets')} title={t('nutrition.editTargets')} className="w-11 h-11 -my-3 -me-2 inline-flex items-center justify-center rounded-full text-chalkdim hover:text-chalk press">
                 <Pencil size={15} />
               </button>
@@ -728,22 +787,30 @@ function Summary({ totals, targets, isAdmin, onEdit }) {
         {targets?.kcal > 0 && <Track value={totals.kcal} max={targets.kcal} tone="kcal" />}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 pt-3.5 border-t border-white/[0.07] text-sm">
+      <div className={`grid ${totals.fiber > 0 ? 'grid-cols-3' : 'grid-cols-2'} gap-3 pt-3.5 border-t border-white/[0.07] text-sm`}>
         {[
           [t('nutrition.carbs'), totals.carbs, targets?.carbs],
           [t('nutrition.fat'), totals.fat, targets?.fat],
+          ...(totals.fiber > 0 ? [[t('nutrition.fiber'), totals.fiber, null]] : []),
         ].map(([label, v, target]) => (
-          <span key={label} className="text-chalkdim whitespace-nowrap">
-            {label}{' '}
-            <N mono className="text-chalk font-medium">{fmt(v, 0)}</N>
+          <div key={label} className="min-w-0">
+            <span className="text-chalkdim whitespace-nowrap">
+              {label}{' '}
+              <N mono className="text-chalk font-medium">{fmt(v, 0)}</N>
+              {target != null && (
+                <>
+                  {' / '}
+                  <N mono>{fmt(target, 1)}</N>
+                </>
+              )}{' '}
+              {g}
+            </span>
             {target != null && (
-              <>
-                {' / '}
-                <N mono>{fmt(target, 1)}</N>
-              </>
-            )}{' '}
-            {g}
-          </span>
+              <div className="text-chalkdim text-xs whitespace-nowrap mt-0.5">
+                <N mono>{fmt(Math.abs(target - v), 0)}</N> {g} {target - v >= 0 ? t('nutrition.left') : t('nutrition.overTarget')}
+              </div>
+            )}
+          </div>
         ))}
       </div>
     </section>

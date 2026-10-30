@@ -188,8 +188,10 @@ export function loadCatalog(uid) {
 }
 
 // A food added or changed in this session (label entry, Open Food Facts
-// cache, approval) shows in search right away. Memory only: the stored copy
-// is marked out of date, and the next check refetches the list with it.
+// cache, approval) shows in search right away. The stamp moves with it (one
+// more row, newest created_at) so the next check does not read our own add
+// as a change; if another device also added a row the count differs and the
+// list is refetched, as it should be.
 export function upsertCatalogFood(food) {
   const uid = loading?.uid ?? mem?.uid
   if (!food?.id || !uid) return
@@ -197,7 +199,14 @@ export function upsertCatalogFood(food) {
   if (mem?.uid !== uid) return
   const i = mem.foods.findIndex((f) => f.id === food.id)
   const foods = i >= 0 ? mem.foods.map((f, j) => (j === i ? food : f)) : [...mem.foods, food]
-  mem = { ...mem, foods, stamp: null }
+  let stamp = mem.stamp
+  if (i < 0 && stamp && food.created_at) {
+    const [count, newest] = stamp.split('|')
+    const latest = newest && Date.parse(newest) > Date.parse(food.created_at) ? newest : food.created_at
+    stamp = `${(Number(count) || 0) + 1}|${latest}`
+  }
+  mem = { ...mem, foods, stamp }
+  if (stamp) idbPut(uid, { foods, stamp, savedAt: mem.savedAt })
 }
 
 // Barcodes already in the catalog, so live Open Food Facts hits that we hold

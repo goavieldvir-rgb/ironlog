@@ -105,12 +105,13 @@ export function scaleMacros(per, grams) {
 }
 
 export function sumLogs(rows) {
-  const t = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+  const t = { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
   for (const r of rows) {
     t.kcal += Number(r.kcal) || 0
     t.protein += Number(r.protein) || 0
     t.carbs += Number(r.carbs) || 0
     t.fat += Number(r.fat) || 0
+    t.fiber += Number(r.fiber) || 0
   }
   return t
 }
@@ -160,6 +161,26 @@ export function defaultUnitIndex(options) {
   return i >= 0 ? i : options.findIndex((o) => o.kind === 'g')
 }
 
+// Where the amount starts for a food: the unit and quantity it was last logged
+// at, else one serving (or 100 g). Returns [option index, quantity text].
+export function startAmount(food, options) {
+  const last = lastAmountFor(food?.id)
+  if (last) {
+    const u = last.unit_label && last.unit_qty > 0 ? options.findIndex((o) => o.kind === 'unit' && o.label === last.unit_label) : -1
+    if (u >= 0) return [u, String(last.unit_qty)]
+    return [options.findIndex((o) => o.kind === 'g'), String(round1(last.grams))]
+  }
+  const i = defaultUnitIndex(options)
+  return [i, String(options[i].def)]
+}
+
+// A log row at that starting amount, for one-tap add.
+export function quickLogRow({ uid, date, meal, food, lang, t }) {
+  const options = buildUnitOptions(food, lang, t)
+  const [i, qty] = startAmount(food, options)
+  return foodLogRow({ uid, date, meal, food, lang, option: options[i], qty })
+}
+
 export function foodLogRow({ uid, date, meal, food, lang, option, qty }) {
   const q = Number(qty)
   const grams = round1(q * option.g)
@@ -174,6 +195,7 @@ export function foodLogRow({ uid, date, meal, food, lang, option, qty }) {
     unit_label: option.kind === 'unit' ? option.label : null,
     unit_qty: option.kind === 'unit' ? q : null,
     ...m,
+    fiber: food.fiber != null ? round1((Number(food.fiber) * grams) / 100) : null,
   }
 }
 
@@ -223,9 +245,26 @@ export async function getLogs(uid, date) {
   )
 }
 
+// Until supabase-food-fiber-own-targets.sql runs, food_logs has no fiber
+// column: writes leave it out (PGRST204 names the missing column).
+let noFiberColumn = false
+const dropFiber = (row) => {
+  const { fiber, ...rest } = row // eslint-disable-line no-unused-vars
+  return rest
+}
+async function writeLogs(write, rows) {
+  if (noFiberColumn) rows = rows.map(dropFiber)
+  const res = await write(rows)
+  if (res.error?.code === 'PGRST204' && /fiber/.test(res.error.message || '')) {
+    noFiberColumn = true
+    return check(await write(rows.map(dropFiber)))
+  }
+  return check(res)
+}
+
 export async function insertLogs(rows) {
   if (!rows.length) return []
-  const inserted = check(await supabase.from('food_logs').insert(rows).select(LOG_SELECT))
+  const inserted = await writeLogs((rs) => supabase.from('food_logs').insert(rs).select(LOG_SELECT), rows)
   for (const r of rows) rememberAmount(r)
   return inserted
 }
@@ -255,7 +294,7 @@ function rememberAmount(r) {
 export const lastAmountFor = (foodId) => (foodId ? lastAmounts.get(foodId) || null : null)
 
 export async function updateLog(id, patch) {
-  return check(await supabase.from('food_logs').update(patch).eq('id', id).select(LOG_SELECT).single())
+  return writeLogs((rs) => supabase.from('food_logs').update(rs[0]).eq('id', id).select(LOG_SELECT).single(), [patch])
 }
 
 export async function deleteLogs(ids) {
@@ -273,7 +312,9 @@ export async function getLogHistory(uid) {
   )
   const byKey = new Map()
   for (const r of rows) {
-    const key = r.food_id ? `f:${r.food_id}` : `n:${String(r.name).toLowerCase()}`
+    // Quick adds have no food: tell them apart by name and macros, so unnamed
+    // ones don't all collapse into one "Quick add" row.
+    const key = r.food_id ? `f:${r.food_id}` : `n:${String(r.name).toLowerCase()}|${r.kcal}|${r.protein}|${r.carbs}|${r.fat}`
     const hit = byKey.get(key)
     if (hit) hit.uses += 1
     else {
@@ -340,6 +381,7 @@ export function cloneLogs(rows, { uid, date, meal }) {
     protein: r.protein,
     carbs: r.carbs,
     fat: r.fat,
+    fiber: r.fiber ?? null,
   }))
 }
 
@@ -385,14 +427,22 @@ export async function getTargets(uid) {
   return check(await supabase.from('nutrition_targets').select('*').eq('user_id', uid).maybeSingle())
 }
 
-export async function saveTargets(uid, t) {
+// setBy: 'coach' when the coach saves, 'self' for a trainee's own targets.
+export async function saveTargets(uid, t, setBy = 'coach') {
+  let withSetBy = true
   const upsert = (row) =>
     supabase
       .from('nutrition_targets')
-      .upsert({ user_id: uid, ...row, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+      .upsert({ user_id: uid, ...row, ...(withSetBy ? { set_by: setBy } : {}), updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
       .select()
       .single()
-  const res = await upsert(t)
+  let res = await upsert(t)
+  // PGRST204: set_by doesn't exist yet (supabase-food-fiber-own-targets.sql
+  // not run). The coach can still save; a trainee is refused by RLS anyway.
+  if (res.error?.code === 'PGRST204' && /set_by/.test(res.error.message || '')) {
+    withSetBy = false
+    res = await upsert(t)
+  }
   // 22P02: the macro columns are still whole numbers because
   // supabase-macro-decimals.sql hasn't been run yet. Save whole grams
   // rather than failing.
@@ -420,12 +470,33 @@ export async function saveMeal(uid, name, logs) {
     protein: r.protein,
     carbs: r.carbs,
     fat: r.fat,
+    fiber: r.fiber ?? null,
   }))
   return check(await supabase.from('saved_meals').insert({ user_id: uid, name, items }).select().single())
 }
 
 export async function deleteSavedMeal(id) {
   check(await supabase.from('saved_meals').delete().eq('id', id))
+}
+
+// patch: { name?, items? }. Returns the updated row.
+export async function updateSavedMeal(id, patch) {
+  return check(await supabase.from('saved_meals').update(patch).eq('id', id).select().single())
+}
+
+// Items scaled by a portion factor (pure). Grams and macros to 1 decimal, unit_qty to 2.
+export function scaleItems(items, factor) {
+  const f = Number(factor) || 1
+  return items.map((it) => ({
+    ...it,
+    grams: it.grams == null ? it.grams : round1(it.grams * f),
+    unit_qty: it.unit_qty == null ? it.unit_qty : Math.round(it.unit_qty * f * 100) / 100,
+    kcal: round1(it.kcal * f),
+    protein: round1(it.protein * f),
+    carbs: round1(it.carbs * f),
+    fat: round1(it.fat * f),
+    ...(it.fiber != null ? { fiber: round1(it.fiber * f) } : {}),
+  }))
 }
 
 // ---------------------------------------------------------------- foods
