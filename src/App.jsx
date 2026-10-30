@@ -39,6 +39,7 @@ const WeeklySummary = lazyRetry(() => import('./components/WeeklySummary.jsx'))
 const Help = lazyRetry(() => import('./components/Help.jsx'))
 const Notifications = lazyRetry(() => import('./components/Notifications.jsx'))
 const Account = lazyRetry(() => import('./components/Account.jsx'))
+const Messages = lazyRetry(() => import('./components/Messages.jsx'))
 
 export default function App() {
   const { user, loading, recovery, needsCode, hasTwoStep } = useAuth()
@@ -110,6 +111,7 @@ export default function App() {
         <Route path="/help" element={<Help />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/account" element={<Account />} />
+        <Route path="/messages" element={<Messages />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/" replace />} />

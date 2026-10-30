@@ -15,6 +15,8 @@ import { TERMS_VERSION } from '../legal/terms.js'
 import { Card, Badge, Button, Field, LoadError } from './ui.jsx'
 import { PageLoader } from './Loading.jsx'
 import ProgressPhotos from './ProgressPhotos.jsx'
+import { MessageThread } from './Messages.jsx'
+import { useMessagesAvailable } from '../lib/messages.js'
 import { RoutineExercises } from './RoutineView.jsx'
 import {
   fetchTraineeDetail,
@@ -45,6 +47,8 @@ export default function PersonDetail() {
   const { isAdmin, setActingAs } = useAdmin()
   const { t, lang } = useLanguage()
   const { toast, confirm } = useFeedback()
+  const { user: me } = useAuth()
+  const messagesOn = useMessagesAvailable()
   const [data, setData] = useState(null)
   const [loadError, setLoadError] = useState(null)
   const [reload, setReload] = useState(0)
@@ -212,6 +216,12 @@ export default function PersonDetail() {
               <p className="text-sm whitespace-pre-wrap">{n.body}</p>
             </div>
           ))}
+
+          {messagesOn && (
+            <Section title={t('messages.title')} hint={t('messages.coachHint')}>
+              <MessageThread traineeId={p.id} viewerId={me.uid} side="coach" />
+            </Section>
+          )}
 
           <Section title={t('person.toReview')} count={derived.toReview.length}
             action={derived.toReview.length > 1 && (

@@ -1919,8 +1919,225 @@ begin
   perform cron.schedule('coach-tasks', '30 5 * * *', $job$select public.run_coach_tasks()$job$);
 end $$;
 
+-- ===== Coach messages (supabase-coach-messages.sql) =====
+-- A two-way message thread per trainee. See supabase-coach-messages.sql.
+
+create table if not exists public.coach_messages (
+  id uuid primary key default gen_random_uuid(),
+  -- The thread: one per trainee.
+  trainee_id uuid not null references auth.users(id) on delete cascade,
+  -- Who wrote it: the trainee, or a coach.
+  sender_id uuid not null references auth.users(id) on delete cascade,
+  body text not null check (length(body) between 1 and 2000),
+  created_at timestamptz not null default now(),
+  -- When the other side opened the thread; null while unread.
+  read_at timestamptz
+);
+create index if not exists coach_messages_thread_idx on public.coach_messages (trainee_id, created_at);
+-- The coach's unread badges only look at unread rows.
+create index if not exists coach_messages_unread_idx on public.coach_messages (trainee_id) where read_at is null;
+
+alter table public.coach_messages enable row level security;
+revoke all on public.coach_messages from anon;
+revoke truncate, references, trigger on public.coach_messages from authenticated;
+revoke update, delete on public.coach_messages from authenticated;
+grant select, insert on public.coach_messages to authenticated;
+
+drop policy if exists "read own thread or coach" on public.coach_messages;
+create policy "read own thread or coach" on public.coach_messages for select to authenticated
+  using (trainee_id = auth.uid() or public.is_admin());
+
+drop policy if exists "write own thread or coach" on public.coach_messages;
+create policy "write own thread or coach" on public.coach_messages for insert to authenticated
+  with check (sender_id = auth.uid() and (trainee_id = auth.uid() or public.is_admin()));
+
+-- Same extra rule the other tables have: with two-step verification on,
+-- an account that skipped the second step reads and writes nothing.
+drop policy if exists "two-step verification when enabled" on public.coach_messages;
+create policy "two-step verification when enabled" on public.coach_messages
+  as restrictive for all to authenticated
+  using ((select public.mfa_satisfied())) with check ((select public.mfa_satisfied()));
+
+-- Marks the other side's messages in one thread as read. A trainee marks the
+-- coach's messages in their own thread; a coach marks the trainee's. Returns
+-- how many messages it marked.
+create or replace function public.mark_messages_read(p_trainee uuid)
+ returns integer
+ language plpgsql
+ security definer
+ set search_path to ''
+as $function$
+declare
+  n integer;
+begin
+  if auth.uid() is null or not public.mfa_satisfied() then
+    raise exception 'not signed in' using errcode = '42501';
+  end if;
+  if p_trainee = auth.uid() then
+    update public.coach_messages
+       set read_at = now()
+     where trainee_id = p_trainee and sender_id <> auth.uid() and read_at is null;
+  elsif public.is_admin() then
+    update public.coach_messages
+       set read_at = now()
+     where trainee_id = p_trainee and sender_id = p_trainee and read_at is null;
+  else
+    raise exception 'not allowed' using errcode = '42501';
+  end if;
+  get diagnostics n = row_count;
+  return n;
+end;
+$function$;
+revoke execute on function public.mark_messages_read(uuid) from public, anon;
+grant execute on function public.mark_messages_read(uuid) to authenticated;
+
+-- ===== Reminder weekdays (supabase-reminder-days.sql) =====
+-- Which weekdays a phone gets the daily reminder: 0 = Sunday ... 6 = Saturday,
+-- in the subscription's own time zone.
+alter table public.push_subscriptions
+  add column if not exists remind_days smallint[] not null default '{0,1,2,3,4,5,6}';
+alter table public.push_subscriptions drop constraint if exists push_subscriptions_remind_days_check;
+alter table public.push_subscriptions
+  add constraint push_subscriptions_remind_days_check
+  check (remind_days <@ array[0,1,2,3,4,5,6]::smallint[] and cardinality(remind_days) >= 1);
+
+-- ===== Two-step recovery codes (supabase-mfa-recovery.sql) =====
+-- 10 one-time codes per person for a lost authenticator app; see that file.
+
+create table if not exists public.mfa_recovery_codes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  code_hash text not null,
+  used_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists mfa_recovery_codes_user_idx on public.mfa_recovery_codes (user_id);
+
+-- Wrong tries, for the rate limit.
+create table if not exists public.mfa_recovery_attempts (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index if not exists mfa_recovery_attempts_user_idx on public.mfa_recovery_attempts (user_id, created_at);
+
+-- RLS on and no policies: nobody reads or writes these tables directly.
+alter table public.mfa_recovery_codes enable row level security;
+alter table public.mfa_recovery_attempts enable row level security;
+revoke all on public.mfa_recovery_codes from anon, authenticated;
+revoke all on public.mfa_recovery_attempts from anon, authenticated;
+
+-- Makes 10 new codes (replacing the old ones) and returns them in plain text,
+-- this once. Needs a session that passed the authenticator code.
+create or replace function public.generate_recovery_codes()
+ returns text[]
+ language plpgsql
+ security definer
+ set search_path = ''
+as $function$
+declare
+  uid uuid := auth.uid();
+  -- 32 letters and digits with no 0/O/1/I lookalikes; 32 divides 256, so
+  -- taking a byte mod 32 is unbiased.
+  alphabet constant text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  codes text[] := '{}';
+  raw text;
+  bytes bytea;
+  i int;
+  j int;
+begin
+  if uid is null then
+    raise exception 'not signed in' using errcode = '42501';
+  end if;
+  if coalesce(auth.jwt() ->> 'aal', '') <> 'aal2' then
+    raise exception 'two-step code required' using errcode = '42501';
+  end if;
+
+  delete from public.mfa_recovery_codes where user_id = uid;
+
+  for i in 1..10 loop
+    bytes := extensions.gen_random_bytes(10);
+    raw := '';
+    for j in 0..9 loop
+      raw := raw || substr(alphabet, (get_byte(bytes, j) % 32) + 1, 1);
+    end loop;
+    codes := codes || (substr(raw, 1, 5) || '-' || substr(raw, 6, 5));
+    insert into public.mfa_recovery_codes (user_id, code_hash)
+    values (uid, extensions.crypt(raw, extensions.gen_salt('bf')));
+  end loop;
+
+  return codes;
+end;
+$function$;
+
+-- How many unused codes the caller has.
+create or replace function public.recovery_codes_left()
+ returns integer
+ language sql
+ stable
+ security definer
+ set search_path = ''
+as $function$
+  select count(*)::int from public.mfa_recovery_codes
+  where user_id = auth.uid() and used_at is null;
+$function$;
+
+-- Spends one code: removes the caller's authenticator app(s) and returns true.
+-- False when no unused code matches. Raises 'too_many_attempts' after 5 wrong
+-- tries in an hour.
+create or replace function public.use_recovery_code(code text)
+ returns boolean
+ language plpgsql
+ security definer
+ set search_path = ''
+as $function$
+declare
+  uid uuid := auth.uid();
+  norm text;
+  hit uuid;
+begin
+  if uid is null then
+    raise exception 'not signed in' using errcode = '42501';
+  end if;
+
+  -- One try at a time per person, so parallel guesses can't dodge the limit.
+  perform pg_advisory_xact_lock(hashtextextended('mfa_recovery:' || uid::text, 0));
+
+  delete from public.mfa_recovery_attempts where created_at < now() - interval '1 day';
+  if (select count(*) from public.mfa_recovery_attempts
+      where user_id = uid and created_at > now() - interval '1 hour') >= 5 then
+    raise exception 'too_many_attempts' using errcode = '54000';
+  end if;
+
+  norm := upper(regexp_replace(coalesce(code, ''), '[\s-]', '', 'g'));
+
+  select c.id into hit
+  from public.mfa_recovery_codes c
+  where c.user_id = uid and c.used_at is null
+    and c.code_hash = extensions.crypt(norm, c.code_hash)
+  limit 1;
+
+  if hit is null then
+    insert into public.mfa_recovery_attempts (user_id) values (uid);
+    return false;
+  end if;
+
+  update public.mfa_recovery_codes set used_at = now() where id = hit;
+  delete from public.mfa_recovery_attempts where user_id = uid;
+  delete from auth.mfa_factors where user_id = uid;
+  return true;
+end;
+$function$;
+
+revoke execute on function public.generate_recovery_codes() from public, anon;
+revoke execute on function public.recovery_codes_left() from public, anon;
+revoke execute on function public.use_recovery_code(text) from public, anon;
+grant execute on function public.generate_recovery_codes() to authenticated;
+grant execute on function public.recovery_codes_left() to authenticated;
+grant execute on function public.use_recovery_code(text) to authenticated;
+
 -- ===== 7. Verification (read-only) =====
--- RLS must be enabled on all 24 tables (rowsecurity = true on every row).
+-- RLS must be enabled on every table (rowsecurity = true on every row).
 select tablename, rowsecurity
 from pg_tables
 where schemaname = 'public'

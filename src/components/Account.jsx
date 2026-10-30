@@ -9,8 +9,8 @@ import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { supabase } from '../supabase.js'
 import { deleteAllPhotos } from '../lib/photos.js'
-import { confirmedApps, removeApp } from '../lib/mfa.js'
-import { TwoStepSetup } from './TwoStep.jsx'
+import { confirmedApps, removeApp, recoveryCodesLeft } from '../lib/mfa.js'
+import { TwoStepSetup, makeAndShowRecoveryCodes } from './TwoStep.jsx'
 import GymSettings from './GymSettings.jsx'
 import { Button, Card, Field } from './ui.jsx'
 import { friendlyAuthError } from '../lib/authErrors.js'
@@ -94,8 +94,39 @@ function TwoStepCard() {
   const [settingUp, setSettingUp] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  const load = () => confirmedApps().then(setApps).catch((err) => { console.error(err); setApps([]) })
+  // Recovery codes left: null when the database doesn't have them yet (all
+  // recovery UI stays hidden then).
+  const [codesLeft, setCodesLeft] = useState(null)
+
+  const loadCodes = () => recoveryCodesLeft().then(setCodesLeft).catch(() => setCodesLeft(null))
+  const load = () => {
+    loadCodes()
+    return confirmedApps().then(setApps).catch((err) => { console.error(err); setApps([]) })
+  }
   useEffect(() => { load() }, [])
+
+  async function newCodes() {
+    // A first set has nothing to replace, so only warn when old codes exist.
+    if (codesLeft > 0) {
+      const ok = await confirm({
+        title: t('twoStep.recConfirmTitle'),
+        body: t('twoStep.recConfirmBody'),
+        confirmLabel: t('twoStep.recMakeNew'),
+        danger: true,
+      })
+      if (!ok) return
+    }
+    setBusy(true)
+    try {
+      await makeAndShowRecoveryCodes()
+    } catch (err) {
+      console.error(err)
+      toast(t('twoStep.recFailed'), 'error')
+    } finally {
+      setBusy(false)
+      loadCodes()
+    }
+  }
 
   async function turnOff() {
     const ok = await confirm({
@@ -127,6 +158,20 @@ function TwoStepCard() {
       ) : on ? (
         <>
           <p className="text-chalkdim text-sm">{t('twoStep.onBody')}</p>
+          {codesLeft !== null && (
+            <div className="flex flex-col gap-1.5 border-t border-line pt-3">
+              <h3 className="text-sm font-semibold">{t('twoStep.recTitle')}</h3>
+              <p className="text-chalkdim text-xs">{t('twoStep.recBody')}</p>
+              <p className="text-sm" data-testid="codes-left">
+                {codesLeft === 0 ? t('twoStep.recLeftNone') : codesLeft === 1 ? t('twoStep.recLeftOne') : t('twoStep.recLeft', { n: codesLeft })}
+              </p>
+              <div>
+                <Button variant="ghost" onClick={newCodes} disabled={busy}>
+                  {codesLeft === 0 ? t('twoStep.recMake') : t('twoStep.recMakeNew')}
+                </Button>
+              </div>
+            </div>
+          )}
           {isAdmin ? (
             <p className="text-chalkdim text-xs">{t('twoStep.coachMustKeep')}</p>
           ) : (

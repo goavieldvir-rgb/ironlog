@@ -2,12 +2,13 @@ import React, { Suspense, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom'
 import { PageLoader } from './Loading.jsx'
-import { Dumbbell, LayoutDashboard, ListChecks, History, Library, LogOut, X, Users, UserCheck, BarChart3, Scale, FileText, HelpCircle, CircleUser, Bell, Apple, Home, Ellipsis } from 'lucide-react'
+import { Dumbbell, LayoutDashboard, ListChecks, History, Library, LogOut, X, Users, UserCheck, BarChart3, Scale, FileText, HelpCircle, CircleUser, Bell, Apple, Home, Ellipsis, MessageSquare } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useScrollLock, resetLockedScroll } from '../lib/scrollLock.js'
 import { useDialog } from './Modal.jsx'
+import { useMessagesState } from '../lib/messages.js'
 
 const links = [
   { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard, end: true },
@@ -23,6 +24,7 @@ export default function Layout() {
   const { user, logout } = useAuth()
   const { isAdmin, nutritionAllowed, actingAs, setActingAs } = useAdmin()
   const { t, lang, setLang } = useLanguage()
+  const { enabled: messagesOn, unread: unreadMessages } = useMessagesState()
   const [open, setOpen] = useState(false)
   useScrollLock(open)
   const location = useLocation()
@@ -252,6 +254,20 @@ export default function Layout() {
                   {t(l.labelKey)}
                 </NavLink>
               ))}
+              {messagesOn && (
+                <NavLink
+                  to="/messages"
+                  onClick={() => setOpen(false)}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3 min-h-[52px] rounded-[14px] text-[15px] whitespace-nowrap ${
+                      isActive ? 'bg-surface2 text-chalk' : 'text-chalkdim'
+                    }`
+                  }
+                >
+                  <MessageSquare size={16} /> {t('messages.nav')}
+                  {unreadMessages > 0 && <span role="img" aria-label={t('messages.unreadLabel')(unreadMessages)} className="w-2 h-2 rounded-full bg-accent" />}
+                </NavLink>
+              )}
               <NavLink
                 to="/notifications"
                 onClick={() => setOpen(false)}
@@ -345,7 +361,10 @@ export default function Layout() {
               aria-haspopup="dialog"
               className="press flex flex-col items-center justify-center gap-0.5 rounded-[18px] text-xs font-medium text-[#8A8A90]"
             >
-              <Ellipsis size={22} strokeWidth={1.75} aria-hidden="true" />
+              <span className="relative">
+                <Ellipsis size={22} strokeWidth={1.75} aria-hidden="true" />
+                {unreadMessages > 0 && <span aria-hidden="true" className="absolute -top-0.5 -end-1 w-2 h-2 rounded-full bg-accent" />}
+              </span>
               <span>{t('nav.more')}</span>
             </button>
           </nav>

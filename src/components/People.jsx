@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Users, UserPlus, Copy, Check, Share, AlertTriangle, Search, Pin, Trophy, CalendarCheck, ChevronUp, ChevronDown } from 'lucide-react'
+import { Users, UserPlus, Copy, Check, Share, AlertTriangle, Search, Pin, Trophy, CalendarCheck, ChevronUp, ChevronDown, MessageSquare } from 'lucide-react'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -12,6 +12,7 @@ import { InfoTip } from './InfoTip.jsx'
 import { PageLoader } from './Loading.jsx'
 import CoachTasks from './CoachTasks.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
+import { fetchUnreadByTrainee, messagesMissing } from '../lib/messages.js'
 import { fetchRoster, fetchRecentPrs, rosterFlags, attentionScore, adherence, daysSince, recordInvite } from '../lib/coach.js'
 
 // The coach's roster: who needs attention first, how each trainee is doing
@@ -29,12 +30,19 @@ export default function People() {
   const [query, setQuery] = useState('')
   const [view, setView] = useState('attention')
   const [recentPrs, setRecentPrs] = useState([])
+  // Unread messages per trainee; stays empty before the SQL is run.
+  const [unreadMsgs, setUnreadMsgs] = useState({})
   const today = toLocalISODate()
 
   // Only the desktop side panel shows this, so it never blocks the list.
   useEffect(() => {
     fetchRecentPrs(today).then(setRecentPrs).catch((e) => console.error(e))
   }, [reload, today])
+
+  useEffect(() => {
+    if (messagesMissing()) return
+    fetchUnreadByTrainee().then(setUnreadMsgs).catch((e) => console.error(e))
+  }, [reload])
 
   useEffect(() => {
     let cancelled = false
@@ -61,9 +69,9 @@ export default function People() {
         .filter((p) => p.id !== user.uid)
         .map((p) => {
           const flags = rosterFlags(p, today)
-          return { ...p, flags, score: attentionScore(flags), adh: adherence(p.week_counts, p.planned_per_week, p.created_at, today) }
+          return { ...p, unread: unreadMsgs[p.id] || 0, flags, score: attentionScore(flags), adh: adherence(p.week_counts, p.planned_per_week, p.created_at, today) }
         }),
-    [rows, user.uid, today],
+    [rows, user.uid, today, unreadMsgs],
   )
   const me = rows.find((p) => p.id === user.uid)
 
@@ -276,6 +284,7 @@ function TraineeRow({ p, today, t }) {
         <div className="flex items-center gap-2 min-w-0">
           <p className="truncate min-w-0">{p.full_name || p.email}</p>
           {p.is_admin && <Badge>{t('people.adminBadge')}</Badge>}
+          {p.unread > 0 && <UnreadBadge n={p.unread} t={t} />}
         </div>
         <p className="text-xs text-chalkdim num">{stats.join(' · ')}</p>
         <FlagChips flags={p.flags} t={t} />
@@ -289,6 +298,14 @@ function TraineeRow({ p, today, t }) {
       <WeekBars counts={p.week_counts} planned={p.planned_per_week} />
       <ForwardChevron size={16} className="text-chalkdim shrink-0" />
     </Link>
+  )
+}
+
+function UnreadBadge({ n, t }) {
+  return (
+    <span role="img" aria-label={t('messages.unreadLabel')(n)} title={t('messages.unreadLabel')(n)} className="shrink-0 inline-flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 font-medium bg-accent text-ink num">
+      <MessageSquare size={11} aria-hidden="true" /> {n}
+    </span>
   )
 }
 
@@ -464,6 +481,7 @@ function RosterTable({ rows, today, t }) {
                       <span className="block truncate text-chalk">{p.full_name || p.email}</span>
                       {p.pinned_note && <span className="block truncate text-xs text-chalkdim">{p.pinned_note}</span>}
                     </span>
+                    {p.unread > 0 && <UnreadBadge n={p.unread} t={t} />}
                   </Link>
                 </td>
                 <td className="px-3 py-3 min-w-[150px]">

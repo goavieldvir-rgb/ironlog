@@ -15,6 +15,7 @@ import { Button, Card, LoadError, FeedbackDot } from './ui.jsx'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import WeeklySchedule from './WeeklySchedule.jsx'
 import { itemTarget } from './RoutineView.jsx'
+import { useMessagesState } from '../lib/messages.js'
 
 // Was hard-coded English ("5m ago") even with the app in Hebrew.
 function timeAgo(ts, t) {
@@ -85,6 +86,7 @@ export default function Dashboard() {
   const { actingAs, effectiveUid, effectiveName } = useAdmin()
   const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
+  const { unread: unreadMessages } = useMessagesState()
   const [exercises, exercisesLoading, refreshExercises, exercisesError] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [routines, routinesLoading, refreshRoutines, routinesError] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [sessions, sessionsLoading, refreshSessions, sessionsError] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
@@ -242,6 +244,17 @@ export default function Dashboard() {
           {fmtDate(lang, now, { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
       </div>
+
+      {unreadMessages > 0 && (
+        <Link to="/messages" className="card press-row !p-4 flex items-center gap-3">
+          <MessageSquareText size={20} className="shrink-0 text-accent" aria-hidden="true" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold">{t('messages.newFromCoach')}</span>
+            <span className="block text-[13px] text-chalkdim num">{t('messages.unreadCount')(unreadMessages)}</span>
+          </span>
+          <ForwardChevron size={16} className="text-chalkdim shrink-0" />
+        </Link>
+      )}
 
       {drafts.map((draft) => (
         <Card key={draft.routineKey} className="!p-5 flex flex-col gap-4">
