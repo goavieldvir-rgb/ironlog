@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Loader2, Plus, ScanBarcode, Search, X, Zap } from 'lucide-react'
 import { useLanguage } from '../../context/LanguageContext.jsx'
+import { fmtDate } from '../../lib/dates.js'
+import { shiftDay } from '../../lib/nutritionStats.js'
 import { Button } from '../ui.jsx'
 import {
   cacheOffFood,
@@ -9,6 +11,7 @@ import {
   foodName,
   friendlyError,
   getLogHistory,
+  getPastMeals,
   historyMap,
   matchHistory,
   rankFoods,
@@ -44,7 +47,7 @@ function Stats({ protein, kcal, extra, source }) {
   )
 }
 
-export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, onScan, onPick, onLabel, onLog, onManageMeals }) {
+export default function AddFood({ meal, setMeal, uid, authUid, date, today, onClose, onScan, onPick, onLabel, onLog, onManageMeals }) {
   const { t, lang } = useLanguage()
   const [query, setQuery] = useState('')
   const [tab, setTab] = useState('recent')
@@ -60,6 +63,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
   const hist = useMemo(() => historyMap(history), [history])
   const [catalogReady, setCatalogReady] = useState(false)
   const [meals, setMeals] = useState(null)
+  const [past, setPast] = useState(null) // meals from the last two weeks, null = not loaded
   const [favs, setFavs] = useState(null) // null = not loaded
   const [done, setDone] = useState({})
   const [online, setOnline] = useState([])
@@ -219,6 +223,34 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, uid, favN])
 
+  // Past meals load when their tab first opens.
+  useEffect(() => {
+    if (tab !== 'past' || past) return
+    let off = false
+    getPastMeals(uid, date, today)
+      .then((list) => !off && setPast(list))
+      .catch((err) => {
+        console.error(err)
+        if (!off) {
+          setPast([])
+          setListErr(friendlyError(err, t, 'nutrition.loadFailed'))
+        }
+      })
+    return () => {
+      off = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, uid, date])
+
+  const dayName = (iso) =>
+    iso === today
+      ? t('nutrition.today')
+      : iso === shiftDay(today, -1)
+        ? t('nutrition.yesterday')
+        : iso === shiftDay(today, 1)
+          ? t('nutrition.tomorrow')
+          : fmtDate(lang, new Date(iso + 'T00:00:00'), { weekday: 'short', day: 'numeric', month: 'short' })
+
   function flash(id) {
     setDone((d) => ({ ...d, [id]: true }))
     setTimeout(() => setDone((d) => ({ ...d, [id]: false })), 2500)
@@ -234,6 +266,11 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
     if (!items.length) return
     const rows = cloneLogs(items, { uid, date, meal })
     if (await onLog(rows, t('nutrition.loggedToMeal', { meal: mealLabel(t, meal) }))) flash(m.id)
+  }
+
+  async function logPast(p) {
+    const rows = cloneLogs(p.items, { uid, date, meal })
+    if (await onLog(rows, t('nutrition.loggedToMeal', { meal: mealLabel(t, meal) }))) flash(p.key)
   }
 
   async function submitQuick(e) {
@@ -280,10 +317,11 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
   const g = t('nutrition.g')
   const tabs = [
     ['recent', t('nutrition.tabRecent')],
+    ['past', t('nutrition.tabPast')],
     ['favorites', t('nutrition.tabFavorites')],
     ['meals', t('nutrition.tabMyMeals')],
   ]
-  const hint = { recent: 'hintRecent', favorites: 'hintFavorites', meals: 'hintMeals' }[tab]
+  const hint = { recent: 'hintRecent', past: 'hintPast', favorites: 'hintFavorites', meals: 'hintMeals' }[tab]
   const addBtn = (id, label, onClick) => (
     <button
       type="button"
@@ -479,6 +517,29 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, onClose, on
                       {addBtn(r.id, t('nutrition.add'), () => logRecent(r))}
                     </li>
                   ))}
+                </ul>
+              </>
+            )}
+            {tab === 'past' && (
+              <>
+                {listErr && <p className="text-sm py-2" role="alert">{listErr}</p>}
+                {!past && !listErr && <p className="eyebrow animate-pulse py-2">{t('common.loading')}</p>}
+                {past && past.length === 0 && !listErr && <p className="text-chalkdim text-sm py-2">{t('nutrition.emptyPast')}</p>}
+                <ul className="divide-y divide-white/[0.06]">
+                  {(past || []).map((p) => {
+                    const tot = sumLogs(p.items)
+                    const title = `${dayName(p.date)} · ${mealLabel(t, p.meal)}`
+                    return (
+                      <li key={p.key} className="flex items-center gap-3 py-2.5">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-[15px] truncate"><bdi>{title}</bdi></div>
+                          <div dir="auto" className="text-chalkdim text-[13px] truncate text-start">{p.items.map((r) => logName(r, lang)).join(', ')}</div>
+                          <Stats protein={tot.protein} kcal={tot.kcal} />
+                        </div>
+                        {addBtn(p.key, t('nutrition.addPastLabel', { title, meal: mealLabel(t, meal) }), () => logPast(p))}
+                      </li>
+                    )
+                  })}
                 </ul>
               </>
             )}

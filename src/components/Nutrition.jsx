@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { BarChart3, Bookmark, Check, ChevronLeft, ChevronRight, Copy, Pencil, Plus, ScanBarcode } from 'lucide-react'
+import { BarChart3, Bookmark, Check, ChevronLeft, ChevronRight, Copy, CopyPlus, Pencil, Plus, Repeat, ScanBarcode } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -85,7 +85,6 @@ function Diary() {
   // The day the `logs` state belongs to, for writing edits back to dayCache.
   const logsFor = useRef('')
   const adding = useRef(false)
-  const [copiedFor, setCopiedFor] = useState('')
 
   // A PWA resumed the next morning still shows yesterday as "Today": move
   // to the new day when the app comes back, if it was showing today.
@@ -181,7 +180,8 @@ function Diary() {
     try {
       if (onUndo) return await onUndo()
       await deleteLogs(ids)
-      setCopiedFor('')
+      // A copy to today may be undone while another day is on screen.
+      dayCache.delete(`${uid}|${today}`)
     } catch (err) {
       console.error(err)
       toast(friendlyError(err, t), 'error')
@@ -197,6 +197,8 @@ function Diary() {
     adding.current = true
     try {
       const inserted = await insertLogs(rows)
+      // Rows for another day (copy to today) make that day's cache stale.
+      for (const r of rows) if (r.date !== date) dayCache.delete(`${uid}|${r.date}`)
       showToast(message, inserted.map((r) => r.id))
       reload()
       return true
@@ -249,7 +251,19 @@ function Diary() {
 
   async function copyPrevious() {
     const rows = cloneLogs(prevLogs, { uid, date })
-    if (await addLogs(rows, t('nutrition.copied', { n: rows.length }))) setCopiedFor(date)
+    await addLogs(rows, t('nutrition.copied', { n: rows.length }))
+  }
+
+  // One meal from the day before, into the same meal on this day.
+  async function copyPrevMeal(m) {
+    const rows = cloneLogs(prevLogs.filter((r) => r.meal === m), { uid, date })
+    await addLogs(rows, t('nutrition.loggedToMeal', { meal: t(MEAL_KEY[m]) }))
+  }
+
+  // From a past day: the same meal, added to today.
+  async function copyMealToToday(m) {
+    const rows = cloneLogs(logs.filter((r) => r.meal === m), { uid, date: today })
+    await addLogs(rows, t('nutrition.copiedToToday', { meal: t(MEAL_KEY[m]) }))
   }
 
   async function onSaveTargets(values) {
@@ -305,6 +319,7 @@ function Diary() {
   const isToday = date === today
   // ISO dates compare as strings, so a later day sorts after today.
   const isFuture = date > today
+  const isPast = date < today
   const tomorrow = shiftDay(today, 1)
   const lastDay = shiftDay(today, MAX_DAYS_AHEAD)
   // Time of day says nothing about a planned day: start from breakfast.
@@ -322,7 +337,9 @@ function Diary() {
   const k = t('nutrition.kcalUnit')
   const notSetUp = loadError && isNotSetUp(loadError)
 
-  const topView = stack[stack.length - 1]
+  const prevMeal = (m) => prevLogs.filter((r) => r.meal === m)
+  // Which day "the day before" is, as the copy buttons name it.
+  const prevWord = isToday ? 'yesterday' : date === tomorrow ? 'today' : 'previous'
   const targetsKnown = !loading && !loadError
 
   return (
@@ -400,7 +417,9 @@ function Diary() {
             </Button>
           </div>
 
-          {prevLogs.length > 0 && copiedFor !== date && (
+          {/* The whole day only copies onto an empty day, so nothing is logged
+              twice; each empty meal offers its own copy below. */}
+          {prevLogs.length > 0 && logs.length === 0 && (
             <Card className="flex items-center justify-between gap-3 !py-3">
               <div className="min-w-0">
                 <div className="eyebrow">{isToday ? t('nutrition.yesterday') : date === tomorrow ? t('nutrition.today') : t('nutrition.previousDayLabel')}</div>
@@ -435,6 +454,11 @@ function Diary() {
                     )}
                   </h2>
                   <div className="flex items-center gap-1 shrink-0">
+                    {isPast && rows.length > 0 && (
+                      <button type="button" onClick={() => copyMealToToday(m)} aria-label={t('nutrition.copyMealToToday', { meal: t(MEAL_KEY[m]) })} title={t('nutrition.copyToTodayShort')} className="w-11 h-11 -my-1 inline-flex items-center justify-center rounded-full text-chalkdim hover:text-chalk press">
+                        <CopyPlus size={18} />
+                      </button>
+                    )}
                     {rows.length > 0 && (
                       <button type="button" onClick={() => push({ type: 'saveMeal', meal: m })} aria-label={`${t('nutrition.saveAsMeal')}: ${t(MEAL_KEY[m])}`} title={t('nutrition.saveAsMeal')} className="w-11 h-11 -my-1 inline-flex items-center justify-center rounded-full text-chalkdim hover:text-chalk press">
                         <Bookmark size={18} />
@@ -445,7 +469,9 @@ function Diary() {
                     </button>
                   </div>
                 </div>
-                {rows.length === 0 ? (
+                {rows.length === 0 && prevMeal(m).length > 0 ? (
+                  <RepeatMeal rows={prevMeal(m)} label={prevWord} meal={t(MEAL_KEY[m])} onClick={() => copyPrevMeal(m)} />
+                ) : rows.length === 0 ? (
                   <p className="text-chalkdim text-sm">{isFuture ? t('nutrition.nothingPlanned') : t('nutrition.nothingLogged')}</p>
                 ) : (
                   <ul className="bg-surface rounded-[18px] overflow-hidden divide-y divide-white/[0.06]">
@@ -494,6 +520,7 @@ function Diary() {
                     uid={uid}
                     authUid={user.uid}
                     date={date}
+                    today={today}
                     onClose={requestCloseAll}
                     onScan={() => setScanner(true)}
                     onPick={(food) => push({ type: 'detail', food })}
@@ -572,6 +599,36 @@ function Diary() {
 
       <UndoToast toast={undoToast} onUndo={undo} />
     </div>
+  )
+}
+
+// An empty meal that was logged the day before: one tap logs it again.
+function RepeatMeal({ rows, label, meal, onClick }) {
+  const { t, lang } = useLanguage()
+  const tot = sumLogs(rows)
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={t(`nutrition.repeatMealLabel_${label}`, { meal })}
+      className="w-full flex items-center gap-3 px-4 min-h-[56px] py-2 rounded-[18px] border border-dashed border-white/[0.14] text-start hover:bg-surface press-row"
+    >
+      <Repeat size={18} className="text-chalkdim shrink-0" aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        <span className="block text-[15px] leading-5 font-medium">{t(`nutrition.repeatMeal_${label}`)}</span>
+        <span dir="auto" className="block text-chalkdim text-[13px] leading-[18px] truncate text-start">
+          {rows.map((r) => logName(r, lang)).join(', ')}
+        </span>
+      </div>
+      <div className="text-end shrink-0 text-[13px] text-chalkdim whitespace-nowrap">
+        <div>
+          <N mono className="text-chalk font-semibold text-[15px]">{fmt(tot.protein, 1)}</N> {t('nutrition.g')}
+        </div>
+        <div>
+          <N mono>{fmt(tot.kcal, 0)}</N> {t('nutrition.kcalUnit')}
+        </div>
+      </div>
+    </button>
   )
 }
 

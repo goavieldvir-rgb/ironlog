@@ -2,6 +2,7 @@ import { supabase } from '../supabase.js'
 import { normalizeHe, searchTextFor } from './foodText.js'
 import { isStrongMatch, rankFoods } from './foodRank.js'
 import { peekCatalog, upsertCatalogFood } from './foodCatalog.js'
+import { shiftDay } from './nutritionStats.js'
 
 // Nutrition diary: pure helpers (text normalising, macro maths) and plain
 // async data functions. Every data function throws on a Supabase error.
@@ -299,6 +300,42 @@ export function cloneLogs(rows, { uid, date, meal }) {
     carbs: r.carbs,
     fat: r.fat,
   }))
+}
+
+// Each meal logged in the two weeks around `date`, for "Past meals" in the add
+// sheet: newest day first, breakfast to snack within a day. `date` itself is
+// left out (it's the diary on screen); days up to today are in, so planning
+// tomorrow can repeat today.
+export async function getPastMeals(uid, date, today, days = 14) {
+  const from = shiftDay(date < today ? date : today, -days)
+  const to = date > today ? date : today
+  const rows = check(
+    await supabase
+      .from('food_logs')
+      .select(LOG_SELECT)
+      .eq('user_id', uid)
+      .gte('date', from)
+      .lte('date', to)
+      .neq('date', date)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: true })
+      .limit(600),
+  )
+  return groupMeals(rows)
+}
+
+// Log rows -> [{ key, date, meal, items }], in the rows' day order and meal order.
+export function groupMeals(rows) {
+  const byKey = new Map()
+  for (const r of rows || []) {
+    const key = `${r.date}|${r.meal}`
+    if (!byKey.has(key)) byKey.set(key, { key, date: r.date, meal: r.meal, items: [] })
+    byKey.get(key).items.push(r)
+  }
+  const dayOrder = [...new Set((rows || []).map((r) => r.date))]
+  return [...byKey.values()].sort(
+    (a, b) => dayOrder.indexOf(a.date) - dayOrder.indexOf(b.date) || MEALS.indexOf(a.meal) - MEALS.indexOf(b.meal),
+  )
 }
 
 // ---------------------------------------------------------------- targets
