@@ -17,7 +17,7 @@ import { Button, Card, Field } from './ui.jsx'
 // Everything a person has in Ironlog, read fresh from the database (not
 // from whatever a page happened to have loaded).
 async function fetchAllData(uid) {
-  const tables = ['exercises', 'routines', 'sessions', 'body_weight_logs', 'weekly_schedule', 'progress_photos', 'gyms']
+  const tables = ['exercises', 'routines', 'sessions', 'body_weight_logs', 'waist_logs', 'weekly_schedule', 'progress_photos', 'gyms']
   const results = await Promise.all(tables.map((tb) => supabase.from(tb).select('*').eq('user_id', uid)))
   const { data: profile, error: pErr } = await supabase.from('profiles').select('*').eq('id', uid).single()
   if (pErr) throw pErr

@@ -545,6 +545,30 @@ export async function updateBodyWeightEntry(uid, id, patch) {
   if (error) throw error
 }
 
+export async function addWaistEntry(uid, entry) {
+  const { error } = await supabase.from('waist_logs').insert({
+    user_id: uid,
+    date: entry.date,
+    waist: Number(entry.waist),
+    unit: entry.unit || 'cm',
+  })
+  if (error) throw error
+}
+
+export async function updateWaistEntry(uid, id, patch) {
+  const row = {}
+  if (patch.date !== undefined) row.date = patch.date
+  if (patch.waist !== undefined) row.waist = Number(patch.waist)
+  if (patch.unit !== undefined) row.unit = patch.unit
+  const { error } = await supabase.from('waist_logs').update(row).eq('id', id).eq('user_id', uid)
+  if (error) throw error
+}
+
+export async function deleteWaistEntry(uid, id) {
+  const { error } = await supabase.from('waist_logs').delete().eq('id', id).eq('user_id', uid)
+  if (error) throw error
+}
+
 export async function deleteBodyWeightEntry(uid, id) {
   const { error } = await supabase.from('body_weight_logs').delete().eq('id', id).eq('user_id', uid)
   if (error) throw error
