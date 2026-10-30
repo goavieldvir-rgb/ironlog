@@ -46,7 +46,7 @@ export default function EditSession() {
           sets: (e.sets || []).map((s) =>
             e.category === 'cardio'
               ? { duration: s.duration ?? '', intensity: s.intensity ?? '', distance: s.distance ?? '' }
-              : { weight: s.weight ?? '', reps: s.reps ?? '', ...(s.warmup ? { warmup: true } : {}) },
+              : { ...s, weight: s.weight ?? '', reps: s.reps ?? '', ...(s.warmup ? { warmup: true } : {}) },
           ),
         })),
       )

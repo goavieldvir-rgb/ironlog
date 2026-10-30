@@ -31,7 +31,8 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
       .filter((g) => {
         const effectiveTab = lockCategory || tab
         if (effectiveTab !== 'all' && g.category !== effectiveTab) return false
-        if (q && !displayName(g).toLowerCase().includes(q.toLowerCase())) return false
+        // Either language matches, so English terms work in Hebrew mode too.
+        if (q && ![g.name, g.name_he].some((n) => n && n.toLowerCase().includes(q.toLowerCase()))) return false
         return true
       })
       .sort((a, b) => displayName(a).localeCompare(displayName(b)))

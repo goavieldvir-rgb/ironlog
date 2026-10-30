@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Plus, Trash2, Pencil, Scale } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -52,7 +52,9 @@ function fullDate(lang, iso) {
   return fmtDate(lang, new Date(iso + 'T00:00:00'), { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-const emptyForm = { date: todayISO(), weight: '', unit: 'kg' }
+// Built fresh each time so the date is today even when the app has been open
+// since yesterday, and the unit follows the person's last entry.
+const emptyForm = (unit = 'kg') => ({ date: todayISO(), weight: '', unit })
 
 export default function BodyWeight() {
   const { effectiveUid, actingAs } = useAdmin()
@@ -60,7 +62,7 @@ export default function BodyWeight() {
   const { confirm, toast } = useFeedback()
   const [entries, loading, refresh, loadError] = useCollection(effectiveUid, 'body_weight_logs', 'date', 'asc')
   const loadFailed = !!loadError && entries.length === 0
-  const [form, setForm] = useState(emptyForm)
+  const [form, setForm] = useState(() => emptyForm())
   const [editingId, setEditingId] = useState(null)
   const [saving, setSaving] = useState(false)
 
@@ -68,6 +70,12 @@ export default function BodyWeight() {
   const latest = sorted[0]
   const first0 = [...entries].sort((a, b) => (a.date > b.date ? 1 : -1))[0]
   const displayUnit = latest?.unit || 'kg'
+
+  // Once entries load, a blank new-entry form picks up the last unit used.
+  useEffect(() => {
+    if (!latest?.unit) return
+    setForm((f) => (editingId || f.weight || f.unit === latest.unit ? f : { ...f, unit: latest.unit }))
+  }, [latest?.unit, editingId])
   const chartData = useMemo(
     () =>
       [...entries]
@@ -93,7 +101,7 @@ export default function BodyWeight() {
         await addBodyWeightEntry(effectiveUid, form)
       }
       refresh()
-      setForm(emptyForm)
+      setForm(emptyForm(form.unit))
       setEditingId(null)
     } catch (err) {
       console.error(err)
@@ -110,7 +118,7 @@ export default function BodyWeight() {
 
   function cancelEdit() {
     setEditingId(null)
-    setForm(emptyForm)
+    setForm(emptyForm(displayUnit))
   }
 
   return (

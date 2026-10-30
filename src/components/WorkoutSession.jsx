@@ -9,13 +9,14 @@ import { useCollection, logSession, addExercise, clearExerciseNote } from '../li
 import { useGyms, sessionGymId, gymHistory, exerciseAtGym, gymLabel } from '../lib/gyms.js'
 import { saveDraft, loadDraft, clearDraft, FREESTYLE_KEY } from '../lib/draft.js'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
-import { Button, Card, Field } from './ui.jsx'
+import { Button, Card, Field, LoadError } from './ui.jsx'
 import SessionEntryCard from './SessionEntryCard.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
 import ExerciseSelect from './ExerciseSelect.jsx'
 import { ExerciseModal, emptyExerciseForm } from './ExerciseLibrary.jsx'
 import RestTimer from './RestTimer.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
+import { useWakeLock } from '../lib/wakeLock.js'
 import { isWarmup, workingSets } from '../lib/warmup.js'
 import { buildSummary } from '../lib/shareSummary.js'
 import { entryName, exerciseMap } from '../lib/names.js'
@@ -61,7 +62,7 @@ export default function WorkoutSession() {
   const navigate = useNavigate()
   const isFreestyle = routineId === 'freestyle'
 
-  const [routines, routinesLoading] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
+  const [routines, routinesLoading, refreshRoutines, routinesError] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [exercises, , refreshExercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [pastSessions, pastLoading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const liveName = (entry) => entryName(entry, exerciseMap(exercises), lang)
@@ -144,6 +145,8 @@ export default function WorkoutSession() {
   useScrollLock(swapIndex != null || showLibraryPicker || creatingCustom)
   const [saved, setSaved] = useState(false)
   const [summary, setSummary] = useState(null)
+  // Screen stays on for the whole workout; the summary screen lets it sleep.
+  useWakeLock(!summary)
   // When this workout was started — carried inside the draft, so resuming
   // after a phone lock or app switch keeps the original start time.
   const [startedAt, setStartedAt] = useState(null)
@@ -651,6 +654,12 @@ export default function WorkoutSession() {
     navigate('/')
   }
 
+  // A failed load is not a missing routine: keep the draft and offer a retry,
+  // so a bad connection at the gym never throws away a half-logged workout.
+  if (!isFreestyle && !routinesLoading && !routine && routinesError) {
+    return <LoadError onRetry={refreshRoutines} />
+  }
+
   if (!isFreestyle && !routinesLoading && !routine) {
     const draft = loadDraft(effectiveUid, draftKey)
     if (draft?.routineId === routineId) clearDraft(effectiveUid, draftKey)
@@ -832,7 +841,19 @@ export default function WorkoutSession() {
           </Field>
         </Card>
 
-        <div className="flex items-center">
+        {/* After a long workout the thumb is at the bottom of the page, so the
+            main action lives here too, not only in the header. */}
+        <Button
+          type="button"
+          variant="brass"
+          className="w-full h-[52px] text-base"
+          onClick={handleFinish}
+          disabled={saving || saved || entries.length === 0 || (gymsOn && gymChoice === undefined)}
+        >
+          {saved ? t('workout.saved') : saving ? t('workout.saving') : t('workout.finishWorkout')}
+        </Button>
+
+        <div className="flex items-center justify-center">
           <Button type="button" variant="danger" onClick={handleDiscard} disabled={saving || saved}>
             {t('workout.discard')}
           </Button>

@@ -96,7 +96,7 @@ export default function ExerciseLibrary() {
   const filtered = useMemo(() => {
     return exercises.filter((e) => {
       if (tab !== 'all' && e.category !== tab) return false
-      if (q && !e.name.toLowerCase().includes(q.toLowerCase())) return false
+      if (q && ![e.name, e.name_he].some((n) => n && n.toLowerCase().includes(q.toLowerCase()))) return false
       return true
     })
   }, [exercises, tab, q])

@@ -5,7 +5,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { fmtDate } from '../lib/dates.js'
 import { fetchCoachTasks, setCoachTaskDone, addCoachTask, deleteCoachTask } from '../lib/coach.js'
-import { Card } from './ui.jsx'
+import { Button, Card } from './ui.jsx'
 
 // The coach's to-do list at the top of People: things worth a word with a
 // trainee (made each morning by supabase-coach-tasks.sql) and tasks the coach
@@ -18,19 +18,23 @@ export default function CoachTasks({ trainees, today }) {
   const [draftFor, setDraftFor] = useState('')
   const [adding, setAdding] = useState(false)
   const [showDone, setShowDone] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let cancelled = false
+    setLoadFailed(false)
     fetchCoachTasks(today)
       .then((rows) => !cancelled && setTasks(rows))
       .catch((e) => {
         console.error(e)
-        if (!cancelled) setTasks([])
+        // Not "all done": a failed load must not hide check-ins that are due.
+        if (!cancelled) setLoadFailed(true)
       })
     return () => {
       cancelled = true
     }
-  }, [today])
+  }, [today, attempt])
 
   const nameOf = useMemo(() => Object.fromEntries(trainees.map((p) => [p.id, p.full_name || p.email])), [trainees])
   const open = (tasks || []).filter((x) => !x.done_at)
@@ -130,7 +134,14 @@ export default function CoachTasks({ trainees, today }) {
           {open.length > 0 && <span className="num text-xs rounded-full bg-accent text-ink px-2 py-0.5">{open.length}</span>}
         </div>
       </div>
-      {open.length === 0 ? (
+      {loadFailed && tasks === null ? (
+        <div role="alert" className="flex items-center justify-between gap-3">
+          <p className="text-sm text-chalkdim">{t('common.loadFailedTitle')}</p>
+          <Button type="button" variant="ghost" onClick={() => setAttempt((n) => n + 1)}>
+            {t('common.tryAgain')}
+          </Button>
+        </div>
+      ) : tasks === null ? null : open.length === 0 ? (
         <p className="text-sm text-chalkdim">{t('tasks.allDone')}</p>
       ) : (
         <ul className="divide-y divide-surface2">{open.map(row)}</ul>
