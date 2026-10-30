@@ -5,6 +5,7 @@ import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useCollection } from '../lib/db.js'
+import { loadDraft } from '../lib/draft.js'
 import { Button, CategoryTag } from './ui.jsx'
 
 // A routine read-only: every exercise with its target, coach note and
@@ -53,7 +54,7 @@ export default function RoutineView() {
 
       <Link to={`/workout/${routine.id}`}>
         <Button variant="brass" className="w-full">
-          <Play size={15} /> {t('routines.startSession')}
+          <Play size={15} /> {loadDraft(effectiveUid, routine.id) ? t('routines.resumeSession') : t('routines.startSession')}
         </Button>
       </Link>
     </div>

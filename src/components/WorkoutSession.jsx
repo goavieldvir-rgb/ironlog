@@ -5,7 +5,7 @@ import { InfoTip } from './InfoTip.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
-import { useCollection, logSession, addExercise, clearExerciseNote } from '../lib/db.js'
+import { useCollection, logSession, addExercise, clearExerciseNote, isCompletedSet } from '../lib/db.js'
 import { useGyms, sessionGymId, gymHistory, exerciseAtGym, gymLabel } from '../lib/gyms.js'
 import { saveDraft, loadDraft, clearDraft, FREESTYLE_KEY } from '../lib/draft.js'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
@@ -37,6 +37,26 @@ function coachFields(it) {
     ...(it.coachNote ? { coachNote: it.coachNote } : {}),
     ...(it.supersetWithNext ? { supersetWithNext: true } : {}),
   }
+}
+
+// One id per workout, made on the client so a retried Finish saves once.
+function newSessionId() {
+  try {
+    return crypto.randomUUID()
+  } catch {
+    // Insecure context: build a v4-shaped id by hand.
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0
+      return (c === 'x' ? r : (r & 3) | 8).toString(16)
+    })
+  }
+}
+
+// A set that has been ticked or has numbers in it (cardio starts with its
+// duration pre-filled, so only a typed distance counts there).
+function setHasLogged(entry, s) {
+  if (s.done) return true
+  return entry.category === 'cardio' ? s.distance !== '' && s.distance != null : [s.weight, s.reps].some((v) => v !== '' && v != null)
 }
 
 function emptySet(category) {
@@ -132,6 +152,8 @@ export default function WorkoutSession() {
   // When this workout was started — carried inside the draft, so resuming
   // after a phone lock or app switch keeps the original start time.
   const [startedAt, setStartedAt] = useState(null)
+  // Kept in the draft so it survives a reload and is the saved session's id.
+  const [sessionId, setSessionId] = useState(newSessionId)
   const [now, setNow] = useState(Date.now())
   const restRef = useRef(null)
   const dateInputRef = useRef(null)
@@ -180,6 +202,7 @@ export default function WorkoutSession() {
         setDate(draft.date || todayISO())
         setNotes(draft.notes || '')
         setStartedAt(draft.startedAt || null)
+        if (draft.sessionId) setSessionId(draft.sessionId)
         if (draft.gymId !== undefined) setGymChoice(draft.gymId)
         setReady(true)
         return
@@ -196,6 +219,7 @@ export default function WorkoutSession() {
         setDate(draft.date || todayISO())
         setNotes(draft.notes || '')
         setStartedAt(draft.startedAt || null)
+        if (draft.sessionId) setSessionId(draft.sessionId)
         if (draft.gymId !== undefined) setGymChoice(draft.gymId)
         setReady(true)
         return
@@ -272,10 +296,11 @@ export default function WorkoutSession() {
       notes,
       entries,
       startedAt,
+      sessionId,
       ...(gymChoice !== undefined ? { gymId: gymChoice } : {}),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries, date, notes, ready, startedAt, gymChoice])
+  }, [entries, date, notes, ready, startedAt, gymChoice, sessionId])
 
   // Ticks the elapsed-time display. Once a minute is plenty for a workout.
   useEffect(() => {
@@ -455,13 +480,41 @@ export default function WorkoutSession() {
     setPickId('')
   }
 
-  function performSwap() {
-    const ex = gymExercises.find((e) => e.id === swapPickId)
-    if (!ex || swapIndex == null) return
+  // Swapping keeps what was logged when the new exercise takes the same kind
+  // of numbers (both cardio, or both not). Otherwise the logged sets can't
+  // carry over, so ask before throwing them away. Returns false if cancelled.
+  async function swapEntry(ex) {
+    const old = entries[swapIndex]
+    if (!old) return false
+    const sameKind = (old.category === 'cardio') === (ex.category === 'cardio')
+    const logged = (old.sets || []).filter((s) => setHasLogged(old, s)).length
+    if (!sameKind && logged > 0) {
+      const ok = await confirm({
+        title: t('workout.swapClearTitle', { name: liveName(old) }),
+        body: t(logged === 1 ? 'workout.swapClearOne' : 'workout.swapClearMany', { n: logged }),
+        confirmLabel: t('workout.swapClearConfirm'),
+        danger: true,
+      })
+      if (!ok) return false
+    }
+    const idx = swapIndex
     // Keep whatever number of sets the original exercise had planned —
     // swapping shouldn't also reset how many sets you meant to do.
-    const targetSets = workingSets(entries[swapIndex]?.sets).length || 3
-    setEntries((prev) => prev.map((e, i) => (i === swapIndex ? swapped(e, ex, targetSets) : e)))
+    const targetSets = workingSets(old.sets).length || 3
+    setEntries((prev) =>
+      prev.map((e, i) => {
+        if (i !== idx) return e
+        const next = swapped(e, ex, targetSets)
+        return sameKind ? { ...next, sets: e.sets, ...(e.notes ? { notes: e.notes } : {}) } : next
+      }),
+    )
+    return true
+  }
+
+  async function performSwap() {
+    const ex = gymExercises.find((e) => e.id === swapPickId)
+    if (!ex || swapIndex == null) return
+    if (!(await swapEntry(ex))) return
     setSwapIndex(null)
     setSwapPickId('')
   }
@@ -470,16 +523,16 @@ export default function WorkoutSession() {
   // for both freestyle-add and swap — one place that knows how to place
   // a newly-picked-or-created exercise wherever it's needed, instead of
   // duplicating this per entry point.
-  function applyPickedExercise(ex) {
+  async function applyPickedExercise(ex) {
     if (swapIndex != null) {
-      const targetSets = workingSets(entries[swapIndex]?.sets).length || 3
-      setEntries((prev) => prev.map((e, i) => (i === swapIndex ? swapped(e, ex, targetSets) : e)))
+      if (!(await swapEntry(ex))) return false
       setSwapIndex(null)
     } else {
       setEntries((prev) => [...prev, buildEntryFromExercise(ex)])
     }
     setPickId('')
     setSwapPickId('')
+    return true
   }
 
   function updateSet(entryIdx, setIdx, patch) {
@@ -507,10 +560,25 @@ export default function WorkoutSession() {
     setEntries((prev) => prev.map((e, i) => (i !== entryIdx ? e : { ...e, sets: [...warmups, ...e.sets] })))
   }
 
+  // Undo puts back just the removed piece, so anything typed since stays.
   function removeSet(entryIdx, setIdx) {
+    const entry = entries[entryIdx]
+    const removed = entry?.sets[setIdx]
+    if (!removed) return
     setEntries((prev) =>
       prev.map((e, i) => (i !== entryIdx ? e : { ...e, sets: e.sets.filter((_, j) => j !== setIdx) })),
     )
+    toast(t('workout.setRemoved'), 'success', {
+      label: t('workout.undo'),
+      onClick: () =>
+        setEntries((prev) =>
+          prev.map((e) =>
+            e.exerciseId !== entry.exerciseId || e.sets.includes(removed)
+              ? e
+              : { ...e, sets: [...e.sets.slice(0, setIdx), removed, ...e.sets.slice(setIdx)] },
+          ),
+        ),
+    })
   }
 
   function moveEntry(entryIdx, dir) {
@@ -540,6 +608,15 @@ export default function WorkoutSession() {
       if (!ok) return
     }
     setEntries((prev) => prev.filter((_, i) => i !== entryIdx))
+    toast(t('workout.entryRemoved', { name: liveName(entry) }), 'success', {
+      label: t('workout.undo'),
+      onClick: () =>
+        setEntries((prev) =>
+          prev.some((e) => e.exerciseId === entry.exerciseId)
+            ? prev
+            : [...prev.slice(0, entryIdx), entry, ...prev.slice(entryIdx)],
+        ),
+    })
   }
 
   async function clearLastNote(exerciseId) {
@@ -553,6 +630,32 @@ export default function WorkoutSession() {
   }
 
   async function handleFinish() {
+    // Sets that won't be saved as typed: planned but empty are dropped, and
+    // ones with numbers but no tick are saved as done. Say so once, up front.
+    let dropped = 0
+    let unticked = 0
+    let completed = 0
+    for (const e of entries) {
+      for (const s of e.sets || []) {
+        if (isCompletedSet(e, s)) completed++
+      }
+      for (const s of workingSets(e.sets)) {
+        if (!isCompletedSet(e, s)) dropped++
+        else if (!s.done) unticked++
+      }
+    }
+    // With nothing savable at all, the save itself explains that.
+    if (completed > 0 && (dropped > 0 || unticked > 0)) {
+      const lines = []
+      if (dropped) lines.push(t(dropped === 1 ? 'workout.finishUnfilledOne' : 'workout.finishUnfilledMany', { n: dropped }))
+      if (unticked) lines.push(t(unticked === 1 ? 'workout.finishUntickedOne' : 'workout.finishUntickedMany', { n: unticked }))
+      const ok = await confirm({
+        title: t('workout.finishCheckTitle'),
+        body: lines.join('\n'),
+        confirmLabel: t('workout.finishSaveAnyway'),
+      })
+      if (!ok) return
+    }
     setSaving(true)
     try {
       // The recap is a bonus: if building it ever fails, saving carries on
@@ -576,6 +679,7 @@ export default function WorkoutSession() {
         console.error(err)
       }
       await logSession(effectiveUid, {
+        id: sessionId,
         routineId: isFreestyle ? null : routine?.id,
         routineName: isFreestyle ? 'Freestyle' : routine?.name,
         category,
@@ -673,7 +777,11 @@ export default function WorkoutSession() {
       <div className="flex flex-col gap-3 max-w-2xl pb-48">
         <header className="grid grid-cols-[88px_minmax(0,1fr)_88px] items-center -mx-2">
           <Link
-            to="/routines"
+            to="/"
+            // Leaving keeps the draft; say so, so it doesn't feel like a loss.
+            onClick={() => {
+              if (!saved && entries.some((e) => e.sets.some((s) => setHasLogged(e, s)))) toast(t('workout.leftSaved'))
+            }}
             aria-label={t('common.close')}
             title={t('common.close')}
             className="press w-11 h-11 flex items-center justify-center text-chalkdim hover:text-chalk"
@@ -910,7 +1018,7 @@ export default function WorkoutSession() {
               notes: '',
             })
             refreshExercises()
-            applyPickedExercise(ex)
+            await applyPickedExercise(ex)
             // A swap is a single "replace this one" action, so close
             // right after — but adding freely (freestyle) stays open,
             // matching how the library picker behaves everywhere else in
@@ -933,8 +1041,7 @@ export default function WorkoutSession() {
           onSave={async (data) => {
             const ex = await addExercise(effectiveUid, data)
             refreshExercises()
-            applyPickedExercise(ex)
-            setCreatingCustom(false)
+            if (await applyPickedExercise(ex)) setCreatingCustom(false)
           }}
         />
       )}

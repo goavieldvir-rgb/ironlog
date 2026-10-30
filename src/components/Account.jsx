@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Download, FileSpreadsheet, ShieldCheck, Trash2 } from 'lucide-react'
+import { Download, FileSpreadsheet, ShieldCheck, Trash2, KeyRound, LogOut } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { applyCurrentTimed } from '../lib/timed.js'
 import { useAdmin } from '../context/AdminContext.jsx'
@@ -13,22 +13,31 @@ import { confirmedApps, removeApp } from '../lib/mfa.js'
 import { TwoStepSetup } from './TwoStep.jsx'
 import GymSettings from './GymSettings.jsx'
 import { Button, Card, Field } from './ui.jsx'
+import { friendlyAuthError } from '../lib/authErrors.js'
 
 // Everything a person has in Ironlog, read fresh from the database (not
 // from whatever a page happened to have loaded).
 async function fetchAllData(uid) {
-  const tables = ['exercises', 'routines', 'sessions', 'body_weight_logs', 'weekly_schedule', 'progress_photos', 'gyms']
+  const tables = [
+    'exercises', 'routines', 'sessions', 'body_weight_logs', 'weekly_schedule', 'progress_photos', 'gyms',
+    'food_logs', 'nutrition_targets', 'saved_meals', 'food_favorites', 'water_logs', 'water_goals',
+  ]
   const results = await Promise.all(tables.map((tb) => supabase.from(tb).select('*').eq('user_id', uid)))
   const { data: profile, error: pErr } = await supabase.from('profiles').select('*').eq('id', uid).single()
   if (pErr) throw pErr
   const out = { exported_at: new Date().toISOString(), profile }
+  const failed = []
   results.forEach(({ data, error }, i) => {
     // A table that doesn't exist yet (a migration not run) shouldn't block
-    // exporting everything else.
-    if (error) console.error(tables[i], error)
+    // exporting everything else, but any other failure is reported, so a
+    // file with missing data is never mistaken for a full copy.
+    if (error) {
+      console.error(tables[i], error)
+      if (!['42P01', 'PGRST205'].includes(error.code)) failed.push(tables[i])
+    }
     out[tables[i]] = data || []
   })
-  return out
+  return { data: out, failed }
 }
 
 function download(filename, text, type) {
@@ -155,8 +164,9 @@ export default function Account() {
   async function exportJson() {
     setBusy('json')
     try {
-      const data = await fetchAllData(effectiveUid)
+      const { data, failed } = await fetchAllData(effectiveUid)
       download(`ironlog-${stamp}.json`, JSON.stringify(data, null, 2), 'application/json')
+      if (failed.length) toast(t('account.exportPartial', { list: failed.join(', ') }), 'error')
     } catch (err) {
       console.error(err)
       toast(t('account.exportFailed'), 'error')
@@ -235,6 +245,8 @@ export default function Account() {
         </div>
       </Card>
 
+      {!actingAs && <PasswordCard />}
+
       {!actingAs && <TwoStepCard />}
 
       <Card className="flex flex-col gap-3 border-ironsoft">
@@ -256,9 +268,79 @@ export default function Account() {
         )}
       </Card>
 
-      <Link to="/privacy" className="text-chalkdim text-sm hover:text-brass w-fit">
-        {t('privacy.link')}
-      </Link>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <Link to="/privacy" className="text-chalkdim text-sm hover:text-brass w-fit">
+          {t('privacy.link')}
+        </Link>
+        {!actingAs && (
+          <Button variant="ghost" onClick={logout}>
+            <LogOut size={16} /> {t('nav.logout')}
+          </Button>
+        )}
+      </div>
     </div>
+  )
+}
+
+// Change the password while signed in, without the logged-out "forgot
+// password" email round trip.
+function PasswordCard() {
+  const { t } = useLanguage()
+  const { toast } = useFeedback()
+  const [open, setOpen] = useState(false)
+  const [password, setPassword] = useState('')
+  const [again, setAgain] = useState('')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function save(e) {
+    e.preventDefault()
+    setError('')
+    if (password.length < 8) return setError(t('resetPassword.minChars'))
+    if (password !== again) return setError(t('resetPassword.noMatch'))
+    setSaving(true)
+    try {
+      const { error: err } = await supabase.auth.updateUser({ password })
+      if (err) throw err
+      toast(t('resetPassword.passwordUpdated'))
+      setOpen(false)
+      setPassword('')
+      setAgain('')
+    } catch (err) {
+      setError(friendlyAuthError(err, t, 'account.passwordFailed'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Card className="flex flex-col gap-3">
+      <h2 className="eyebrow">{t('account.passwordTitle')}</h2>
+      {!open ? (
+        <div>
+          <Button variant="ghost" onClick={() => setOpen(true)}>
+            <KeyRound size={16} /> {t('account.changePassword')}
+          </Button>
+        </div>
+      ) : (
+        <form onSubmit={save} className="flex flex-col gap-3">
+          <Field label={t('resetPassword.newPassword')}>
+            <input type="password" dir="ltr" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required />
+          </Field>
+          <Field label={t('resetPassword.confirmPassword')}>
+            <input type="password" dir="ltr" value={again} onChange={(e) => setAgain(e.target.value)} autoComplete="new-password" required />
+          </Field>
+          {error && <p className="text-irontext text-sm">{error}</p>}
+          <div className="flex gap-2">
+            <Button type="submit" disabled={saving}>
+              {saving ? t('resetPassword.saving') : t('resetPassword.updatePassword')}
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              {t('common.cancel')}
+            </Button>
+          </div>
+        </form>
+      )}
+    </Card>
   )
 }

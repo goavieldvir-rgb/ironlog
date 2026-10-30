@@ -1,7 +1,7 @@
 import ExerciseVideo from './ExerciseVideo.jsx'
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { Pencil, Share, MessageSquareText, Check, Trash2, TrendingUp, TrendingDown, Minus, Target } from 'lucide-react'
+import { Pencil, Share, MessageSquareText, Check, Trash2, TrendingUp, TrendingDown, Minus, Target, LineChart as ChartIcon, Repeat } from 'lucide-react'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts'
 import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
@@ -15,6 +15,7 @@ import { useGyms, sessionGymId, gymLabel } from '../lib/gyms.js'
 import { Card, CategoryTag, Badge, Button } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { isWarmup, workingSets } from '../lib/warmup.js'
+import { entryPrKind, recordBaseline } from '../lib/records.js'
 import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
 import { formatPace } from '../lib/cardio.js'
 import CardioTotals from './CardioTotals.jsx'
@@ -51,32 +52,32 @@ function formatSet(entry, s, t) {
   return `${s.weight || 0}${entry.unit} × ${s.reps || 0}${rir}`
 }
 
-// The set that beat everything logged for this exercise in earlier sessions.
-// Returns its index, or -1. A first-ever session is not a record.
-function prSetIndex(entry, session, sessions) {
-  if (entry.category === 'cardio' || !entry.exerciseId) return -1
-  const metric = (set) => Number(entry.bodyweight || entry.timed ? set.reps : set.weight)
-  const valid = (set) => !isWarmup(set) && set.reps !== '' && set.reps != null && isFinite(metric(set))
-  let prior = null
-  for (const o of sessions) {
-    if (o.id === session.id) continue
-    const earlier = o.date < session.date || (o.date === session.date && (o.created_at || '') < (session.created_at || ''))
-    if (!earlier) continue
-    for (const e of o.entries || []) {
-      if (e.exerciseId !== entry.exerciseId) continue
-      for (const set of e.sets || []) if (valid(set) && (prior == null || metric(set) > prior)) prior = metric(set)
-    }
-  }
-  if (prior == null || prior <= 0) return -1
-  let best = -1
-  let bestVal = prior
+// Saved before `session`: an earlier day, or earlier the same day.
+function isEarlier(o, session) {
+  return o.date < session.date || (o.date === session.date && (o.created_at || '') < (session.created_at || ''))
+}
+
+// Which sets of an entry broke a record, by the same rule as the share card
+// and the workout screen: 'weight' beats everything before it, 'reps' is the
+// most reps at that weight or heavier. Only the best of each kind is marked.
+function prSets(entry, baseline) {
+  const out = {}
+  if (!entry.exerciseId) return out
+  const best = baseline.personalBests[entry.exerciseId]
+  const past = baseline.pastStrengthSets[entry.exerciseId]
+  let weightAt = -1
+  let repsAt = -1
   ;(entry.sets || []).forEach((set, j) => {
-    if (valid(set) && metric(set) > bestVal) {
-      best = j
-      bestVal = metric(set)
-    }
+    const k = entryPrKind(entry, set, best, past)
+    if (k === 'weight') {
+      const v = Number(entry.category === 'cardio' ? set.duration : entry.bodyweight ? set.reps : set.weight)
+      const cur = weightAt < 0 ? -1 : Number(entry.category === 'cardio' ? entry.sets[weightAt].duration : entry.bodyweight ? entry.sets[weightAt].reps : entry.sets[weightAt].weight)
+      if (v > cur) weightAt = j
+    } else if (k === 'reps' && (repsAt < 0 || Number(set.reps) > Number(entry.sets[repsAt].reps))) repsAt = j
   })
-  return best
+  if (weightAt >= 0) out[weightAt] = 'weight'
+  if (repsAt >= 0) out[repsAt] = 'reps'
+  return out
 }
 
 export default function SessionDetail() {
@@ -101,6 +102,13 @@ export default function SessionDetail() {
     if (!gymsOn || !session) return same
     const here = sessionGymId(session, gyms)
     return same.filter((s) => sessionGymId(s, gyms) === here)
+  }, [session, sessions, gymsOn, gyms])
+  // Records count against the workouts saved before this one, at the same
+  // gym for someone with several; the share card does the same.
+  const baseline = useMemo(() => {
+    if (!session) return { personalBests: {}, pastStrengthSets: {} }
+    const here = gymsOn ? sessionGymId(session, gyms) : null
+    return recordBaseline(sessions.filter((o) => o.id !== session.id && isEarlier(o, session) && (!gymsOn || sessionGymId(o, gyms) === here)))
   }, [session, sessions, gymsOn, gyms])
   const [compareCount, setCompareCount] = useState(0)
   const compared = previous.slice(0, compareCount)
@@ -170,8 +178,17 @@ export default function SessionDetail() {
           </div>
         </div>
         <p className="text-chalkdim text-[13px] tabular-nums">{meta.join(' · ')}</p>
-        <div className="mt-1">
+        <div className="mt-1 flex items-center gap-2 flex-wrap">
           <CategoryTag category={session.category} />
+          {/* Only while the routine still exists. Quieter than Share / Edit. */}
+          {routine && (
+            <Link
+              to={`/workout/${routine.id}`}
+              className="press inline-flex items-center gap-1.5 min-h-[44px] px-3 text-sm font-medium text-chalkdim hover:text-chalk"
+            >
+              <Repeat size={14} aria-hidden="true" /> {t('sessionDetail.doAgain')}
+            </Link>
+          )}
         </div>
       </div>
 
@@ -193,7 +210,7 @@ export default function SessionDetail() {
       )}
 
       {(session.entries || []).map((entry, i) => {
-        const prIdx = prSetIndex(entry, session, sessions)
+        const prs = prSets(entry, baseline)
         const target = targetFor(entry, routine)
         const doneSets = workingSets(entry.sets).length
         let n = 0
@@ -201,7 +218,21 @@ export default function SessionDetail() {
           <section key={i} className="bg-surface rounded-[20px] overflow-hidden">
             <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-2">
               <div className="flex items-center gap-2 flex-wrap min-w-0">
-                <h2 className="text-[17px] leading-6">{entryName(entry, exById, lang)}</h2>
+                {/* One tap to how this exercise has gone over time. */}
+                {entry.exerciseId ? (
+                  <h2 className="text-[17px] leading-6">
+                    <Link
+                      to={`/stats?exercise=${encodeURIComponent(entry.exerciseId)}`}
+                      aria-label={t('sessionDetail.exerciseProgress', { name: entryName(entry, exById, lang) })}
+                      className="inline-flex items-center gap-1.5 min-h-[44px]"
+                    >
+                      {entryName(entry, exById, lang)}
+                      <ChartIcon size={14} className="text-chalkdim shrink-0" aria-hidden="true" />
+                    </Link>
+                  </h2>
+                ) : (
+                  <h2 className="text-[17px] leading-6">{entryName(entry, exById, lang)}</h2>
+                )}
                 {entry.category === 'cardio' && <Badge tone="cardio">{t('sessionCard.cardioBadge')}</Badge>}
                 {entry.category !== 'cardio' && entry.timed ? <Badge tone="brass">{t('exercises.timedBadge')}</Badge> : entry.category !== 'cardio' && entry.bodyweight && <Badge tone="brass">{t('sessionCard.bodyweightBadge')}</Badge>}
               </div>
@@ -239,9 +270,9 @@ export default function SessionDetail() {
                   {/* Warm-ups read "W" and sit muted; working sets count from 1. */}
                   <span className="w-6 shrink-0 text-chalkdim text-[13px]">{isWarmup(s) ? t('sessionCard.warmupShort') : ++n}</span>
                   <span className="flex-1 min-w-0">{formatSet(entry, s, t)}</span>
-                  {j === prIdx && (
+                  {prs[j] && (
                     <span className="shrink-0 rounded-full bg-accentsoft text-accent text-xs font-semibold px-2 py-0.5">
-                      {t('sessionCard.prBadge')}
+                      {prs[j] === 'reps' ? t('sessionCard.repsPrBadge') : t('sessionCard.prBadge')}
                     </span>
                   )}
                 </div>

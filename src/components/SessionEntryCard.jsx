@@ -5,6 +5,7 @@ import { Badge } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import OverflowMenu from './OverflowMenu.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 import { fmtDate } from '../lib/dates.js'
 import { isWarmup, workingSets, suggestWarmups } from '../lib/warmup.js'
 import { formatSeconds } from '../lib/timed.js'
@@ -156,6 +157,8 @@ export default function SessionEntryCard({
   previousFrom = null,
 }) {
   const { t, lang } = useLanguage()
+  const { toast } = useFeedback()
+  const sectionRef = useRef(null)
   // Follow the current language (switching mid-workout updates the name).
   const displayName = liveExercise ? (lang === 'he' && liveExercise.name_he) || liveExercise.name : entryName(entry, {}, lang)
   const [showNote, setShowNote] = useState(!!entry.notes)
@@ -381,8 +384,22 @@ export default function SessionEntryCard({
     }
     const m = { ...s, ...patch }
     const complete = isCardio ? hasVal(m.duration) : hasVal(m.reps) && (entry.bodyweight || hasVal(m.weight))
-    // A set with nothing in it can't be ticked off.
-    if (!complete) return
+    // A set with nothing in it can't be ticked off. Say why, and put the
+    // cursor in the first box that still needs a number.
+    if (!complete) {
+      const missing = fieldDefs.findIndex(([key]) => {
+        if (key === 'rir') return false
+        if (key === 'weight' && entry.bodyweight) return false
+        return !hasVal(m[key])
+      })
+      const row = sectionRef.current?.querySelector(`[data-set-row="${j}"]`)
+      row?.querySelectorAll('input[type="number"]')[Math.max(missing, 0)]?.focus()
+      toast(
+        t(isCardio ? 'sessionCard.enterDuration' : entry.bodyweight ? (isTimed ? 'sessionCard.enterSeconds' : 'sessionCard.enterReps') : isTimed ? 'sessionCard.enterWeightSeconds' : 'sessionCard.enterWeightReps'),
+        'info',
+      )
+      return
+    }
     onUpdateSet(j, patch)
     if (navigator.vibrate) navigator.vibrate(10)
     onSetDone?.(j)
@@ -463,7 +480,7 @@ export default function SessionEntryCard({
   )
 
   return (
-    <section className={`relative bg-surface rounded-[22px] pt-[18px] px-3.5 pb-1.5 flex flex-col gap-3 ${supersetClass}`}>
+    <section ref={sectionRef} className={`relative bg-surface rounded-[22px] pt-[18px] px-3.5 pb-1.5 flex flex-col gap-3 ${supersetClass}`}>
       {linkNext && <span className="absolute -start-[3px] top-full w-[3px] h-3 bg-chalkdim/50" aria-hidden="true" />}
       <div className="flex items-start justify-between gap-2 -mt-2.5 -me-2.5">
         <div className="min-w-0 flex-1 pt-1.5 px-0.5 flex flex-col gap-1.5">
@@ -630,6 +647,7 @@ export default function SessionEntryCard({
             // under the next rows, so its items couldn't be tapped.
             <div
               key={j}
+              data-set-row={j}
               className={`${rowBase} ${justFilled.includes(j) ? 'flash-fill' : ''} ${isWarmup(s) ? '[&>*:not(:first-child):not(:last-child)]:opacity-70' : ''}`}
             >
               {setMenu(j)}

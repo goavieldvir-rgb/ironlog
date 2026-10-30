@@ -98,7 +98,7 @@ export default function CoachTasks({ trainees, today }) {
           onClick={() => toggle(task)}
           aria-pressed={isDone}
           aria-label={isDone ? t('tasks.markOpen') : t('tasks.markDone')}
-          className={`press shrink-0 mt-0.5 w-6 h-6 rounded-full border flex items-center justify-center ${
+          className={`press hit shrink-0 mt-0.5 w-6 h-6 rounded-full border flex items-center justify-center ${
             isDone ? 'bg-goodbtn border-goodbtn text-chalk' : 'border-chalkdim/60'
           }`}
         >
@@ -118,7 +118,7 @@ export default function CoachTasks({ trainees, today }) {
           </p>
         </div>
         {task.kind === 'custom' && (
-          <button type="button" onClick={() => remove(task)} aria-label={t('common.delete')} className="press shrink-0 text-chalkdim p-1">
+          <button type="button" onClick={() => remove(task)} aria-label={t('common.delete')} className="press shrink-0 -my-2 w-11 h-11 flex items-center justify-center text-chalkdim">
             <Trash2 size={15} />
           </button>
         )}

@@ -60,7 +60,11 @@ export default function Layout() {
   // Nutrition takes the second slot only for people whose coach turned it on.
   const tabs = [
     { to: '/', labelKey: 'nav.today', icon: Home, end: true },
-    nutritionAllowed
+    // A coach's daily work is their people, so it takes the second slot;
+    // their own routines and nutrition move under More.
+    isAdmin
+      ? { to: '/people', labelKey: 'nav.people', icon: Users }
+      : nutritionAllowed
       ? { to: '/nutrition', labelKey: 'nav.nutritionTab', icon: Apple }
       : { to: '/routines', labelKey: 'nav.routines', icon: ListChecks },
     { to: '/history', labelKey: 'nav.history', icon: History },
@@ -317,6 +321,7 @@ export default function Layout() {
               type="button"
               onClick={() => setOpen(true)}
               aria-expanded={open}
+              aria-haspopup="dialog"
               className="press flex flex-col items-center justify-center gap-0.5 rounded-[18px] text-[11px] font-medium text-[#8A8A90]"
             >
               <Ellipsis size={22} strokeWidth={1.75} aria-hidden="true" />

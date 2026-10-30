@@ -71,7 +71,11 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
 
   // The home screen can ask for a day's panel (the rest-day card's link).
   useEffect(() => {
-    if (openRequest) openDayPanel(openRequest.day)
+    if (openRequest) {
+      openDayPanel(openRequest.day)
+      // "Train anyway" lands straight on the routine list — no second tap.
+      if (openRequest.other) setShowOther(true)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openRequest])
 

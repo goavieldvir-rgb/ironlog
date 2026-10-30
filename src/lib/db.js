@@ -322,7 +322,10 @@ export function cleanEntries(entries) {
 export async function logSession(uid, session) {
   session = { ...session, entries: cleanEntries(session.entries) }
   if (session.entries.length === 0) throw new Error('EMPTY_SESSION')
-  const { error: sessionError } = await supabase.from('sessions').insert({
+  // The id is made once per workout on the client, so a Finish retried after
+  // a timeout (the first request may have landed) can't create a second row.
+  const row = {
+    ...(session.id ? { id: session.id } : {}),
     user_id: uid,
     routine_id: session.routineId || null,
     routine_name: session.routineName || 'Freestyle',
@@ -335,7 +338,10 @@ export async function logSession(uid, session) {
     ...(session.gymId ? { gym_id: session.gymId } : {}),
     ...(session.startedAt ? { started_at: session.startedAt } : {}),
     ...(session.durationMinutes != null ? { duration_minutes: session.durationMinutes } : {}),
-  })
+  }
+  const { error: sessionError } = session.id
+    ? await supabase.from('sessions').upsert(row, { onConflict: 'id', ignoreDuplicates: true })
+    : await supabase.from('sessions').insert(row)
   if (sessionError) throw sessionError
 
   // Only overwrite an exercise's remembered note when a new one was
@@ -345,50 +351,48 @@ export async function logSession(uid, session) {
 
   // Denormalize "last performance" onto each exercise for quick lookup
   // when building the next session.
-  for (const entry of session.entries) {
-    if (!entry.exerciseId) continue
-    const completedSets = workingSets(entry.sets).filter((s) => isCompletedSet(entry, s))
-    if (completedSets.length === 0) continue
-    const last = completedSets[completedSets.length - 1]
+  // In parallel: the session is already saved, so a failed update here only
+  // logs (the hint just stays stale) and never fails the Finish.
+  await Promise.all(
+    session.entries.map(async (entry) => {
+      if (!entry.exerciseId) return
+      const completedSets = workingSets(entry.sets).filter((s) => isCompletedSet(entry, s))
+      if (completedSets.length === 0) return
+      const last = completedSets[completedSets.length - 1]
 
-    if (entry.category === 'cardio') {
-      const { error } = await supabase
-        .from('exercises')
-        .update({
-          last_weight: Number(last.duration) || 0, // minutes
-          last_reps: Number(last.intensity) || 0,
-          last_distance: last.distance !== '' && last.distance != null ? Number(last.distance) : null,
-          last_date: session.date,
-          ...noteFields(entry),
-          last_sets: completedSets.map((s) => ({
-            duration: Number(s.duration) || 0,
-            intensity: Number(s.intensity) || 0,
-            distance: s.distance !== '' && s.distance != null ? Number(s.distance) : null,
-          })),
-        })
-        .eq('id', entry.exerciseId)
-        .eq('user_id', uid)
-      if (error) console.error(error)
-      continue
-    }
-
-    const { error } = await supabase
-      .from('exercises')
-      .update({
-        last_weight: Number(last.weight) || 0,
-        last_reps: Number(last.reps),
-        last_date: session.date,
-        ...noteFields(entry),
-        last_sets: completedSets.map((s) => ({
-          weight: Number(s.weight) || 0,
-          reps: Number(s.reps),
-          ...(s.rir !== '' && s.rir != null ? { rir: Number(s.rir) } : {}),
-        })),
-      })
-      .eq('id', entry.exerciseId)
-      .eq('user_id', uid)
-    if (error) console.error(error)
-  }
+      const fields =
+        entry.category === 'cardio'
+          ? {
+              last_weight: Number(last.duration) || 0, // minutes
+              last_reps: Number(last.intensity) || 0,
+              last_distance: last.distance !== '' && last.distance != null ? Number(last.distance) : null,
+              last_date: session.date,
+              ...noteFields(entry),
+              last_sets: completedSets.map((s) => ({
+                duration: Number(s.duration) || 0,
+                intensity: Number(s.intensity) || 0,
+                distance: s.distance !== '' && s.distance != null ? Number(s.distance) : null,
+              })),
+            }
+          : {
+              last_weight: Number(last.weight) || 0,
+              last_reps: Number(last.reps),
+              last_date: session.date,
+              ...noteFields(entry),
+              last_sets: completedSets.map((s) => ({
+                weight: Number(s.weight) || 0,
+                reps: Number(s.reps),
+                ...(s.rir !== '' && s.rir != null ? { rir: Number(s.rir) } : {}),
+              })),
+            }
+      try {
+        const { error } = await supabase.from('exercises').update(fields).eq('id', entry.exerciseId).eq('user_id', uid)
+        if (error) console.error(error)
+      } catch (err) {
+        console.error(err)
+      }
+    }),
+  )
 }
 
 export async function deleteSession(uid, id) {

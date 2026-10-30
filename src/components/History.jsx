@@ -125,6 +125,13 @@ export default function History() {
     setTab('all')
   }
 
+  // The first few exercise names, in the current language, so a row says what
+  // was trained and not only the routine's name.
+  const names = (s) => {
+    const all = (s.entries || []).map((e) => entryName(e, exById, lang)).filter(Boolean)
+    return all.length > 3 ? `${all.slice(0, 3).join(', ')}…` : all.join(', ')
+  }
+
   const groups = useMemo(() => {
     const out = []
     const sorted = [...filtered].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.created_at || '').localeCompare(a.created_at || '')))
@@ -226,6 +233,21 @@ export default function History() {
         />
       )}
 
+      {/* Three placeholder rows while the first load runs, instead of a blank page. */}
+      {loading && sessions.length === 0 && (
+        <div className="bg-surface rounded-[18px] overflow-hidden" aria-busy="true" aria-label={t('common.loading')}>
+          {[0, 1, 2].map((i) => (
+            <div key={i} className={`flex items-center gap-3.5 min-h-[64px] ps-4 pe-3.5 py-2 ${i > 0 ? 'border-t border-white/[0.06]' : ''}`}>
+              <div className="w-[34px] h-10 rounded-md bg-surface2 animate-pulse shrink-0" />
+              <div className="flex-1 flex flex-col gap-2">
+                <div className="h-3.5 w-1/2 rounded bg-surface2 animate-pulse" />
+                <div className="h-3 w-3/4 rounded bg-surface2 animate-pulse" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {!loading && loadFailed && <LoadError onRetry={refresh} />}
 
       {!loading && !loadFailed && sessions.length === 0 && (
@@ -268,7 +290,8 @@ export default function History() {
                         {!actingAs && hasUnreadFeedback(s) && <FeedbackDot label={t('history.newFeedback')} />}
                         {sessionTitle(s, t)}
                       </span>
-                      <span className="text-[13px] leading-[18px] text-chalkdim truncate tabular-nums">{sessionMeta(s, t, lang, gymsOn ? gymLabel(sessionGymId(s, gyms), gyms, mainName, t) : null)}</span>
+                      {names(s) && <span className="text-[13px] leading-[18px] text-chalkdim truncate">{names(s)}</span>}
+                    <span className="text-[13px] leading-[18px] text-chalkdim truncate tabular-nums">{sessionMeta(s, t, lang, gymsOn ? gymLabel(sessionGymId(s, gyms), gyms, mainName, t) : null)}</span>
                     </div>
                   </Link>
                   {/* Straight to the share cards, for a workout saved without sharing. */}

@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Users, UserPlus, Copy, Check, AlertTriangle, Search, Pin, Trophy, CalendarCheck, ChevronUp, ChevronDown } from 'lucide-react'
+import { Users, UserPlus, Copy, Check, Share, AlertTriangle, Search, Pin, Trophy, CalendarCheck, ChevronUp, ChevronDown } from 'lucide-react'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 import { Card, Badge, EmptyState, Button, Field, LoadError } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { PageLoader } from './Loading.jsx'
@@ -295,6 +296,12 @@ function TraineeRow({ p, today, t }) {
 
 function InviteModal({ onClose, t }) {
   useScrollLock(true)
+  const { toast } = useFeedback()
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [copiedLink, setCopiedLink] = useState(false)
@@ -315,22 +322,43 @@ function InviteModal({ onClose, t }) {
     // Best effort: the link still works today if this fails, as long as
     // invite-only sign-up hasn't been switched on.
     recordInvite(email).catch((err) => console.error(err))
-    await navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch (err) {
+      console.error(err)
+      toast(t('people.copyFailed'), 'error')
+    }
+  }
+
+  // The phone's share sheet goes straight to WhatsApp and friends, with no
+  // copy-and-paste step. Only offered where the browser supports it.
+  const canShare = typeof navigator !== 'undefined' && !!navigator.share
+  async function share() {
+    recordInvite(email).catch((err) => console.error(err))
+    try {
+      await navigator.share({ text: message })
+    } catch (err) {
+      // Closing the sheet is not an error worth a message.
+      if (err?.name !== 'AbortError') {
+        console.error(err)
+        toast(t('people.copyFailed'), 'error')
+      }
+    }
   }
 
   const ready = name.trim() && email.trim()
 
   return (
-    <div className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }} onClick={onClose}>
+    <div role="dialog" aria-modal="true" aria-label={t('people.inviteModalTitle')} className="fixed inset-0 bg-ink/80 backdrop-blur-sm z-30 flex items-center justify-center p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }} onClick={onClose}>
       <div className="card p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-2xl mb-1">{t('people.inviteModalTitle')}</h2>
         <p className="text-chalkdim text-sm mb-4">{t('people.inviteModalSubtitle')}</p>
 
         <div className="flex flex-col gap-4">
           <Field label={t('people.theirName')}>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ido" autoFocus />
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('people.namePlaceholder')} autoFocus />
           </Field>
           <Field label={t('people.theirEmail')}>
             <input
@@ -338,16 +366,21 @@ function InviteModal({ onClose, t }) {
               dir="ltr"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="ido@example.com"
+              placeholder={t('people.emailPlaceholder')}
             />
           </Field>
 
           {ready && (
             <div className="flex flex-col gap-2 pt-2 border-t border-line">
+              {canShare && (
+                <Button variant="brass" onClick={share}>
+                  <Share size={15} /> {t('people.shareInvite')}
+                </Button>
+              )}
               <Button variant="ghost" onClick={() => copy(link, setCopiedLink)}>
                 {copiedLink ? <Check size={15} /> : <Copy size={15} />} {copiedLink ? t('people.linkCopied') : t('people.copyInviteLink')}
               </Button>
-              <Button variant="brass" onClick={() => copy(message, setCopiedMessage)}>
+              <Button variant={canShare ? 'ghost' : 'brass'} onClick={() => copy(message, setCopiedMessage)}>
                 {copiedMessage ? <Check size={15} /> : <Copy size={15} />}
                 {copiedMessage ? t('people.messageCopied') : t('people.copyReadyMessage')}
               </Button>

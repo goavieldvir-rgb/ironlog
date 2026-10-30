@@ -5,7 +5,7 @@ import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, deleteRoutine, addRoutine, copyRoutineToUser } from '../lib/db.js'
-import { clearDraft } from '../lib/draft.js'
+import { clearDraft, loadDraft } from '../lib/draft.js'
 import { supabase } from '../supabase.js'
 import { Button, Card, CategoryTag, EmptyState, LoadError } from './ui.jsx'
 import { Tabs } from './ExerciseLibrary.jsx'
@@ -156,7 +156,7 @@ export default function RoutineList() {
 
             <Link to={`/workout/${r.id}`} className="mt-1">
               <Button variant="brass" className="w-full">
-                <Play size={15} /> {t('routines.startSession')}
+                <Play size={15} /> {loadDraft(effectiveUid, r.id) ? t('routines.resumeSession') : t('routines.startSession')}
               </Button>
             </Link>
           </Card>
