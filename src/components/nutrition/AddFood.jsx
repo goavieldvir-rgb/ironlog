@@ -15,6 +15,7 @@ import {
   historyMap,
   matchHistory,
   rankFoods,
+  recentForMeal,
   searchLocal,
   getSavedMeals,
   FAV_EVENT,
@@ -59,7 +60,8 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, today, onCl
   const [searching, setSearching] = useState(false)
   const [searchErr, setSearchErr] = useState('')
   const [history, setHistory] = useState(null) // every food this diary logged, newest first
-  const recent = history && history.slice(0, 20)
+  // Foods most logged in the meal being added to come first.
+  const recent = useMemo(() => history && recentForMeal(history, meal), [history, meal])
   const hist = useMemo(() => historyMap(history), [history])
   const [catalogReady, setCatalogReady] = useState(false)
   const [meals, setMeals] = useState(null)

@@ -6,6 +6,7 @@ import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { fmtDate, toLocalISODate } from '../lib/dates.js'
+import { shiftDay } from '../lib/nutritionStats.js'
 import {
   MEALS,
   MEAL_KEY,
@@ -17,6 +18,7 @@ import {
   foodLogRow,
   friendlyError,
   getLogs,
+  getLogsBetween,
   getTargets,
   insertLogs,
   isNotSetUp,
@@ -48,12 +50,6 @@ export default function Nutrition() {
   return <Diary />
 }
 
-const shiftDay = (iso, n) => {
-  const d = new Date(iso + 'T00:00:00')
-  d.setDate(d.getDate() + n)
-  return toLocalISODate(d)
-}
-
 // Days already seen in this app session, so returning to the page or
 // stepping back a day shows the diary at once while it refreshes.
 const dayCache = new Map() // `${uid}|${date}` -> logs
@@ -61,6 +57,8 @@ const targetsCache = new Map() // uid -> targets
 
 // How far ahead the diary lets you plan meals.
 const MAX_DAYS_AHEAD = 30
+// How far back the copy buttons look for a day or meal to repeat.
+const COPY_LOOKBACK = 14
 
 function Diary() {
   const { t, lang } = useLanguage()
@@ -71,6 +69,7 @@ function Diary() {
   const today = toLocalISODate()
   const [date, setDate] = useState(today)
   const [logs, setLogs] = useState([])
+  // Logs from the days before this one, newest day first: the copy sources.
   const [prevLogs, setPrevLogs] = useState([])
   const [targets, setTargets] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -100,12 +99,12 @@ function Diary() {
     return () => document.removeEventListener('visibilitychange', onShow)
   }, [])
 
-  // Load the day, the day before it (for "copy"), and the targets.
+  // Load the day, the two weeks before it (for "copy"), and the targets.
   useEffect(() => {
     if (!uid) return
     let off = false
     const key = `${uid}|${date}`
-    const prevKey = `${uid}|${shiftDay(date, -1)}`
+    const prevKey = `${uid}|before|${date}`
     if (loadedFor.current !== key) {
       if (dayCache.has(key)) {
         loadedFor.current = key
@@ -117,7 +116,7 @@ function Diary() {
         setLoading(false)
       } else setLoading(true)
     }
-    Promise.all([getLogs(uid, date), getLogs(uid, shiftDay(date, -1)), getTargets(uid)])
+    Promise.all([getLogs(uid, date), getLogsBetween(uid, shiftDay(date, -COPY_LOOKBACK), shiftDay(date, -1)), getTargets(uid)])
       .then(([day, prev, tg]) => {
         if (off) return
         loadedFor.current = key
@@ -234,11 +233,19 @@ function Diary() {
     setScanner(true)
   }
 
+  // After a food is logged, go back to the add sheet (search and all) so the
+  // next food of the meal is one search away; close only when it wasn't open.
+  const backToAdd = () =>
+    setStack((s) => {
+      const i = s.findIndex((v) => v.type === 'add')
+      return i >= 0 ? s.slice(0, i + 1) : []
+    })
+
   async function logFood(food, option, qty, m) {
     const row = foodLogRow({ uid, date, meal: m, food, lang, option, qty })
     if (await addLogs([row], t('nutrition.added', { name: row.name }))) {
       setScanner(false)
-      closeAll()
+      backToAdd()
     }
   }
 
@@ -246,17 +253,17 @@ function Diary() {
     const options = buildUnitOptions(food, lang, t)
     const option = options.find((o) => o.kind === 'unit') || options.find((o) => o.kind === '100g')
     const row = foodLogRow({ uid, date, meal, food, lang, option, qty: 1 })
-    if (await addLogs([row], t('nutrition.added', { name: row.name }))) closeAll()
+    if (await addLogs([row], t('nutrition.added', { name: row.name }))) backToAdd()
   }
 
   async function copyPrevious() {
-    const rows = cloneLogs(prevLogs, { uid, date })
+    const rows = cloneLogs(prevDay.rows, { uid, date })
     await addLogs(rows, t('nutrition.copied', { n: rows.length }))
   }
 
-  // One meal from the day before, into the same meal on this day.
+  // The last time this meal was logged, into the same meal on this day.
   async function copyPrevMeal(m) {
-    const rows = cloneLogs(prevLogs.filter((r) => r.meal === m), { uid, date })
+    const rows = cloneLogs(prevMeal(m).rows, { uid, date })
     await addLogs(rows, t('nutrition.loggedToMeal', { meal: t(MEAL_KEY[m]) }))
   }
 
@@ -315,7 +322,12 @@ function Diary() {
 
   // ----- derived
   const totals = sumLogs(logs)
-  const prevTotals = sumLogs(prevLogs)
+  // Copy sources: the last day anything was logged, and per meal the last day
+  // that meal was. Usually yesterday; a skipped day falls back further.
+  const lastDayOf = (rows) => (rows.length ? { date: rows[0].date, rows: rows.filter((r) => r.date === rows[0].date) } : null)
+  const prevDay = lastDayOf(prevLogs)
+  const prevMeal = (m) => lastDayOf(prevLogs.filter((r) => r.meal === m))
+  const prevTotals = sumLogs(prevDay?.rows || [])
   const isToday = date === today
   // ISO dates compare as strings, so a later day sorts after today.
   const isFuture = date > today
@@ -337,9 +349,13 @@ function Diary() {
   const k = t('nutrition.kcalUnit')
   const notSetUp = loadError && isNotSetUp(loadError)
 
-  const prevMeal = (m) => prevLogs.filter((r) => r.meal === m)
-  // Which day "the day before" is, as the copy buttons name it.
-  const prevWord = isToday ? 'yesterday' : date === tomorrow ? 'today' : 'previous'
+  // A copy source's day, as the buttons name it.
+  const sourceDay = (iso) =>
+    iso === today
+      ? 'today'
+      : iso === shiftDay(today, -1)
+        ? 'yesterday'
+        : fmtDate(lang, new Date(iso + 'T00:00:00'), { weekday: 'short', day: 'numeric', month: 'short' })
   const targetsKnown = !loading && !loadError
 
   return (
@@ -419,10 +435,10 @@ function Diary() {
 
           {/* The whole day only copies onto an empty day, so nothing is logged
               twice; each empty meal offers its own copy below. */}
-          {prevLogs.length > 0 && logs.length === 0 && (
+          {prevDay && logs.length === 0 && (
             <Card className="flex items-center justify-between gap-3 !py-3">
               <div className="min-w-0">
-                <div className="eyebrow">{isToday ? t('nutrition.yesterday') : date === tomorrow ? t('nutrition.today') : t('nutrition.previousDayLabel')}</div>
+                <div className="eyebrow"><bdi>{dayWord(t, sourceDay(prevDay.date))}</bdi></div>
                 <p className="text-sm mt-0.5 whitespace-nowrap">
                   <N mono>{fmt(prevTotals.protein, 1)}</N> {g} {t('nutrition.proteinWord')}
                 </p>
@@ -431,7 +447,7 @@ function Diary() {
                 </p>
               </div>
               <Button variant="ghost" className="shrink-0 whitespace-nowrap" onClick={copyPrevious}>
-                <Copy size={16} /> {isToday ? t('nutrition.copyYesterday') : date === tomorrow ? t('nutrition.copyToday') : t('nutrition.copyPrevious')}
+                <Copy size={16} /> {copyLabel(t, sourceDay(prevDay.date))}
               </Button>
             </Card>
           )}
@@ -469,8 +485,8 @@ function Diary() {
                     </button>
                   </div>
                 </div>
-                {rows.length === 0 && prevMeal(m).length > 0 ? (
-                  <RepeatMeal rows={prevMeal(m)} label={prevWord} meal={t(MEAL_KEY[m])} onClick={() => copyPrevMeal(m)} />
+                {rows.length === 0 && prevMeal(m) ? (
+                  <RepeatMeal rows={prevMeal(m).rows} day={sourceDay(prevMeal(m).date)} meal={t(MEAL_KEY[m])} onClick={() => copyPrevMeal(m)} />
                 ) : rows.length === 0 ? (
                   <p className="text-chalkdim text-sm">{isFuture ? t('nutrition.nothingPlanned') : t('nutrition.nothingLogged')}</p>
                 ) : (
@@ -602,20 +618,28 @@ function Diary() {
   )
 }
 
-// An empty meal that was logged the day before: one tap logs it again.
-function RepeatMeal({ rows, label, meal, onClick }) {
+// 'today' / 'yesterday' / a short date -> words for the copy buttons.
+const dayWord = (t, day) => (day === 'today' ? t('nutrition.today') : day === 'yesterday' ? t('nutrition.yesterday') : day)
+const copyLabel = (t, day) =>
+  day === 'today' ? t('nutrition.copyToday') : day === 'yesterday' ? t('nutrition.copyYesterday') : t('nutrition.copyDay', { day })
+
+// An empty meal that was logged on an earlier day: one tap logs it again.
+function RepeatMeal({ rows, day, meal, onClick }) {
   const { t, lang } = useLanguage()
   const tot = sumLogs(rows)
+  const dayIn = day === 'today' ? t('nutrition.fromToday') : day === 'yesterday' ? t('nutrition.fromYesterday') : t('nutrition.fromDay', { day })
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={t(`nutrition.repeatMealLabel_${label}`, { meal })}
+      aria-label={t('nutrition.repeatMealLabel', { meal, day: dayIn })}
       className="w-full flex items-center gap-3 px-4 min-h-[56px] py-2 rounded-[18px] border border-dashed border-white/[0.14] text-start hover:bg-surface press-row"
     >
       <Repeat size={18} className="text-chalkdim shrink-0" aria-hidden="true" />
       <div className="min-w-0 flex-1">
-        <span className="block text-[15px] leading-5 font-medium">{t(`nutrition.repeatMeal_${label}`)}</span>
+        <span className="block text-[15px] leading-5 font-medium">
+          {day === 'today' ? t('nutrition.repeatMealToday') : day === 'yesterday' ? t('nutrition.repeatMealYesterday') : t('nutrition.repeatMealDay', { day })}
+        </span>
         <span dir="auto" className="block text-chalkdim text-[13px] leading-[18px] truncate text-start">
           {rows.map((r) => logName(r, lang)).join(', ')}
         </span>

@@ -225,8 +225,34 @@ export async function getLogs(uid, date) {
 
 export async function insertLogs(rows) {
   if (!rows.length) return []
-  return check(await supabase.from('food_logs').insert(rows).select(LOG_SELECT))
+  const inserted = check(await supabase.from('food_logs').insert(rows).select(LOG_SELECT))
+  for (const r of rows) rememberAmount(r)
+  return inserted
 }
+
+// Every log from `from` to `to`, both included, newest day first.
+export async function getLogsBetween(uid, from, to) {
+  return check(
+    await supabase
+      .from('food_logs')
+      .select(LOG_SELECT)
+      .eq('user_id', uid)
+      .gte('date', from)
+      .lte('date', to)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: true })
+      .limit(600),
+  )
+}
+
+// The amount each food was last logged at (food_id -> log row), so the amount
+// screen opens there instead of at 1 serving. Filled by the history load and
+// by every log written in this app session.
+const lastAmounts = new Map()
+function rememberAmount(r) {
+  if (r.food_id && r.grams > 0) lastAmounts.set(r.food_id, { grams: Number(r.grams), unit_label: r.unit_label, unit_qty: r.unit_qty })
+}
+export const lastAmountFor = (foodId) => (foodId ? lastAmounts.get(foodId) || null : null)
 
 export async function updateLog(id, patch) {
   return check(await supabase.from('food_logs').update(patch).eq('id', id).select(LOG_SELECT).single())
@@ -239,7 +265,8 @@ export async function deleteLogs(ids) {
 
 // Distinct foods this user logged (by food_id, or name for quick adds),
 // newest first, each with `uses`: how often it was logged in the last 500
-// entries. Feeds the Recent tab, "logged before" in search, and ranking.
+// entries, and `inMeal`: the same count per meal. Feeds the Recent tab,
+// "logged before" in search, and ranking.
 export async function getLogHistory(uid) {
   const rows = check(
     await supabase.from('food_logs').select(LOG_SELECT).eq('user_id', uid).order('created_at', { ascending: false }).limit(500),
@@ -249,9 +276,23 @@ export async function getLogHistory(uid) {
     const key = r.food_id ? `f:${r.food_id}` : `n:${String(r.name).toLowerCase()}`
     const hit = byKey.get(key)
     if (hit) hit.uses += 1
-    else byKey.set(key, { ...r, uses: 1 })
+    else {
+      byKey.set(key, { ...r, uses: 1, inMeal: {} })
+      if (!lastAmounts.has(r.food_id)) rememberAmount(r)
+    }
+    const h = byKey.get(key)
+    h.inMeal[r.meal] = (h.inMeal[r.meal] || 0) + 1
   }
   return [...byKey.values()]
+}
+
+// Recent for one meal: foods most logged in that meal first, then newest.
+export function recentForMeal(history, meal, limit = 20) {
+  return (history || [])
+    .map((r, i) => [r, i])
+    .sort(([a, i], [b, j]) => (b.inMeal?.[meal] || 0) - (a.inMeal?.[meal] || 0) || i - j)
+    .slice(0, limit)
+    .map(([r]) => r)
 }
 
 // food_id -> { count } for ranking.
