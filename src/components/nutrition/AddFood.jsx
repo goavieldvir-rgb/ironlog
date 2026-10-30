@@ -19,6 +19,7 @@ import {
   searchLocal,
   getSavedMeals,
   FAV_EVENT,
+  MEALS_EVENT,
   getFavorites,
   parseNum,
   searchFoods,
@@ -196,6 +197,16 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, today, onCl
       off = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid])
+
+  // Saved meals edited under "Manage meals" show here on the way back.
+  useEffect(() => {
+    const reload = () =>
+      getSavedMeals(uid)
+        .then(setMeals)
+        .catch((err) => console.error(err))
+    window.addEventListener(MEALS_EVENT, reload)
+    return () => window.removeEventListener(MEALS_EVENT, reload)
   }, [uid])
 
   // Favorites are saved to the account; reload when the tab opens and when
@@ -446,7 +457,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, today, onCl
                         ) : (
                           <div className="min-w-0 flex-1">{body}</div>
                         )}
-                        {addBtn(r.id, t('nutrition.addSameAmount'), () => logRecent(r))}
+                        {addBtn(r.id, t('nutrition.addFoodLabel', { name: logName(r, qLang) }), () => logRecent(r))}
                       </li>
                     )
                   })}

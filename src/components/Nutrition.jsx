@@ -787,11 +787,10 @@ function Summary({ totals, targets, canEdit, onEdit }) {
         {targets?.kcal > 0 && <Track value={totals.kcal} max={targets.kcal} tone="kcal" />}
       </div>
 
-      <div className={`grid ${totals.fiber > 0 ? 'grid-cols-3' : 'grid-cols-2'} gap-3 pt-3.5 border-t border-white/[0.07] text-sm`}>
+      <div className="grid grid-cols-2 gap-3 pt-3.5 border-t border-white/[0.07] text-sm">
         {[
           [t('nutrition.carbs'), totals.carbs, targets?.carbs],
           [t('nutrition.fat'), totals.fat, targets?.fat],
-          ...(totals.fiber > 0 ? [[t('nutrition.fiber'), totals.fiber, null]] : []),
         ].map(([label, v, target]) => (
           <div key={label} className="min-w-0">
             <span className="text-chalkdim whitespace-nowrap">
@@ -812,6 +811,11 @@ function Summary({ totals, targets, canEdit, onEdit }) {
             )}
           </div>
         ))}
+        {totals.fiber > 0 && (
+          <span className="col-span-2 text-chalkdim whitespace-nowrap">
+            {t('nutrition.fiber')} <N mono className="text-chalk font-medium">{fmt(totals.fiber, 0)}</N> {g}
+          </span>
+        )}
       </div>
     </section>
   )

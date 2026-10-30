@@ -472,16 +472,25 @@ export async function saveMeal(uid, name, logs) {
     fat: r.fat,
     fiber: r.fiber ?? null,
   }))
-  return check(await supabase.from('saved_meals').insert({ user_id: uid, name, items }).select().single())
+  const row = check(await supabase.from('saved_meals').insert({ user_id: uid, name, items }).select().single())
+  mealsChanged()
+  return row
 }
+
+// Fired when saved meals change, so an open Add sheet reloads its list.
+export const MEALS_EVENT = 'ironlog:saved-meals'
+const mealsChanged = () => window.dispatchEvent(new Event(MEALS_EVENT))
 
 export async function deleteSavedMeal(id) {
   check(await supabase.from('saved_meals').delete().eq('id', id))
+  mealsChanged()
 }
 
 // patch: { name?, items? }. Returns the updated row.
 export async function updateSavedMeal(id, patch) {
-  return check(await supabase.from('saved_meals').update(patch).eq('id', id).select().single())
+  const row = check(await supabase.from('saved_meals').update(patch).eq('id', id).select().single())
+  mealsChanged()
+  return row
 }
 
 // Items scaled by a portion factor (pure). Grams and macros to 1 decimal, unit_qty to 2.
