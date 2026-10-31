@@ -11,6 +11,7 @@ import ExercisePicker from './ExercisePicker.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { formatSeconds } from '../lib/timed.js'
+import RestSelect from './RestSelect.jsx'
 
 export const emptyExerciseForm = {
   name: '',
@@ -23,6 +24,7 @@ export const emptyExerciseForm = {
   timed: false,
   intensityType: 'rpe',
   trackRir: false,
+  restSeconds: null,
 }
 
 function formatLast(ex, t) {
@@ -155,7 +157,7 @@ export default function ExerciseLibrary() {
               <div className="flex gap-1 shrink-0">
                 <button
                   className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-surface2 text-chalkdim hover:text-chalk"
-                  onClick={() => setEditing({ ...ex, nameHe: ex.name_he || '', videoUrl: ex.video_url, intensityType: ex.intensity_type, trackRir: ex.track_rir })}
+                  onClick={() => setEditing({ ...ex, nameHe: ex.name_he || '', videoUrl: ex.video_url, intensityType: ex.intensity_type, trackRir: ex.track_rir, restSeconds: ex.rest_seconds ?? null })}
                   title={t('common.edit')} aria-label={t('common.edit')}
                 >
                   <Pencil size={15} />
@@ -241,6 +243,7 @@ export default function ExerciseLibrary() {
               timed: !!currentForm.timed,
               intensityType: currentForm.intensityType,
               trackRir: currentForm.trackRir,
+              restSeconds: currentForm.restSeconds ?? null,
             })
           }}
         />
@@ -316,13 +319,18 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
       // Leave `timed` out unless it matters, so saving an ordinary exercise
       // never touches a column that may not exist yet.
       if (!form.timed && !initial.timed) delete data.timed
+      // Same for the rest column: untouched unless a rest is or was set.
+      if (form.category === 'cardio') data.restSeconds = null
+      if (data.restSeconds == null && initial.restSeconds == null) delete data.restSeconds
       await onSave(data)
     } catch (err) {
       console.error(err)
       // The "timed" column is added in Supabase once; until then only the
       // save that turns timed on can fail, and it says why.
-      const missingColumn = /timed/i.test(`${err?.message || ''} ${err?.details || ''}`)
-      toast(missingColumn ? t('exercises.timedNeedsSetup') : t('feedback.saveFailed'), 'error')
+      const msg = `${err?.message || ''} ${err?.details || ''}`
+      const missingColumn = /timed/i.test(msg)
+      const missingRest = /rest_seconds/i.test(msg)
+      toast(missingColumn ? t('exercises.timedNeedsSetup') : missingRest ? t('rest.needsSetup') : t('feedback.saveFailed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -441,6 +449,20 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
                   <option value="off">{t('exercises.trackRirOff')}</option>
                   <option value="on">{t('exercises.trackRirOn')}</option>
                 </select>
+              </Field>
+
+              <Field
+                label={
+                  <>
+                    {t('rest.exerciseLabel')} <InfoTip text={t('rest.exerciseTip')} />
+                  </>
+                }
+              >
+                <RestSelect
+                  value={form.restSeconds}
+                  onChange={(v) => setForm({ ...form, restSeconds: v })}
+                  emptyLabel={t('rest.timerDefault')}
+                />
               </Field>
             </>
           )}

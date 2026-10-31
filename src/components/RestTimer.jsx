@@ -70,6 +70,9 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
   // Whether the server currently holds an end time for this rest, so it can
   // send the alert while the app is in the background.
   const pushedRef = useRef(false)
+  // The length the rest on screen started at, so Restart repeats it. An
+  // exercise's own rest doesn't replace the remembered default.
+  const baseRef = useRef(DEFAULT_REST)
 
   // Tells the server when this rest ends (or that it no longer does).
   function pushRest(end, force = false) {
@@ -173,6 +176,13 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
     // "resuming" from a negative time.
     const duration = preset ?? (secondsLeft > 0 ? secondsLeft : lastDuration)
     if (preset != null) setLastDuration(preset)
+    // Resuming a pause keeps the length Restart goes back to.
+    startFor(duration, preset == null && secondsLeft > 0)
+  }
+
+  // Starts a rest of `duration` seconds without changing the default length.
+  function startFor(duration, resuming = false) {
+    if (!resuming) baseRef.current = duration
     endTimeRef.current = Date.now() + duration * 1000
     pushRest(endTimeRef.current)
     // Ready before the screen locks, when there's no time left to set it up.
@@ -186,8 +196,9 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
   }
 
   useImperativeHandle(ref, () => ({
-    // A new rest, at whichever length was used last.
-    start: () => start(lastDuration),
+    // A new rest. An exercise with its own rest passes it in, and it's used
+    // for this rest only; otherwise whichever length was picked last.
+    start: (seconds) => (seconds > 0 ? startFor(seconds) : start(lastDuration)),
   }))
 
   function pause() {
@@ -196,10 +207,10 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
     clearRestNotification()
   }
 
-  // Restart: go back to whichever duration was actually last used — not a
-  // hardcoded default — and start counting down again immediately.
+  // Restart: go back to the length this rest started at (the exercise's own
+  // rest, or the last picked one) and count down again immediately.
   function restart() {
-    start(lastDuration)
+    startFor(baseRef.current || lastDuration)
   }
 
   // Nudges the rest by a few seconds, from the stored end time while running

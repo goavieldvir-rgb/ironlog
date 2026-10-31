@@ -14,6 +14,8 @@ import { ExerciseModal, emptyExerciseForm } from './ExerciseLibrary.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { disambiguateLabels } from '../lib/disambiguate.js'
 import { useScrollLock } from '../lib/scrollLock.js'
+import RestSelect from './RestSelect.jsx'
+import { cleanRest, formatRest } from '../lib/rest.js'
 
 export default function RoutineBuilder() {
   const { effectiveUid } = useAdmin()
@@ -170,11 +172,13 @@ export default function RoutineBuilder() {
       // Drop the optional coach fields when empty, and a superset link on the
       // last item (nothing to link to), so routines stay free of dead keys.
       const cleaned = items.map((it, i) => {
-        const { coachNote, targetRir, supersetWithNext, ...rest } = it
+        const { coachNote, targetRir, supersetWithNext, restSeconds, ...rest } = it
         const note = (coachNote || '').trim()
         const rir = targetRir === '' || targetRir == null ? null : Number(targetRir)
+        const restSecs = it.category === 'cardio' || isCardio ? null : cleanRest(restSeconds)
         return {
           ...rest,
+          ...(restSecs != null ? { restSeconds: restSecs } : {}),
           ...(note ? { coachNote: note } : {}),
           ...(rir != null && isFinite(rir) ? { targetRir: Math.min(5, Math.max(0, rir)) } : {}),
           ...(supersetWithNext && i < items.length - 1 ? { supersetWithNext: true } : {}),
@@ -339,6 +343,20 @@ export default function RoutineBuilder() {
                       <span className="text-chalkdim text-xs">{t('routines.rirShort')}</span>
                     </>
                   )}
+                  {/* Rest after each set of this exercise. Empty falls back to
+                      the exercise's own default, then the timer's last length. */}
+                  {(() => {
+                    const exRest = cleanRest(exercises.find((e) => e.id === it.exerciseId)?.rest_seconds)
+                    return (
+                      <RestSelect
+                        compact
+                        value={it.restSeconds}
+                        onChange={(v) => updateItem(i, { restSeconds: v })}
+                        emptyLabel={exRest != null ? t('rest.exerciseDefault', { time: formatRest(exRest) }) : t('rest.timerDefault')}
+                        className="text-sm num ms-1 max-w-[9.5rem]"
+                      />
+                    )
+                  })()}
                 </>
               )}
               <div className="flex items-center ms-auto">

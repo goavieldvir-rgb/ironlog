@@ -8,6 +8,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { fmtDate } from '../lib/dates.js'
 import { isWarmup, workingSets, suggestWarmups } from '../lib/warmup.js'
 import { formatSeconds } from '../lib/timed.js'
+import { formatRest } from '../lib/rest.js'
 import { entryPrKind } from '../lib/records.js'
 import { cardioSummary } from '../lib/cardio.js'
 import CardioTotals from './CardioTotals.jsx'
@@ -518,9 +519,20 @@ export default function SessionEntryCard({
               <span className="font-medium text-chalk">{t('workout.coachLabel')}</span> {entry.coachNote}
             </p>
           )}
-          {targetBody && (
+          {(targetBody || (!isCardio && entry.restSeconds)) && (
             <p className="num text-[13px] leading-[18px] text-chalkdim">
-              {t('workout.targetLine')} <bdi dir="ltr">{targetBody}</bdi>
+              {targetBody && (
+                <>
+                  {t('workout.targetLine')} <bdi dir="ltr">{targetBody}</bdi>
+                </>
+              )}
+              {targetBody && !isCardio && entry.restSeconds ? ' · ' : ''}
+              {/* This exercise's own rest, which the timer uses after each set. */}
+              {!isCardio && entry.restSeconds ? (
+                <>
+                  {t('rest.short')} <bdi dir="ltr">{formatRest(entry.restSeconds)}</bdi>
+                </>
+              ) : null}
             </p>
           )}
           {previousFrom && (

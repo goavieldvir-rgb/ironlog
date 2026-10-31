@@ -74,10 +74,12 @@ create table if not exists public.exercises (
   last_note text,
   last_note_date date,
   timed boolean default false not null,
+  rest_seconds integer,
   constraint exercises_pkey PRIMARY KEY (id),
   constraint exercises_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
   constraint exercises_category_check CHECK ((category = ANY (ARRAY['strength'::text, 'mobility'::text, 'cardio'::text]))),
-  constraint exercises_intensity_type_check CHECK ((intensity_type = ANY (ARRAY['rpe'::text, 'hr_zone'::text])))
+  constraint exercises_intensity_type_check CHECK ((intensity_type = ANY (ARRAY['rpe'::text, 'hr_zone'::text]))),
+  constraint exercises_rest_seconds_check CHECK ((rest_seconds IS NULL OR (rest_seconds >= 5 AND rest_seconds <= 3600)))
 );
 create table if not exists public.global_exercises (
   id uuid default gen_random_uuid() not null,
@@ -1881,6 +1883,18 @@ begin
     perform cron.unschedule('coach-tasks');
   end if;
   perform cron.schedule('coach-tasks', '30 5 * * *', $job$select public.run_coach_tasks()$job$);
+end $$;
+
+-- ===== 6h. Per-exercise rest time (supabase-exercise-rest.sql) =====
+-- For databases made before rest_seconds was in the exercises table above.
+alter table public.exercises add column if not exists rest_seconds integer;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'exercises_rest_seconds_check') then
+    alter table public.exercises
+      add constraint exercises_rest_seconds_check
+      check (rest_seconds is null or (rest_seconds between 5 and 3600));
+  end if;
 end $$;
 
 -- ===== 7. Verification (read-only) =====
