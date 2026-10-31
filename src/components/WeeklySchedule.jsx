@@ -71,7 +71,11 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
 
   // The home screen can ask for a day's panel (the rest-day card's link).
   useEffect(() => {
-    if (openRequest) openDayPanel(openRequest.day)
+    if (openRequest) {
+      openDayPanel(openRequest.day)
+      // "Train anyway" lands straight on the routine list — no second tap.
+      if (openRequest.other) setShowOther(true)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openRequest])
 
@@ -86,7 +90,12 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
 
   function savedSlots(dow) {
     if (justSaved[dow]) return justSaved[dow]
-    return SLOTS.map((slot) => schedule.find((s) => s.day_of_week === dow && s.slot === slot)?.routine_id || '')
+    // A deleted routine's id would show as "Empty" yet still be resent, so
+    // unknown ids become ''. Skip the check until routines have loaded.
+    return SLOTS.map((slot) => {
+      const id = schedule.find((s) => s.day_of_week === dow && s.slot === slot)?.routine_id || ''
+      return id && (routinesLoading || routines.some((r) => r.id === id)) ? id : ''
+    })
   }
   const pickIds = openDay == null ? ['', '', ''] : pending[openDay] || savedSlots(openDay)
   const dirtyDays = Object.keys(pending)
@@ -126,11 +135,10 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
   async function saveDay() {
     setSaving(true)
     try {
-      for (const dow of dirtyDays) {
-        for (const slot of SLOTS) {
-          await setScheduleDay(effectiveUid, dow, slot, pending[dow][slot] || null)
-        }
-      }
+      // Days and slots are independent rows, so save them together.
+      await Promise.all(
+        dirtyDays.flatMap((dow) => SLOTS.map((slot) => setScheduleDay(effectiveUid, dow, slot, pending[dow][slot] || null))),
+      )
       setJustSaved((prev) => ({ ...prev, ...Object.fromEntries(dirtyDays.map((d) => [d, pending[d]])) }))
       setPending({})
       refreshSchedule?.()
@@ -336,11 +344,14 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
                         className="w-full"
                       >
                         <option value="">{t('dashboard.slotEmpty')}</option>
-                        {routines.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.name}
-                          </option>
-                        ))}
+                        {/* A routine already picked in another slot can't be picked twice. */}
+                        {routines
+                          .filter((r) => r.id === pickIds[slot] || !pickIds.includes(r.id))
+                          .map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.name}
+                            </option>
+                          ))}
                       </select>
                     </Field>
                   ))}

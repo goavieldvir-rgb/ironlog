@@ -1,7 +1,10 @@
 import React from 'react'
+import { Link } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
-export function Button({ children, variant = 'primary', className = '', ...props }) {
+// With `to` it renders a router Link styled as the button — a <button> inside
+// an <a> is invalid HTML and breaks keyboard/screen-reader behavior.
+export function Button({ children, variant = 'primary', className = '', to, ...props }) {
   const base =
     'inline-flex items-center justify-center gap-1.5 rounded-[14px] px-4 py-2 min-h-[44px] text-[15px] font-semibold transition-colors press disabled:opacity-40 disabled:pointer-events-none'
   const variants = {
@@ -11,6 +14,13 @@ export function Button({ children, variant = 'primary', className = '', ...props
     ghost: 'bg-surface2 text-chalk hover:bg-surface2/70',
     subtle: 'bg-surface2 text-chalk hover:bg-surface2/70',
     danger: 'bg-transparent text-irontext hover:bg-ironsoft',
+  }
+  if (to) {
+    return (
+      <Link to={to} className={`${base} ${variants[variant]} ${className}`} {...props}>
+        {children}
+      </Link>
+    )
   }
   return (
     <button className={`${base} ${variants[variant]} ${className}`} {...props}>

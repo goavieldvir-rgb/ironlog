@@ -4,11 +4,11 @@
 // means saving, last-time numbers, PRs and charts all work without any new
 // set fields — only the labels change.
 
-// 45 -> "45s", 90 -> "1:30".
-export function formatSeconds(value) {
+// 45 -> "45s", 90 -> "1:30". secLabel is the translated suffix (default "s").
+export function formatSeconds(value, secLabel = 's') {
   const n = Math.round(Number(value))
   if (!isFinite(n) || n < 0) return ''
-  if (n < 60) return `${n}s`
+  if (n < 60) return `${n}${secLabel}`
   return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`
 }
 

@@ -51,7 +51,7 @@ let fontsDone = false
 export function shareFontsReady() {
   if (fontsPromise) return fontsPromise
   if (typeof document === 'undefined' || typeof FontFace === 'undefined') return (fontsPromise = Promise.resolve(false))
-  fontsPromise = Promise.all(
+  const mine = (fontsPromise = Promise.all(
     FACES.map(async ([family, file, weight, unicodeRange]) => {
       try {
         const url = new URL(`fonts/share/${file}.woff2`, document.baseURI)
@@ -63,8 +63,13 @@ export function shareFontsReady() {
         return false
       }
     }),
-  ).then((r) => (fontsDone = r.every(Boolean)))
-  return fontsPromise
+  ).then((r) => {
+    fontsDone = r.every(Boolean)
+    // A failed face (offline, bad connection) must not stick: the next card retries.
+    if (!fontsDone && fontsPromise === mine) fontsPromise = null
+    return fontsDone
+  }))
+  return mine
 }
 // True once every share font has arrived (so a redraw would change nothing).
 export const shareFontsLoaded = () => fontsDone

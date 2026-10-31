@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react'
-import { Copy, Download, Check } from 'lucide-react'
+import { Copy, Download, Check, ArrowUp, ArrowDown, Minus, ChevronDown } from 'lucide-react'
 import { BackChevron, ForwardChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useFeedback } from '../context/FeedbackContext.jsx'
+import { recordBaseline, entryPrKind } from '../lib/records.js'
 import { useCollection } from '../lib/db.js'
 import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
 import { toLocalISODate, fmtDate, dateLocale, weekStartDate } from '../lib/dates.js'
@@ -170,7 +172,7 @@ function computeTotals(sessions) {
   return { totalSets, totalVolume, totalCardioMinutes, totalCardioKm }
 }
 
-function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t, lang, exById }) {
+function buildSummary({ mode, start, end, sessions, bodyWeights, waists, personName, t, lang, exById }) {
   const lines = []
   const modeLabel = {
     week: t('summary.docWeekly'),
@@ -217,6 +219,14 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t, 
     lines.push('')
   }
 
+  if (waists.length > 0) {
+    lines.push(`## ${t('summary.docWaist')}`)
+    for (const w of [...waists].sort((a, b) => (a.date < b.date ? -1 : 1))) {
+      lines.push(`- ${formatDay(lang, w.date)}: ${w.waist}${w.unit || ''}`)
+    }
+    lines.push('')
+  }
+
   return lines.join('\n')
 }
 
@@ -229,18 +239,188 @@ function Chip({ value, label }) {
   )
 }
 
-// On-screen version of the export, built from the same data and helpers as
-// buildSummary (which stays the source of the Copy/Download text). Mixed
-// English/Hebrew fragments sit in <bdi> so they keep their own direction.
-function SummaryPreview({ mode, start, end, sessions, bodyWeights, personName, t, lang, exById }) {
+// Personal records set inside [startISO, endISO]: one per exercise per
+// session, judged against everything logged before that session (the same
+// rule the workout screen uses), so a week's count never depends on later data.
+function countPRs(allSessions, startISO, endISO) {
+  const { personalBests: best, pastStrengthSets: past } = recordBaseline(allSessions.filter((s) => s.date < startISO))
+  const inRange = allSessions
+    .filter((s) => s.date >= startISO && s.date <= endISO)
+    .sort((a, b) => (a.date === b.date ? ((a.created_at || '') < (b.created_at || '') ? -1 : 1) : a.date < b.date ? -1 : 1))
+  let n = 0
+  for (const s of inRange) {
+    for (const e of s.entries || []) {
+      if (!e.exerciseId) continue
+      if ((e.sets || []).some((set) => entryPrKind(e, set, best[e.exerciseId], past[e.exerciseId]))) n++
+    }
+    const base = recordBaseline([s])
+    for (const [id, v] of Object.entries(base.personalBests)) if (best[id] == null || v > best[id]) best[id] = v
+    for (const [id, list] of Object.entries(base.pastStrengthSets)) past[id] = (past[id] || []).concat(list)
+  }
+  return n
+}
+
+// Body-weight change across a period (last entry minus first), in the unit of
+// the last entry; null with fewer than two weigh-ins.
+function weightChange(bodyWeights) {
+  if (bodyWeights.length < 2) return null
+  const asc = [...bodyWeights].sort((a, b) => (a.date < b.date ? -1 : 1))
+  const first = asc[0]
+  const last = asc[asc.length - 1]
+  const toKgW = (w) => (w.unit === 'lb' ? Number(w.weight) * 0.45359237 : Number(w.weight))
+  const diffKg = toKgW(last) - toKgW(first)
+  const unit = last.unit || 'kg'
+  return { value: Math.round((unit === 'lb' ? diffKg / 0.45359237 : diffKg) * 10) / 10, unit }
+}
+
+// Neutral arrow + size of the move against the previous period. No red/green:
+// more or less volume isn't good or bad by itself.
+function Delta({ cur, prev, hasPrev, fmt, label, t }) {
+  if (!hasPrev) return <span className="text-chalkdim text-xs">{t('summary.noCompare')}</span>
+  const diff = Math.round((cur - prev) * 10) / 10
+  const Icon = diff > 0 ? ArrowUp : diff < 0 ? ArrowDown : Minus
+  return (
+    <span className="text-chalkdim text-xs leading-snug">
+      <Icon size={12} aria-hidden="true" className="inline align-[-1px] me-1" />
+      {diff === 0 ? t('summary.sameAsPrev') : <bdi dir="ltr" className="num">{fmt(Math.abs(diff))}</bdi>} {label}
+    </span>
+  )
+}
+
+function StatTile({ label, value, children, className = '' }) {
+  return (
+    <div className={`card p-3 flex flex-col gap-1 ${className}`}>
+      <span className="text-chalkdim text-xs">{label}</span>
+      <span className="num text-chalk text-2xl leading-none">
+        <bdi dir="ltr">{value}</bdi>
+      </span>
+      {children}
+    </div>
+  )
+}
+
+// A header row that opens and closes the content under it.
+function Collapsible({ title, meta, open, onToggle, children }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="flex items-center justify-between gap-3 min-h-11 rounded-md bg-surface2 px-3 text-start"
+      >
+        <span className="text-chalk text-sm font-medium">{title}</span>
+        <span className="flex items-center gap-2 text-chalkdim text-xs">
+          {meta}
+          <ChevronDown size={16} aria-hidden="true" className={open ? 'rotate-180' : ''} />
+        </span>
+      </button>
+      {open && children}
+    </div>
+  )
+}
+
+function SessionCard({ s, t, lang, exById }) {
+  return (
+    <Card className="flex flex-col gap-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="eyebrow">{formatDay(lang, s.date)}</div>
+          <h3 className="text-lg leading-tight">
+            <bdi dir="auto">{sessionTitle(s, t)}</bdi>
+          </h3>
+        </div>
+        <CategoryTag category={s.category} />
+      </div>
+      <ul className="flex flex-col divide-y divide-line">
+        {(s.entries || []).map((e, i) => (
+          <li key={i} className="py-2 first:pt-0 last:pb-0">
+            <div className="text-sm text-chalk">
+              <bdi dir="auto">{entryName(e, exById, lang)}</bdi>
+            </div>
+            <div className="text-chalkdim text-sm num">
+              {(e.sets || []).length === 0
+                ? t('summary.docNoSetsLogged')
+                : (e.sets || []).map((set, j) => (
+                    <React.Fragment key={j}>
+                      {j > 0 && ', '}
+                      <bdi dir="auto">{(isWarmup(set) ? `${t('sessionCard.warmupShort')} ` : '') + formatSet(e, set, t)}</bdi>
+                    </React.Fragment>
+                  ))}
+            </div>
+            {e.notes && (
+              <div className="text-chalkdim text-xs italic mt-0.5">
+                <bdi dir="auto">{e.notes}</bdi>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+      {s.notes && (
+        <p className="text-chalkdim text-xs border-t border-line pt-2">
+          {t('summary.docNotes')} <bdi dir="auto">{s.notes}</bdi>
+        </p>
+      )}
+    </Card>
+  )
+}
+
+// Dated measurements: body weight, or waist with field="waist".
+function BodyWeightList({ list, lang, field = 'weight' }) {
+  return (
+    <Card className="flex flex-col gap-2">
+      <ul className="flex flex-col divide-y divide-line">
+        {[...list]
+          .sort((a, b) => (a.date < b.date ? -1 : 1))
+          .map((bw) => (
+            <li key={bw.id || bw.date} className="flex items-center justify-between gap-2 py-2 first:pt-0 last:pb-0">
+              <span className="text-chalkdim text-sm">{formatDay(lang, bw.date)}</span>
+              <span className="num text-chalk text-sm">
+                <bdi dir="ltr">
+                  {bw[field]}
+                  {bw.unit || ''}
+                </bdi>
+              </span>
+            </li>
+          ))}
+      </ul>
+    </Card>
+  )
+}
+
+// Compact totals first (with the move against the previous period), the
+// per-session detail behind a toggle. Year mode folds the detail by month so
+// a whole year never renders at once. Mixed English/Hebrew fragments sit in
+// <bdi> so they keep their own direction. buildSummary stays the source of the
+// Copy/Download text.
+function SummaryPreview({ mode, start, end, sessions, bodyWeights, waists, personName, t, lang, exById, prev, prCount, prevPrCount }) {
+  const [showDetails, setShowDetails] = useState(false)
+  const [openMonths, setOpenMonths] = useState({})
+  const [bwOpen, setBwOpen] = useState(false)
+  const [waistOpen, setWaistOpen] = useState(false)
   const modeLabel = {
     week: t('summary.docWeekly'),
     month: t('summary.docMonthly'),
     year: t('summary.docYearly'),
     custom: t('summary.docCustomRange'),
   }[mode]
-  const { totalSets, totalVolume, totalCardioMinutes, totalCardioKm } = computeTotals(sessions)
+  const { totalSets, totalVolume, totalCardioMinutes, totalCardioKm } = useMemo(() => computeTotals(sessions), [sessions])
   const num = (n) => Math.round(n).toLocaleString(dateLocale(lang))
+  const vs = t({ week: 'summary.vsWeek', month: 'summary.vsMonth', year: 'summary.vsYear', custom: 'summary.vsPrev' }[mode])
+  const hasPrev = prev.sessions > 0
+  const bwChange = weightChange(bodyWeights)
+  const bwPrev = prev.bwChange
+  const sorted = useMemo(() => [...sessions].sort((a, b) => (a.date < b.date ? -1 : 1)), [sessions])
+  const months = useMemo(() => {
+    const map = new Map()
+    for (const s of sorted) {
+      const k = s.date.slice(0, 7)
+      if (!map.has(k)) map.set(k, [])
+      map.get(k).push(s)
+    }
+    return [...map.entries()]
+  }, [sorted])
+  const monthName = (k) => fmtDate(lang, new Date(k + '-01T00:00:00'), { month: 'long', year: mode === 'year' ? undefined : 'numeric' })
 
   return (
     <div className="flex flex-col gap-4">
@@ -249,88 +429,88 @@ function SummaryPreview({ mode, start, end, sessions, bodyWeights, personName, t
           {modeLabel} {t('summary.docTrainingSummary')}
         </h2>
         <p className="text-chalkdim text-sm mt-0.5">
-          {formatRange(lang, start, end, mode)}
-          {personName && (
-            <>
-              {' — '}
-              <bdi dir="auto">{personName}</bdi>
-            </>
-          )}
+          {personName ? <bdi dir="auto">{personName}</bdi> : formatRange(lang, start, end, mode)}
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <Chip value={sessions.length} label={sessions.length === 1 ? t('summary.docSession') : t('summary.docSessions')} />
-        <Chip value={totalSets} label={t('summary.docTotalSets')} />
-        <Chip value={`~${num(totalVolume)}`} label={t('summary.docTotalVolume')} />
-        {totalCardioMinutes > 0 && <Chip value={num(totalCardioMinutes)} label={t('summary.docCardioMinutes')} />}
-        {totalCardioKm > 0 && <Chip value={formatDistance(totalCardioKm)} label={t('summary.docCardioDistance')} />}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatTile label={t('summary.statSessions')} value={sessions.length}>
+          <Delta cur={sessions.length} prev={prev.sessions} hasPrev={hasPrev} fmt={num} label={vs} t={t} />
+        </StatTile>
+        <StatTile label={t('summary.statVolume')} value={`~${num(totalVolume)}`}>
+          <Delta cur={totalVolume} prev={prev.volume} hasPrev={hasPrev} fmt={num} label={vs} t={t} />
+        </StatTile>
+        <StatTile label={t('summary.statSets')} value={totalSets}>
+          <Delta cur={totalSets} prev={prev.sets} hasPrev={hasPrev} fmt={num} label={vs} t={t} />
+        </StatTile>
+        <StatTile label={t('summary.statPRs')} value={prCount}>
+          <Delta cur={prCount} prev={prevPrCount} hasPrev={hasPrev} fmt={num} label={vs} t={t} />
+        </StatTile>
+        {bwChange && (
+          <StatTile label={t('summary.statBodyWeight')} value={`${bwChange.value > 0 ? '+' : ''}${bwChange.value}${bwChange.unit}`} className="col-span-2 sm:col-span-4">
+            <Delta cur={bwChange.value} prev={bwPrev ?? 0} hasPrev={bwPrev != null} fmt={(n) => `${n}${bwChange.unit}`} label={vs} t={t} />
+          </StatTile>
+        )}
       </div>
 
-      {[...sessions]
-        .sort((a, b) => (a.date < b.date ? -1 : 1))
-        .map((s) => (
-          <Card key={s.id} className="flex flex-col gap-2.5">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="eyebrow">{formatDay(lang, s.date)}</div>
-                <h3 className="text-lg leading-tight">
-                  <bdi dir="auto">{sessionTitle(s, t)}</bdi>
-                </h3>
-              </div>
-              <CategoryTag category={s.category} />
-            </div>
-            <ul className="flex flex-col divide-y divide-line">
-              {(s.entries || []).map((e, i) => (
-                <li key={i} className="py-2 first:pt-0 last:pb-0">
-                  <div className="text-sm text-chalk">
-                    <bdi dir="auto">{entryName(e, exById, lang)}</bdi>
-                  </div>
-                  <div className="text-chalkdim text-sm num">
-                    {(e.sets || []).length === 0
-                      ? t('summary.docNoSetsLogged')
-                      : (e.sets || []).map((set, j) => (
-                          <React.Fragment key={j}>
-                            {j > 0 && ', '}
-                            <bdi dir="auto">{(isWarmup(set) ? `${t('sessionCard.warmupShort')} ` : '') + formatSet(e, set, t)}</bdi>
-                          </React.Fragment>
-                        ))}
-                  </div>
-                  {e.notes && (
-                    <div className="text-chalkdim text-xs italic mt-0.5">
-                      <bdi dir="auto">{e.notes}</bdi>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-            {s.notes && (
-              <p className="text-chalkdim text-xs border-t border-line pt-2">
-                {t('summary.docNotes')} <bdi dir="auto">{s.notes}</bdi>
-              </p>
-            )}
-          </Card>
-        ))}
+      {(totalCardioMinutes > 0 || totalCardioKm > 0) && (
+        <div className="flex flex-wrap gap-2">
+          {totalCardioMinutes > 0 && <Chip value={num(totalCardioMinutes)} label={t('summary.docCardioMinutes')} />}
+          {totalCardioKm > 0 && <Chip value={formatDistance(totalCardioKm)} label={t('summary.docCardioDistance')} />}
+        </div>
+      )}
 
-      {bodyWeights.length > 0 && (
-        <Card className="flex flex-col gap-2">
-          <h3 className="text-lg leading-tight">{t('summary.docBodyWeight')}</h3>
-          <ul className="flex flex-col divide-y divide-line">
-            {[...bodyWeights]
-              .sort((a, b) => (a.date < b.date ? -1 : 1))
-              .map((bw) => (
-                <li key={bw.id || bw.date} className="flex items-center justify-between gap-2 py-2 first:pt-0 last:pb-0">
-                  <span className="text-chalkdim text-sm">{formatDay(lang, bw.date)}</span>
-                  <span className="num text-chalk text-sm">
-                    <bdi dir="ltr">
-                      {bw.weight}
-                      {bw.unit || ''}
-                    </bdi>
-                  </span>
-                </li>
+      <Button variant="ghost" onClick={() => setShowDetails((v) => !v)} aria-expanded={showDetails} className="self-start">
+        <ChevronDown size={15} aria-hidden="true" className={showDetails ? 'rotate-180' : ''} />
+        {showDetails ? t('summary.hideDetails') : t('summary.showDetails')}
+      </Button>
+
+      {showDetails && mode === 'year' && (
+        <>
+          {months.map(([k, list]) => (
+            <Collapsible
+              key={k}
+              title={monthName(k)}
+              meta={list.length === 1 ? t('summary.monthSession') : t('summary.monthSessions', { n: list.length })}
+              open={!!openMonths[k]}
+              onToggle={() => setOpenMonths((o) => ({ ...o, [k]: !o[k] }))}
+            >
+              {list.map((s) => (
+                <SessionCard key={s.id} s={s} t={t} lang={lang} exById={exById} />
               ))}
-          </ul>
-        </Card>
+            </Collapsible>
+          ))}
+          {bodyWeights.length > 0 && (
+            <Collapsible title={t('summary.docBodyWeight')} meta={<span className="num">{bodyWeights.length}</span>} open={bwOpen} onToggle={() => setBwOpen((v) => !v)}>
+              <BodyWeightList list={bodyWeights} lang={lang} />
+            </Collapsible>
+          )}
+          {waists.length > 0 && (
+            <Collapsible title={t('summary.docWaist')} meta={<span className="num">{waists.length}</span>} open={waistOpen} onToggle={() => setWaistOpen((v) => !v)}>
+              <BodyWeightList list={waists} lang={lang} field="waist" />
+            </Collapsible>
+          )}
+        </>
+      )}
+
+      {showDetails && mode !== 'year' && (
+        <>
+          {sorted.map((s) => (
+            <SessionCard key={s.id} s={s} t={t} lang={lang} exById={exById} />
+          ))}
+          {bodyWeights.length > 0 && (
+            <>
+              <h3 className="text-lg leading-tight">{t('summary.docBodyWeight')}</h3>
+              <BodyWeightList list={bodyWeights} lang={lang} />
+            </>
+          )}
+          {waists.length > 0 && (
+            <>
+              <h3 className="text-lg leading-tight">{t('summary.docWaist')}</h3>
+              <BodyWeightList list={waists} lang={lang} field="waist" />
+            </>
+          )}
+        </>
       )}
     </div>
   )
@@ -339,9 +519,11 @@ function SummaryPreview({ mode, start, end, sessions, bodyWeights, personName, t
 export default function WeeklySummary() {
   const { effectiveUid, effectiveName, actingAs } = useAdmin()
   const { t, lang } = useLanguage()
+  const { toast } = useFeedback()
   const MODES = getModes(t)
   const [rawSessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [bodyWeightAll] = useCollection(effectiveUid, 'body_weight_logs', 'date', 'desc')
+  const [waistAll] = useCollection(effectiveUid, 'waist_logs', 'date', 'desc')
   const [exercises, exercisesLoading] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const sessions = useMemo(() => applyCurrentTimed(rawSessions, exercises), [rawSessions, exercises])
   const [routines, routinesLoading] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
@@ -358,17 +540,50 @@ export default function WeeklySummary() {
     setOffset(0)
   }
 
-  const { start, end, periodSessions, periodBodyWeights } = useMemo(() => {
+  const { start, end, periodSessions, periodBodyWeights, periodWaists, prev, prCount, prevPrCount } = useMemo(() => {
     const { start, end } = computeRange(mode, offset, customStart, customEnd)
     const startISO = toISO(start)
     const endISO = toISO(end)
+    // The previous period, cut to the same number of elapsed days so a week
+    // or month still in progress isn't set against a full one.
+    let pStart
+    let pEnd
+    const elapsed = Math.round((Math.min(end, todayStart()) - start) / 86400000)
+    if (mode === 'custom') {
+      const span = Math.round((end - start) / 86400000) + 1
+      pEnd = new Date(start)
+      pEnd.setDate(pEnd.getDate() - 1)
+      pStart = new Date(pEnd)
+      pStart.setDate(pStart.getDate() - (span - 1))
+    } else {
+      const full = computeRange(mode, offset - 1, customStart, customEnd)
+      pStart = full.start
+      pEnd = new Date(pStart)
+      pEnd.setDate(pEnd.getDate() + Math.max(elapsed, 0))
+      if (pEnd > full.end) pEnd = full.end
+    }
+    const pS = toISO(pStart)
+    const pE = toISO(pEnd)
+    const inRange = (d, a, b) => d >= a && d <= b
+    const periodSessions = sessions.filter((s) => inRange(s.date, startISO, endISO))
+    const prevSessions = sessions.filter((s) => inRange(s.date, pS, pE))
+    const pt = computeTotals(prevSessions)
     return {
       start,
       end,
-      periodSessions: sessions.filter((s) => s.date >= startISO && s.date <= endISO),
-      periodBodyWeights: bodyWeightAll.filter((b) => b.date >= startISO && b.date <= endISO),
+      periodSessions,
+      periodBodyWeights: bodyWeightAll.filter((b) => inRange(b.date, startISO, endISO)),
+      periodWaists: waistAll.filter((b) => inRange(b.date, startISO, endISO)),
+      prev: {
+        sessions: prevSessions.length,
+        sets: pt.totalSets,
+        volume: pt.totalVolume,
+        bwChange: weightChange(bodyWeightAll.filter((b) => inRange(b.date, pS, pE)))?.value ?? null,
+      },
+      prCount: countPRs(sessions, startISO, endISO),
+      prevPrCount: countPRs(sessions, pS, pE),
     }
-  }, [sessions, bodyWeightAll, mode, offset, customStart, customEnd])
+  }, [sessions, bodyWeightAll, waistAll, mode, offset, customStart, customEnd])
 
   const summaryText = useMemo(
     () =>
@@ -378,18 +593,24 @@ export default function WeeklySummary() {
         end,
         sessions: periodSessions,
         bodyWeights: periodBodyWeights,
+        waists: periodWaists,
         personName: actingAs ? effectiveName : null,
         t,
         lang,
         exById,
       }),
-    [mode, start, end, periodSessions, periodBodyWeights, actingAs, effectiveName, t, lang, exById],
+    [mode, start, end, periodSessions, periodBodyWeights, periodWaists, actingAs, effectiveName, t, lang, exById],
   )
 
   async function handleCopy() {
-    await navigator.clipboard.writeText(summaryText)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    try {
+      await navigator.clipboard.writeText(summaryText)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch (e) {
+      console.error(e)
+      toast(t('summary.copyFailed'), 'error')
+    }
   }
 
   function handleDownload() {
@@ -410,6 +631,7 @@ export default function WeeklySummary() {
       routines,
       sessions,
       body_weight_logs: bodyWeightAll,
+      waist_logs: waistAll,
     }
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -427,22 +649,14 @@ export default function WeeklySummary() {
         <h1 className="text-3xl">{t('summary.title')}</h1>
       </div>
 
-      <Card className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <p className="text-chalk">{t('summary.fullBackup')}</p>
-          <p className="text-chalkdim text-xs mt-0.5">{t('summary.fullBackupBody')}</p>
-        </div>
-        <Button variant="ghost" onClick={handleFullBackup} disabled={loading || exercisesLoading || routinesLoading}>
-          <Download size={15} /> {t('summary.downloadEverything')}
-        </Button>
-      </Card>
-
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <div className="flex rounded-md bg-surface2 p-1 text-sm w-fit">
+          <div role="group" aria-label={t('summary.periodGroup')} className="flex rounded-md bg-surface2 p-1 text-sm w-fit">
             {MODES.map((m) => (
               <button
                 key={m.id}
+                type="button"
+                aria-pressed={mode === m.id}
                 onClick={() => switchMode(m.id)}
                 className={`px-3 min-h-11 rounded transition-colors ${
                   mode === m.id ? 'bg-ink text-chalk' : 'text-chalkdim'
@@ -477,21 +691,25 @@ export default function WeeklySummary() {
       ) : (
         <div className="flex items-center gap-1">
           <button
+            type="button"
             onClick={() => setOffset((o) => o - 1)}
-            className="p-2 rounded-md hover:bg-surface2 text-chalkdim hover:text-chalk"
+            aria-label={t({ week: 'summary.prevWeek', month: 'summary.prevMonth', year: 'summary.prevYear' }[mode])}
+            className="min-w-11 min-h-11 inline-flex items-center justify-center rounded-md hover:bg-surface2 text-chalkdim hover:text-chalk"
           >
             <BackChevron size={16} />
           </button>
           <span className="num text-sm w-44 text-center">{formatRange(lang, start, end, mode)}</span>
           <button
+            type="button"
             onClick={() => setOffset((o) => Math.min(0, o + 1))}
             disabled={offset === 0}
-            className="p-2 rounded-md hover:bg-surface2 text-chalkdim hover:text-chalk disabled:opacity-30"
+            aria-label={t({ week: 'summary.nextWeek', month: 'summary.nextMonth', year: 'summary.nextYear' }[mode])}
+            className="min-w-11 min-h-11 inline-flex items-center justify-center rounded-md hover:bg-surface2 text-chalkdim hover:text-chalk disabled:opacity-30"
           >
             <ForwardChevron size={16} />
           </button>
           {offset !== 0 && (
-            <button onClick={() => setOffset(0)} className="text-chalkdim text-xs hover:text-chalk ms-1">
+            <button type="button" onClick={() => setOffset(0)} className="text-chalkdim text-xs hover:text-chalk ms-1 min-h-11 px-2">
               {t('summary.backToCurrent')}
             </button>
           )}
@@ -505,17 +723,32 @@ export default function WeeklySummary() {
         />
       ) : (
         <SummaryPreview
+          key={mode}
           mode={mode}
           start={start}
           end={end}
           sessions={periodSessions}
           bodyWeights={periodBodyWeights}
+          waists={periodWaists}
           personName={actingAs ? effectiveName : null}
           t={t}
           lang={lang}
           exById={exById}
+          prev={prev}
+          prCount={prCount}
+          prevPrCount={prevPrCount}
         />
       )}
+
+      <Card className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-chalk">{t('summary.fullBackup')}</p>
+          <p className="text-chalkdim text-xs mt-0.5">{t('summary.fullBackupBody')}</p>
+        </div>
+        <Button variant="ghost" onClick={handleFullBackup} disabled={loading || exercisesLoading || routinesLoading}>
+          <Download size={15} /> {t('summary.downloadEverything')}
+        </Button>
+      </Card>
     </div>
   )
 }

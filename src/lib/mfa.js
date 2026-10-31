@@ -48,3 +48,52 @@ export async function removeApp(factorId) {
   // Without this the session keeps saying 'aal2' until the next refresh.
   await supabase.auth.refreshSession()
 }
+
+// ---- Recovery codes (supabase-mfa-recovery.sql) ----
+// Before that file is run the functions don't exist; every helper then says
+// "not available" instead of throwing, and the screens hide themselves.
+function missingFn(err) {
+  return (
+    err?.code === 'PGRST202' || err?.code === '42883' || err?.code === '42P01' ||
+    /could not find the function|does not exist|schema cache/i.test(err?.message || '')
+  )
+}
+
+// Unused codes left, or null when recovery codes aren't set up on the database.
+export async function recoveryCodesLeft() {
+  const { data, error } = await supabase.rpc('recovery_codes_left')
+  if (error) {
+    if (missingFn(error)) return null
+    throw error
+  }
+  return typeof data === 'number' ? data : 0
+}
+
+// 10 new codes, shown once. Needs an aal2 session; replaces the old ones.
+// Returns null when the feature isn't on the database.
+export async function makeRecoveryCodes() {
+  const { data, error } = await supabase.rpc('generate_recovery_codes')
+  if (error) {
+    if (missingFn(error)) return null
+    throw error
+  }
+  return Array.isArray(data) ? data : []
+}
+
+// Spends a code at the sign-in step: true when it worked (the authenticator
+// app is gone and the session is refreshed), false for a wrong code. Throws
+// an error with .tooMany for the rate limit.
+export async function spendRecoveryCode(code) {
+  const { data, error } = await supabase.rpc('use_recovery_code', { code })
+  if (error) {
+    if (/too_many_attempts/.test(error.message || '') || error.code === '54000') {
+      const e = new Error('too_many_attempts')
+      e.tooMany = true
+      throw e
+    }
+    throw error
+  }
+  if (data !== true) return false
+  await supabase.auth.refreshSession()
+  return true
+}

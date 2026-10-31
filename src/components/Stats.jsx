@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useGyms, sessionGymId, gymLabel } from '../lib/gyms.js'
 import {
   ResponsiveContainer,
@@ -22,6 +23,7 @@ import { EmptyState, LoadError, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { workingSets } from '../lib/warmup.js'
 import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
+import { currentStreak } from '../lib/streak.js'
 import { cardioSummary, formatPace, formatSpeed, formatDistance, toKm } from '../lib/cardio.js'
 import { ACCENT, CHALK, CHALKDIM, MUTED, GRID, SURFACE } from '../theme.js'
 
@@ -49,7 +51,15 @@ export default function Stats() {
   const [rawSessions, loading, refreshSessions, loadError] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const sessions = useMemo(() => applyCurrentTimed(rawSessions, exercises), [rawSessions, exercises])
-  const [exerciseId, setExerciseId] = useState('')
+  // null = nothing picked yet (the deep link or the most recent exercise
+  // fills in); '' = the lifter cleared the picker on purpose.
+  const [searchParams] = useSearchParams()
+  const linkedId = searchParams.get('exercise')
+  const [pickedId, setPickedId] = useState(null)
+  // A link tapped while this page is already open (same route) re-aims it.
+  useEffect(() => {
+    setPickedId(null)
+  }, [linkedId])
   // Progress and records for one gym, or 'all'. Only shown to someone who
   // trains at several gyms; '' is the main gym.
   const { gyms, mainName, enabled: gymsOn } = useGyms(effectiveUid)
@@ -63,6 +73,7 @@ export default function Stats() {
     [sessions, gymsOn, gyms, gymFilter],
   )
   const [cardioMetric, setCardioMetric] = useState('duration')
+  const [liftMetric, setLiftMetric] = useState('weight')
 
   const weeks = useMemo(() => last12WeekStarts(), [])
 
@@ -99,14 +110,9 @@ export default function Stats() {
     })
   }, [sessions, weeks, lang])
 
-  const streak = useMemo(() => {
-    let count = 0
-    for (let i = weeklyData.length - 1; i >= 0; i--) {
-      if (weeklyData[i].sessions > 0) count++
-      else break
-    }
-    return count
-  }, [weeklyData])
+  // Same count as the saved-workout screen. This week doesn't break the
+  // streak until it's over, and it isn't capped at the 12 weeks charted.
+  const streak = useMemo(() => currentStreak(sessions), [sessions])
 
   const totalVolume = useMemo(() => weeklyData.reduce((s, w) => s + w.volume, 0), [weeklyData])
   const totalCardioMinutes = useMemo(() => weeklyData.reduce((s, w) => s + w.cardioMinutes, 0), [weeklyData])
@@ -118,7 +124,7 @@ export default function Stats() {
 
   // Personal records + per-exercise progress history, derived straight from
   // the sets people logged (no need for a separate exercises fetch).
-  const { records, exerciseOptions, progressByExercise } = useMemo(() => {
+  const { records, exerciseOptions, recentIds, progressByExercise } = useMemo(() => {
     const exById = exerciseMap(exercises)
     const recMap = {}
     const progMap = {}
@@ -204,11 +210,24 @@ export default function Stats() {
         if (!progMap[entry.exerciseId]) {
           progMap[entry.exerciseId] = { name: entryName(entry, exById, lang), category: entry.category, unit: entry.unit, bodyweight: !!entry.bodyweight, timed: !!entry.timed, points: [] }
         }
+        // Est. 1RM (Epley) only from sets of 1-12 reps, where it's reliable;
+        // volume is every working set's weight x reps.
+        let e1rm = null
+        let volume = 0
+        for (const set of completed) {
+          const w = Number(set.weight)
+          const r = Number(set.reps)
+          if (!isFinite(w) || !isFinite(r)) continue
+          volume += w * r
+          if (w > 0 && r >= 1 && r <= 12) e1rm = Math.max(e1rm ?? 0, w * (1 + r / 30))
+        }
         progMap[entry.exerciseId].points.push({
           date: s.date,
           label: shortDate(lang, s.date),
           weight: Number(topSet.weight) || 0,
           reps: Number(topSet.reps),
+          e1rm: e1rm == null ? null : Math.round(e1rm * 10) / 10,
+          volume: Math.round(volume),
         })
       }
     }
@@ -219,16 +238,43 @@ export default function Stats() {
 
     const exerciseOptions = Object.entries(progMap).map(([id, p]) => ({ id, name: p.name, category: p.category, unit: p.unit, bodyweight: p.bodyweight, timed: p.timed, intensityType: p.intensityType }))
     exerciseOptions.sort((a, b) => a.name.localeCompare(b.name))
+    // Most recently trained first (points are date-sorted below), for the
+    // default pick and the top of the picker.
+    const lastTrained = (id) => progMap[id].points.reduce((m, p) => (p.date > m ? p.date : m), '')
+    const recentIds = exerciseOptions
+      .map((e) => e.id)
+      .sort((a, b) => (lastTrained(a) < lastTrained(b) ? 1 : lastTrained(a) > lastTrained(b) ? -1 : 0))
+      .slice(0, 5)
 
     // Sessions come back newest-first (needed elsewhere), but a progress
     // line chart only makes sense read oldest-to-newest, left to right.
     // Without this, the most recent point would plot on the left and the
     // oldest on the right — backwards.
     for (const key of Object.keys(progMap)) {
-      progMap[key].points.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+      const pts = progMap[key].points
+      pts.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+      // One point per day: two workouts on the same date keep the best one.
+      // Cardio points are whole-workout numbers, so they're left as they are.
+      if (progMap[key].category === 'cardio') continue
+      const bw = progMap[key].bodyweight
+      const merged = []
+      for (const p of pts) {
+        const last = merged[merged.length - 1]
+        if (!last || last.date !== p.date) {
+          merged.push({ ...p })
+          continue
+        }
+        if (bw ? p.reps > last.reps : p.weight > last.weight || (p.weight === last.weight && p.reps > last.reps)) {
+          last.weight = p.weight
+          last.reps = p.reps
+        }
+        if (p.e1rm != null && (last.e1rm == null || p.e1rm > last.e1rm)) last.e1rm = p.e1rm
+        last.volume = Math.max(last.volume, p.volume)
+      }
+      progMap[key].points = merged
     }
 
-    return { records, exerciseOptions, progressByExercise: progMap }
+    return { records, exerciseOptions, recentIds, progressByExercise: progMap }
   }, [gymSessions, exercises, lang])
 
   // If two exercises share a name (possible now that tracking method can
@@ -239,7 +285,15 @@ export default function Stats() {
   const recordLabels = useMemo(() => disambiguateLabels(records, (r) => r.name, t), [records, t])
   const exerciseOptionLabels = useMemo(() => disambiguateLabels(exerciseOptions, (e) => e.name, t), [exerciseOptions, t])
 
+  // The picked exercise, else the one in the link, else the one trained last.
+  const exerciseId = pickedId ?? (progressByExercise[linkedId] ? linkedId : recentIds[0] || '')
   const selectedProgress = exerciseId ? progressByExercise[exerciseId] : null
+  const pickerOptions = useMemo(() => {
+    const labelOf = new Map(exerciseOptions.map((e, i) => [e.id, exerciseOptionLabels[i]]))
+    // Recent first, then everything else alphabetically.
+    const ids = [...recentIds, ...exerciseOptions.map((e) => e.id).filter((id) => !recentIds.includes(id))]
+    return ids.map((id) => ({ id, label: labelOf.get(id) }))
+  }, [exerciseOptions, exerciseOptionLabels, recentIds])
 
   // Cardio chart: time is always there; the others only when logged.
   const isCardioSel = selectedProgress?.category === 'cardio'
@@ -255,6 +309,26 @@ export default function Stats() {
     pace: t('stats.metricPace'),
     effort: selectedProgress?.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe'),
   }
+  // Weighted lifts: top weight, estimated 1RM or volume. Bodyweight, timed
+  // and cardio keep their single line.
+  const isLiftSel = !!selectedProgress && !isCardioSel && !selectedProgress.bodyweight && !selectedProgress.timed
+  const liftMetrics = isLiftSel
+    ? ['weight', 'e1rm', 'volume'].filter((k) => k === 'weight' || selectedProgress.points.some((p) => p[k] != null && p[k] > 0))
+    : []
+  const lift = liftMetrics.includes(liftMetric) ? liftMetric : 'weight'
+  const liftLabel = { weight: t('stats.metricTopWeight'), e1rm: t('stats.metricE1rm'), volume: t('stats.metricVolume') }
+  const dataKey = isCardioSel ? metric : selectedProgress?.bodyweight ? 'reps' : isLiftSel ? lift : 'weight'
+  // Pad the y-axis by ~8% of the data's own range, so a 2.5 kg change
+  // reads as a change and a flat line isn't pinned to the edge.
+  const paddedDomain = useMemo(() => {
+    if (!selectedProgress) return ['auto', 'auto']
+    const vals = selectedProgress.points.map((p) => p[dataKey]).filter((v) => v != null && isFinite(v))
+    if (vals.length === 0) return ['auto', 'auto']
+    const lo = Math.min(...vals)
+    const hi = Math.max(...vals)
+    const pad = hi > lo ? (hi - lo) * 0.08 : Math.max(hi * 0.05, 1)
+    return [Math.max(0, Math.floor(lo - pad)), Math.ceil(hi + pad)]
+  }, [selectedProgress, dataKey])
   const loadFailed = !!loadError && rawSessions.length === 0
   const hasData = !loading && sessions.length > 0
 
@@ -351,8 +425,8 @@ export default function Stats() {
             <Field label={t('stats.exercise')}>
               <ExerciseSelect
                 value={exerciseId}
-                onChange={setExerciseId}
-                options={exerciseOptions.map((e, i) => ({ id: e.id, label: exerciseOptionLabels[i] }))}
+                onChange={setPickedId}
+                options={pickerOptions}
                 placeholder={t('stats.chooseExercise')}
                 className="w-full sm:w-72"
               />
@@ -369,6 +443,22 @@ export default function Stats() {
                     className={`min-h-[44px] px-4 rounded-full text-sm font-medium transition-colors duration-200 ${metric === k ? 'bg-[#2A2A2E] text-chalk' : 'bg-surface2 text-chalkdim'}`}
                   >
                     {metricLabel[k]}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {liftMetrics.length > 1 && (
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('stats.chartShows')}>
+                {liftMetrics.map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setLiftMetric(k)}
+                    aria-pressed={lift === k}
+                    className={`min-h-[44px] px-4 rounded-full text-sm font-medium transition-colors duration-200 ${lift === k ? 'bg-[#2A2A2E] text-chalk' : 'bg-surface2 text-chalkdim'}`}
+                  >
+                    {liftLabel[k]}
                   </button>
                 ))}
               </div>
@@ -394,13 +484,13 @@ export default function Stats() {
                               : [0, 'auto']
                           : selectedProgress.bodyweight
                             ? [0, 'dataMax + 5']
-                            : ['dataMin - 5', 'dataMax + 5']
+                            : paddedDomain
                       }
                     />
                     <Tooltip
                       {...TOOLTIP}
                       cursor={{ stroke: GRID }}
-                      formatter={(value) => {
+                      formatter={(value, _name, item) => {
                         if (isCardioSel) {
                           if (metric === 'distance') return [`${formatDistance(value)} ${distUnit}`, metricLabel.distance]
                           if (metric === 'speed') return [`${formatSpeed(value)} ${distUnit === 'mi' ? 'mph' : 'km/h'}`, metricLabel.speed]
@@ -408,15 +498,18 @@ export default function Stats() {
                           if (metric === 'effort') return [Math.round(value * 10) / 10, metricLabel.effort]
                           return [`${formatDistance(value)} min`, t('stats.duration')]
                         }
-                        if (selectedProgress.timed) return [formatSeconds(value), t('stats.longestHold')]
+                        if (selectedProgress.timed) return [formatSeconds(value, t('dashboard.secShort')), t('stats.longestHold')]
                         if (selectedProgress.bodyweight) return [`${value} reps`, t('stats.topSet')]
-                        return [`${value}${selectedProgress.unit}`, t('stats.topSet')]
+                        if (lift === 'e1rm') return [`${value}${selectedProgress.unit}`, t('stats.e1rmLabel')]
+                        if (lift === 'volume') return [`${value.toLocaleString(dateLocale(lang))}${selectedProgress.unit}`, t('stats.volumeLabel')]
+                        // Top weight: also say how many reps it was done for.
+                        return [`${value}${selectedProgress.unit} × ${item?.payload?.reps}`, t('stats.topSet')]
                       }}
                     />
                     <Line
                       type="monotone"
                       connectNulls
-                      dataKey={isCardioSel ? metric : selectedProgress.bodyweight ? 'reps' : 'weight'}
+                      dataKey={dataKey}
                       stroke={COLORS.chalkdim}
                       strokeWidth={2}
                       dot={(p) =>
@@ -434,6 +527,7 @@ export default function Stats() {
             ) : (
               <p className="text-chalkdim text-sm">{t('stats.pickToSee')}</p>
             )}
+            {isLiftSel && lift === 'e1rm' && <p className="text-chalkdim text-xs">{t('stats.e1rmNote')}</p>}
             {selectedProgress?.category === 'cardio' && (
               <p className="text-chalkdim text-xs">{t('stats.cardioTrackingNote')}</p>
             )}
@@ -465,7 +559,7 @@ export default function Stats() {
                             r.distance != null ? ` · ${r.distance}${r.unit}` : ''
                           }`
                         : r.timed
-                          ? `${r.weight > 0 ? `+${r.weight}${r.unit} · ` : ''}${formatSeconds(r.reps)}`
+                          ? `${r.weight > 0 ? `+${r.weight}${r.unit} · ` : ''}${formatSeconds(r.reps, t('dashboard.secShort'))}`
                           : r.bodyweight
                             ? `${r.weight > 0 ? `+${r.weight}${r.unit} ` : ''}${t('sessionCard.bwShort')} × ${r.reps}`
                             : `${r.weight}${r.unit} × ${r.reps}`}
