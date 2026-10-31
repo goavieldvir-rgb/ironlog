@@ -6,12 +6,14 @@ import { terms } from '../legal/terms.js'
 import { Card } from './ui.jsx'
 
 // The notice itself, shared with the consent screen.
-export function PrivacySections({ doc }) {
+// `level` is the heading level of each section: one below the heading above it.
+export function PrivacySections({ doc, level = 2 }) {
+  const H = `h${level}`
   return (
     <div className="flex flex-col gap-4">
       {doc.sections.map((s) => (
         <div key={s.heading}>
-          <h2 className="text-base mb-1">{s.heading}</h2>
+          <H className="text-base mb-1">{s.heading}</H>
           <p className="text-chalkdim text-sm leading-relaxed whitespace-pre-line">{s.body}</p>
         </div>
       ))}
@@ -45,7 +47,7 @@ export default function Privacy({ standalone = false }) {
       </div>
 
       <Card>
-        <PrivacySections doc={termsDoc} />
+        <PrivacySections doc={termsDoc} level={3} />
       </Card>
 
       <div>
@@ -54,7 +56,7 @@ export default function Privacy({ standalone = false }) {
       </div>
 
       <Card>
-        <PrivacySections doc={minorDoc} />
+        <PrivacySections doc={minorDoc} level={4} />
       </Card>
     </div>
   )
@@ -64,7 +66,7 @@ export default function Privacy({ standalone = false }) {
   return (
     <div className="min-h-dvh bg-ink px-4 pb-8 flex justify-center" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2rem)' }}>
       <div className="w-full max-w-2xl flex flex-col gap-4">
-        <Link to="/" className="text-chalkdim text-xs hover:text-chalk w-fit">
+        <Link to="/" className="text-chalkdim text-xs hover:text-chalk w-fit inline-flex items-center min-h-[44px]">
           {t('privacy.back')}
         </Link>
         {page}

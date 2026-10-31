@@ -6,6 +6,41 @@ import { clearRestNotification, isIOS, setRestPush, showRestNotification, swRegi
 
 const PRESETS = [60, 90, 120, 180]
 const DEFAULT_REST = 90
+const KEY_SECONDS = 'ironlog:restSeconds'
+const KEY_ENDS = 'ironlog:restEndsAt'
+const KEY_AUTO = 'ironlog:restAuto'
+
+// localStorage can throw (private mode, blocked data) — the timer must still work.
+function store(key, value) {
+  try {
+    if (value == null) localStorage.removeItem(key)
+    else localStorage.setItem(key, String(value))
+  } catch {
+    // not persisted; fine.
+  }
+}
+function load(key) {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+// Called when a workout is saved or discarded, so its rest doesn't carry
+// over into the next workout opened within the same minute or two.
+export function clearSavedRest() {
+  store(KEY_ENDS, null)
+}
+
+function savedSeconds() {
+  const n = Number(load(KEY_SECONDS))
+  return Number.isFinite(n) && n >= 5 && n <= 3600 ? Math.round(n) : DEFAULT_REST
+}
+// A rest running when the page was reloaded: restored only if it hasn't ended.
+function savedEnd() {
+  const n = Number(load(KEY_ENDS))
+  return Number.isFinite(n) && n > Date.now() ? n : null
+}
 
 function beep() {
   try {
@@ -47,13 +82,18 @@ function clockText(seconds) {
 const RestTimer = forwardRef(function RestTimer(_props, ref) {
   const { t, lang } = useLanguage()
   const [notifyOn, setNotifyOn] = useState(canNotify && Notification.permission === 'granted')
-  const [secondsLeft, setSecondsLeft] = useState(DEFAULT_REST)
-  const [lastDuration, setLastDuration] = useState(DEFAULT_REST)
-  const [running, setRunning] = useState(false)
+  const [restoredEnd] = useState(savedEnd)
+  const [secondsLeft, setSecondsLeft] = useState(() => (restoredEnd ? Math.ceil((restoredEnd - Date.now()) / 1000) : savedSeconds()))
+  // The last chosen rest length sticks across workouts and reloads.
+  const [lastDuration, setLastDuration] = useState(savedSeconds)
+  const [running, setRunning] = useState(!!restoredEnd)
   // Whether a rest is on screen at all (running, paused or in overtime).
-  const [active, setActive] = useState(false)
+  const [active, setActive] = useState(!!restoredEnd)
   const [finished, setFinished] = useState(false)
-  const [totalDuration, setTotalDuration] = useState(DEFAULT_REST)
+  const [totalDuration, setTotalDuration] = useState(() => (restoredEnd ? Math.max(savedSeconds(), Math.ceil((restoredEnd - Date.now()) / 1000)) : savedSeconds()))
+  // Whether ticking a set starts the rest by itself. Default on.
+  const [auto, setAuto] = useState(() => load(KEY_AUTO) !== '0')
+  const autoRef = useRef(auto)
   // Presets and alerts live one tap away so the dock stays slim.
   const [expanded, setExpanded] = useState(false)
   // The actual wall-clock moment the timer should hit zero — not a ticking
@@ -62,7 +102,11 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
   // "loses" whatever time passed while you were away. Deriving remaining
   // time from a real timestamp means it's always correct the moment you
   // come back, even if not a single tick fired while you were gone.
-  const endTimeRef = useRef(null)
+  const endTimeRef = useRef(restoredEnd)
+  // Keep the end time on disk while a rest runs, so a reload can resume it.
+  function persistEnd(end) {
+    store(KEY_ENDS, end)
+  }
   // Whether this run already alerted. The timer keeps going past zero and
   // shows how long you've rested beyond the set time, so the beep must
   // fire once at zero rather than on every overtime tick.
@@ -72,7 +116,7 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
   const pushedRef = useRef(false)
   // The length the rest on screen started at, so Restart repeats it. An
   // exercise's own rest doesn't replace the remembered default.
-  const baseRef = useRef(DEFAULT_REST)
+  const baseRef = useRef(null)
 
   // Tells the server when this rest ends (or that it no longer does).
   function pushRest(end, force = false) {
@@ -175,7 +219,10 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
     // Resuming a timer paused in overtime starts a fresh rest rather than
     // "resuming" from a negative time.
     const duration = preset ?? (secondsLeft > 0 ? secondsLeft : lastDuration)
-    if (preset != null) setLastDuration(preset)
+    if (preset != null) {
+      setLastDuration(preset)
+      store(KEY_SECONDS, preset)
+    }
     // Resuming a pause keeps the length Restart goes back to.
     startFor(duration, preset == null && secondsLeft > 0)
   }
@@ -184,6 +231,7 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
   function startFor(duration, resuming = false) {
     if (!resuming) baseRef.current = duration
     endTimeRef.current = Date.now() + duration * 1000
+    persistEnd(endTimeRef.current)
     pushRest(endTimeRef.current)
     // Ready before the screen locks, when there's no time left to set it up.
     if (notifyOn) swRegistration()
@@ -196,12 +244,26 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
   }
 
   useImperativeHandle(ref, () => ({
-    // A new rest. An exercise with its own rest passes it in, and it's used
-    // for this rest only; otherwise whichever length was picked last.
-    start: (seconds) => (seconds > 0 ? startFor(seconds) : start(lastDuration)),
+    // A new rest. The page calls this when a set is ticked, so it does nothing
+    // while auto-start is off; the dock's own buttons call start() directly
+    // and always work. An exercise with its own rest passes it in, and it's
+    // used for this rest only; otherwise whichever length was picked last.
+    start: (seconds) => {
+      if (!autoRef.current) return
+      if (seconds > 0) startFor(seconds)
+      else start(lastDuration)
+    },
   }))
 
+  function toggleAuto() {
+    const next = !auto
+    autoRef.current = next
+    setAuto(next)
+    store(KEY_AUTO, next ? '1' : '0')
+  }
+
   function pause() {
+    persistEnd(null)
     setRunning(false)
     pushRest(null)
     clearRestNotification()
@@ -224,6 +286,7 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
     }
     const end = Math.max(Date.now() + 1000, (endTimeRef.current || Date.now()) + delta * 1000)
     endTimeRef.current = end
+    persistEnd(end)
     pushRest(end)
     const remaining = Math.ceil((end - Date.now()) / 1000)
     setSecondsLeft(remaining)
@@ -235,6 +298,7 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
 
   function skip() {
     endTimeRef.current = null
+    persistEnd(null)
     pushRest(null)
     clearRestNotification()
     alertedRef.current = false
@@ -316,6 +380,20 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={auto}
+            onClick={toggleAuto}
+            className="press inline-flex items-center gap-2 min-h-[44px] px-2 text-[13px] text-chalkdim"
+          >
+            <span className={`relative inline-block h-5 w-9 rounded-full transition-colors ${auto ? 'bg-accent' : 'bg-white/15'}`}>
+              <span
+                className={`absolute top-0.5 start-0.5 h-4 w-4 rounded-full bg-chalk transition-transform ${auto ? 'ltr:translate-x-4 rtl:-translate-x-4' : ''}`}
+              />
+            </span>
+            {t('restTimer.autoStart')}
+          </button>
           <div className="flex items-center gap-0.5 ms-auto">
             <InfoTip text={t('restTimer.tip')} />
             {canNotify && (

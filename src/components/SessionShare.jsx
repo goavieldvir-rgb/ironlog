@@ -4,6 +4,7 @@ import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useCollection } from '../lib/db.js'
+import { LoadError } from './ui.jsx'
 import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
 import { useGyms, sessionGymId } from '../lib/gyms.js'
 import { applyCurrentTimed } from '../lib/timed.js'
@@ -27,7 +28,7 @@ export default function SessionShare() {
   const { t, lang } = useLanguage()
   const { id } = useParams()
   const navigate = useNavigate()
-  const [rawSessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const [rawSessions, loading, refresh, loadError] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [exercises, exercisesLoading] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const sessions = useMemo(() => applyCurrentTimed(rawSessions, exercises), [rawSessions, exercises])
   const { gyms, enabled: gymsOn, loading: gymsLoading } = useGyms(effectiveUid)
@@ -65,6 +66,7 @@ export default function SessionShare() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, sessions, exercises, gyms, gymsOn, loading, exercisesLoading, gymsLoading, lang])
 
+  if (!loading && !session && loadError) return <LoadError onRetry={refresh} />
   if (!loading && !session) return <p className="text-chalkdim">{t('sessionDetail.notFound')}</p>
   if (!session || summary === null) return null
 

@@ -1,12 +1,14 @@
 import ExerciseVideo from './ExerciseVideo.jsx'
 import React, { useEffect, useRef, useState } from 'react'
-import { X, Plus, Trash2, Minus, CornerDownLeft, StickyNote, Repeat, ArrowUp, ArrowDown, Trophy, Link2, Check, Flame } from 'lucide-react'
+import { X, Plus, Trash2, Minus, CornerDownLeft, StickyNote, Repeat, ArrowUp, ArrowDown, Trophy, Link2, Check, Flame, ChevronDown, Play, Square } from 'lucide-react'
 import { Badge } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import OverflowMenu from './OverflowMenu.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useFeedback } from '../context/FeedbackContext.jsx'
 import { fmtDate } from '../lib/dates.js'
 import { isWarmup, workingSets, suggestWarmups } from '../lib/warmup.js'
+import { platesPerSide, isBarbellLift } from '../lib/plates.js'
 import { formatSeconds } from '../lib/timed.js'
 import { formatRest } from '../lib/rest.js'
 import { entryPrKind } from '../lib/records.js'
@@ -16,7 +18,7 @@ import { entryName } from '../lib/names.js'
 
 const hasVal = (v) => v !== '' && v != null
 
-function Stepper({ value, onChange, step, min = 0, max, label, placeholder, done }) {
+function Stepper({ value, onChange, step, min = 0, max, label, placeholder, done, onFocusCell, onBlurCell, adorn, readOnly }) {
   const holdRef = useRef(null)
   const justFocused = useRef(false)
 
@@ -26,6 +28,7 @@ function Stepper({ value, onChange, step, min = 0, max, label, placeholder, done
   // placement both land after focus and collapse the selection, so it is
   // selected again on the next tick and that first mouseup is cancelled.
   function selectAll(e) {
+    onFocusCell?.()
     const el = e.target
     justFocused.current = true
     el.select()
@@ -97,6 +100,7 @@ function Stepper({ value, onChange, step, min = 0, max, label, placeholder, done
       <button type="button" {...holdProps(-step)} aria-label={label ? `${label} −${step}` : undefined} className={`${btn} rounded-s-[10px]`}>
         <Minus size={13} />
       </button>
+      <div className="relative flex-1 min-w-0 flex">
       <input
         type="number"
         inputMode="decimal"
@@ -107,12 +111,20 @@ function Stepper({ value, onChange, step, min = 0, max, label, placeholder, done
         onFocus={selectAll}
         onMouseUp={keepSelection}
         onKeyDown={() => (justFocused.current = false)}
-        onBlur={() => (justFocused.current = false)}
+        onBlur={() => {
+          justFocused.current = false
+          onBlurCell?.()
+        }}
+        readOnly={readOnly}
         aria-label={label}
-        className={`num text-center !px-0.5 min-w-0 w-full text-[17px] font-medium placeholder:text-[#6E6E74] !rounded-[10px] min-[560px]:!rounded-none ${
-          done ? '!bg-transparent' : ''
-        }`}
+        // Suggestions (placeholders) are lighter than typed values so a
+        // number that is only a suggestion never reads as logged.
+        className={`num text-center !px-0.5 min-w-0 w-full text-[17px] font-medium placeholder:text-[#8E8E94] placeholder:font-normal !rounded-[10px] min-[560px]:!rounded-none ${
+          adorn ? '!pe-6' : ''
+        } ${done ? '!bg-transparent' : ''}`}
       />
+      {adorn}
+      </div>
       <button type="button" {...holdProps(step)} aria-label={label ? `${label} +${step}` : undefined} className={`${btn} rounded-e-[10px]`}>
         <Plus size={13} />
       </button>
@@ -157,11 +169,28 @@ export default function SessionEntryCard({
   previousFrom = null,
 }) {
   const { t, lang } = useLanguage()
+  const { toast } = useFeedback()
+  const sectionRef = useRef(null)
   // Follow the current language (switching mid-workout updates the name).
   const displayName = liveExercise ? (lang === 'he' && liveExercise.name_he) || liveExercise.name : entryName(entry, {}, lang)
   const [showNote, setShowNote] = useState(!!entry.notes)
   // Indexes of the sets that numbers were just filled into, so they can flash.
   const [justFilled, setJustFilled] = useState([])
+  // Set whose weight box has the cursor: it gets the +/- chips and plate line.
+  const [focusSet, setFocusSet] = useState(null)
+  // Running hold stopwatch for a timed set: { idx, start } in wall-clock ms,
+  // so it keeps counting through re-renders and a backgrounded tab.
+  const [hold, setHold] = useState(null)
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    if (!hold) return
+    const id = setInterval(() => setTick((n) => n + 1), 250)
+    return () => clearInterval(id)
+  }, [hold])
+  // The clock is tied to a set by position, so adding or removing a set
+  // mid-hold stops it rather than writing the seconds into the wrong row.
+  const setCount = (entry.sets || []).length
+  useEffect(() => { setHold(null) }, [setCount])
   const isCardio = entry.category === 'cardio'
   // Timed holds (plank, wall sit) are bodyweight-style sets whose "reps"
   // field holds seconds, so everything else about them carries over.
@@ -251,6 +280,20 @@ export default function SessionEntryCard({
   function addWarmups() {
     onAddWarmups(warmupSuggestion.map((w) => ({ weight: String(w.weight), reps: String(w.reps), rir: '', warmup: true })))
   }
+  const canPlates = !isCardio && !isTimed && !entry.bodyweight && isBarbellLift(entry.nameEn, liveExercise?.name, entry.name)
+
+  // Progression: last time every working set hit the routine's rep target, so
+  // offer last time's top weight plus one step. Needs a plain numeric target
+  // and last-time data; ranges like "8-10" give no hint.
+  const targetRepsNum = Number(entry.targetReps)
+  const firstOpenIdx = (entry.sets || []).findIndex((s) => !isWarmup(s) && !s.done)
+  const nextWeight = (() => {
+    if (isCardio || isTimed || entry.bodyweight || !(targetRepsNum > 0) || lastSets.length === 0 || firstOpenIdx < 0) return null
+    if (hasVal(entry.sets[firstOpenIdx].weight)) return null
+    if (!lastSets.every((s) => Number(s.reps) >= targetRepsNum)) return null
+    const top = Math.max(...lastSets.map((s) => Number(s.weight) || 0))
+    return top > 0 ? Math.round((top + weightStep) * 100) / 100 : null
+  })()
   const prUnit = isCardio ? t('sessionCard.minUnit') : isTimed ? 's' : entry.bodyweight ? t('sessionCard.reps') : entry.unit
 
   // A short buzz the first moment a set crosses the old best, so it lands
@@ -272,6 +315,7 @@ export default function SessionEntryCard({
       ? (Number(a.duration) || 0) === (Number(b.duration) || 0) && (Number(a.intensity) || 0) === (Number(b.intensity) || 0)
       : (Number(a.weight) || 0) === (Number(b.weight) || 0) && (Number(a.reps) || 0) === (Number(b.reps) || 0)
   const hasChoice = lastSetData && topSetData && !sameSet(lastSetData, topSetData)
+  const showFillRow = hasChoice || nextWeight != null
 
   function flashFilled(idxs) {
     setJustFilled(idxs)
@@ -318,7 +362,7 @@ export default function SessionEntryCard({
     }
     if (isTimed) {
       const added = Number(data.weight) > 0 ? `+${data.weight} · ` : ''
-      return `${added}${formatSeconds(data.reps)}`
+      return `${added}${formatSeconds(data.reps, t('dashboard.secShort'))}`
     }
     if (entry.bodyweight) return Number(data.weight) > 0 ? `+${data.weight} × ${data.reps}` : `${data.reps}`
     return `${data.weight} × ${data.reps}`
@@ -368,7 +412,23 @@ export default function SessionEntryCard({
     return hasVal(fallback) ? String(fallback) : ''
   }
 
+  const holdSecs = () => (hold ? Math.max(0, Math.floor((Date.now() - hold.start) / 1000)) : 0)
+  function toggleHold(j) {
+    if (hold && hold.idx === j) {
+      onUpdateSet(j, { reps: String(holdSecs()) })
+      setHold(null)
+    } else {
+      setHold({ idx: j, start: Date.now() })
+    }
+    if (navigator.vibrate) navigator.vibrate(10)
+  }
+
   function toggleDone(j) {
+    // Ticking mid-hold just stops the clock and writes the seconds first.
+    if (hold && hold.idx === j) {
+      toggleHold(j)
+      return
+    }
     const s = entry.sets[j]
     if (s.done) {
       onUpdateSet(j, { done: false })
@@ -382,8 +442,22 @@ export default function SessionEntryCard({
     }
     const m = { ...s, ...patch }
     const complete = isCardio ? hasVal(m.duration) : hasVal(m.reps) && (entry.bodyweight || hasVal(m.weight))
-    // A set with nothing in it can't be ticked off.
-    if (!complete) return
+    // A set with nothing in it can't be ticked off. Say why, and put the
+    // cursor in the first box that still needs a number.
+    if (!complete) {
+      const missing = fieldDefs.findIndex(([key]) => {
+        if (key === 'rir') return false
+        if (key === 'weight' && entry.bodyweight) return false
+        return !hasVal(m[key])
+      })
+      const row = sectionRef.current?.querySelector(`[data-set-row="${j}"]`)
+      row?.querySelectorAll('input[type="number"]')[Math.max(missing, 0)]?.focus()
+      toast(
+        t(isCardio ? 'sessionCard.enterDuration' : entry.bodyweight ? (isTimed ? 'sessionCard.enterSeconds' : 'sessionCard.enterReps') : isTimed ? 'sessionCard.enterWeightSeconds' : 'sessionCard.enterWeightReps'),
+        'info',
+      )
+      return
+    }
     onUpdateSet(j, patch)
     if (navigator.vibrate) navigator.vibrate(10)
     onSetDone?.(j)
@@ -393,10 +467,16 @@ export default function SessionEntryCard({
     <OverflowMenu
       label={`${t('sessionCard.moreSetActions')} ${setLabels[j]}`}
       align="start"
-      triggerClassName={`press num text-[15px] font-medium min-h-[44px] w-7 inline-flex items-center justify-center rounded-[10px] hover:text-chalk ${
-        isWarmup(entry.sets[j]) ? 'text-[#7C7C82]' : 'text-chalkdim'
+      triggerClassName={`hit press num text-[15px] leading-none font-medium min-h-[44px] w-7 inline-flex flex-col items-center justify-center gap-0.5 rounded-[10px] hover:text-chalk ${
+        isWarmup(entry.sets[j]) ? 'text-[#8E8E94]' : 'text-chalkdim'
       }`}
-      trigger={setLabels[j]}
+      trigger={
+        <>
+          {setLabels[j]}
+          {/* Tiny chevron so the number reads as a menu, not a label. */}
+          <ChevronDown size={9} strokeWidth={3} className="opacity-60" aria-hidden="true" />
+        </>
+      }
       items={[
         {
           key: 'warmup',
@@ -420,7 +500,7 @@ export default function SessionEntryCard({
   const prevCell = (j) => {
     const s = entry.sets[j]
     const data = previousFor(j)
-    if (!data) return <span className="text-[14px] text-[#7C7C82]">—</span>
+    if (!data) return <span className="text-[14px] text-chalkdim">—</span>
     const text = numbersText(data)
     return (
       <button
@@ -428,7 +508,7 @@ export default function SessionEntryCard({
         disabled={!!s.done}
         onClick={() => usePrevious(j, data)}
         aria-label={`${t('sessionCard.copyPrevious')} ${text}`}
-        className="num h-11 min-w-0 w-full text-start text-[14px] text-[#7C7C82] active:text-chalk disabled:pointer-events-none transition-colors duration-150 whitespace-nowrap overflow-hidden text-ellipsis"
+        className="num h-11 min-w-0 w-full text-start text-[14px] text-chalkdim active:text-chalk disabled:pointer-events-none transition-colors duration-150 whitespace-nowrap overflow-hidden text-ellipsis"
       >
         <bdi dir="ltr">{text}</bdi>
       </button>
@@ -437,13 +517,14 @@ export default function SessionEntryCard({
 
   const doneBtn = (j) => {
     const done = !!entry.sets[j].done
+    const doneLabel = t('sessionCard.markSetDone', { n: setLabels[j], name: displayName })
     return (
       <button
         type="button"
         onClick={() => toggleDone(j)}
         aria-pressed={done}
-        aria-label={t('sessionCard.markDone')}
-        className={`press justify-self-center w-10 h-10 rounded-[11px] border-[1.5px] flex items-center justify-center transition-[background-color,border-color] duration-150 ${
+        aria-label={doneLabel}
+        className={`press justify-self-center w-11 h-11 rounded-[11px] border-[1.5px] flex items-center justify-center transition-[background-color,border-color] duration-150 ${
           done ? 'bg-accent border-transparent' : 'border-[#3A3A40]'
         }`}
       >
@@ -452,8 +533,13 @@ export default function SessionEntryCard({
     )
   }
 
-  const headLabel = 'text-[12px] leading-4 text-[#7C7C82]'
-  const cols = isCardio || showRir
+  const headLabel = 'text-[12px] leading-4 text-chalkdim'
+  // Timed sets give the seconds box the room, since it also holds the clock button.
+  const cols = isTimed
+    ? showRir
+      ? 'grid-cols-[28px_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.3fr)_minmax(0,0.7fr)_44px]'
+      : 'grid-cols-[28px_minmax(0,1.1fr)_minmax(0,0.8fr)_minmax(0,1.3fr)_44px]'
+    : isCardio || showRir
     ? 'grid-cols-[28px_minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_44px]'
     : 'grid-cols-[28px_minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)_44px]'
   const rowBase = `grid gap-1.5 items-center min-h-[52px] ${cols}`
@@ -464,7 +550,7 @@ export default function SessionEntryCard({
   )
 
   return (
-    <section className={`relative bg-surface rounded-[22px] pt-[18px] px-3.5 pb-1.5 flex flex-col gap-3 ${supersetClass}`}>
+    <section ref={sectionRef} className={`relative bg-surface rounded-[22px] pt-[18px] px-3.5 pb-1.5 flex flex-col gap-3 ${supersetClass}`}>
       {linkNext && <span className="absolute -start-[3px] top-full w-[3px] h-3 bg-chalkdim/50" aria-hidden="true" />}
       <div className="flex items-start justify-between gap-2 -mt-2.5 -me-2.5">
         <div className="min-w-0 flex-1 pt-1.5 px-0.5 flex flex-col gap-1.5">
@@ -573,10 +659,27 @@ export default function SessionEntryCard({
         />
       </div>
 
-      {hasChoice && (
+      {showFillRow && (
         <div className="flex flex-wrap items-center gap-2 px-0.5">
-          <span className="hidden min-[560px]:inline text-[13px] text-[#7C7C82]">{t('sessionCard.fillFrom')}</span>
-          {[
+          {hasChoice && <span className="hidden min-[560px]:inline text-[13px] text-chalkdim">{t('sessionCard.fillFrom')}</span>}
+          {nextWeight != null && (
+            <button
+              type="button"
+              onClick={() => {
+                onUpdateSet(firstOpenIdx, { weight: String(nextWeight) })
+                flashFilled([firstOpenIdx])
+              }}
+              title={t('sessionCard.tryHeavierTitle', { weight: `${nextWeight} ${entry.unit}` })}
+              className="press inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-accentsoft text-accent text-[13px] font-semibold num"
+            >
+              <ArrowUp size={13} />
+              {t('sessionCard.tryHeavier')}{' '}
+              <bdi dir="ltr">
+                +{weightStep} {entry.unit}
+              </bdi>
+            </button>
+          )}
+          {hasChoice && [
             ['sessionCard.lastSetChip', lastSetData],
             ['sessionCard.topSetChip', topSetData],
           ].map(([key, data]) => (
@@ -624,9 +727,26 @@ export default function SessionEntryCard({
         {entry.sets.map((s, j) => {
           const done = !!s.done
           const stepFor = (key) => (key === 'weight' ? weightStep : key === 'reps' ? (isTimed ? 5 : 1) : key === 'distance' ? 0.1 : 1)
+          const running = hold?.idx === j
           const cell = (key, label, opts = {}) => (
             <Stepper
-              value={s[key]}
+              value={running && key === 'reps' ? String(holdSecs()) : s[key]}
+              readOnly={running && key === 'reps'}
+              adorn={
+                isTimed && key === 'reps' && !done ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleHold(j)}
+                    aria-pressed={running}
+                    aria-label={t(running ? 'sessionCard.holdStop' : 'sessionCard.holdStart')}
+                    className={`hit press absolute end-0 inset-y-0 w-6 flex items-center justify-center rounded-[8px] ${running ? 'text-accent' : 'text-chalkdim'}`}
+                  >
+                    {running ? <Square size={13} fill="currentColor" /> : <Play size={13} fill="currentColor" />}
+                  </button>
+                ) : null
+              }
+              onFocusCell={key === 'weight' ? () => setFocusSet(j) : undefined}
+              onBlurCell={key === 'weight' ? () => setFocusSet((cur) => (cur === j ? null : cur)) : undefined}
               step={opts.step ?? stepFor(key)}
               min={opts.min}
               max={opts.max}
@@ -636,12 +756,19 @@ export default function SessionEntryCard({
               label={`${t('sessionCard.set')} ${setLabels[j]} ${label}`}
             />
           )
+          const wNow = Number(hasVal(s.weight) ? s.weight : placeholderFor(j, 'weight', lastWeight)) || 0
+          const plan = canPlates && focusSet === j ? platesPerSide(wNow, entry.unit) : null
+          const showStrip = focusSet === j && !isCardio && !entry.bodyweight && !done
+          const chip =
+            'press inline-flex items-center justify-center h-11 min-w-[64px] px-3 rounded-full bg-surface2 text-chalk text-[14px] font-medium num select-none'
+          const bumpW = (d) => onUpdateSet(j, { weight: String(Math.max(0, Math.round((wNow + d) * 100) / 100)) })
+          // Warm-ups are muted cell by cell, not on the whole row: opacity
+          // on the row also faded the set menu inside it and trapped it
+          // under the next rows, so its items couldn't be tapped.
           return (
-            // Warm-ups are muted cell by cell, not on the whole row: opacity
-            // on the row also faded the set menu inside it and trapped it
-            // under the next rows, so its items couldn't be tapped.
+            <React.Fragment key={j}>
             <div
-              key={j}
+              data-set-row={j}
               className={`${rowBase} ${justFilled.includes(j) ? 'flash-fill' : ''} ${isWarmup(s) ? '[&>*:not(:first-child):not(:last-child)]:opacity-70' : ''}`}
             >
               {setMenu(j)}
@@ -661,6 +788,34 @@ export default function SessionEntryCard({
               )}
               {doneBtn(j)}
             </div>
+            {/* Phone-friendly weight bumps and the plate readout, only under
+                the set whose weight box has the cursor so rows stay compact.
+                Pressing a chip must not steal focus from the box, or the
+                strip would vanish before the tap lands. */}
+            {showStrip && (
+              <div
+                className="flex flex-wrap items-center gap-2 pb-1.5 ps-[34px]"
+                onMouseDown={(e) => e.preventDefault()}
+                onPointerDown={(e) => e.preventDefault()}
+              >
+                <button type="button" onClick={() => bumpW(-weightStep)} aria-label={`${t('sessionCard.wt')} −${weightStep}`} className={`${chip} min-[560px]:hidden`}>
+                  <bdi dir="ltr">−{weightStep}</bdi>
+                </button>
+                <button type="button" onClick={() => bumpW(weightStep)} aria-label={`${t('sessionCard.wt')} +${weightStep}`} className={`${chip} min-[560px]:hidden`}>
+                  <bdi dir="ltr">+{weightStep}</bdi>
+                </button>
+                {plan && (
+                  <span className="num text-[13px] text-chalkdim" aria-live="polite">
+                    {t('sessionCard.plateEach')}{' '}
+                    <bdi dir="ltr" className="text-chalk">
+                      {plan.plates.length ? plan.plates.join(' + ') : '—'}
+                      {plan.rest > 0 ? ' *' : ''}
+                    </bdi>
+                  </span>
+                )}
+              </div>
+            )}
+            </React.Fragment>
           )
         })}
       </div>

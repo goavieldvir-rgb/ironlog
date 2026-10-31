@@ -1,15 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Camera, Download, Lock, Trash2 } from 'lucide-react'
+import { Camera, Lock } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
 import {
   ANGLES,
-  LINK_REFRESH_MS,
   fetchPhotoStatus,
   listPhotos,
-  photoUrls,
   addPhoto,
   deletePhoto,
   downloadPhoto,
@@ -19,8 +17,12 @@ import {
 import { photosConsent } from '../legal/photos.js'
 import { Button, Field } from './ui.jsx'
 import PhotoCompare from './PhotoCompare.jsx'
+import PhotoViewer, { PhotoThumb } from './PhotoViewer.jsx'
 
 const PREVIEW_COUNT = 9
+
+const newestFirst = (a, b) =>
+  a.taken_on !== b.taken_on ? (a.taken_on < b.taken_on ? 1 : -1) : a.created_at < b.created_at ? 1 : -1
 
 function shortDate(lang, iso) {
   return fmtDate(lang, new Date(iso + 'T00:00:00'), { month: 'short', day: 'numeric', year: 'numeric' })
@@ -38,7 +40,9 @@ export default function ProgressPhotos({ uid, mode = 'own' }) {
   const { confirm, toast } = useFeedback()
   const [status, setStatus] = useState(null)
   const [photos, setPhotos] = useState([])
-  const [urls, setUrls] = useState({})
+  // Photos still being prepared and sent: { key, taken_on, angle, preview }.
+  const [pending, setPending] = useState([])
+  const [viewing, setViewing] = useState(null)
   const [failed, setFailed] = useState(false)
   const [showConsent, setShowConsent] = useState(false)
   const [busy, setBusy] = useState(null)
@@ -54,11 +58,9 @@ export default function ProgressPhotos({ uid, mode = 'own' }) {
     try {
       const st = await fetchPhotoStatus(uid)
       const list = st.minor ? [] : await listPhotos(uid)
-      const signed = await photoUrls(list.map((p) => p.path))
       if (id !== loadId.current) return
       setStatus(st)
       setPhotos(list)
-      setUrls(signed)
       setFailed(false)
     } catch (e) {
       console.error(e)
@@ -69,7 +71,7 @@ export default function ProgressPhotos({ uid, mode = 'own' }) {
   useEffect(() => {
     setStatus(null)
     setPhotos([])
-    setUrls({})
+    setViewing(null)
     setFailed(false)
     setShowConsent(false)
     setShowAll(false)
@@ -78,20 +80,6 @@ export default function ProgressPhotos({ uid, mode = 'own' }) {
       loadId.current++
     }
   }, [load])
-
-  // The image links expire, so a page left open (or a phone coming back
-  // from the background) gets fresh ones.
-  useEffect(() => {
-    if (!photos.length) return
-    const refresh = () => photoUrls(photos.map((p) => p.path)).then(setUrls).catch((e) => console.error(e))
-    const timer = setInterval(refresh, LINK_REFRESH_MS)
-    const onVisible = () => document.visibilityState === 'visible' && refresh()
-    document.addEventListener('visibilitychange', onVisible)
-    return () => {
-      clearInterval(timer)
-      document.removeEventListener('visibilitychange', onVisible)
-    }
-  }, [photos])
 
   async function enable() {
     setBusy('consent')
@@ -128,20 +116,27 @@ export default function ProgressPhotos({ uid, mode = 'own' }) {
     }
   }
 
+  // The photo shows in the grid straight away and is sent in the
+  // background, so the page never waits; several can be added in a row.
   async function onPick(e) {
-    const file = e.target.files?.[0]
+    const files = [...(e.target.files || [])]
     e.target.value = ''
-    if (!file) return
-    setBusy('upload')
-    try {
-      await addPhoto(uid, file, form.date, form.angle)
-      await load()
-      toast(t('photos.added'))
-    } catch (err) {
-      console.error(err)
-      toast(t(err?.message === 'IMAGE_DECODE_FAILED' ? 'photos.unsupported' : 'photos.addFailed'), 'error')
-    } finally {
-      setBusy(null)
+    const { date, angle } = form
+    for (const file of files) {
+      const key = crypto.randomUUID()
+      const preview = URL.createObjectURL(file)
+      setPending((list) => [{ key, taken_on: date, angle, preview }, ...list])
+      try {
+        const row = await addPhoto(uid, file, date, angle)
+        setPhotos((list) => [row, ...list].sort(newestFirst))
+        toast(t('photos.added'))
+      } catch (err) {
+        console.error(err)
+        toast(t(err?.message === 'IMAGE_DECODE_FAILED' ? 'photos.unsupported' : 'photos.addFailed'), 'error')
+      } finally {
+        setPending((list) => list.filter((x) => x.key !== key))
+        URL.revokeObjectURL(preview)
+      }
     }
   }
 
@@ -158,7 +153,11 @@ export default function ProgressPhotos({ uid, mode = 'own' }) {
     if (!(await confirm({ title: t('photos.deleteConfirm'), confirmLabel: t('common.delete'), danger: true }))) return
     try {
       await deletePhoto(p)
-      setPhotos((list) => list.filter((x) => x.id !== p.id))
+      setPhotos((list) => {
+        const next = list.filter((x) => x.id !== p.id)
+        setViewing((v) => (v == null ? v : next.length ? Math.min(v, next.length - 1) : null))
+        return next
+      })
       toast(t('feedback.deleted'))
     } catch (e) {
       console.error(e)
@@ -215,7 +214,7 @@ export default function ProgressPhotos({ uid, mode = 'own' }) {
   return (
     <div className="flex flex-col gap-4">
       {photos.length > 0 ? (
-        <PhotoCompare photos={photos} urls={urls} />
+        <PhotoCompare photos={photos} />
       ) : (
         <p className="text-sm text-chalkdim">{own ? t('photos.emptyOwn') : t('photos.coachEmpty')}</p>
       )}
@@ -225,51 +224,57 @@ export default function ProgressPhotos({ uid, mode = 'own' }) {
           <Field label={t('photos.date')}>
             <input type="date" value={form.date} max={toLocalISODate()} onChange={(e) => setForm({ ...form, date: e.target.value })} />
           </Field>
-          <Field label={t('photos.angleLabel')}>
-            <select value={form.angle} onChange={(e) => setForm({ ...form, angle: e.target.value })}>
+          <div role="radiogroup" aria-label={t('photos.angleLabel')} className="flex flex-col gap-1">
+            <span className="text-xs text-chalkdim">{t('photos.angleLabel')}</span>
+            <div className="flex gap-1 bg-surface2 rounded-[12px] p-1">
               {ANGLES.map((a) => (
-                <option key={a} value={a}>{t(`photos.angle.${a}`)}</option>
+                <button
+                  key={a}
+                  type="button"
+                  role="radio"
+                  aria-checked={form.angle === a}
+                  onClick={() => setForm({ ...form, angle: a })}
+                  className={`px-3 min-h-9 rounded-[9px] text-sm ${form.angle === a ? 'bg-surface text-chalk' : 'text-chalkdim'}`}
+                >
+                  {t(`photos.angle.${a}`)}
+                </button>
               ))}
-            </select>
-          </Field>
-          <Button onClick={() => fileRef.current?.click()} disabled={busy === 'upload' || !form.date}>
-            <Camera size={16} /> {busy === 'upload' ? t('photos.uploading') : t('photos.add')}
+            </div>
+          </div>
+          <Button onClick={() => fileRef.current?.click()} disabled={!form.date}>
+            <Camera size={16} /> {t('photos.add')}
           </Button>
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPick} />
+          <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onPick} />
         </div>
       )}
 
-      {photos.length > 0 && (
+      {(photos.length > 0 || pending.length > 0) && (
         <div className="flex flex-col gap-2">
           <h3 className="eyebrow">{t('photos.all')}</h3>
           <ul className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
-            {shown.map((p) => (
-              <li key={p.id} className="relative aspect-[3/4] rounded-[10px] bg-surface2 overflow-hidden">
-                {urls[p.path] && <img src={urls[p.path]} alt="" loading="lazy" className="w-full h-full object-cover" />}
-                <div className="absolute inset-x-0 bottom-0 px-1.5 py-1 bg-ink/70 text-[11px] leading-tight">
-                  <div className="text-chalk">{t(`photos.angle.${p.angle}`)}</div>
-                  <div className="text-chalkdim num">{shortDate(lang, p.taken_on)}</div>
-                </div>
-                <div className="absolute top-0 end-0 flex">
-                  {own && (
-                    <button
-                      onClick={() => save(p)}
-                      aria-label={t('photos.download')}
-                      className="min-w-[40px] min-h-[40px] inline-flex items-center justify-center text-chalk"
-                    >
-                      <span className="rounded-full bg-ink/70 p-1.5"><Download size={13} /></span>
-                    </button>
-                  )}
-                  <button
-                    onClick={() => remove(p)}
-                    aria-label={t('common.delete')}
-                    className="min-w-[40px] min-h-[40px] inline-flex items-center justify-center text-chalk"
-                  >
-                    <span className="rounded-full bg-ink/70 p-1.5"><Trash2 size={13} /></span>
-                  </button>
-                </div>
+            {pending.map((p) => (
+              <li key={p.key} className="relative aspect-[3/4] rounded-[10px] bg-surface2 overflow-hidden" aria-busy="true">
+                <img src={p.preview} alt="" className="w-full h-full object-cover opacity-60" />
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <span className="w-6 h-6 rounded-full border-2 border-chalk/30 border-t-chalk animate-spin" />
+                </span>
+                <div className="absolute inset-x-0 bottom-0 px-1.5 py-1 bg-ink/70 text-[11px] leading-tight text-chalk">{t('photos.uploading')}</div>
               </li>
             ))}
+            {shown.map((p, i) => {
+              const label = `${t(`photos.angle.${p.angle}`)}, ${shortDate(lang, p.taken_on)}`
+              return (
+                <li key={p.id} className="relative aspect-[3/4] rounded-[10px] bg-surface2 overflow-hidden">
+                  <button type="button" onClick={() => setViewing(i)} aria-label={`${label}. ${t('photos.tapToEnlarge')}`} className="block w-full h-full">
+                    <PhotoThumb photo={p} alt="" />
+                    <div className="absolute inset-x-0 bottom-0 px-1.5 py-1 bg-ink/70 text-[11px] leading-tight text-start">
+                      <div className="text-chalk">{t(`photos.angle.${p.angle}`)}</div>
+                      <div className="text-chalkdim num">{shortDate(lang, p.taken_on)}</div>
+                    </div>
+                  </button>
+                </li>
+              )
+            })}
           </ul>
           {photos.length > PREVIEW_COUNT && (
             <button onClick={() => setShowAll((v) => !v)} className="text-xs text-chalkdim self-start min-h-9">
@@ -277,6 +282,17 @@ export default function ProgressPhotos({ uid, mode = 'own' }) {
             </button>
           )}
         </div>
+      )}
+
+      {viewing != null && photos[viewing] && (
+        <PhotoViewer
+          photos={photos}
+          index={viewing}
+          onIndex={setViewing}
+          onClose={() => setViewing(null)}
+          onDownload={own ? save : undefined}
+          onDelete={remove}
+        />
       )}
 
       {own && (status.enabled || photos.length > 0) && (

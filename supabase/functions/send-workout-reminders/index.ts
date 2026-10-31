@@ -100,6 +100,9 @@ async function runReminders() {
   for (const s of subs || []) {
     try {
       const now = localParts(s.tz)
+      // Chosen weekdays, read in the phone's own tz. Null/missing (column not
+      // added yet) or an empty list means every day.
+      if (Array.isArray(s.remind_days) && s.remind_days.length && !s.remind_days.includes(now.dow)) { skipped++; continue }
       if (s.last_sent_date === now.date || !isDue(s.remind_time, now.minutes)) { skipped++; continue }
 
       const { data: sched } = await db.from('weekly_schedule').select('day_of_week, routine_id')
