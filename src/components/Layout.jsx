@@ -1,12 +1,14 @@
-import React, { Suspense, useEffect, useState } from 'react'
+import React, { Suspense, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom'
 import { PageLoader } from './Loading.jsx'
-import { Dumbbell, LayoutDashboard, ListChecks, History, Library, LogOut, X, Users, UserCheck, BarChart3, Scale, FileText, HelpCircle, CircleUser, Bell, Apple, Home, Ellipsis } from 'lucide-react'
+import { Dumbbell, LayoutDashboard, ListChecks, History, Library, LogOut, X, Users, UserCheck, BarChart3, Scale, FileText, HelpCircle, CircleUser, Bell, Apple, Home, Ellipsis, MessageSquare } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useScrollLock, resetLockedScroll } from '../lib/scrollLock.js'
+import { useDialog } from './Modal.jsx'
+import { useMessagesState } from '../lib/messages.js'
 
 const links = [
   { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard, end: true },
@@ -22,6 +24,7 @@ export default function Layout() {
   const { user, logout } = useAuth()
   const { isAdmin, nutritionAllowed, actingAs, setActingAs } = useAdmin()
   const { t, lang, setLang } = useLanguage()
+  const { enabled: messagesOn, unread: unreadMessages } = useMessagesState()
   const [open, setOpen] = useState(false)
   useScrollLock(open)
   const location = useLocation()
@@ -43,12 +46,22 @@ export default function Layout() {
     setOpen(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname])
+  const sheetRef = useRef(null)
+  const dialogProps = useDialog(open, () => setOpen(false), sheetRef)
+
+  // Offline notice. The app needs the network for its data, so say why
+  // things fail to load instead of leaving people guessing.
+  const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine !== false))
   useEffect(() => {
-    if (!open) return
-    const onKey = (e) => e.key === 'Escape' && setOpen(false)
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open])
+    const up = () => setOnline(true)
+    const down = () => setOnline(false)
+    window.addEventListener('online', up)
+    window.addEventListener('offline', down)
+    return () => {
+      window.removeEventListener('online', up)
+      window.removeEventListener('offline', down)
+    }
+  }, [])
 
   const navLinks = [
     ...links,
@@ -60,7 +73,11 @@ export default function Layout() {
   // Nutrition takes the second slot only for people whose coach turned it on.
   const tabs = [
     { to: '/', labelKey: 'nav.today', icon: Home, end: true },
-    nutritionAllowed
+    // A coach's daily work is their people, so it takes the second slot;
+    // their own routines and nutrition move under More.
+    isAdmin
+      ? { to: '/people', labelKey: 'nav.people', icon: Users }
+      : nutritionAllowed
       ? { to: '/nutrition', labelKey: 'nav.nutritionTab', icon: Apple }
       : { to: '/routines', labelKey: 'nav.routines', icon: ListChecks },
     { to: '/history', labelKey: 'nav.history', icon: History },
@@ -75,6 +92,14 @@ export default function Layout() {
 
   return (
     <div className="min-h-dvh flex flex-col">
+      {/* Always mounted so screen readers announce it when it fills in. */}
+      <div role="status" aria-live="polite">
+        {!online && (
+          <div className="sticky top-0 z-30 bg-surface text-chalkdim text-xs text-center px-4 py-2 border-b border-line" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)' }}>
+            {t('layout.offline')}
+          </div>
+        )}
+      </div>
       {/* On phones the brand bar is gone: navigation lives in the floating
           tab bar at the bottom, and each screen carries its own title. */}
       {actingAs && (
@@ -133,11 +158,12 @@ export default function Layout() {
           <div className="hidden md:flex items-center gap-3">
             <button
               onClick={toggleLang}
+              aria-pressed={lang === 'he'}
               className="hit flex rounded-md bg-surface2 p-0.5 text-xs num"
               title={t('layout.language')} aria-label={t('layout.language')}
             >
               <span className={`px-2 py-1 rounded ${lang === 'en' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>EN</span>
-              <span className={`px-2 py-1 rounded ${lang === 'he' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>עב</span>
+              <span lang="he" className={`px-2 py-1 rounded ${lang === 'he' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>עב</span>
             </button>
             <NavLink
               to="/notifications"
@@ -202,7 +228,7 @@ export default function Layout() {
           was scrolled to. */}
       {open &&
         createPortal(
-          <div className="md:hidden fixed inset-0 z-40 bg-ink flex flex-col" role="dialog" aria-modal="true" aria-label={t('nav.more')}>
+          <div ref={sheetRef} {...dialogProps} className="md:hidden fixed inset-0 z-40 bg-ink flex flex-col outline-none" aria-label={t('nav.more')}>
             <div style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
               <div className="px-4 pt-4 pb-2 flex items-center justify-between">
                 <h1 className="text-[30px] leading-9">{t('nav.more')}</h1>
@@ -228,6 +254,20 @@ export default function Layout() {
                   {t(l.labelKey)}
                 </NavLink>
               ))}
+              {messagesOn && (
+                <NavLink
+                  to="/messages"
+                  onClick={() => setOpen(false)}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3 min-h-[52px] rounded-[14px] text-[15px] whitespace-nowrap ${
+                      isActive ? 'bg-surface2 text-chalk' : 'text-chalkdim'
+                    }`
+                  }
+                >
+                  <MessageSquare size={16} /> {t('messages.nav')}
+                  {unreadMessages > 0 && <span role="img" aria-label={t('messages.unreadLabel')(unreadMessages)} className="w-2 h-2 rounded-full bg-accent" />}
+                </NavLink>
+              )}
               <NavLink
                 to="/notifications"
                 onClick={() => setOpen(false)}
@@ -263,12 +303,13 @@ export default function Layout() {
               </NavLink>
               <button
                 onClick={toggleLang}
+                aria-pressed={lang === 'he'}
                 className="flex items-center justify-between gap-2 px-3 min-h-[52px] rounded-[14px] text-[15px] text-chalkdim whitespace-nowrap"
               >
                 <span>{t('layout.language')}</span>
                 <span className="flex rounded-md bg-surface2 p-0.5 text-xs num">
                   <span className={`px-2 py-1 rounded ${lang === 'en' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>EN</span>
-                  <span className={`px-2 py-1 rounded ${lang === 'he' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>עב</span>
+                  <span lang="he" className={`px-2 py-1 rounded ${lang === 'he' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>עב</span>
                 </span>
               </button>
               <button onClick={logout} className="flex items-center gap-3 px-3 min-h-[52px] rounded-[14px] text-[15px] text-irontext whitespace-nowrap">
@@ -304,7 +345,7 @@ export default function Layout() {
                 to={tab.to}
                 end={tab.end}
                 className={({ isActive }) =>
-                  `press flex flex-col items-center justify-center gap-0.5 rounded-[18px] text-[11px] font-medium transition-colors duration-150 ${
+                  `press flex flex-col items-center justify-center gap-0.5 rounded-[18px] text-xs font-medium transition-colors duration-150 ${
                     isActive ? 'bg-white/[0.08] text-chalk' : 'text-[#8A8A90]'
                   }`
                 }
@@ -317,9 +358,13 @@ export default function Layout() {
               type="button"
               onClick={() => setOpen(true)}
               aria-expanded={open}
-              className="press flex flex-col items-center justify-center gap-0.5 rounded-[18px] text-[11px] font-medium text-[#8A8A90]"
+              aria-haspopup="dialog"
+              className="press flex flex-col items-center justify-center gap-0.5 rounded-[18px] text-xs font-medium text-[#8A8A90]"
             >
-              <Ellipsis size={22} strokeWidth={1.75} aria-hidden="true" />
+              <span className="relative">
+                <Ellipsis size={22} strokeWidth={1.75} aria-hidden="true" />
+                {unreadMessages > 0 && <span aria-hidden="true" className="absolute -top-0.5 -end-1 w-2 h-2 rounded-full bg-accent" />}
+              </span>
               <span>{t('nav.more')}</span>
             </button>
           </nav>

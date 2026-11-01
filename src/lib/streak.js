@@ -21,3 +21,16 @@ export function weeklyStreak(sessions, justSaved) {
   }
   return count
 }
+
+// The streak as of today: the current week doesn't break it until it's over,
+// so on a Sunday before the first workout it still counts last week's run.
+// Stats and the saved-workout screen both count with weeklyStreak above.
+export function currentStreak(sessions, today = toLocalISODate()) {
+  const weeks = new Set((sessions || []).map((s) => weekStartOf(s.date)))
+  const thisWeek = weekStartOf(today)
+  if (weeks.has(thisWeek)) return weeklyStreak(sessions, today)
+  const d = new Date(thisWeek + 'T00:00:00')
+  d.setDate(d.getDate() - 7)
+  const lastWeek = toLocalISODate(d)
+  return weeks.has(lastWeek) ? weeklyStreak(sessions, lastWeek) : 0
+}

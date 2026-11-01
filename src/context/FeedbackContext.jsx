@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Check, X } from 'lucide-react'
+import { AlertTriangle, Check, Info, X } from 'lucide-react'
 import { useLanguage } from './LanguageContext.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 
@@ -42,11 +42,14 @@ export function FeedbackProvider({ children }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [dialog])
 
-  const toast = useCallback((message, tone = 'success') => {
+  // `action` ({ label, onClick }) adds a button to the pill, e.g. Undo. A toast
+  // with an action stays up longer so there is time to reach it. Tone 'info'
+  // is a neutral hint (no check mark).
+  const toast = useCallback((message, tone = 'success', action) => {
     const id = Math.random().toString(36).slice(2)
-    setToasts((prev) => [...prev, { id, message, tone }])
+    setToasts((prev) => [...prev, { id, message, tone, action }])
     // Errors stay up longer — they usually need reading, not just noticing.
-    setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), tone === 'error' ? 6000 : 2800)
+    setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), tone === 'error' || action ? 6000 : 2800)
   }, [])
 
   return (
@@ -94,10 +97,22 @@ export function FeedbackProvider({ children }) {
             key={x.id}
             className="flex items-center gap-2.5 rounded-full bg-[#232326] text-chalk ps-2.5 pe-4 py-2.5 text-[15px] font-semibold max-w-sm shadow-[0_8px_24px_rgba(0,0,0,0.45)] animate-toast motion-reduce:animate-none"
           >
-            <span className="grid place-items-center w-7 h-7 rounded-full bg-good/15 text-good shrink-0">
-              <Check size={16} strokeWidth={2.75} />
+            <span className={`grid place-items-center w-7 h-7 rounded-full shrink-0 ${x.tone === 'info' ? 'bg-chalkdim/15 text-chalkdim' : 'bg-good/15 text-good'}`}>
+              {x.tone === 'info' ? <Info size={16} strokeWidth={2.5} /> : <Check size={16} strokeWidth={2.75} />}
             </span>
             <span>{x.message}</span>
+            {x.action && (
+              <button
+                type="button"
+                onClick={() => {
+                  setToasts((prev) => prev.filter((y) => y.id !== x.id))
+                  x.action.onClick()
+                }}
+                className="pointer-events-auto press ms-1 -me-2 min-h-[44px] px-3 text-accent font-semibold"
+              >
+                {x.action.label}
+              </button>
+            )}
           </div>
         ))}
       </div>

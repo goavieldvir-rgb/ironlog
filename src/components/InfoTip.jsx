@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { HelpCircle } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
+import { useDialog } from './Modal.jsx'
 
 // A small "?" that opens its explanation in a panel rendered at the top
 // level of the page, NOT inside whatever contains the "?" itself.
@@ -16,6 +17,8 @@ export function InfoTip({ text }) {
   const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   useScrollLock(open)
+  const panelRef = useRef(null)
+  const dialogProps = useDialog(open, () => setOpen(false), panelRef)
 
   return (
     <>
@@ -28,6 +31,8 @@ export function InfoTip({ text }) {
         }}
         className="hit text-chalkdim hover:text-brass inline-flex align-middle shrink-0"
         aria-label={t('common.whatDoesThisMean')}
+        aria-haspopup="dialog"
+        aria-expanded={open}
       >
         <HelpCircle size={13} />
       </button>
@@ -42,11 +47,12 @@ export function InfoTip({ text }) {
               setOpen(false)
             }}
           >
-            <div className="card p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div ref={panelRef} {...dialogProps} aria-label={t('common.whatDoesThisMean')} className="card p-5 w-full max-w-sm outline-none" onClick={(e) => e.stopPropagation()}>
               <p className="text-sm text-chalk whitespace-pre-line">{text}</p>
               <div className="flex justify-end mt-4">
                 <button
                   type="button"
+                  data-autofocus
                   onClick={() => setOpen(false)}
                   className="rounded-md px-3.5 py-2 text-sm font-medium bg-surface2 text-chalk hover:bg-line"
                 >

@@ -14,18 +14,29 @@ import { hideSplash } from '../lib/splash.js'
 // prop, and the default-exported functional wrapper below supplies it —
 // this only works because LanguageProvider sits above ErrorBoundary in
 // main.jsx, so useLanguage() here is always safe to call.
+// A screen's code failed to download: offline, or an old deploy's file is gone.
+function isChunkError(error) {
+  const msg = String(error?.message || error)
+  return error?.name === 'ChunkLoadError' || /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Loading chunk .* failed/i.test(msg)
+}
+
 class ErrorBoundaryInner extends React.Component {
   constructor(props) {
     super(props)
     this.state = { hasError: false }
   }
 
-  static getDerivedStateFromError() {
-    return { hasError: true }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
   }
 
   componentDidCatch(error, info) {
     console.error(error, info)
+    // Not a bug in the app, so nothing for the coach to triage.
+    if (isChunkError(error)) {
+      hideSplash()
+      return
+    }
     // The launch screen would otherwise sit on top of the recovery screen.
     hideSplash()
     this.logError(error, info)
@@ -56,17 +67,26 @@ class ErrorBoundaryInner extends React.Component {
   render() {
     if (this.state.hasError) {
       const { t } = this.props
+      const chunk = isChunkError(this.state.error)
       return (
         <div className="min-h-dvh flex items-center justify-center px-4" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
           <div className="max-w-sm text-center flex flex-col gap-4">
             <div className="eyebrow">Ironlog</div>
-            <h1 className="text-3xl">{t('errorBoundary.title')}</h1>
-            <p className="text-chalkdim text-sm">{t('errorBoundary.body')}</p>
+            <h1 className="text-3xl">{t(chunk ? 'errorBoundary.offlineTitle' : 'errorBoundary.title')}</h1>
+            <p className="text-chalkdim text-sm">{t(chunk ? 'errorBoundary.offlineBody' : 'errorBoundary.body')}</p>
             <button
               onClick={() => window.location.reload()}
               className="bg-ironbtn text-chalk rounded-md px-4 py-2 text-sm font-medium hover:bg-ironbtn/90 mx-auto"
             >
-              {t('errorBoundary.reload')}
+              {t(chunk ? 'errorBoundary.offlineRetry' : 'errorBoundary.reload')}
+            </button>
+            {/* HashRouter keeps the failing route across a reload, so offer a
+                way out to the home screen as well. */}
+            <button
+              onClick={() => { window.location.hash = '#/'; window.location.reload() }}
+              className="text-chalkdim text-sm underline underline-offset-4 min-h-[44px] mx-auto"
+            >
+              {t('errorBoundary.goHome')}
             </button>
           </div>
         </div>

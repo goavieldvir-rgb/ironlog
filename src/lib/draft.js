@@ -14,6 +14,18 @@
 const PREFIX = 'ironlog:draft:'
 export const FREESTYLE_KEY = 'freestyle'
 
+const DAY_MS = 24 * 60 * 60 * 1000
+export const STALE_AFTER_DAYS = 3 // worth asking "finish or discard?"
+export const EXPIRE_AFTER_DAYS = 14 // dropped on read
+
+// Whole days since the draft was last autosaved (0 when unknown).
+export function draftAgeDays(draft, now = Date.now()) {
+  if (!draft?.savedAt) return 0
+  return Math.max(0, Math.floor((now - draft.savedAt) / DAY_MS))
+}
+export const isStaleDraft = (draft, now = Date.now()) => draftAgeDays(draft, now) >= STALE_AFTER_DAYS
+const isExpired = (draft, now = Date.now()) => draftAgeDays(draft, now) >= EXPIRE_AFTER_DAYS
+
 function storageKey(uid, routineKey) {
   return `${PREFIX}${uid}:${routineKey || FREESTYLE_KEY}`
 }
@@ -51,8 +63,15 @@ export function loadDraft(uid, routineKey) {
   if (!uid) return null
   try {
     migrateLegacy(uid)
-    const raw = localStorage.getItem(storageKey(uid, routineKey))
-    return raw ? JSON.parse(raw) : null
+    const key = storageKey(uid, routineKey)
+    const raw = localStorage.getItem(key)
+    const draft = raw ? JSON.parse(raw) : null
+    // An abandoned workout shouldn't come back weeks later with old numbers.
+    if (draft && isExpired(draft)) {
+      localStorage.removeItem(key)
+      return null
+    }
+    return draft
   } catch {
     return null
   }
@@ -75,16 +94,19 @@ export function listDrafts(uid) {
     migrateLegacy(uid)
     const prefix = `${PREFIX}${uid}:`
     const out = []
+    const expired = []
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
       if (!key || !key.startsWith(prefix)) continue
       try {
         const draft = JSON.parse(localStorage.getItem(key))
-        if (draft) out.push({ ...draft, routineKey: key.slice(prefix.length) })
+        if (draft && isExpired(draft)) expired.push(key)
+        else if (draft) out.push({ ...draft, routineKey: key.slice(prefix.length) })
       } catch {
         // skip anything unreadable rather than breaking the list
       }
     }
+    expired.forEach((key) => localStorage.removeItem(key)) // after the loop, so indexes stay put
     return out.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0))
   } catch {
     return []

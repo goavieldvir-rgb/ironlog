@@ -68,14 +68,17 @@ export const formatDistance = (v) => (Math.round(Number(v) * 100) / 100).toStrin
 export const toKm = (distance, unit) => (unit === 'mi' ? distance * KM_PER_MI : distance)
 
 // ["40 min", "5 km", "6:00 /km", "10 km/h"] — the whole exercise at a glance.
-export function cardioTotalParts(summary, unit, minLabel) {
+// `labels` (optional, translated) = { km, mi, kmh, mph, paceKm, paceMi };
+// anything missing falls back to the English units.
+export function cardioTotalParts(summary, unit, minLabel, labels = {}) {
   if (!summary) return []
-  const u = unit === 'mi' ? 'mi' : 'km'
+  const mi = unit === 'mi'
+  const L = { km: 'km', mi: 'mi', kmh: 'km/h', mph: 'mph', paceKm: '/km', paceMi: '/mi', ...labels }
   const parts = [`${formatDistance(summary.minutes)} ${minLabel}`]
   if (summary.distance != null) {
-    parts.push(`${formatDistance(summary.distance)} ${u}`)
-    parts.push(`${formatPace(summary.pace)} /${u}`)
-    parts.push(`${formatSpeed(summary.speed)} ${u === 'mi' ? 'mph' : 'km/h'}`)
+    parts.push(`${formatDistance(summary.distance)} ${mi ? L.mi : L.km}`)
+    parts.push(`${formatPace(summary.pace)} ${mi ? L.paceMi : L.paceKm}`)
+    parts.push(`${formatSpeed(summary.speed)} ${mi ? L.mph : L.kmh}`)
   }
   return parts
 }

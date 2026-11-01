@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useId, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Search, X } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
@@ -9,8 +9,12 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 // The list expands inline rather than floating over the page, so it can't
 // get clipped or mispositioned inside a modal (the swap dialog) or on a
 // small screen.
-export default function ExerciseSelect({ value, onChange, options, placeholder, className = '' }) {
+//
+// `groups` (optional): [{ label, ids }] pins those options under a heading at
+// the top (e.g. "Recent"); everything else follows, under `restLabel` if given.
+export default function ExerciseSelect({ value, onChange, options, placeholder, className = '', groups, restLabel }) {
   const { t } = useLanguage()
+  const listId = useId()
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const inputRef = useRef(null)
@@ -22,6 +26,23 @@ export default function ExerciseSelect({ value, onChange, options, placeholder, 
     return options.filter((o) => o.label.toLowerCase().includes(needle))
   }, [options, q])
 
+  // Sections to render: the pinned groups (in order, only options that match
+  // the search), then the rest. Without `groups` it's one unlabelled section.
+  const sections = useMemo(() => {
+    if (!groups || groups.length === 0) return [{ label: null, items: filtered }]
+    const used = new Set()
+    const out = []
+    for (const g of groups) {
+      const ids = new Set(g.ids)
+      const items = filtered.filter((o) => ids.has(o.id) && !used.has(o.id))
+      items.forEach((o) => used.add(o.id))
+      if (items.length) out.push({ label: g.label, items })
+    }
+    const rest = filtered.filter((o) => !used.has(o.id))
+    if (rest.length) out.push({ label: out.length ? restLabel || null : null, items: rest })
+    return out
+  }, [filtered, groups, restLabel])
+
   function choose(id) {
     onChange(id)
     setQ('')
@@ -29,10 +50,22 @@ export default function ExerciseSelect({ value, onChange, options, placeholder, 
   }
 
   return (
-    <div className={`flex flex-col gap-1.5 ${className}`}>
+    <div
+      className={`flex flex-col gap-1.5 ${className}`}
+      onKeyDown={(e) => {
+        // Escape closes just the list, not the dialog the list sits in.
+        if (e.key === 'Escape' && open) {
+          e.stopPropagation()
+          setOpen(false)
+        }
+      }}
+    >
       <div className="relative">
         <button
           type="button"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-controls={open ? listId : undefined}
           onClick={() => {
             setOpen((v) => !v)
             setTimeout(() => inputRef.current?.focus(), 0)
@@ -71,24 +104,31 @@ export default function ExerciseSelect({ value, onChange, options, placeholder, 
               className="!border-0 !bg-transparent !px-0 !py-0 text-sm w-full"
             />
           </div>
-          <div className="max-h-56 overflow-y-auto">
+          <div id={listId} role="listbox" aria-label={placeholder} className="max-h-56 overflow-y-auto">
             {filtered.length === 0 && <p className="text-chalkdim text-sm px-3 py-3">{t('common.noMatches')}</p>}
-            {filtered.map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                onClick={(e) => {
-                  // This picker usually sits inside a <label> (Field). Once
-                  // the tapped option disappears, the browser treats the tap
-                  // as a click on the label and "clicks" the first button in
-                  // it — the toggle — so the list popped straight back open.
-                  e.preventDefault()
-                  choose(o.id)
-                }}
-                className={`press-row w-full text-start px-3 py-2 text-sm hover:bg-ink ${o.id === value ? 'text-brass' : 'text-chalk'}`}
-              >
-                {o.label}
-              </button>
+            {sections.map((sec, si) => (
+              <div key={si} role={sec.label ? 'group' : undefined} aria-label={sec.label || undefined}>
+                {sec.label && <p className="px-3 pt-2 pb-1 text-[11px] uppercase tracking-wide text-chalkdim" aria-hidden="true">{sec.label}</p>}
+                {sec.items.map((o) => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    role="option"
+                    aria-selected={o.id === value}
+                    onClick={(e) => {
+                      // This picker usually sits inside a <label> (Field). Once
+                      // the tapped option disappears, the browser treats the tap
+                      // as a click on the label and "clicks" the first button in
+                      // it — the toggle — so the list popped straight back open.
+                      e.preventDefault()
+                      choose(o.id)
+                    }}
+                    className={`press-row w-full text-start px-3 py-2 min-h-[44px] text-sm hover:bg-ink ${o.id === value ? 'text-brass' : 'text-chalk'}`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
             ))}
           </div>
         </div>

@@ -7,13 +7,15 @@ import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { fmtDate, toLocalISODate } from '../lib/dates.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
-import { useCollection, hasUnreadFeedback } from '../lib/db.js'
+import { useCollection, hasUnreadFeedback, addBodyWeightEntry } from '../lib/db.js'
 import { isFreestyleSession, sessionTitle, entryName, exerciseMap } from '../lib/names.js'
 import { workingSets } from '../lib/warmup.js'
 import { listDrafts, clearDraft } from '../lib/draft.js'
-import { Card, LoadError, FeedbackDot } from './ui.jsx'
+import { Button, Card, LoadError, FeedbackDot } from './ui.jsx'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import WeeklySchedule from './WeeklySchedule.jsx'
+import { itemTarget } from './RoutineView.jsx'
+import { useMessagesState } from '../lib/messages.js'
 
 // Was hard-coded English ("5m ago") even with the app in Hebrew.
 function timeAgo(ts, t) {
@@ -21,15 +23,26 @@ function timeAgo(ts, t) {
   if (mins < 60) return t('dashboard.minutesAgo', { n: mins })
   const hrs = Math.round(mins / 60)
   if (hrs < 24) return t('dashboard.hoursAgo', { n: hrs })
-  return t('dashboard.daysAgo', { n: Math.round(hrs / 24) })
+  return t('dashboard.daysAgo')(Math.round(hrs / 24))
 }
 
 function greetingKey(hour) {
+  // Not "Good night": that's a farewell, and this is someone opening the app.
   if (hour < 5) return 'dashboard.greetingNight'
   if (hour < 12) return 'dashboard.greetingMorning'
   if (hour < 17) return 'dashboard.greetingAfternoon'
   if (hour < 22) return 'dashboard.greetingEvening'
   return 'dashboard.greetingNight'
+}
+
+// "Not today" on the weight card hides it for the rest of the day only.
+const weightHiddenKey = (uid) => `ironlog:weightCardHidden:${uid}`
+function readWeightHidden(uid, todayIso) {
+  try {
+    return localStorage.getItem(weightHiddenKey(uid)) === todayIso
+  } catch {
+    return false
+  }
 }
 
 const numLocale = (lang) => (lang === 'he' ? 'he-IL' : 'en-US')
@@ -72,11 +85,26 @@ export default function Dashboard() {
   const { user } = useAuth()
   const { actingAs, effectiveUid, effectiveName } = useAdmin()
   const { t, lang } = useLanguage()
-  const { confirm } = useFeedback()
+  const { confirm, toast } = useFeedback()
+  const { unread: unreadMessages } = useMessagesState()
   const [exercises, exercisesLoading, refreshExercises, exercisesError] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [routines, routinesLoading, refreshRoutines, routinesError] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [sessions, sessionsLoading, refreshSessions, sessionsError] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [schedule, scheduleLoading, refreshSchedule, scheduleError] = useCollection(effectiveUid, 'weekly_schedule', 'day_of_week', 'asc')
+  const [weights, weightsLoading, refreshWeights, weightsError] = useCollection(effectiveUid, 'body_weight_logs', 'date', 'desc')
+  // Hides the quick weight card right after saving, before the list refetches.
+  const [weightSaved, setWeightSaved] = useState(false)
+  useEffect(() => setWeightSaved(false), [effectiveUid])
+  const [weightHidden, setWeightHidden] = useState(() => readWeightHidden(effectiveUid, toLocalISODate(new Date())))
+  useEffect(() => setWeightHidden(readWeightHidden(effectiveUid, toLocalISODate(new Date()))), [effectiveUid])
+  function hideWeightCard() {
+    setWeightHidden(true)
+    try {
+      localStorage.setItem(weightHiddenKey(effectiveUid), toLocalISODate(new Date()))
+    } catch {
+      /* storage blocked: it just hides until the next load */
+    }
+  }
   const exById = useMemo(() => exerciseMap(exercises), [exercises])
   // Lets the rest-day card open today's panel inside WeeklySchedule.
   const [panelReq, setPanelReq] = useState(null)
@@ -171,6 +199,22 @@ export default function Dashboard() {
     .filter((s) => s.day_of_week === todayDow && s.routine_id)
     .map((s) => routines.find((r) => r.id === s.routine_id))
     .filter(Boolean)
+  // No weekly plan at all: "rest day" would be wrong every day, so offer the
+  // next routine in rotation — never done first, then the longest ago.
+  const noSchedule = schedule.filter((s) => s.routine_id).length === 0
+  const rotation = useMemo(() => {
+    if (scheduleLoading || routinesLoading || sessionsLoading || !noSchedule) return []
+    const lastDone = {}
+    for (const x of sessions) if (x.routine_id && (!lastDone[x.routine_id] || x.date > lastDone[x.routine_id])) lastDone[x.routine_id] = x.date
+    return [...routines].sort((a, b) => {
+      const da = lastDone[a.id] || ''
+      const db = lastDone[b.id] || ''
+      if (da !== db) return da < db ? -1 : 1
+      return String(a.created_at || '') < String(b.created_at || '') ? -1 : 1
+    })
+  }, [noSchedule, scheduleLoading, routines, routinesLoading, sessions, sessionsLoading])
+  const rotationStart = rotation.filter((r) => !drafts.some((d) => d.routineId === r.id))
+  const showRotation = !loadFailed && rotationStart.length > 0
   const loadedPlan = !scheduleLoading && !routinesLoading && !sessionsLoading && !loadFailed
   const loggedToday = sessions.some((x) => x.date === todayIso)
   const recent = sessions.slice(0, 3)
@@ -181,7 +225,7 @@ export default function Dashboard() {
   const restLink = (label) => (
     <button
       type="button"
-      onClick={() => setPanelReq({ day: todayDow, n: Date.now() })}
+      onClick={() => setPanelReq({ day: todayDow, n: Date.now(), other: true })}
       className="press self-start text-[14px] text-chalk underline underline-offset-4 decoration-white/20 min-h-11 pe-2"
     >
       {label}
@@ -201,6 +245,17 @@ export default function Dashboard() {
         </p>
       </div>
 
+      {unreadMessages > 0 && (
+        <Link to="/messages" className="card press-row !p-4 flex items-center gap-3">
+          <MessageSquareText size={20} className="shrink-0 text-accent" aria-hidden="true" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold">{t('messages.newFromCoach')}</span>
+            <span className="block text-[13px] text-chalkdim num">{t('messages.unreadCount')(unreadMessages)}</span>
+          </span>
+          <ForwardChevron size={16} className="text-chalkdim shrink-0" />
+        </Link>
+      )}
+
       {drafts.map((draft) => (
         <Card key={draft.routineKey} className="!p-5 flex flex-col gap-4">
           <div>
@@ -210,7 +265,7 @@ export default function Dashboard() {
             </div>
             <p className="text-[20px] font-semibold leading-tight">{isFreestyleSession(draft) ? t('workout.freestyleSession') : draft.routineName}</p>
             <p className="text-chalkdim text-[13px] mt-1">
-              {timeAgo(draft.savedAt, t)} · {draft.entries?.length || 0} {t('dashboard.exerciseLoggedSoFar')}
+              {timeAgo(draft.savedAt, t)} · {t('dashboard.exerciseLoggedSoFar')(draft.entries?.length || 0)}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -267,7 +322,40 @@ export default function Dashboard() {
         <TodayHero routine={todayStarts[0]} others={todayStarts.slice(1)} sessions={sessions} exById={exById} lang={lang} t={t} />
       )}
 
-      {loadedPlan && todayStarts.length === 0 && drafts.length === 0 && !showChecklist && (
+      {showRotation && todayStarts.length === 0 && (
+        <TodayHero
+          routine={rotationStart[0]}
+          others={rotationStart.slice(1, 4)}
+          eyebrow={t('dashboard.upNext')}
+          othersLabel={rotationStart.length > 1 ? t('dashboard.otherRoutines') : null}
+          sessions={sessions}
+          exById={exById}
+          lang={lang}
+          t={t}
+        />
+      )}
+
+      {/* A morning weigh-in is the person's own; a coach viewing their account doesn't get it. */}
+      {!actingAs && !weightSaved && !weightHidden && !weightsLoading && !weightsError && !loadFailed && !weights.some((w) => w.date === todayIso) && (
+        <WeightQuickCard
+          last={weights[0]}
+          t={t}
+          onHide={hideWeightCard}
+          onSave={async (weight, unit) => {
+            try {
+              await addBodyWeightEntry(effectiveUid, { date: todayIso, weight, unit })
+              setWeightSaved(true)
+              refreshWeights()
+              toast(t('dashboard.logWeightSaved'))
+            } catch (err) {
+              console.error(err)
+              toast(t('feedback.saveFailed'), 'error')
+            }
+          }}
+        />
+      )}
+
+      {loadedPlan && !showRotation && !noSchedule && todayStarts.length === 0 && drafts.length === 0 && !showChecklist && (
         <Card className="!p-5 flex flex-col gap-1">
           {plannedToday.length === 0 ? (
             <>
@@ -328,7 +416,7 @@ export default function Dashboard() {
         <span className="text-[15px]">
           {t('dashboard.navRoutines')}{' '}
           <span className="text-chalkdim">
-            · {routines.length} {t('dashboard.routinesCount')}
+            · {t('dashboard.routinesCount')(routines.length)}
           </span>
         </span>
         <ForwardChevron size={16} className="text-chalkdim/70 shrink-0" />
@@ -340,16 +428,17 @@ export default function Dashboard() {
 // Today's workout, one tap from the home screen (same route as the play
 // button in the day panel). The first pending routine is the hero; any
 // others (a day can hold mobility + strength + cardio) are quieter rows.
-function TodayHero({ routine, others, sessions, exById, lang, t }) {
+function TodayHero({ routine, others, eyebrow = null, othersLabel = null, sessions, exById, lang, t }) {
   const last = sessions.find((x) => x.routine_id === routine.id)
   const items = routine.exercises || []
   const shown = items.slice(0, 6)
-  const parts = [`${items.length} ${t('dashboard.exercisesCount')}`]
+  const parts = [t('dashboard.exercisesCount')(items.length)]
   if (last?.duration_minutes) parts.push(t('dashboard.aboutMin', { min: last.duration_minutes }))
   if (last?.date) parts.push(t('dashboard.lastDone', { day: fmtDate(lang, new Date(last.date + 'T00:00:00'), { weekday: 'long' }) }))
   return (
     <section className="bg-surface rounded-[22px] p-5 flex flex-col gap-4">
       <div className="flex flex-col gap-1">
+        {eyebrow && <div className="eyebrow">{eyebrow}</div>}
         <h2 className="text-2xl leading-[30px] tracking-[-0.015em]">{routine.name}</h2>
         <p className="text-[14px] leading-5 text-chalkdim">{parts.join(' · ')}</p>
       </div>
@@ -358,11 +447,10 @@ function TodayHero({ routine, others, sessions, exById, lang, t }) {
           {shown.map((it, i) => (
             <div key={i} className="flex items-center justify-between gap-3 py-3 border-t border-white/[0.07]">
               <span className="text-[15px] leading-5 truncate">{entryName(it, exById, lang)}</span>
-              <span className="text-[14px] text-chalkdim whitespace-nowrap">
-                {it.targetSets
-                  ? `${it.targetSets}${it.targetReps && it.category !== 'cardio' ? ` × ${it.targetReps}${it.timed ? t('dashboard.secShort') : ''}` : ''}`
-                  : ''}
-              </span>
+              {/* Same text as the routine list and view (cardio gets its unit). */}
+              <bdi dir="ltr" className="num text-[14px] text-chalkdim whitespace-nowrap">
+                {it.targetSets || it.targetDuration ? itemTarget(routine, it, t) : ''}
+              </bdi>
             </div>
           ))}
           {items.length > shown.length && (
@@ -379,6 +467,7 @@ function TodayHero({ routine, others, sessions, exById, lang, t }) {
         <Play size={16} fill="currentColor" />
         {t('dashboard.startWorkout')}
       </Link>
+      {othersLabel && others.length > 0 && <div className="eyebrow -mb-2">{othersLabel}</div>}
       {others.map((r) => (
         <Link
           key={r.id}
@@ -419,6 +508,96 @@ function OnboardingChecklist({ steps, t }) {
           </Link>
         ))}
       </div>
+    </Card>
+  )
+}
+
+// One number, one tap: today's weight without leaving the home screen.
+// Only shown while today has no entry. The unit follows the last entry;
+// a first-time user picks kg or lb here instead of being stuck with kg.
+const WEIGHT_RANGE = { kg: [20, 400], lb: [44, 880] }
+function WeightQuickCard({ last, t, onSave, onHide }) {
+  const [value, setValue] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [pickedUnit, setPickedUnit] = useState('kg')
+  const [rangeError, setRangeError] = useState(false)
+  const unit = last?.unit || pickedUnit
+  const [min, max] = WEIGHT_RANGE[unit] || WEIGHT_RANGE.kg
+  const num = Number(value.replace(',', '.'))
+  const valid = value.trim() !== '' && Number.isFinite(num) && num > 0
+  async function submit(e) {
+    e.preventDefault()
+    if (!valid || saving) return
+    // A slip like 800 would poison every later "last weight" and chart.
+    if (num < min || num > max) {
+      setRangeError(true)
+      return
+    }
+    setSaving(true)
+    await onSave(num, unit)
+    setSaving(false)
+  }
+  return (
+    <Card className="!p-4">
+      <form onSubmit={submit} className="flex flex-col gap-2">
+        <label htmlFor="quick-weight" className="text-[15px] font-medium">
+          {t('dashboard.logWeightTitle')}
+        </label>
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 min-w-0">
+            <input
+              id="quick-weight"
+              type="text"
+              inputMode="decimal"
+              value={value}
+              onChange={(e) => {
+                setValue(e.target.value)
+                setRangeError(false)
+              }}
+              placeholder={last ? String(last.weight) : ''}
+              aria-label={t('dashboard.logWeightLabel')}
+              aria-invalid={rangeError || undefined}
+              className="w-full num pe-12 min-h-[44px]"
+            />
+            <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-chalkdim text-sm">{unit}</span>
+          </div>
+          <Button type="submit" disabled={!valid || saving} className="min-h-[44px]">
+            {t('dashboard.logWeightSave')}
+          </Button>
+        </div>
+        {rangeError && (
+          <p role="alert" className="text-[13px] text-red-400">
+            {t('dashboard.logWeightRange', { min, max, unit })}
+          </p>
+        )}
+        <div className="flex items-center justify-between gap-2">
+          {last?.unit ? (
+            <span />
+          ) : (
+            <div role="group" aria-label={t('dashboard.logWeightUnit')} dir="ltr" className="inline-flex rounded-[10px] bg-surface2 p-0.5">
+              {['kg', 'lb'].map((u) => (
+                <button
+                  key={u}
+                  type="button"
+                  aria-pressed={pickedUnit === u}
+                  onClick={() => {
+                    setPickedUnit(u)
+                    setRangeError(false)
+                  }}
+                  className={`press min-h-[44px] min-w-[52px] rounded-[8px] text-[13px] ${
+                    pickedUnit === u ? 'bg-chalk text-ink font-semibold' : 'text-chalkdim hover:text-chalk'
+                  }`}
+                >
+                  {u}
+                </button>
+              ))}
+            </div>
+          )}
+          <button type="button" onClick={onHide} className="press text-chalkdim text-[13px] hover:text-chalk min-h-[44px] px-2">
+            {t('dashboard.logWeightHide')}
+          </button>
+        </div>
+      </form>
     </Card>
   )
 }

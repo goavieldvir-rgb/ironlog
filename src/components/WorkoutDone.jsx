@@ -25,7 +25,7 @@ export default function WorkoutDone({ summary, onDone, fromHistory = false }) {
   // Each picture is made ahead of any tap, so the share menu / clipboard can
   // open straight from the tap (phones refuse it if we make them wait).
   const [made, setMade] = useState({}) // { plain: { file, url }, photo, sticker }
-  const [failed, setFailed] = useState(false)
+  const [failed, setFailed] = useState({}) // { plain: true, photo, sticker }: that picture couldn't be drawn
   const [photoBusy, setPhotoBusy] = useState(false)
   const [busy, setBusy] = useState(false)
   const fileInput = useRef(null)
@@ -59,13 +59,17 @@ export default function WorkoutDone({ summary, onDone, fromHistory = false }) {
   useEffect(() => {
     let cancelled = false
     setMade({})
-    setFailed(false)
+    setFailed({})
     const draw = (v) =>
       prepareCard(summary, { rtl: dir === 'rtl', labels, variant: v, photo: v === 'photo' ? photoRef.current : null }, fileName(v))
-        .then((f) => !cancelled && remember(v, f))
+        .then((f) => {
+          if (cancelled) return
+          remember(v, f)
+          setFailed((m) => (m[v] ? { ...m, [v]: false } : m))
+        })
         .catch((err) => {
           console.error(err)
-          if (!cancelled && v === 'plain') setFailed(true)
+          if (!cancelled) setFailed((m) => ({ ...m, [v]: true }))
         })
     const variants = ['plain', 'sticker', ...(photoRef.current ? ['photo'] : [])]
     Promise.all(variants.map(draw)).then(() => {
@@ -120,6 +124,18 @@ export default function WorkoutDone({ summary, onDone, fromHistory = false }) {
   }
 
   const current = made[variant]
+
+  // Retry one picture whose draw failed (big photo, canvas out of memory...).
+  async function retryCard(v) {
+    setFailed((m) => ({ ...m, [v]: false }))
+    try {
+      const f = await prepareCard(summary, { rtl: dir === 'rtl', labels, variant: v, photo: v === 'photo' ? photoRef.current : null }, fileName(v))
+      remember(v, f)
+    } catch (err) {
+      console.error(err)
+      setFailed((m) => ({ ...m, [v]: true }))
+    }
+  }
 
   async function handleShare() {
     if (!current) return
@@ -205,14 +221,7 @@ export default function WorkoutDone({ summary, onDone, fromHistory = false }) {
         </p>
       )}
 
-      {failed && (
-        <p className="text-chalkdim text-sm" role="alert" data-testid="card-failed">
-          {t('share.cardFailed')}
-        </p>
-      )}
-
-      {!failed && (
-        <div className="flex flex-col gap-3" data-testid="share-section">
+      <div className="flex flex-col gap-3" data-testid="share-section">
           <div role="tablist" className="grid grid-cols-3 gap-1 bg-surface2 rounded-lg p-1">
             {tabs.map(([key, label]) => (
               <button
@@ -239,6 +248,13 @@ export default function WorkoutDone({ summary, onDone, fromHistory = false }) {
                 data-testid={`preview-${variant}`}
                 className={`rounded-xl shadow-lg shadow-black/40 border border-line max-h-[420px] w-auto ${variant === 'sticker' ? 'bg-[#6b7280]' : ''}`}
               />
+            ) : failed[variant] && (variant !== 'photo' || photoRef.current) ? (
+              <div className="flex flex-col items-center gap-3 py-6 text-center" role="alert" data-testid="card-failed">
+                <p className="text-chalkdim text-sm">{t('share.cardFailed')}</p>
+                <Button variant="ghost" onClick={() => retryCard(variant)} data-testid="card-retry">
+                  {t('common.tryAgain')}
+                </Button>
+              </div>
             ) : variant === 'photo' ? (
               <p className="text-chalkdim text-sm text-center py-6">{t('share.photoHint')}</p>
             ) : (
@@ -268,16 +284,15 @@ export default function WorkoutDone({ summary, onDone, fromHistory = false }) {
               </div>
             </>
           )}
-        </div>
-      )}
+      </div>
 
       <div className="flex gap-3">
-        {!failed && variant === 'photo' && !made.photo && (
+        {variant === 'photo' && !made.photo && (
           <Button variant="brass" className="flex-1" onClick={() => fileInput.current?.click()} disabled={photoBusy}>
             <ImagePlus size={16} /> {photoBusy ? t('share.sharing') : t('share.choosePhoto')}
           </Button>
         )}
-        {!failed && variant !== 'sticker' && !(variant === 'photo' && !made.photo) && (
+        {variant !== 'sticker' && !(variant === 'photo' && !made.photo) && (
           <Button variant="brass" className="flex-1" onClick={handleShare} disabled={busy || !current}>
             <Share size={16} /> {busy || !current ? t('share.sharing') : t('share.share')}
           </Button>

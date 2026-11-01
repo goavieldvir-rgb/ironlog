@@ -5,7 +5,8 @@ import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useCollection } from '../lib/db.js'
-import { Button, CategoryTag } from './ui.jsx'
+import { loadDraft } from '../lib/draft.js'
+import { Button, CategoryTag, LoadError } from './ui.jsx'
 
 // A routine read-only: every exercise with its target, coach note and
 // superset link, nothing editable. For a coach checking what a trainee is
@@ -14,7 +15,7 @@ export default function RoutineView() {
   const { id } = useParams()
   const { effectiveUid } = useAdmin()
   const { t, lang } = useLanguage()
-  const [routines, loading] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
+  const [routines, loading, refresh, loadError] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const routine = routines.find((r) => r.id === id)
   const nameById = useMemo(
@@ -22,6 +23,8 @@ export default function RoutineView() {
     [exercises, lang],
   )
 
+  // A failed load must not read as "deleted".
+  if (!loading && !routine && loadError) return <LoadError onRetry={refresh} />
   if (!loading && !routine) return <p className="text-chalkdim">{t('routines.notFound')}</p>
   if (!routine) return null
 
@@ -42,7 +45,7 @@ export default function RoutineView() {
           </Link>
         </div>
         <p className="text-chalkdim text-[13px]">
-          {routine.exercises?.length || 0} {t('routines.exercisesCount')} · {t('routines.viewOnly')}
+          {t('routines.exerciseCount')(routine.exercises?.length || 0)} · {t('routines.viewOnly')}
         </p>
         <div className="mt-1">
           <CategoryTag category={routine.category} />
@@ -51,11 +54,9 @@ export default function RoutineView() {
 
       <RoutineExercises routine={routine} nameOf={(it) => nameById[it.exerciseId] || it.name} t={t} />
 
-      <Link to={`/workout/${routine.id}`}>
-        <Button variant="brass" className="w-full">
-          <Play size={15} /> {t('routines.startSession')}
-        </Button>
-      </Link>
+      <Button to={`/workout/${routine.id}`} variant="brass" className="w-full">
+        <Play size={15} /> {loadDraft(effectiveUid, routine.id) ? t('routines.resumeSession') : t('routines.startSession')}
+      </Button>
     </div>
   )
 }
@@ -66,8 +67,8 @@ export function itemTarget(routine, it, t) {
     const intensity = it.targetIntensity != null ? ` · ${it.intensityType === 'hr_zone' ? t('exercises.hrZone') : t('exercises.rpe')} ${it.targetIntensity}` : ''
     return `${it.targetDuration ?? it.targetSets ?? ''} ${t('sessionCard.minUnit')}${intensity}`
   }
-  const reps = it.targetReps !== '' && it.targetReps != null ? `×${it.targetReps}${it.timed ? 's' : ''}` : ''
-  const rir = it.targetRir != null && it.targetRir !== '' ? ` · RIR ${it.targetRir}` : ''
+  const reps = it.targetReps !== '' && it.targetReps != null ? `×${it.targetReps}${it.timed ? t('routines.secSuffix') : ''}` : ''
+  const rir = it.targetRir != null && it.targetRir !== '' ? ` · ${t('routines.rirShort')} ${it.targetRir}` : ''
   return `${it.targetSets ?? ''}${reps}${rir}`
 }
 

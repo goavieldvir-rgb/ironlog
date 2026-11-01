@@ -46,7 +46,7 @@ function clearCachedConsent(uid) {
 // whenever the wording changes.
 export default function ConsentGate({ uid, children }) {
   const { logout } = useAuth()
-  const { t, lang } = useLanguage()
+  const { t, lang, setLang } = useLanguage()
   const { toast } = useFeedback()
   const [state, setState] = useState('checking') // checking | needed | ok | error
   const [isMinor, setIsMinor] = useState(false)
@@ -171,7 +171,25 @@ export default function ConsentGate({ uid, children }) {
     >
       <div className="w-full max-w-lg flex flex-col gap-4">
         <div>
-          <div className="eyebrow mb-1">Ironlog</div>
+          {/* A way out of this screen: the wrong account, or the wrong language. */}
+          <div className="flex items-center justify-between gap-3 mb-1">
+            <div className="eyebrow">Ironlog</div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setLang(lang === 'en' ? 'he' : 'en')}
+                className="hit flex rounded-md bg-surface2 p-0.5 text-xs num"
+                title={t('layout.language')}
+                aria-label={t('layout.language')}
+              >
+                <span className={`px-2 py-1 rounded ${lang === 'en' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>EN</span>
+                <span lang="he" className={`px-2 py-1 rounded ${lang === 'he' ? 'bg-ink text-chalk' : 'text-chalkdim'}`}>עב</span>
+              </button>
+              <button type="button" onClick={logout} className="min-h-[44px] px-3 text-chalkdim text-xs hover:text-chalk">
+                {t('nav.logout')}
+              </button>
+            </div>
+          </div>
           <h1 className="text-3xl">{doc.title}</h1>
           <p className="text-chalkdim text-sm mt-1">{doc.intro}</p>
         </div>

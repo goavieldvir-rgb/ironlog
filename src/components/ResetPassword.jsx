@@ -4,6 +4,7 @@ import { supabase } from '../supabase.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { friendlyAuthError } from '../lib/authErrors.js'
+import { Eye, EyeOff } from 'lucide-react'
 import { Button, Card, Field } from './ui.jsx'
 
 export default function ResetPassword() {
@@ -15,6 +16,7 @@ export default function ResetPassword() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -55,27 +57,41 @@ export default function ResetPassword() {
             <Button onClick={() => navigate('/')}>{t('resetPassword.continueToApp')}</Button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
             <Field label={t('resetPassword.newPassword')}>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                minLength={8}
-                required
-                autoFocus
-              />
+              {/* Passwords are typed left to right in both languages, eye button included. */}
+              <div className="relative" dir="ltr">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="new-password"
+                  className="w-full pe-12"
+                  required
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? t('login.hidePassword') : t('login.showPassword')}
+                  aria-pressed={showPassword}
+                  className="absolute inset-y-0 end-0 w-11 flex items-center justify-center text-chalkdim hover:text-chalk"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </Field>
             <Field label={t('resetPassword.confirmPassword')}>
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
-                minLength={8}
+                autoComplete="new-password"
+                dir="ltr"
                 required
               />
             </Field>
-            {error && <p className="text-irontext text-sm">{error}</p>}
+            {error && <p role="alert" className="text-irontext text-sm">{error}</p>}
             <Button type="submit" disabled={saving} className="w-full">
               {saving ? t('resetPassword.saving') : t('resetPassword.updatePassword')}
             </Button>
