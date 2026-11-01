@@ -1993,6 +1993,52 @@ $function$;
 revoke execute on function public.mark_messages_read(uuid) from public, anon;
 grant execute on function public.mark_messages_read(uuid) to authenticated;
 
+-- ===== Message push (supabase-message-push.sql) =====
+-- A push to the other side of the thread for each new message; see that file.
+
+create or replace function public.on_coach_message()
+ returns trigger
+ language plpgsql
+ security definer
+ set search_path to ''
+as $function$
+declare
+  secret text;
+begin
+  -- A burst of messages buzzes once: while an earlier message from the same
+  -- sender in this thread is still unread and under a minute old, the phone
+  -- already has a notification for it.
+  if exists (
+    select 1 from public.coach_messages m
+     where m.trainee_id = new.trainee_id and m.sender_id = new.sender_id
+       and m.id <> new.id and m.read_at is null
+       and m.created_at > now() - interval '60 seconds'
+  ) then
+    return null;
+  end if;
+
+  select value into secret from public.push_config where key = 'cron_secret';
+  if secret is null then return null; end if;
+  -- A failed request must never stop the message itself from saving.
+  begin
+    perform net.http_post(
+      url := 'https://hwdgjkiwanxluicdpndh.supabase.co/functions/v1/send-workout-reminders',
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret', secret),
+      body := jsonb_build_object('message_id', new.id)
+    );
+  exception when others then
+    raise warning 'message push failed: %', sqlerrm;
+  end;
+  return null;
+end;
+$function$;
+
+revoke execute on function public.on_coach_message() from public, anon, authenticated;
+
+drop trigger if exists trg_coach_message_push on public.coach_messages;
+create trigger trg_coach_message_push after insert on public.coach_messages
+  for each row execute function public.on_coach_message();
+
 -- ===== Reminder weekdays (supabase-reminder-days.sql) =====
 -- Which weekdays a phone gets the daily reminder: 0 = Sunday ... 6 = Saturday,
 -- in the subscription's own time zone.

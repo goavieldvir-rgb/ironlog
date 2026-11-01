@@ -89,7 +89,19 @@ self.addEventListener('push', (event) => {
   let data = {}
   try { data = event.data ? event.data.json() : {} } catch { /* ignore bad payload */ }
   const title = data.title || 'Ironlog'
-  event.waitUntil(
+  const isMessage = typeof data.tag === 'string' && data.tag.startsWith('ironlog-msg-')
+  const jobs = []
+  // The unread count on the app icon, where the phone supports it (iPhone
+  // Home Screen apps, Android and desktop Chrome).
+  if (isMessage && typeof data.count === 'number' && self.navigator.setAppBadge) {
+    jobs.push((data.count > 0 ? self.navigator.setAppBadge(data.count) : self.navigator.clearAppBadge()).catch(() => {}))
+  }
+  // An open app refreshes its unread badges right away.
+  if (isMessage) {
+    jobs.push(self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((list) => list.forEach((c) => c.postMessage({ type: 'ironlog-message' }))).catch(() => {}))
+  }
+  jobs.push(
     self.registration.showNotification(title, {
       body: data.body || '',
       icon: './apple-touch-icon.png',
@@ -98,13 +110,15 @@ self.addEventListener('push', (event) => {
       tag: data.tag || 'ironlog-reminder',
       // "Rest over" replaces the rest timer's quiet lock screen card, and
       // must still sound and vibrate when it does.
-      renotify: data.tag === 'ironlog-rest-timer',
+      // A new message in a thread that already has a card still buzzes.
+      renotify: data.tag === 'ironlog-rest-timer' || isMessage,
       lang: data.lang,
       dir: data.lang === 'he' ? 'rtl' : 'ltr',
       // A screen inside the app to open on tap, such as '#/history/<id>'.
       data: { url: typeof data.url === 'string' && data.url.startsWith('#/') ? data.url : '' },
     }),
   )
+  event.waitUntil(Promise.all(jobs))
 })
 
 self.addEventListener('notificationclick', (event) => {

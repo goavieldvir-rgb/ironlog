@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Navigate } from 'react-router-dom'
-import { SendHorizontal, RotateCw, X } from 'lucide-react'
+import { Link, Navigate } from 'react-router-dom'
+import { SendHorizontal, RotateCw, X, BellRing } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -8,6 +8,7 @@ import { dateLocale } from '../lib/dates.js'
 import { fetchThread, sendMessage, markThreadRead, clearUnread, refreshUnread, useMessagesState, MESSAGE_MAX } from '../lib/messages.js'
 import { LoadError } from './ui.jsx'
 import { PageLoader } from './Loading.jsx'
+import { pushStatus } from '../lib/push.js'
 
 const POLL_MS = 30000
 
@@ -49,7 +50,7 @@ export function MessageThread({ traineeId, viewerId, side, listClass = 'max-h-[2
         if (document.visibilityState === 'visible' && data.some((m) => !m.read_at && isOther(m))) {
           markThreadRead(traineeId)
             .then(() => {
-              if (side === 'trainee') clearUnread()
+              clearUnread(side === 'coach' ? traineeId : undefined)
               onRead?.()
             })
             .catch((e) => console.error(e))
@@ -223,7 +224,44 @@ export default function Messages() {
         <div className="eyebrow mb-1">{t('messages.coach')}</div>
         <h1 className="text-[30px] leading-9">{t('messages.title')}</h1>
       </div>
+      <NotifyHint t={t} />
       <MessageThread traineeId={user.uid} viewerId={user.uid} side="trainee" listClass="min-h-[40dvh] max-h-[calc(100dvh-22rem)]" />
     </div>
+  )
+}
+
+// Push for messages rides on this phone's notification subscription. When
+// there is none, say so once here, with the way to turn it on.
+function NotifyHint({ t }) {
+  const [show, setShow] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const status = pushStatus()
+        if (status === 'unsupported') return
+        if (status === 'ready' && Notification.permission === 'granted') {
+          const reg = await navigator.serviceWorker.getRegistration()
+          if (await reg?.pushManager.getSubscription()) return
+        }
+        if (!cancelled) setShow(true)
+      } catch {
+        // Can't tell: say nothing.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  if (!show) return null
+  return (
+    <Link to="/notifications" className="press-row card !p-3.5 flex items-start gap-3">
+      <BellRing size={18} className="text-accent shrink-0 mt-0.5" aria-hidden="true" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-[14px] font-semibold leading-5">{t('messages.notifyTitle')}</span>
+        <span className="block text-[13px] text-chalkdim leading-5 mt-0.5">{t('messages.notifyBody')}</span>
+        <span className="block text-[13px] text-accent font-medium mt-1">{t('messages.notifyAction')}</span>
+      </span>
+    </Link>
   )
 }

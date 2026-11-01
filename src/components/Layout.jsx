@@ -25,6 +25,9 @@ export default function Layout() {
   const { isAdmin, nutritionAllowed, actingAs, setActingAs } = useAdmin()
   const { t, lang, setLang } = useLanguage()
   const { enabled: messagesOn, unread: unreadMessages } = useMessagesState()
+  // Where the unread count shows: People for the coach, Messages (under More
+  // on phones) for a trainee.
+  const unreadTo = isAdmin ? '/people' : '/messages'
   const [open, setOpen] = useState(false)
   useScrollLock(open)
   const location = useLocation()
@@ -68,6 +71,8 @@ export default function Layout() {
     ...(isAdmin ? [{ to: '/people', labelKey: 'nav.people', icon: Users }] : []),
     ...(nutritionAllowed ? [{ to: '/nutrition', labelKey: 'nav.nutrition', icon: Apple }] : []),
   ]
+  // Desktop only: phones reach Messages from More.
+  const desktopLinks = messagesOn ? [...navLinks, { to: '/messages', labelKey: 'messages.nav', icon: MessageSquare }] : navLinks
 
   // The four destinations used every day, plus More for everything else.
   // Nutrition takes the second slot only for people whose coach turned it on.
@@ -138,7 +143,7 @@ export default function Layout() {
           )}
 
           <nav className="hidden md:flex items-center gap-1">
-            {navLinks.map((l) => (
+            {desktopLinks.map((l) => (
               <NavLink
                 key={l.to}
                 to={l.to}
@@ -151,6 +156,7 @@ export default function Layout() {
               >
                 <l.icon size={16} />
                 {t(l.labelKey)}
+                {l.to === unreadTo && <CountBadge n={unreadMessages} label={t('messages.unreadLabel')} />}
               </NavLink>
             ))}
           </nav>
@@ -265,7 +271,7 @@ export default function Layout() {
                   }
                 >
                   <MessageSquare size={16} /> {t('messages.nav')}
-                  {unreadMessages > 0 && <span role="img" aria-label={t('messages.unreadLabel')(unreadMessages)} className="w-2 h-2 rounded-full bg-accent" />}
+                  <CountBadge n={unreadMessages} label={t('messages.unreadLabel')} />
                 </NavLink>
               )}
               <NavLink
@@ -350,7 +356,10 @@ export default function Layout() {
                   }`
                 }
               >
-                <tab.icon size={22} strokeWidth={1.75} aria-hidden="true" />
+                <span className="relative">
+                  <tab.icon size={22} strokeWidth={1.75} aria-hidden="true" />
+                  {tab.to === unreadTo && <CountBadge n={unreadMessages} label={t('messages.unreadLabel')} corner />}
+                </span>
                 <span className="truncate max-w-full px-1">{t(tab.labelKey)}</span>
               </NavLink>
             ))}
@@ -363,7 +372,7 @@ export default function Layout() {
             >
               <span className="relative">
                 <Ellipsis size={22} strokeWidth={1.75} aria-hidden="true" />
-                {unreadMessages > 0 && <span aria-hidden="true" className="absolute -top-0.5 -end-1 w-2 h-2 rounded-full bg-accent" />}
+                {!isAdmin && <CountBadge n={unreadMessages} label={t('messages.unreadLabel')} corner />}
               </span>
               <span>{t('nav.more')}</span>
             </button>
@@ -371,5 +380,22 @@ export default function Layout() {
         </>
       )}
     </div>
+  )
+}
+
+// The unread message count: a small accent pill, pinned to an icon's corner
+// in the tab bar, inline elsewhere. Nothing at zero.
+function CountBadge({ n, label, corner = false }) {
+  if (!n) return null
+  return (
+    <span
+      role="img"
+      aria-label={label(n)}
+      className={`num inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-accent text-ink text-[11px] font-bold leading-none ${
+        corner ? 'absolute -top-1.5 -end-2.5 ring-2 ring-[#242428]' : ''
+      }`}
+    >
+      {n > 99 ? '99+' : n}
+    </span>
   )
 }

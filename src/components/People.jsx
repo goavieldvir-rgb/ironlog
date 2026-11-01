@@ -12,7 +12,7 @@ import { InfoTip } from './InfoTip.jsx'
 import { PageLoader } from './Loading.jsx'
 import CoachTasks from './CoachTasks.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
-import { fetchUnreadByTrainee, messagesMissing } from '../lib/messages.js'
+import { useMessagesState } from '../lib/messages.js'
 import { fetchRoster, fetchRecentPrs, rosterFlags, attentionScore, adherence, daysSince, recordInvite } from '../lib/coach.js'
 
 // The coach's roster: who needs attention first, how each trainee is doing
@@ -30,19 +30,15 @@ export default function People() {
   const [query, setQuery] = useState('')
   const [view, setView] = useState('attention')
   const [recentPrs, setRecentPrs] = useState([])
-  // Unread messages per trainee; stays empty before the SQL is run.
-  const [unreadMsgs, setUnreadMsgs] = useState({})
+  // Unread messages per trainee, kept fresh app-wide (a push or a minute on
+  // screen refreshes it); stays empty before the SQL is run.
+  const { byTrainee: unreadMsgs } = useMessagesState()
   const today = toLocalISODate()
 
   // Only the desktop side panel shows this, so it never blocks the list.
   useEffect(() => {
     fetchRecentPrs(today).then(setRecentPrs).catch((e) => console.error(e))
   }, [reload, today])
-
-  useEffect(() => {
-    if (messagesMissing()) return
-    fetchUnreadByTrainee().then(setUnreadMsgs).catch((e) => console.error(e))
-  }, [reload])
 
   useEffect(() => {
     let cancelled = false
