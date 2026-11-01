@@ -468,7 +468,7 @@ function FoundCard({ result, lang, meal, setMeal, onAgain, onAdd }) {
           <Button variant="ghost" className="min-h-[52px] px-4 shrink-0" onClick={onAgain} aria-label={t('nutrition.scanAgain')}>
             <ScanBarcode size={20} />
           </Button>
-          <Button variant="brass" className="flex-1 min-h-[52px] text-base" disabled={!a.valid} onClick={() => onAdd(food, a.option, a.q, meal)}>
+          <Button variant="brass" className="flex-1 min-h-[52px] text-base" disabled={!a.valid} onClick={async () => (await onAdd(food, a.option, a.q, meal)) && onAgain()}>
             <Plus size={20} /> {t('nutrition.addToButton', { meal: mealLabel(t, meal) })}
           </Button>
         </div>

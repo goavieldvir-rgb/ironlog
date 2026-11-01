@@ -2,10 +2,11 @@ import React, { useState } from 'react'
 import { AlertCircle, AlertTriangle, Check } from 'lucide-react'
 import { useLanguage } from '../../context/LanguageContext.jsx'
 import { Button } from '../ui.jsx'
-import { createLabelFood, findFoodsByBarcode, foodName, friendlyError, parseNum, sanityCheck, fmt } from '../../lib/nutrition.js'
+import { createLabelFood, findFoodsByBarcode, foodName, friendlyError, parseNum, round1, sanityCheck, fmt } from '../../lib/nutrition.js'
 import { MacroInputs, Name, SheetHeader, SourceLabel, useDirtyForm } from './parts.jsx'
 
-// Add a product from its label ("new product"). Values are per 100 g.
+// Add a product from its label ("new product"). Values are per 100 g or per
+// serving; per-serving entries are converted to per 100 g before saving.
 export default function LabelForm({ barcode: initialBarcode = '', prefill, uid, isAdmin, onBack, onClose, onSaved, onUseExisting }) {
   const { t, lang } = useLanguage()
   const scanned = !!initialBarcode
@@ -13,6 +14,7 @@ export default function LabelForm({ barcode: initialBarcode = '', prefill, uid, 
   const [f, setF] = useState({
     name: (incomplete && (prefill.name || prefill.brand)) || '',
     barcode: initialBarcode,
+    mode: 'per100',
     kcal: '',
     protein: '',
     carbs: '',
@@ -26,9 +28,16 @@ export default function LabelForm({ barcode: initialBarcode = '', prefill, uid, 
   const [initial] = useState(f)
   useDirtyForm(Object.keys(f).some((k) => f[k] !== initial[k]))
 
-  const num = (k) => parseNum(f[k])
-  const filled = ['kcal', 'protein', 'carbs', 'fat'].every((k) => f[k] !== '' && Number.isFinite(num(k)))
-  const sanity = filled ? sanityCheck({ kcal: num('kcal'), protein: num('protein'), carbs: num('carbs'), fat: num('fat') }) : null
+  const perServing = f.mode === 'serving'
+  // Blank carbs/fat count as 0; kcal and protein are required.
+  const val = (k) => (f[k] === '' && (k === 'carbs' || k === 'fat') ? 0 : parseNum(f[k]))
+  const servingG = parseNum(f.serving)
+  const servingOk = Number.isFinite(servingG) && servingG > 0
+  const filled = ['kcal', 'protein', 'carbs', 'fat'].every((k) => Number.isFinite(val(k)))
+  // Values per 100 g, whichever way they were typed.
+  const per100 = (k) => (perServing ? round1((val(k) * 100) / servingG) : val(k))
+  const ready = filled && (!perServing || servingOk)
+  const sanity = ready ? sanityCheck({ kcal: per100('kcal'), protein: per100('protein'), carbs: per100('carbs'), fat: per100('fat') }) : null
 
   async function save(e) {
     e.preventDefault()
@@ -37,9 +46,10 @@ export default function LabelForm({ barcode: initialBarcode = '', prefill, uid, 
     const name = f.name.trim()
     const code = f.barcode.replace(/\s+/g, '')
     if (!name) return setError(t('nutrition.needName'))
-    if (!filled) return setError(t('nutrition.needValues'))
+    if (perServing && !servingOk) return setError(t('nutrition.needServing'))
+    if (!filled) return setError(t('nutrition.needKcalProtein'))
     if (code && !/^\d{8,14}$/.test(code)) return setError(t('nutrition.badBarcode'))
-    const vals = { kcal: num('kcal'), protein: num('protein'), carbs: num('carbs'), fat: num('fat') }
+    const vals = { kcal: per100('kcal'), protein: per100('protein'), carbs: per100('carbs'), fat: per100('fat') }
     if (Object.values(vals).some((v) => v < 0) || vals.kcal > 900 || vals.protein > 100 || vals.carbs > 100 || vals.fat > 100) {
       return setError(t('nutrition.outOfRange'))
     }
@@ -52,8 +62,7 @@ export default function LabelForm({ barcode: initialBarcode = '', prefill, uid, 
           return
         }
       }
-      const serving = parseNum(f.serving)
-      const food = await createLabelFood({ uid, isAdmin, lang, name, barcode: code, ...vals, serving: Number.isFinite(serving) && serving > 0 ? serving : 0 })
+      const food = await createLabelFood({ uid, isAdmin, lang, name, barcode: code, ...vals, serving: servingOk ? servingG : 0 })
       await onSaved(food)
     } catch (err) {
       console.error(err)
@@ -106,20 +115,37 @@ export default function LabelForm({ barcode: initialBarcode = '', prefill, uid, 
           )}
           <div>
             <div className="flex items-baseline justify-between gap-2">
-              <h3 className="text-lg">{t('nutrition.valuesPer100Title')}</h3>
+              <h3 className="text-lg">{t(perServing ? 'nutrition.valuesPerServingTitle' : 'nutrition.valuesPer100Title')}</h3>
               <span className="text-xs text-chalkdim">{t('nutrition.fromLabel')}</span>
+            </div>
+            <div role="radiogroup" aria-label={t('nutrition.valuesBasis')} className="grid grid-cols-2 gap-1 p-1 mt-3 rounded-[14px] bg-surface2">
+              {[
+                ['per100', t('nutrition.basisPer100')],
+                ['serving', t('nutrition.basisPerServing')],
+              ].map(([k, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  role="radio"
+                  aria-checked={f.mode === k}
+                  onClick={() => setF((s) => ({ ...s, mode: k }))}
+                  className={`min-h-[44px] rounded-[11px] text-sm font-medium press transition-colors ${f.mode === k ? 'bg-chalk text-ink' : 'text-chalkdim hover:text-chalk'}`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
             <div className="mt-3">
               <MacroInputs values={f} onChange={(k, v) => setF((s) => ({ ...s, [k]: v }))} />
             </div>
-            {filled &&
+            {ready &&
               (sanity ? (
                 <div className="mt-3 rounded-[14px] bg-surface2 p-3 flex gap-2.5 text-sm" role="status">
                   <AlertTriangle size={18} className="shrink-0 mt-0.5 text-chalkdim" aria-hidden="true" />
                   <p>
                     {sanity.kind === 'kcal'
-                      ? t('nutrition.sanityKcal', { kcal: fmt(num('kcal'), 0), est: fmt(sanity.est, 0) })
-                      : t('nutrition.sanityMacros')}
+                      ? t(perServing ? 'nutrition.sanityKcalServing' : 'nutrition.sanityKcal', { kcal: fmt(per100('kcal'), 0), est: fmt(sanity.est, 0) })
+                      : t(perServing ? 'nutrition.sanityMacrosServing' : 'nutrition.sanityMacros')}
                   </p>
                 </div>
               ) : (
@@ -130,9 +156,9 @@ export default function LabelForm({ barcode: initialBarcode = '', prefill, uid, 
           </div>
           <label className="flex flex-col gap-1.5">
             <span className="text-sm text-chalkdim">
-              {t('nutrition.servingSize')} ({t('nutrition.servingOptional')})
+              {t('nutrition.servingSize')} {!perServing && <>({t('nutrition.servingOptional')})</>}
             </span>
-            <input inputMode="decimal" dir="ltr" className="num w-full !text-lg" value={f.serving} onChange={set('serving')} placeholder={g} />
+            <input inputMode="decimal" dir="ltr" className="num w-full !text-lg" value={f.serving} onChange={set('serving')} placeholder={g} required={perServing} />
           </label>
           {/* the not-found banner already says who the product is saved for */}
           {!(scanned && !incomplete) && (
