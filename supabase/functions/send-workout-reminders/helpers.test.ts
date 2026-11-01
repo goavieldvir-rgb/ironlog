@@ -1,5 +1,5 @@
 // Run with: deno test supabase/functions/send-workout-reminders/helpers.test.ts
-import { coachTasksCopy, feedbackCopy, isAllowedEndpoint, isDue, localParts, reminderKind } from './helpers.ts'
+import { coachTasksCopy, feedbackCopy, messageCopy, isAllowedEndpoint, isDue, localParts, reminderKind } from './helpers.ts'
 
 const assert = (c: boolean, m: string) => { if (!c) throw new Error('FAIL ' + m) }
 
@@ -63,4 +63,12 @@ Deno.test('coach tasks push', () => {
   assert(he.body.startsWith('Dana לא התאמן/ה 6 ימים'), 'quiet line')
   const en = coachTasksCopy('en', tasks.slice(3, 4))
   assert(en.title === '1 thing needs you' && en.body === 'Order bands', 'single custom task')
+})
+
+Deno.test('message push copy', () => {
+  const a = messageCopy('en', { toCoach: true, name: 'Dana', text: '  hi\n coach ', unread: 1 })
+  assert(a.title === 'Message from Dana' && a.body === 'hi coach', 'to coach')
+  const b = messageCopy('he', { toCoach: false, name: '', text: 'x'.repeat(200), unread: 3 })
+  assert(b.title === 'הודעה מהמאמן (3)' && b.body.length === 140 && b.body.endsWith('…'), 'to trainee, cut, counted')
+  assert(messageCopy('en', { toCoach: true, name: '', text: 'a', unread: 1 }).title === 'Message from a trainee', 'no name')
 })

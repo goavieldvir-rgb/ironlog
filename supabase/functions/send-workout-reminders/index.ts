@@ -1,19 +1,21 @@
 // Sends the daily "you have a workout today" web push, the "your coach left
 // feedback" push, the coach's morning "needs attention" push, the "rest is
 // over" push for a rest timer running in the background, and the
-// on-demand "send a test notification" from the Notifications page.
+// on-demand "send a test notification" from the Notifications page, and
+// the "new message" push to the other side of a coach message thread.
 //
 // Two ways in (deploy with verify_jwt = false, the function checks itself):
 //  - the database, with header x-cron-secret matching push_config: pg_cron
 //    every 15 minutes for reminders, or the trainer feedback trigger
 //    (supabase-coach-feedback.sql) with { feedback_session_id }, or the
 //    morning coach tasks job (supabase-coach-tasks.sql) with { coach_tasks },
-//    or the rest timer job (supabase-rest-timer-push.sql) with { rest_alerts }.
+//    or the rest timer job (supabase-rest-timer-push.sql) with { rest_alerts },
+//    or the new message trigger (supabase-message-push.sql) with { message_id }.
 //  - the app's test button: the signed-in user's own token; sends only to
 //    that user's own subscriptions, at most once a minute.
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import webpush from 'npm:web-push@3.6.7'
-import { coachTasksCopy, feedbackCopy, isAllowedEndpoint, isDue, localParts, reminderKind } from './helpers.ts'
+import { coachTasksCopy, feedbackCopy, messageCopy, isAllowedEndpoint, isDue, localParts, reminderKind } from './helpers.ts'
 
 const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
@@ -49,7 +51,7 @@ const REST_DONE_COPY = {
 const REST_STALE_MS = 120_000
 
 // Returns 'sent' | 'removed' (expired on the phone's side). Throws otherwise.
-async function deliver(s: any, msg: { title: string; body: string; url?: string }, tag: string, ttl = 3600) {
+async function deliver(s: any, msg: { title: string; body: string; url?: string; count?: number }, tag: string, ttl = 3600) {
   if (!isAllowedEndpoint(s.endpoint)) {
     await db.from('push_subscriptions').delete().eq('id', s.id)
     return 'removed'
@@ -215,6 +217,68 @@ async function runCoachTasks() {
   return json({ sent, removed, failed, ntfy })
 }
 
+// A new message goes to the other side of its thread: the trainee's devices
+// when the coach wrote, every coach's devices when the trainee wrote. One tag
+// per thread, so a phone shows one card per conversation. The unread count
+// also sets the app icon's badge where the phone supports it.
+async function runMessage(messageId: string) {
+  const { data: m } = await db.from('coach_messages')
+    .select('id, trainee_id, sender_id, body, read_at').eq('id', messageId).maybeSingle()
+  if (!m) return json({ error: 'no message' }, 404)
+  if (m.read_at) return json({ sent: 0, read: true })
+
+  const toCoach = m.sender_id === m.trainee_id
+  let recipients: string[]
+  if (toCoach) {
+    const { data: admins } = await db.from('profiles').select('id').eq('is_admin', true)
+    // A coach writing in their own thread needs no alert.
+    recipients = (admins || []).map((a) => a.id).filter((id) => id !== m.sender_id)
+  } else {
+    recipients = [m.trainee_id]
+  }
+  if (!recipients.length) return json({ sent: 0 })
+
+  let name = ''
+  if (toCoach) {
+    const { data: p } = await db.from('profiles').select('full_name, email').eq('id', m.trainee_id).maybeSingle()
+    name = p?.full_name || p?.email?.split('@')[0] || ''
+  }
+
+  // Unread in this thread, and in total for the app icon badge.
+  const unreadQ = () => db.from('coach_messages').select('id', { count: 'exact', head: true }).is('read_at', null)
+  const { count: inThread } = toCoach
+    ? await unreadQ().eq('trainee_id', m.trainee_id).eq('sender_id', m.trainee_id)
+    : await unreadQ().eq('trainee_id', m.trainee_id).neq('sender_id', m.trainee_id)
+  let total = inThread || 0
+  if (toCoach) {
+    const { data: rows } = await db.from('coach_messages').select('trainee_id, sender_id').is('read_at', null).limit(1000)
+    total = (rows || []).filter((r) => r.sender_id === r.trainee_id).length
+  }
+
+  const { data: subs } = await db.from('push_subscriptions').select('*').in('user_id', recipients)
+  const url = toCoach ? `#/people/${m.trainee_id}` : '#/messages'
+  let sent = 0, removed = 0, failed = 0
+  for (const s of subs || []) {
+    try {
+      const msg = messageCopy(s.lang, { toCoach, name, text: m.body, unread: inThread || 1 })
+      const r = await deliver(s, { ...msg, url, count: total }, `ironlog-msg-${m.trainee_id}`, 86400)
+      if (r === 'sent') sent++
+      else removed++
+    } catch (e: any) {
+      console.error('message push failed', s.id, e?.message || e)
+      failed++
+    }
+  }
+  // No coach phone took it: ntfy instead, with the name only. The message
+  // text stays inside the app.
+  let ntfy = false
+  if (toCoach && !sent) {
+    const msg = messageCopy('he', { toCoach, name, text: '', unread: inThread || 1 })
+    ntfy = !(await db.rpc('send_admin_push', { p_title: 'Ironlog: ' + msg.title, p_message: 'פתחו את Ironlog כדי לקרוא ולענות.' })).error
+  }
+  return json({ sent, removed, failed, ntfy })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
   if (req.method !== 'POST') return json({ error: 'method' }, 405)
@@ -229,6 +293,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}))
     if (body?.coach_tasks) return runCoachTasks()
     if (body?.rest_alerts) return runRestAlerts()
+    if (body?.message_id) return runMessage(String(body.message_id))
     return body?.feedback_session_id ? runFeedback(String(body.feedback_session_id)) : runReminders()
   }
   return runTest(req)

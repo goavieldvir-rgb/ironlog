@@ -86,7 +86,8 @@ export default function Dashboard() {
   const { actingAs, effectiveUid, effectiveName } = useAdmin()
   const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
-  const { unread: unreadMessages } = useMessagesState()
+  const { unread: unreadMessages, latest: latestMessage, threads: coachThreads } = useMessagesState()
+  const { isAdmin } = useAdmin()
   const [exercises, exercisesLoading, refreshExercises, exercisesError] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [routines, routinesLoading, refreshRoutines, routinesError] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [sessions, sessionsLoading, refreshSessions, sessionsError] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
@@ -245,15 +246,23 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {unreadMessages > 0 && (
-        <Link to="/messages" className="card press-row !p-4 flex items-center gap-3">
-          <MessageSquareText size={20} className="shrink-0 text-accent" aria-hidden="true" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-semibold">{t('messages.newFromCoach')}</span>
-            <span className="block text-[13px] text-chalkdim num">{t('messages.unreadCount')(unreadMessages)}</span>
-          </span>
-          <ForwardChevron size={16} className="text-chalkdim shrink-0" />
-        </Link>
+      {/* New messages lead the page, for both sides: a trainee sees their
+          coach's newest message, the coach sees who wrote. Hidden while the
+          coach is managing someone else's account. */}
+      {!actingAs && unreadMessages > 0 && (isAdmin ? coachThreads.length > 0 : true) && (
+        <MessageBanner
+          to={isAdmin ? (coachThreads.length === 1 ? `/people/${coachThreads[0].traineeId}` : '/people') : '/messages'}
+          title={
+            isAdmin
+              ? coachThreads.length === 1
+                ? t('messages.newFrom')(coachThreads[0].name)
+                : t('messages.newFromMany')(coachThreads[0].name, coachThreads.length - 1)
+              : t('messages.newFromCoach')
+          }
+          preview={isAdmin ? coachThreads[0].latest?.body : latestMessage?.body}
+          count={unreadMessages}
+          t={t}
+        />
       )}
 
       {drafts.map((draft) => (
@@ -599,5 +608,31 @@ function WeightQuickCard({ last, t, onSave, onHide }) {
         </div>
       </form>
     </Card>
+  )
+}
+
+// The new message card at the top of Home: accent edge, the newest message
+// in two lines, and the unread count.
+function MessageBanner({ to, title, preview, count, t }) {
+  return (
+    <Link
+      to={to}
+      className="press-row relative overflow-hidden flex items-start gap-3 rounded-[18px] bg-accent/10 border border-accent/40 ps-5 pe-4 py-3.5 text-chalk"
+    >
+      <span aria-hidden="true" className="absolute inset-y-0 start-0 w-1 bg-accent" />
+      <span className="relative shrink-0 mt-0.5">
+        <MessageSquareText size={20} className="text-accent" aria-hidden="true" />
+        <span aria-hidden="true" className="absolute -top-1 -end-1 w-2.5 h-2.5 rounded-full bg-accent ring-2 ring-ink animate-pulse" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-start justify-between gap-2">
+          <span className="text-[15px] font-semibold leading-5 min-w-0 break-words">{title}</span>
+          <span className="num shrink-0 mt-px text-[11px] leading-[18px] font-bold rounded-full bg-accent text-ink px-1.5 min-w-[18px] text-center">{count > 99 ? '99+' : count}</span>
+        </span>
+        {preview && <span className="text-[14px] leading-5 text-chalkdim mt-1 line-clamp-2 break-words">{preview}</span>}
+        <span className="block text-[13px] text-accent font-medium mt-1.5">{t('messages.openReply')}</span>
+      </span>
+      <ForwardChevron size={16} className="text-chalkdim shrink-0 self-center" />
+    </Link>
   )
 }

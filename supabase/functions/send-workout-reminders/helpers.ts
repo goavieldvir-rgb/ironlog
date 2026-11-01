@@ -94,3 +94,18 @@ export function coachTasksCopy(lang: string, tasks: CoachTask[], max = 4) {
     : (he ? `${tasks.length} משימות למאמן` : `${tasks.length} things need you`)
   return { title, body: lines.join('\n') }
 }
+
+// A new coach message. To the trainee it comes from "your coach"; to the
+// coach it carries the trainee's name. The text itself is the body, cut to a
+// lock screen; more than one unread in the thread shows the count.
+export function messageCopy(lang: string, opts: { toCoach: boolean; name: string; text: string; unread: number }) {
+  const he = lang === 'he'
+  const text = opts.text.trim().replace(/\s+/g, ' ')
+  const body = text.length > 140 ? text.slice(0, 139) + '…' : text
+  const name = opts.name.trim()
+  let title = opts.toCoach
+    ? (name ? (he ? `הודעה מ${name}` : `Message from ${name}`) : (he ? 'הודעה ממתאמן/ת' : 'Message from a trainee'))
+    : (he ? 'הודעה מהמאמן' : 'Message from your coach')
+  if (opts.unread > 1) title += ` (${opts.unread})`
+  return { title, body }
+}
