@@ -170,7 +170,7 @@ function computeTotals(sessions) {
   return { totalSets, totalVolume, totalCardioMinutes, totalCardioKm }
 }
 
-function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t, lang, exById }) {
+function buildSummary({ mode, start, end, sessions, bodyWeights, waists, personName, t, lang, exById }) {
   const lines = []
   const modeLabel = {
     week: t('summary.docWeekly'),
@@ -217,6 +217,14 @@ function buildSummary({ mode, start, end, sessions, bodyWeights, personName, t, 
     lines.push('')
   }
 
+  if (waists.length > 0) {
+    lines.push(`## ${t('summary.docWaist')}`)
+    for (const w of [...waists].sort((a, b) => (a.date < b.date ? -1 : 1))) {
+      lines.push(`- ${formatDay(lang, w.date)}: ${w.waist}${w.unit || ''}`)
+    }
+    lines.push('')
+  }
+
   return lines.join('\n')
 }
 
@@ -232,7 +240,7 @@ function Chip({ value, label }) {
 // On-screen version of the export, built from the same data and helpers as
 // buildSummary (which stays the source of the Copy/Download text). Mixed
 // English/Hebrew fragments sit in <bdi> so they keep their own direction.
-function SummaryPreview({ mode, start, end, sessions, bodyWeights, personName, t, lang, exById }) {
+function SummaryPreview({ mode, start, end, sessions, bodyWeights, waists, personName, t, lang, exById }) {
   const modeLabel = {
     week: t('summary.docWeekly'),
     month: t('summary.docMonthly'),
@@ -332,6 +340,27 @@ function SummaryPreview({ mode, start, end, sessions, bodyWeights, personName, t
           </ul>
         </Card>
       )}
+
+      {waists.length > 0 && (
+        <Card className="flex flex-col gap-2">
+          <h3 className="text-lg leading-tight">{t('summary.docWaist')}</h3>
+          <ul className="flex flex-col divide-y divide-line">
+            {[...waists]
+              .sort((a, b) => (a.date < b.date ? -1 : 1))
+              .map((w) => (
+                <li key={w.id || w.date} className="flex items-center justify-between gap-2 py-2 first:pt-0 last:pb-0">
+                  <span className="text-chalkdim text-sm">{formatDay(lang, w.date)}</span>
+                  <span className="num text-chalk text-sm">
+                    <bdi dir="ltr">
+                      {w.waist}
+                      {w.unit || ''}
+                    </bdi>
+                  </span>
+                </li>
+              ))}
+          </ul>
+        </Card>
+      )}
     </div>
   )
 }
@@ -342,6 +371,7 @@ export default function WeeklySummary() {
   const MODES = getModes(t)
   const [rawSessions, loading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   const [bodyWeightAll] = useCollection(effectiveUid, 'body_weight_logs', 'date', 'desc')
+  const [waistAll] = useCollection(effectiveUid, 'waist_logs', 'date', 'desc')
   const [exercises, exercisesLoading] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const sessions = useMemo(() => applyCurrentTimed(rawSessions, exercises), [rawSessions, exercises])
   const [routines, routinesLoading] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
@@ -358,7 +388,7 @@ export default function WeeklySummary() {
     setOffset(0)
   }
 
-  const { start, end, periodSessions, periodBodyWeights } = useMemo(() => {
+  const { start, end, periodSessions, periodBodyWeights, periodWaists } = useMemo(() => {
     const { start, end } = computeRange(mode, offset, customStart, customEnd)
     const startISO = toISO(start)
     const endISO = toISO(end)
@@ -367,8 +397,9 @@ export default function WeeklySummary() {
       end,
       periodSessions: sessions.filter((s) => s.date >= startISO && s.date <= endISO),
       periodBodyWeights: bodyWeightAll.filter((b) => b.date >= startISO && b.date <= endISO),
+      periodWaists: waistAll.filter((b) => b.date >= startISO && b.date <= endISO),
     }
-  }, [sessions, bodyWeightAll, mode, offset, customStart, customEnd])
+  }, [sessions, bodyWeightAll, waistAll, mode, offset, customStart, customEnd])
 
   const summaryText = useMemo(
     () =>
@@ -378,12 +409,13 @@ export default function WeeklySummary() {
         end,
         sessions: periodSessions,
         bodyWeights: periodBodyWeights,
+        waists: periodWaists,
         personName: actingAs ? effectiveName : null,
         t,
         lang,
         exById,
       }),
-    [mode, start, end, periodSessions, periodBodyWeights, actingAs, effectiveName, t, lang, exById],
+    [mode, start, end, periodSessions, periodBodyWeights, periodWaists, actingAs, effectiveName, t, lang, exById],
   )
 
   async function handleCopy() {
@@ -410,6 +442,7 @@ export default function WeeklySummary() {
       routines,
       sessions,
       body_weight_logs: bodyWeightAll,
+      waist_logs: waistAll,
     }
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -510,6 +543,7 @@ export default function WeeklySummary() {
           end={end}
           sessions={periodSessions}
           bodyWeights={periodBodyWeights}
+          waists={periodWaists}
           personName={actingAs ? effectiveName : null}
           t={t}
           lang={lang}
