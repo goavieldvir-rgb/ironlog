@@ -5,6 +5,7 @@ import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useCollection } from '../lib/db.js'
+import { cleanRest, formatRest } from '../lib/rest.js'
 import { loadDraft } from '../lib/draft.js'
 import { Button, CategoryTag, LoadError } from './ui.jsx'
 
@@ -69,7 +70,8 @@ export function itemTarget(routine, it, t) {
   }
   const reps = it.targetReps !== '' && it.targetReps != null ? `×${it.targetReps}${it.timed ? t('routines.secSuffix') : ''}` : ''
   const rir = it.targetRir != null && it.targetRir !== '' ? ` · ${t('routines.rirShort')} ${it.targetRir}` : ''
-  return `${it.targetSets ?? ''}${reps}${rir}`
+  const rest = cleanRest(it.restSeconds) != null ? ` · ${t('rest.short')} ${formatRest(cleanRest(it.restSeconds))}` : ''
+  return `${it.targetSets ?? ''}${reps}${rir}${rest}`
 }
 
 // The full exercise list of a routine, read-only. Shared with the coach page.

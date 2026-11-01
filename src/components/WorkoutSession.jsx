@@ -18,6 +18,7 @@ import RestTimer, { clearSavedRest } from './RestTimer.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { useWakeLock } from '../lib/wakeLock.js'
 import { isWarmup, workingSets } from '../lib/warmup.js'
+import { restFor } from '../lib/rest.js'
 import { buildSummary } from '../lib/shareSummary.js'
 import { recordBaseline } from '../lib/records.js'
 import { entryName, exerciseMap } from '../lib/names.js'
@@ -65,6 +66,11 @@ function withKeys(list) {
 function setHasLogged(entry, s) {
   if (s.done) return true
   return entry.category === 'cardio' ? s.distance !== '' && s.distance != null : [s.weight, s.reps].some((v) => v !== '' && v != null)
+}
+
+// Only set when there is one, so entries without a rest look as before.
+function withRest(seconds) {
+  return seconds != null ? { restSeconds: seconds } : {}
 }
 
 function emptySet(category) {
@@ -346,6 +352,7 @@ export default function WorkoutSession() {
             targetSets: it.targetSets || null,
             targetReps: it.targetReps ?? null,
             ...(it.targetRir != null && it.targetRir !== '' ? { targetRir: Number(it.targetRir) } : {}),
+            ...withRest(restFor(it, full)),
             notes: '',
             sets: Array.from({ length: it.targetSets || 3 }, () => ({ weight: '', reps: '', rir: '' })),
           }
@@ -505,8 +512,10 @@ export default function WorkoutSession() {
   // and exercises outside a superset rest as usual.
   function handleSetDone(entryIdx, setIdx) {
     const entry = entries[entryIdx]
+    // An exercise with its own rest (from the routine or the exercise's
+    // settings) uses it; otherwise the timer keeps its last picked length.
     if (!supersetPos(entries, entryIdx) || isWarmup(entry.sets[setIdx])) {
-      restRef.current?.start()
+      restRef.current?.start(entry.restSeconds)
       return
     }
     let first = entryIdx
@@ -523,7 +532,7 @@ export default function WorkoutSession() {
         return
       }
     }
-    restRef.current?.start()
+    restRef.current?.start(entry.restSeconds)
     for (let k = first; k <= last; k++) {
       if (hasSetsLeft(k)) {
         if (k !== entryIdx) scrollToEntry(k)
@@ -590,6 +599,7 @@ export default function WorkoutSession() {
       lastWeight: ex.last_weight,
       lastReps: ex.last_reps,
       lastSets: ex.last_sets || [],
+      ...withRest(restFor(null, ex)),
       notes: '',
       sets: Array.from({ length: targetSets }, () => ({ weight: '', reps: '', rir: '' })),
     }
