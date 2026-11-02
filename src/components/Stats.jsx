@@ -26,6 +26,7 @@ import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
 import { currentStreak } from '../lib/streak.js'
 import { cardioSummary, formatPace, formatSpeed, formatDistance, toKm } from '../lib/cardio.js'
 import { ACCENT, CHALK, CHALKDIM, MUTED, GRID, SURFACE } from '../theme.js'
+import { setVolume } from '../lib/bodyweight.js'
 
 const COLORS = { iron: ACCENT, brass: ACCENT, cardio: MUTED, chalk: CHALK, chalkdim: CHALKDIM, grid: GRID }
 
@@ -91,11 +92,7 @@ export default function Stats() {
             if (c && c.distance != null) cardioKm += toKm(c.distance, e.unit)
           } else if (!e.timed) {
             // Holds have no weight × reps volume — their reps are seconds.
-            volume += workingSets(e.sets).reduce((sv, set) => {
-              const w = Number(set.weight)
-              const r = Number(set.reps)
-              return sv + (isFinite(w) && isFinite(r) ? w * r : 0)
-            }, 0)
+            volume += workingSets(e.sets).reduce((sv, set) => sv + setVolume(e, set), 0)
           }
         }
       }
@@ -218,7 +215,7 @@ export default function Stats() {
           const w = Number(set.weight)
           const r = Number(set.reps)
           if (!isFinite(w) || !isFinite(r)) continue
-          volume += w * r
+          volume += setVolume(entry, set)
           if (w > 0 && r >= 1 && r <= 12) e1rm = Math.max(e1rm ?? 0, w * (1 + r / 30))
         }
         progMap[entry.exerciseId].points.push({

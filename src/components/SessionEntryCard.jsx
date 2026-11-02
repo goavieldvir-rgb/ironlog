@@ -1,6 +1,6 @@
 import ExerciseVideo from './ExerciseVideo.jsx'
 import React, { useEffect, useRef, useState } from 'react'
-import { X, Plus, Trash2, Minus, CornerDownLeft, StickyNote, Repeat, ArrowUp, ArrowDown, Trophy, Link2, Check, Flame, ChevronDown, Play, Square } from 'lucide-react'
+import { X, Plus, Trash2, Minus, CornerDownLeft, StickyNote, Repeat, ArrowUp, ArrowDown, Trophy, Link2, Check, Flame, ChevronDown, Play, Square, Scale } from 'lucide-react'
 import { Badge } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import OverflowMenu from './OverflowMenu.jsx'
@@ -15,6 +15,7 @@ import { entryPrKind } from '../lib/records.js'
 import { cardioSummary } from '../lib/cardio.js'
 import CardioTotals from './CardioTotals.jsx'
 import { entryName } from '../lib/names.js'
+import { usesBodyWeight } from '../lib/bodyweight.js'
 
 const hasVal = (v) => v !== '' && v != null
 
@@ -167,10 +168,32 @@ export default function SessionEntryCard({
   // Gym name when the previous numbers come from another gym (this
   // exercise hasn't been done at the current gym yet).
   previousFrom = null,
+  // Bodyweight exercises during a workout: { value, date, loading } from
+  // the weight log, value already in the exercise's unit (null when nothing
+  // is logged). Left out elsewhere, where the body weight saved with the
+  // workout is shown instead.
+  bodyWeight = null,
+  // (weight, unit) => logs a weigh-in when there's none yet.
+  onLogBodyWeight,
 }) {
   const { t, lang } = useLanguage()
   const { toast } = useFeedback()
   const sectionRef = useRef(null)
+  const bwInfo = bodyWeight ?? (usesBodyWeight(entry) && Number(entry.bodyWeight) > 0 ? { value: Number(entry.bodyWeight), saved: true } : null)
+  const [bwDraft, setBwDraft] = useState('')
+  const [bwSaving, setBwSaving] = useState(false)
+  async function saveBodyWeight(e) {
+    e.preventDefault()
+    const v = Number(bwDraft)
+    if (!(v > 0) || bwSaving) return
+    setBwSaving(true)
+    try {
+      await onLogBodyWeight(v, entry.unit === 'lb' ? 'lb' : 'kg')
+      setBwDraft('')
+    } finally {
+      setBwSaving(false)
+    }
+  }
   // Follow the current language (switching mid-workout updates the name).
   const displayName = liveExercise ? (lang === 'he' && liveExercise.name_he) || liveExercise.name : entryName(entry, {}, lang)
   const [showNote, setShowNote] = useState(!!entry.notes)
@@ -658,6 +681,49 @@ export default function SessionEntryCard({
           ]}
         />
       </div>
+
+      {/* Body weight counts as the base load; the weight column is only for
+          what's added on top (dip belt, vest). */}
+      {bwInfo && !bwInfo.loading && (bwInfo.value > 0 ? (
+        <p className="flex items-start gap-1.5 px-0.5 text-[13px] leading-[18px] text-chalkdim" data-testid="bw-line">
+          <Scale size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+          <span>
+            {t('sessionCard.bwBase')}{' '}
+            <b className="num font-semibold text-chalk">
+              <bdi dir="ltr">
+                {bwInfo.value} {entry.unit}
+              </bdi>
+            </b>
+            {bwInfo.saved
+              ? null
+              : bwInfo.date && (
+                  <> · {t('sessionCard.bwFromLog', { date: fmtDate(lang, new Date(bwInfo.date + 'T00:00:00'), { day: 'numeric', month: 'short' }) })}</>
+                )}
+            {!bwInfo.saved && <> {t('sessionCard.bwAddedOnly')}</>}
+          </span>
+        </p>
+      ) : onLogBodyWeight ? (
+        <form onSubmit={saveBodyWeight} className="flex flex-wrap items-center gap-2 rounded-xl bg-surface2 px-3 py-2 text-[13px]" data-testid="bw-missing">
+          <Scale size={14} className="shrink-0 text-accent" aria-hidden="true" />
+          <span className="text-chalk flex-1 min-w-[180px]">{t('sessionCard.bwMissing')}</span>
+          <span className="inline-flex items-center gap-1.5">
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              min="0"
+              value={bwDraft}
+              onChange={(e) => setBwDraft(e.target.value)}
+              aria-label={`${t('sessionCard.bwBase')} (${entry.unit === 'lb' ? 'lb' : 'kg'})`}
+              placeholder={entry.unit === 'lb' ? 'lb' : 'kg'}
+              className="num w-20 h-9 text-center !bg-surface border border-white/10 rounded-lg"
+            />
+            <button type="submit" disabled={!(Number(bwDraft) > 0) || bwSaving} className="press h-9 px-3 rounded-full bg-accentsoft text-accent font-semibold disabled:opacity-50">
+              {t('common.save')}
+            </button>
+          </span>
+        </form>
+      ) : null)}
 
       {showFillRow && (
         <div className="flex flex-wrap items-center gap-2 px-0.5">

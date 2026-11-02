@@ -47,8 +47,13 @@ function formatSet(entry, s, t) {
     return `${added}${formatSeconds(s.reps, t('dashboard.secShort')) || `0${t('dashboard.secShort')}`}`
   }
   if (entry.bodyweight) {
-    const added = Number(s.weight) > 0 ? `+${s.weight}${entry.unit} ` : ''
     const rir = s.rir !== '' && s.rir != null ? ` · RIR ${s.rir}` : ''
+    // Body weight saved with the workout: "BW 80kg +10kg × 8".
+    if (Number(entry.bodyWeight) > 0) {
+      const added = Number(s.weight) > 0 ? ` +${s.weight}${entry.unit}` : ''
+      return `${t('sessionCard.bwShort')} ${entry.bodyWeight}${entry.unit}${added} × ${s.reps || 0}${rir}`
+    }
+    const added = Number(s.weight) > 0 ? `+${s.weight}${entry.unit} ` : ''
     return `${added}${t('sessionCard.bwShort')} × ${s.reps || 0}${rir}`
   }
   const rir = s.rir !== '' && s.rir != null ? ` · RIR ${s.rir}` : ''

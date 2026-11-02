@@ -13,6 +13,7 @@ import { InfoTip } from './InfoTip.jsx'
 import { isWarmup, workingSets } from '../lib/warmup.js'
 import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
 import { cardioSummary, formatPace, formatDistance, toKm } from '../lib/cardio.js'
+import { setVolume } from '../lib/bodyweight.js'
 
 
 function startOfMonth(d) {
@@ -89,6 +90,10 @@ function formatSet(entry, s, t) {
     return `${added}${formatSeconds(s.reps) || '0s'}`
   }
   if (entry.bodyweight) {
+    if (Number(entry.bodyWeight) > 0) {
+      const added = Number(s.weight) > 0 ? `+${s.weight}${unit}` : ''
+      return `${t('sessionCard.bwShort')} ${entry.bodyWeight}${unit}${added}×${s.reps || 0}`
+    }
     const added = Number(s.weight) > 0 ? `+${s.weight}${unit} ` : ''
     return `${added}${t('sessionCard.bwShort')}×${s.reps || 0}`
   }
@@ -141,11 +146,7 @@ function computeTotals(sessions) {
       if (e.category === 'cardio' || e.timed) return eSum
       return (
         eSum +
-        workingSets(e.sets).reduce((sv, set) => {
-          const w = Number(set.weight) || 0
-          const r = Number(set.reps) || 0
-          return sv + w * r
-        }, 0)
+        workingSets(e.sets).reduce((sv, set) => sv + setVolume(e, set), 0)
       )
     }, 0)
     return sum + v

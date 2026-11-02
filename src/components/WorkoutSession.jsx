@@ -5,7 +5,8 @@ import { InfoTip } from './InfoTip.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
-import { useCollection, logSession, addExercise, clearExerciseNote, isCompletedSet } from '../lib/db.js'
+import { useCollection, logSession, addExercise, clearExerciseNote, isCompletedSet, addBodyWeightEntry } from '../lib/db.js'
+import { bodyWeightFor, bodyWeightIn, usesBodyWeight } from '../lib/bodyweight.js'
 import { useGyms, sessionGymId, gymHistory, exerciseAtGym, gymLabel } from '../lib/gyms.js'
 import { saveDraft, loadDraft, clearDraft, FREESTYLE_KEY } from '../lib/draft.js'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
@@ -203,6 +204,9 @@ export default function WorkoutSession() {
   const [routines, routinesLoading, refreshRoutines, routinesError] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [exercises, , refreshExercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [pastSessions, pastLoading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  // The weight log, so bodyweight exercises count the trainee's body weight
+  // and only extra load (belt, vest) has to be typed.
+  const [bodyWeightLogs, bodyWeightLoading, refreshBodyWeight] = useCollection(effectiveUid, 'body_weight_logs', 'date', 'desc')
   const liveName = (entry) => entryName(entry, exerciseMap(exercises), lang)
 
   // Which gym this workout is at. Only someone who has added a gym gets a
@@ -245,6 +249,25 @@ export default function WorkoutSession() {
   const draftKey = isFreestyle ? FREESTYLE_KEY : routineId
 
   const [date, setDate] = useState(todayISO())
+  const bodyWeight = useMemo(() => bodyWeightFor(bodyWeightLogs, date), [bodyWeightLogs, date])
+  // Stamps body weight (in the exercise's unit) on a bodyweight entry, so
+  // its volume is body weight + added weight. Others pass through.
+  function withBodyWeight(e) {
+    if (!usesBodyWeight(e)) return e
+    const bw = bodyWeightIn(bodyWeight, e.unit)
+    return bw ? { ...e, bodyWeight: bw } : e
+  }
+  // Logs a weigh-in from inside the workout when there's none yet.
+  async function logBodyWeight(weight, unit) {
+    try {
+      await addBodyWeightEntry(effectiveUid, { date, weight, unit: unit || 'kg' })
+      refreshBodyWeight()
+      toast(t('sessionCard.bwSaved'))
+    } catch (err) {
+      console.error(err)
+      toast(t('sessionCard.bwSaveFailed'), 'error')
+    }
+  }
   const [notes, setNotes] = useState('')
   const [entries, setEntries] = useState([])
   // A one-time, this-session-only substitution — e.g. a machine is broken
@@ -817,7 +840,7 @@ export default function WorkoutSession() {
       let summaryData = null
       try {
         summaryData = buildSummary({
-          entries: entries.map((e) => ({ ...e, name: liveName(e) })),
+          entries: entries.map((e) => withBodyWeight({ ...e, name: liveName(e) })),
           personalBests,
           pastSets: pastStrengthSets,
           routineName: isFreestyle ? t('workout.freestyleSession') : routine?.name,
@@ -842,7 +865,7 @@ export default function WorkoutSession() {
         startedAt: isLive ? new Date(startedAt).toISOString() : null,
         durationMinutes: finalDuration(),
         gymId,
-        entries: entries.map((e) => ({
+        entries: entries.map(withBodyWeight).map((e) => ({
           exerciseId: e.exerciseId,
           name: e.name,
           nameEn: e.nameEn,
@@ -850,6 +873,8 @@ export default function WorkoutSession() {
           unit: e.unit,
           category: e.category || 'strength',
           bodyweight: e.bodyweight,
+          // Body weight from the weight log at the time of the workout.
+          ...(e.bodyWeight > 0 ? { bodyWeight: e.bodyWeight } : {}),
           timed: !!e.timed,
           intensityType: e.intensityType,
           videoUrl: e.videoUrl,
@@ -1068,6 +1093,8 @@ export default function WorkoutSession() {
             })()}
             personalBest={personalBests[entry.exerciseId]}
             pastSets={pastStrengthSets[entry.exerciseId]}
+            bodyWeight={usesBodyWeight(entry) ? { value: bodyWeightIn(bodyWeight, entry.unit), date: bodyWeight?.date, loading: bodyWeightLoading } : null}
+            onLogBodyWeight={logBodyWeight}
             removable
             supersetPos={supersetPos(entries, i)}
             onMoveUp={i > 0 ? () => moveEntry(i, -1) : undefined}

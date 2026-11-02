@@ -1,6 +1,7 @@
 import { workingSets } from './warmup.js'
 import { isFreestyleSession } from './names.js'
 import { cardioSummary } from './cardio.js'
+import { setVolume } from './bodyweight.js'
 
 // Comparing a saved workout with earlier workouts of the same kind, for the
 // coach reviewing it (and the trainee looking back). Everything here works on
@@ -105,7 +106,7 @@ export function sessionVolume(session) {
   let unit = null
   for (const e of session?.entries || []) {
     if (e.category === 'cardio' || e.timed) continue
-    const v = workingSets(e.sets).reduce((sum, s) => sum + (num(s.weight) || 0) * (num(s.reps) || 0), 0)
+    const v = workingSets(e.sets).reduce((sum, s) => sum + setVolume(e, s), 0)
     if (v <= 0) continue
     if (unit && unit !== e.unit) return null
     unit = e.unit
