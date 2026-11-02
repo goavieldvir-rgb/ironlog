@@ -16,6 +16,7 @@ import { ForwardChevron } from './DirectionalIcon.jsx'
 import WeeklySchedule from './WeeklySchedule.jsx'
 import { itemTarget } from './RoutineView.jsx'
 import { useMessagesState } from '../lib/messages.js'
+import { setVolume } from '../lib/bodyweight.js'
 
 // Was hard-coded English ("5m ago") even with the app in Hebrew.
 function timeAgo(ts, t) {
@@ -63,7 +64,7 @@ function sessionLoad(s, lang, t) {
           if (e.unit) dUnit = e.unit
         }
       } else if (!e.timed) {
-        const v = (Number(set.weight) || 0) * (Number(set.reps) || 0)
+        const v = setVolume(e, set)
         if (v > 0) {
           volume += v
           vUnit = set.unit || e.unit || vUnit

@@ -12,6 +12,7 @@ import { EmptyState, LoadError, Button, Field, FeedbackDot } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { workingSets } from '../lib/warmup.js'
 import { cardioSummary, formatDistance, toKm } from '../lib/cardio.js'
+import { setVolume } from '../lib/bodyweight.js'
 
 function dayParts(lang, iso) {
   const d = new Date(iso + 'T00:00:00')
@@ -41,11 +42,7 @@ function sessionMeta(s, t, lang, gym) {
       e.timed
         ? sum
         : sum +
-          workingSets(e.sets).reduce((v, set) => {
-            const w = Number(set.weight)
-            const r = Number(set.reps)
-            return v + (isFinite(w) && isFinite(r) ? w * r : 0)
-          }, 0),
+          workingSets(e.sets).reduce((v, set) => v + setVolume(e, set), 0),
     0,
   )
   const rawUnit = lifts.find((e) => e.unit)?.unit || 'kg'

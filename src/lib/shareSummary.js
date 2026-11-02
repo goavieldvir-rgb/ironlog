@@ -6,6 +6,7 @@ import { workingSets } from './warmup.js'
 import { cardioSummary, formatPace, formatDistance } from './cardio.js'
 import { formatSeconds } from './timed.js'
 import { entryPrKind } from './records.js'
+import { setVolume } from './bodyweight.js'
 
 const num = (v) => {
   const n = Number(v)
@@ -86,7 +87,7 @@ export function buildSummary({ entries, personalBests = {}, pastSets = {}, routi
     if (!best) continue
     setCount += sets.filter((s) => num(s.weight) > 0 || num(s.reps) > 0).length
     if (!e.timed) {
-      const v = sets.reduce((sum, s) => sum + num(s.weight) * num(s.reps), 0)
+      const v = sets.reduce((sum, s) => sum + setVolume(e, s), 0)
       if (v > 0) {
         volume += v
         if (volumeUnit && volumeUnit !== e.unit) mixedVolumeUnits = true
