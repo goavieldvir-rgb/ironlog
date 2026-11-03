@@ -5,9 +5,16 @@
 //    only when the network is slow or gone. Never cache first.
 //  - /assets/ (Vite's hashed files) and /fonts/: cache first, they never change
 //    under the same name.
+//  - /clips/ (exercise stills and clips): cache first, in their own cache so
+//    a gym with no signal still plays them. Every link carries ?v=<hash of
+//    the file>, so a re-rendered clip is a new address; the old version of
+//    that file is dropped when the new one is stored. Videos are stored
+//    whole and Range requests (Safari asks for byte ranges) are answered
+//    from the stored copy.
 //  - Everything else (Supabase, Google Fonts, any other origin, any non-GET)
 //    is left to the browser untouched.
 const CACHE = 'ironlog-shell-v1'
+const CLIPS = 'ironlog-clips-v1'
 const NAV_TIMEOUT_MS = 3000
 const SCOPE = self.registration.scope // ends with '/', the app's own folder
 const SCOPE_PATH = new URL(SCOPE).pathname
@@ -27,7 +34,7 @@ self.addEventListener('activate', (e) =>
   e.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('ironlog-') && k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('ironlog-') && k !== CACHE && k !== CLIPS).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   ),
 )
@@ -70,6 +77,71 @@ function assetResponse(request, event) {
   })
 }
 
+// Part of a stored response, for a "Range: bytes=start-end" request.
+async function rangeResponse(res, range) {
+  const buf = await res.arrayBuffer()
+  const size = buf.byteLength
+  const m = /^bytes=(\d*)-(\d*)$/.exec(range.trim())
+  if (!m || (m[1] === '' && m[2] === '')) return new Response(buf, { status: 200, headers: res.headers })
+  let start, end
+  if (m[1] === '') {
+    // "bytes=-500": the last 500 bytes.
+    start = Math.max(0, size - Number(m[2]))
+    end = size - 1
+  } else {
+    start = Number(m[1])
+    end = m[2] === '' ? size - 1 : Math.min(Number(m[2]), size - 1)
+  }
+  if (start >= size || start > end) {
+    return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } })
+  }
+  return new Response(buf.slice(start, end + 1), {
+    status: 206,
+    headers: {
+      'Content-Type': res.headers.get('Content-Type') || 'video/mp4',
+      'Content-Range': `bytes ${start}-${end}/${size}`,
+      'Content-Length': String(end - start + 1),
+      'Accept-Ranges': 'bytes',
+    },
+  })
+}
+
+function clipResponse(request, event) {
+  const url = new URL(request.url)
+  const key = url.origin + url.pathname + url.search
+  const range = request.headers.get('range')
+  return caches
+    .open(CLIPS)
+    .then(async (c) => {
+      let res = await c.match(key)
+      if (!res) {
+        // The whole file, even when the player asked for a range.
+        const full = await fetch(key, { credentials: 'same-origin' })
+        if (!full.ok || full.status !== 200) return range ? fetch(request) : full
+        const copy = full.clone()
+        event.waitUntil(
+          c
+            .put(key, copy)
+            .then(() => c.keys())
+            .then((keys) =>
+              Promise.all(
+                keys
+                  .filter((k) => {
+                    const u = new URL(k.url)
+                    return u.pathname === url.pathname && u.search !== url.search
+                  })
+                  .map((k) => c.delete(k)),
+              ),
+            )
+            .catch(() => {}),
+        )
+        res = full
+      }
+      return range ? rangeResponse(res, range) : res
+    })
+    .catch(() => fetch(request))
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event
   if (request.method !== 'GET') return
@@ -78,6 +150,10 @@ self.addEventListener('fetch', (event) => {
   if (request.mode === 'navigate') {
     if (!url.pathname.startsWith(SCOPE_PATH)) return
     event.respondWith(pageResponse(request, event))
+    return
+  }
+  if (url.pathname.startsWith(SCOPE_PATH + 'clips/')) {
+    event.respondWith(clipResponse(request, event))
     return
   }
   if (url.pathname.startsWith(SCOPE_PATH + 'assets/') || url.pathname.startsWith(SCOPE_PATH + 'fonts/')) {

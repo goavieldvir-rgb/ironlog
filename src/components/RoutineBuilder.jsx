@@ -1,3 +1,4 @@
+import ExerciseThumb from './ExerciseThumb.jsx'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { Plus, Trash2, ArrowUp, ArrowDown, Library, Video, StickyNote, Link2 } from 'lucide-react'
@@ -300,15 +301,25 @@ export default function RoutineBuilder() {
               )}
               {/* Name and video button on their own line, so a long exercise
                   name wraps instead of being cut to a few letters. */}
-              <div className="flex items-center gap-2">
-              <div className="flex-1 min-w-0">
-                <p className="break-words">
-                  {(() => {
-                    const found = exercises.find((e) => e.id === it.exerciseId)
-                    return (lang === 'he' && found?.name_he) || found?.name || it.name
-                  })()}
-                </p>
-              </div>
+              <div className="flex items-center gap-2.5">
+              {(() => {
+                const found = exercises.find((e) => e.id === it.exerciseId)
+                const label = (lang === 'he' && found?.name_he) || found?.name || it.name
+                return (
+                  <>
+                    <ExerciseThumb
+                      size={40}
+                      chosen={found?.clip}
+                      names={[found?.name, it.name]}
+                      videoUrl={found?.video_url || it.videoUrl}
+                      label={label}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="break-words">{label}</p>
+                    </div>
+                  </>
+                )
+              })()}
               <button
                 type="button"
                 onClick={() => openVideo(it.exerciseId)}

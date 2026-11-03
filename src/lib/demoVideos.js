@@ -251,11 +251,17 @@ const ALIASES = {
   'jogging': 'treadmill',
 }
 
+// The canonical exercise key for a name (e.g. "Lat Pull Down" ->
+// 'lat_pulldown'), or null when the name isn't one we know.
+export function exerciseKeyFor(name) {
+  const norm = normalizeExerciseName(name)
+  return ALIASES[norm] || (DEMO_VIDEOS[norm.replace(/ /g, '_')] ? norm.replace(/ /g, '_') : null)
+}
+
 // The demo entry for an exercise name, or null when there's no alias or no
 // clip has been filled in for it yet.
 export function demoVideoFor(name) {
-  const norm = normalizeExerciseName(name)
-  const key = ALIASES[norm] || (DEMO_VIDEOS[norm.replace(/ /g, '_')] ? norm.replace(/ /g, '_') : null)
+  const key = exerciseKeyFor(name)
   const demo = key ? DEMO_VIDEOS[key] : null
   return demo && demo.id ? demo : null
 }

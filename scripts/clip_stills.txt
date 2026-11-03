@@ -1,0 +1,8 @@
+# Hand overrides for scripts/clip_still.py, one clip per line:
+#   <slug> [--frame N] [--crop CX,CY,SIDE]
+# Crops are in the clip's 720 px frame. Used for tall cable machines, where
+# the automatic crop keeps the whole stack and the figure ends up tiny.
+cable-biceps-curl --crop 450,380,500
+cable-crunch --crop 450,430,440
+close-grip-lat-pulldown --crop 400,440,500
+single-arm-lat-pulldown --crop 380,430,520
