@@ -52,7 +52,7 @@ export const CLIPS = {
   'romanian-deadlift': { v: 'bfbefa93' },
   'scapular-push-up': { v: 'c5f11295' },
   'seated-cable-row': { v: 'a07078df', t: '5fbe0f6b' },
-  'seated-dumbbell-curl': { v: 'd1c91aeb' },
+  'seated-dumbbell-curl': { v: 'ef3a07b3' },
   'seated-dumbbell-shoulder-press': { v: 'cd025c6d', t: '0bff78c5' },
   'seated-leg-curl': { v: '4be9c27b' },
   'single-arm-lat-pulldown': { v: '493a542b', t: '4ad7eada' },
