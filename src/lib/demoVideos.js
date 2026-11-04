@@ -51,6 +51,7 @@ export const DEMO_VIDEOS = {
   barbell_curl: { id: 'QZEqB6wUPxQ' }, // ScottHermanFitness
   dumbbell_curl: { id: 'w7hl4IbHMtY' }, // Live Lean TV Daily Exercises
   seated_dumbbell_curl: { id: 's9GGVuUXgmY' }, // Live Lean TV Daily Exercises
+  incline_dumbbell_curl: { id: '5uAAU3sUURA' }, // Live Lean TV Daily Exercises
   cable_curl: { id: '_hRnRorKRWs' }, // Live Lean TV Daily Exercises
   ez_bar_curl: { id: 'wGi7k6JGs1k' }, // No Pain Project
   hammer_curl: { id: 'zC3nLlEvin4' }, // ScottHermanFitness
@@ -147,6 +148,10 @@ const ALIASES = {
   'hanging leg raise': 'hanging_leg_raise',
   'hanging leg raises': 'hanging_leg_raise',
   'incline bench press': 'incline_bench_press',
+  'incline curl': 'incline_dumbbell_curl',
+  'incline curls': 'incline_dumbbell_curl',
+  'incline dumbbell curl': 'incline_dumbbell_curl',
+  'incline dumbbell curls': 'incline_dumbbell_curl',
   'incline dumbbell bench press': 'incline_dumbbell_press',
   'incline dumbbell press': 'incline_dumbbell_press',
   'incline smith machine press': 'incline_smith_press',
