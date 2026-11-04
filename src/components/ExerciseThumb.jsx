@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Dumbbell, Play, X } from 'lucide-react'
+import { ChevronRight, Dumbbell, Play, X } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { exerciseClipFor } from '../lib/exerciseClips.js'
-import { resolveExerciseVideo } from '../lib/demoVideos.js'
+import { demoVideoFor, resolveExerciseVideo } from '../lib/demoVideos.js'
 import { VideoModal } from './ExerciseVideo.jsx'
 
 // The small picture at the start of an exercise's name: a still of our own
@@ -64,6 +64,10 @@ export default function ExerciseThumb({ chosen, names = [], videoUrl, label, siz
   }
 
   const title = t('clips.open', { name: label })
+  // The built-in YouTube video, kept as a quiet "in-depth explanation" link
+  // inside the player, so it isn't mistaken for another quick example.
+  const deepDemo = names.reduce((found, n) => found || (n ? demoVideoFor(n) : null), null)
+  const deep = deepDemo ? { kind: 'embed', id: deepDemo.id, start: deepDemo.start, end: deepDemo.end, builtIn: true } : null
   return (
     <>
       <button
@@ -91,7 +95,10 @@ export default function ExerciseThumb({ chosen, names = [], videoUrl, label, siz
         {/* A faint edge so the white still doesn't glare on the dark card. */}
         <span className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-black/10" style={{ borderRadius: radius }} />
       </button>
-      {open && <ClipPlayer clip={clip} name={label} onClose={() => setOpen(false)} />}
+      {open === true && (
+        <ClipPlayer clip={clip} name={label} deepDive={!!deep} onDeepDive={() => setOpen('deep')} onClose={() => setOpen(false)} />
+      )}
+      {open === 'deep' && <VideoModal video={deep} name={label} onClose={() => setOpen(true)} />}
     </>
   )
 }
@@ -108,7 +115,7 @@ function prefersReducedMotion() {
 // starts on its still so there's no black flash, and fits the shorter side
 // of the screen so it works upright and sideways. Closes with the X, a tap
 // outside the video, a swipe down, or Escape.
-export function ClipPlayer({ clip, name, onClose }) {
+export function ClipPlayer({ clip, name, onClose, deepDive = false, onDeepDive }) {
   const { t } = useLanguage()
   useScrollLock(true)
   const [tab, setTab] = useState('main')
@@ -258,6 +265,19 @@ export function ClipPlayer({ clip, name, onClose }) {
             </span>
           )}
         </button>
+
+        {/* The longer YouTube explanation: plain small text, no play mark or
+            tile, so it reads as "more reading" and not as another clip. */}
+        {deepDive && (
+          <button
+            type="button"
+            onClick={onDeepDive}
+            className="self-center inline-flex items-center gap-1 min-h-[44px] px-2 text-[13px] text-chalkdim hover:text-chalk"
+          >
+            {t('clips.deepDive')}
+            <ChevronRight size={14} className="rtl:rotate-180" aria-hidden="true" />
+          </button>
+        )}
       </div>
     </div>,
     document.body,
