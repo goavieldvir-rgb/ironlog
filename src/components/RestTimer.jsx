@@ -1,5 +1,5 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { Play, Pause, RotateCcw, Bell, BellOff } from 'lucide-react'
+import { Play, Pause, RotateCcw, Bell, BellOff, Timer } from 'lucide-react'
 import { InfoTip } from './InfoTip.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { clearRestNotification, isIOS, setRestPush, showRestNotification, swRegistration } from '../lib/push.js'
@@ -36,10 +36,15 @@ function savedSeconds() {
   const n = Number(load(KEY_SECONDS))
   return Number.isFinite(n) && n >= 5 && n <= 3600 ? Math.round(n) : DEFAULT_REST
 }
-// A rest running when the page was reloaded: restored only if it hasn't ended.
+// How long after a rest ended it still comes back when the workout screen
+// opens again, showing how far over it is.
+const RESTORE_OVERTIME_MS = 15 * 60 * 1000
+// A rest running when the workout screen was left (another page, a tapped
+// notification, a reload): restored if it's still running or only recently
+// ended, so leaving during overtime doesn't make the timer vanish.
 function savedEnd() {
   const n = Number(load(KEY_ENDS))
-  return Number.isFinite(n) && n > Date.now() ? n : null
+  return Number.isFinite(n) && n > Date.now() - RESTORE_OVERTIME_MS ? n : null
 }
 
 function beep() {
@@ -89,8 +94,10 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
   const [running, setRunning] = useState(!!restoredEnd)
   // Whether a rest is on screen at all (running, paused or in overtime).
   const [active, setActive] = useState(!!restoredEnd)
-  const [finished, setFinished] = useState(false)
-  const [totalDuration, setTotalDuration] = useState(() => (restoredEnd ? Math.max(savedSeconds(), Math.ceil((restoredEnd - Date.now()) / 1000)) : savedSeconds()))
+  const [finished, setFinished] = useState(() => !!restoredEnd && restoredEnd <= Date.now())
+  const [totalDuration, setTotalDuration] = useState(() =>
+    restoredEnd ? Math.max(savedSeconds(), Math.ceil((restoredEnd - Date.now()) / 1000)) : savedSeconds(),
+  )
   // Whether ticking a set starts the rest by itself. Default on.
   const [auto, setAuto] = useState(() => load(KEY_AUTO) !== '0')
   const autoRef = useRef(auto)
@@ -110,7 +117,8 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
   // Whether this run already alerted. The timer keeps going past zero and
   // shows how long you've rested beyond the set time, so the beep must
   // fire once at zero rather than on every overtime tick.
-  const alertedRef = useRef(false)
+  // A restored rest that already ended has alerted before.
+  const alertedRef = useRef(!!restoredEnd && restoredEnd <= Date.now())
   // Whether the server currently holds an end time for this rest, so it can
   // send the alert while the app is in the background.
   const pushedRef = useRef(false)
@@ -128,6 +136,13 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
       setRestPush(null)
     }
   }
+
+  // A rest restored while still running gets its background alert back: the
+  // last time this screen closed, it cancelled the server's alert.
+  useEffect(() => {
+    if (restoredEnd && restoredEnd > Date.now() && notifyOn) pushRest(restoredEnd, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Leaving the workout mid-rest cancels the server's alert too.
   useEffect(
@@ -327,108 +342,129 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
   const smallBtn = 'press inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl text-chalkdim hover:text-chalk'
 
   return (
-    <div
-      role="timer"
-      aria-live="off"
-      aria-label={t('restTimer.rest')}
-      aria-hidden={!active}
-      inert={!active ? '' : undefined}
-      className={`fixed inset-x-4 mx-auto max-w-[460px] z-20 rounded-[20px] bg-[#232326] overflow-hidden transition-[transform,opacity] duration-[220ms] ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none ${
-        active ? 'translate-y-0 opacity-100' : 'translate-y-[calc(100%+64px)] opacity-0 pointer-events-none'
-      }`}
-      style={{
-        bottom: 'max(24px, calc(env(safe-area-inset-bottom, 0px) + 12px))',
-        boxShadow: '0 16px 40px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.4)',
-      }}
-    >
-      <div className="flex items-center gap-1 h-16 ps-[18px] pe-2">
+    <>
+      {/* With auto-start off, ticking a set starts nothing and the dock stays
+        hidden, and the switch to turn it back on lives inside the dock. This
+        button keeps the timer reachable: it starts a rest, which opens the
+        dock with all its controls. */}
+      {!active && !auto && (
         <button
           type="button"
-          onClick={() => setExpanded((v) => !v)}
-          aria-expanded={expanded}
-          title={expanded ? t('restTimer.collapse') : t('restTimer.expand')}
-          className="flex-1 min-w-0 h-full flex items-center gap-2.5 text-start"
+          onClick={() => start()}
+          title={t('restTimer.start')}
+          aria-label={t('restTimer.start')}
+          className="press fixed end-4 z-20 h-12 ps-3.5 pe-4 inline-flex items-center gap-2 rounded-full bg-[#232326] text-chalk text-[15px] font-medium shadow-[0_8px_24px_rgba(0,0,0,0.45)]"
+          style={{
+            bottom: 'max(24px, calc(env(safe-area-inset-bottom, 0px) + 12px))',
+          }}
         >
-          <span className="text-sm text-chalkdim">{overtime ? t('restTimer.over') : t('restTimer.rest')}</span>
-          <span className="num text-2xl font-semibold tracking-[-0.01em]">{clock}</span>
+          <Timer size={18} aria-hidden="true" />
+          {t('restTimer.rest')}
         </button>
-        <button type="button" onClick={() => adjust(-15)} className={dockBtn}>
-          <bdi dir="ltr">−15</bdi>
-        </button>
-        <button type="button" onClick={() => adjust(15)} className={dockBtn}>
-          <bdi dir="ltr">+15</bdi>
-        </button>
-        <button type="button" onClick={skip} className={`${dockBtn} px-3.5 bg-[#34343A]`}>
-          {overtime ? t('restTimer.next') : t('restTimer.skip')}
-        </button>
-      </div>
-
-      {expanded && (
-        <div className="flex items-center gap-1 ps-3 pe-2 pb-2 pt-0.5 border-t border-white/[0.06] flex-wrap">
-          <div className="flex gap-1">
-            {PRESETS.map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => {
-                  start(p)
-                  setExpanded(false)
-                }}
-                className="press px-2.5 min-h-[44px] min-w-[44px] rounded-xl text-sm num text-chalkdim hover:text-chalk"
-              >
-                {p}s
-              </button>
-            ))}
-          </div>
+      )}
+      <div
+        role="timer"
+        aria-live="off"
+        aria-label={t('restTimer.rest')}
+        aria-hidden={!active}
+        inert={!active ? '' : undefined}
+        className={`fixed inset-x-4 mx-auto max-w-[460px] z-20 rounded-[20px] bg-[#232326] overflow-hidden transition-[transform,opacity] duration-[220ms] ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none ${
+          active ? 'translate-y-0 opacity-100' : 'translate-y-[calc(100%+64px)] opacity-0 pointer-events-none'
+        }`}
+        style={{
+          bottom: 'max(24px, calc(env(safe-area-inset-bottom, 0px) + 12px))',
+          boxShadow: '0 16px 40px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.4)',
+        }}
+      >
+        <div className="flex items-center gap-1 h-16 ps-[18px] pe-2">
           <button
             type="button"
-            role="switch"
-            aria-checked={auto}
-            onClick={toggleAuto}
-            className="press inline-flex items-center gap-2 min-h-[44px] px-2 text-[13px] text-chalkdim"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+            title={expanded ? t('restTimer.collapse') : t('restTimer.expand')}
+            className="flex-1 min-w-0 h-full flex items-center gap-2.5 text-start"
           >
-            <span className={`relative inline-block h-5 w-9 rounded-full transition-colors ${auto ? 'bg-accent' : 'bg-white/15'}`}>
-              <span
-                className={`absolute top-0.5 start-0.5 h-4 w-4 rounded-full bg-chalk transition-transform ${auto ? 'ltr:translate-x-4 rtl:-translate-x-4' : ''}`}
-              />
-            </span>
-            {t('restTimer.autoStart')}
+            <span className="text-sm text-chalkdim">{overtime ? t('restTimer.over') : t('restTimer.rest')}</span>
+            <span className="num text-2xl font-semibold tracking-[-0.01em]">{clock}</span>
           </button>
-          <div className="flex items-center gap-0.5 ms-auto">
-            <InfoTip text={t('restTimer.tip')} />
-            {canNotify && (
-              <button
-                type="button"
-                onClick={toggleNotify}
-                title={notifyOn ? t('restTimer.notifyOn') : t('restTimer.notifyOff')}
-                aria-label={notifyOn ? t('restTimer.notifyOn') : t('restTimer.notifyOff')}
-                className={`${smallBtn} ${notifyOn ? '!text-chalk' : ''}`}
-              >
-                {notifyOn ? <Bell size={16} /> : <BellOff size={16} />}
-              </button>
-            )}
-            {running ? (
-              <button type="button" onClick={pause} title={t('restTimer.pause')} aria-label={t('restTimer.pause')} className={smallBtn}>
-                <Pause size={16} />
-              </button>
-            ) : (
-              <button type="button" onClick={() => start()} title={t('restTimer.start')} aria-label={t('restTimer.start')} className={smallBtn}>
-                <Play size={16} />
-              </button>
-            )}
-            <button type="button" onClick={restart} title={t('restTimer.restart')} aria-label={t('restTimer.restart')} className={smallBtn}>
-              <RotateCcw size={16} />
-            </button>
-          </div>
+          <button type="button" onClick={() => adjust(-15)} className={dockBtn}>
+            <bdi dir="ltr">−15</bdi>
+          </button>
+          <button type="button" onClick={() => adjust(15)} className={dockBtn}>
+            <bdi dir="ltr">+15</bdi>
+          </button>
+          <button type="button" onClick={skip} className={`${dockBtn} px-3.5 bg-[#34343A]`}>
+            {overtime ? t('restTimer.next') : t('restTimer.skip')}
+          </button>
         </div>
-      )}
 
-      <div
-        className="absolute bottom-0 start-0 h-[3px] bg-chalk/30 transition-[width] duration-1000 ease-linear motion-reduce:transition-none"
-        style={{ width: `${pct}%` }}
-        aria-hidden="true"
-      />
-    </div>
+        {expanded && (
+          <div className="flex items-center gap-1 ps-3 pe-2 pb-2 pt-0.5 border-t border-white/[0.06] flex-wrap">
+            <div className="flex gap-1">
+              {PRESETS.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => {
+                    start(p)
+                    setExpanded(false)
+                  }}
+                  className="press px-2.5 min-h-[44px] min-w-[44px] rounded-xl text-sm num text-chalkdim hover:text-chalk"
+                >
+                  {p}s
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={auto}
+              onClick={toggleAuto}
+              className="press inline-flex items-center gap-2 min-h-[44px] px-2 text-[13px] text-chalkdim"
+            >
+              <span className={`relative inline-block h-5 w-9 rounded-full transition-colors ${auto ? 'bg-accent' : 'bg-white/15'}`}>
+                <span
+                  className={`absolute top-0.5 start-0.5 h-4 w-4 rounded-full bg-chalk transition-transform ${auto ? 'ltr:translate-x-4 rtl:-translate-x-4' : ''}`}
+                />
+              </span>
+              {t('restTimer.autoStart')}
+            </button>
+            <div className="flex items-center gap-0.5 ms-auto">
+              <InfoTip text={t('restTimer.tip')} />
+              {canNotify && (
+                <button
+                  type="button"
+                  onClick={toggleNotify}
+                  title={notifyOn ? t('restTimer.notifyOn') : t('restTimer.notifyOff')}
+                  aria-label={notifyOn ? t('restTimer.notifyOn') : t('restTimer.notifyOff')}
+                  className={`${smallBtn} ${notifyOn ? '!text-chalk' : ''}`}
+                >
+                  {notifyOn ? <Bell size={16} /> : <BellOff size={16} />}
+                </button>
+              )}
+              {running ? (
+                <button type="button" onClick={pause} title={t('restTimer.pause')} aria-label={t('restTimer.pause')} className={smallBtn}>
+                  <Pause size={16} />
+                </button>
+              ) : (
+                <button type="button" onClick={() => start()} title={t('restTimer.start')} aria-label={t('restTimer.start')} className={smallBtn}>
+                  <Play size={16} />
+                </button>
+              )}
+              <button type="button" onClick={restart} title={t('restTimer.restart')} aria-label={t('restTimer.restart')} className={smallBtn}>
+                <RotateCcw size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div
+          className="absolute bottom-0 start-0 h-[3px] bg-chalk/30 transition-[width] duration-1000 ease-linear motion-reduce:transition-none"
+          style={{ width: `${pct}%` }}
+          aria-hidden="true"
+        />
+      </div>
+    </>
   )
 })
 
