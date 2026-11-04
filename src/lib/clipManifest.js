@@ -2,7 +2,7 @@
 // slug -> { v: version of the clip and its still, t: version of the technique-tips clip }
 export const CLIPS = {
   'ab-wheel-rollout': { v: 'ec1c62b8' },
-  'arnold-press': { v: '052207ee', t: '2ff0a331' },
+  'arnold-press': { v: 'aaa01bc3', t: '2ff0a331' },
   'assault-air-bike': { v: '3876caff', t: '7d26a4d9' },
   'assisted-dips': { v: 'bb276d76', t: 'ece2a80e' },
   'assisted-pull-up': { v: '39219940', t: '9a99235b' },
@@ -39,7 +39,7 @@ export const CLIPS = {
   'leg-press': { v: '68939dd9' },
   'lying-leg-curl': { v: '23642a03' },
   'machine-lateral-raise': { v: '71fd65a6' },
-  'machine-shoulder-press': { v: 'b7547e24', t: '2308c13d' },
+  'machine-shoulder-press': { v: '43587076', t: '2308c13d' },
   'machine-single-arm-row': { v: '2486661a' },
   'one-arm-dumbbell-row': { v: '5677b3bc', t: '2ae898c6' },
   'parallel-bar-dips': { v: 'b21b2720', t: '45984c53' },
@@ -53,7 +53,7 @@ export const CLIPS = {
   'scapular-push-up': { v: 'c5f11295' },
   'seated-cable-row': { v: 'a07078df', t: '5fbe0f6b' },
   'seated-dumbbell-curl': { v: 'd1c91aeb' },
-  'seated-dumbbell-shoulder-press': { v: 'f34c0f24', t: '0bff78c5' },
+  'seated-dumbbell-shoulder-press': { v: 'cd025c6d', t: '0bff78c5' },
   'seated-leg-curl': { v: '4be9c27b' },
   'single-arm-lat-pulldown': { v: '493a542b', t: '4ad7eada' },
   'split-squat': { v: 'cb0b14c9' },
