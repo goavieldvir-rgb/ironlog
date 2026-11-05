@@ -43,7 +43,7 @@ export const CLIPS = {
   'machine-single-arm-row': { v: '2486661a' },
   'one-arm-dumbbell-row': { v: '5677b3bc', t: '2ae898c6' },
   'parallel-bar-dips': { v: 'b21b2720', t: '45984c53' },
-  'pec-deck-fly-machine': { v: '857aeb56' },
+  'pec-deck-fly-machine': { v: '1f5d20ed' },
   'plank': { v: '87005ee1' },
   'preacher-curl': { v: 'ab4fb819' },
   'pull-up': { v: 'fd65a54e', t: '2f1adb74' },

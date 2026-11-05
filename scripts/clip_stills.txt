@@ -12,3 +12,6 @@ cable-lateral-raise --frame 30
 # Rear three-quarter camera (Nov 5 re-render): frame the figure and pad,
 # not the whole base, at the top of the rep.
 back-extension --frame 28 --crop 318,330,590
+# Forearm-pad rebuild (Nov 5): mid-sweep, so the face and chest show (at the
+# squeeze the upright forearms cover them).
+pec-deck-fly-machine --frame 16
