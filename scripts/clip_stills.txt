@@ -6,3 +6,6 @@ cable-biceps-curl --crop 450,380,500
 cable-crunch --crop 450,430,440
 close-grip-lat-pulldown --crop 400,440,500
 single-arm-lat-pulldown --crop 380,430,520
+# The re-render (Nov 4) has a new, closer camera, so no crop is needed;
+# frame 30 is the top of the rep (27-33), held steadier than the auto pick.
+cable-lateral-raise --frame 30
