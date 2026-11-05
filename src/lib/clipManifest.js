@@ -45,7 +45,7 @@ export const CLIPS = {
   'parallel-bar-dips': { v: 'b21b2720', t: '45984c53' },
   'pec-deck-fly-machine': { v: '857aeb56' },
   'plank': { v: '87005ee1' },
-  'preacher-curl': { v: '19e98b31' },
+  'preacher-curl': { v: 'ab4fb819' },
   'pull-up': { v: 'fd65a54e', t: '2f1adb74' },
   'push-up': { v: 'b68be821' },
   'rear-delt-fly': { v: 'f3498281' },
