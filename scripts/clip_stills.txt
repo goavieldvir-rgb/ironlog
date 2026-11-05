@@ -9,3 +9,6 @@ single-arm-lat-pulldown --crop 380,430,520
 # The re-render (Nov 4) has a new, closer camera, so no crop is needed;
 # frame 30 is the top of the rep (27-33), held steadier than the auto pick.
 cable-lateral-raise --frame 30
+# Rear three-quarter camera (Nov 5 re-render): frame the figure and pad,
+# not the whole base, at the top of the rep.
+back-extension --frame 28 --crop 318,330,590

@@ -17,7 +17,7 @@ the app gets their own private login and their own history; nobody sees anyone e
   name (workout, routine, builder, library, picker, history); tap it for the looping clip
   and, where there is one, a technique-tips clip. Matched by English name, or picked per
   exercise by the coach (needs `supabase-exercise-clips.sql`). The files live in
-  `public/clips/`; after a re-render run `scripts/sync-clips.sh` to copy them in, remake
+  `public/clips/`; after an approved re-render run `ONLY=<slug> scripts/sync-clips.sh` (or with no `ONLY` for everything) to copy it in, remake
   the stills (`scripts/clip_still.py`, overrides in `scripts/clip_stills.txt`) and update
   `src/lib/clipManifest.js`.
 - **Accounts** — email/password sign-up. Everyone shares the same app, but Supabase
