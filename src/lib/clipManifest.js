@@ -6,7 +6,7 @@ export const CLIPS = {
   'assault-air-bike': { v: '3876caff', t: '7d26a4d9' },
   'assisted-dips': { v: 'bb276d76', t: 'ece2a80e' },
   'assisted-pull-up': { v: '39219940', t: '9a99235b' },
-  'back-extension': { v: 'd7b56c92', t: '8bf2f9fc' },
+  'back-extension': { v: 'd7b56c92', t: 'a22a064f' },
   'barbell-bench-press': { v: 'bd3f91a1' },
   'barbell-biceps-curl': { v: 'ff4427a7' },
   'bench-dips': { v: 'b2ac4d64' },

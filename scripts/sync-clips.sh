@@ -6,6 +6,7 @@
 #
 #   scripts/sync-clips.sh [ANIMATIONS_OUT_DIR]
 #   ONLY=slug,slug scripts/sync-clips.sh   just these clips, the rest untouched
+#   ONLY=slug TIPS=1 scripts/sync-clips.sh also their technique-tips clips
 #
 # Use ONLY when a single clip was re-rendered and approved: the render output
 # often holds other re-renders that are still waiting for review.
@@ -44,8 +45,13 @@ for f in "${files[@]}"; do
   v="$(cat "$OUT/$slug.mp4" "$OUT/$slug.jpg" | sha1sum | cut -c1-8)"
   tips=""
   t="$SRC/technique-tips/$slug/$slug-tips.mp4"
+  # With ONLY, the tips clip is reviewed separately: keep the app's copy
+  # unless TIPS=1 says that one was approved too.
+  if [ -n "${ONLY:-}" ] && [ -z "${TIPS:-}" ]; then
+    t="$OUT/tips/$slug.mp4"
+  fi
   if [ -f "$t" ]; then
-    cp "$t" "$OUT/tips/$slug.mp4"
+    [ "$t" = "$OUT/tips/$slug.mp4" ] || cp "$t" "$OUT/tips/$slug.mp4"
     tips=", t: '$(sha1sum < "$t" | cut -c1-8)'"
   fi
   entries+=("  '$slug': { v: '$v'$tips },")
