@@ -15,3 +15,5 @@ back-extension --frame 28 --crop 318,330,590
 # Forearm-pad rebuild (Nov 5): mid-sweep, so the face and chest show (at the
 # squeeze the upright forearms cover them).
 pec-deck-fly-machine --frame 16
+# Nov 6 re-render: frame 30 is the bottom of the dip (elbows ~86 deg).
+bench-dips --frame 30
