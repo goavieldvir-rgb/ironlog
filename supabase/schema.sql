@@ -87,11 +87,13 @@ create table if not exists public.exercises (
   last_note_date date,
   timed boolean default false not null,
   rest_seconds integer,
+  clip text,
   constraint exercises_pkey PRIMARY KEY (id),
   constraint exercises_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
   constraint exercises_category_check CHECK ((category = ANY (ARRAY['strength'::text, 'mobility'::text, 'cardio'::text]))),
   constraint exercises_intensity_type_check CHECK ((intensity_type = ANY (ARRAY['rpe'::text, 'hr_zone'::text]))),
-  constraint exercises_rest_seconds_check CHECK ((rest_seconds IS NULL OR (rest_seconds >= 5 AND rest_seconds <= 3600)))
+  constraint exercises_rest_seconds_check CHECK ((rest_seconds IS NULL OR (rest_seconds >= 5 AND rest_seconds <= 3600))),
+  constraint exercises_clip_check CHECK ((clip IS NULL OR clip ~ '^[a-z0-9-]{1,80}$'))
 );
 create table if not exists public.global_exercises (
   id uuid default gen_random_uuid() not null,
@@ -2193,6 +2195,18 @@ begin
     alter table public.exercises
       add constraint exercises_rest_seconds_check
       check (rest_seconds is null or (rest_seconds between 5 and 3600));
+  end if;
+end $$;
+
+-- ===== 6i. Demo clip per exercise (supabase-exercise-clips.sql) =====
+-- For databases made before clip was in the exercises table above.
+alter table public.exercises add column if not exists clip text;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'exercises_clip_check') then
+    alter table public.exercises
+      add constraint exercises_clip_check
+      check (clip is null or clip ~ '^[a-z0-9-]{1,80}$');
   end if;
 end $$;
 

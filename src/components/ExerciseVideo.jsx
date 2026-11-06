@@ -4,16 +4,19 @@ import { Play, Volume2, VolumeX, X } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { resolveExerciseVideo, youtubeEmbedUrl } from '../lib/demoVideos.js'
+import { exerciseClipFor } from '../lib/exerciseClips.js'
 
 // The "Example" button every exercise shares. A coach's own non-YouTube link
 // still opens in a new tab; everything else (built-in demo clips and
 // coach-pasted YouTube links) plays in the same fixed 16:9 frame, so every
-// exercise looks and behaves the same.
+// exercise looks and behaves the same. Where we have our own rendered clip
+// (shown by ExerciseThumb), the built-in YouTube demo is left out; a coach's
+// own link still shows.
 //
 // `name` is what the card shows; `matchNames` are the names tried against
 // the built-in clips, English first (entries can carry a Hebrew display
 // name, but the clips are matched by the English one).
-export default function ExerciseVideo({ name, matchNames = [], videoUrl, className = '', iconSize = 13 }) {
+export default function ExerciseVideo({ name, matchNames = [], videoUrl, chosenClip, className = '', iconSize = 13 }) {
   const { t } = useLanguage()
   const [open, setOpen] = useState(false)
 
@@ -21,6 +24,7 @@ export default function ExerciseVideo({ name, matchNames = [], videoUrl, classNa
     .filter(Boolean)
     .reduce((found, n) => found || resolveExerciseVideo({ name: n, videoUrl }), null)
   if (!video) return null
+  if (video.builtIn && exerciseClipFor(chosenClip, [...matchNames, name])) return null
 
   const look = `inline-flex items-center gap-1 text-brass hover:underline w-fit ${className}`
 
@@ -42,7 +46,7 @@ export default function ExerciseVideo({ name, matchNames = [], videoUrl, classNa
   )
 }
 
-function VideoModal({ video, name, onClose }) {
+export function VideoModal({ video, name, onClose }) {
   const { t } = useLanguage()
   useScrollLock(true)
   // YouTube's player on iPhone has no mute or volume button of its own, so

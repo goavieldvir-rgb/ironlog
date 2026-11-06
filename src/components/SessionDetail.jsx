@@ -1,4 +1,5 @@
 import ExerciseVideo from './ExerciseVideo.jsx'
+import ExerciseThumb from './ExerciseThumb.jsx'
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { Pencil, Share, MessageSquareText, Check, Trash2, TrendingUp, TrendingDown, Minus, Target, LineChart as ChartIcon, Repeat } from 'lucide-react'
@@ -225,7 +226,14 @@ export default function SessionDetail() {
         return (
           <section key={i} className="bg-surface rounded-[20px] overflow-hidden">
             <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-2">
-              <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <ExerciseThumb
+                size={36}
+                chosen={exById[entry.exerciseId]?.clip}
+                names={[exById[entry.exerciseId]?.name, entry.nameEn, entry.name]}
+                videoUrl={exById[entry.exerciseId]?.video_url || entry.videoUrl}
+                label={entryName(entry, exById, lang)}
+              />
+              <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
                 {/* One tap to how this exercise has gone over time. */}
                 {entry.exerciseId ? (
                   <h2 className="text-[17px] leading-6">
@@ -250,6 +258,7 @@ export default function SessionDetail() {
                 name={entryName(entry, exById, lang)}
                 matchNames={[exercises.find((x) => x.id === entry.exerciseId)?.name, entry.nameEn]}
                 videoUrl={exercises.find((x) => x.id === entry.exerciseId)?.video_url || entry.videoUrl}
+                chosenClip={exById[entry.exerciseId]?.clip}
                 className="text-xs shrink-0"
               />
             </div>

@@ -8,6 +8,7 @@ import { useCollection } from '../lib/db.js'
 import { cleanRest, formatRest } from '../lib/rest.js'
 import { loadDraft } from '../lib/draft.js'
 import { Button, CategoryTag, LoadError } from './ui.jsx'
+import ExerciseThumb from './ExerciseThumb.jsx'
 
 // A routine read-only: every exercise with its target, coach note and
 // superset link, nothing editable. For a coach checking what a trainee is
@@ -23,6 +24,7 @@ export default function RoutineView() {
     () => Object.fromEntries(exercises.map((e) => [e.id, (lang === 'he' && e.name_he) || e.name])),
     [exercises, lang],
   )
+  const exerciseById = useMemo(() => Object.fromEntries(exercises.map((e) => [e.id, e])), [exercises])
 
   // A failed load must not read as "deleted".
   if (!loading && !routine && loadError) return <LoadError onRetry={refresh} />
@@ -53,7 +55,12 @@ export default function RoutineView() {
         </div>
       </div>
 
-      <RoutineExercises routine={routine} nameOf={(it) => nameById[it.exerciseId] || it.name} t={t} />
+      <RoutineExercises
+        routine={routine}
+        nameOf={(it) => nameById[it.exerciseId] || it.name}
+        exerciseOf={(it) => exerciseById[it.exerciseId]}
+        t={t}
+      />
 
       <Button to={`/workout/${routine.id}`} variant="brass" className="w-full">
         <Play size={15} /> {loadDraft(effectiveUid, routine.id) ? t('routines.resumeSession') : t('routines.startSession')}
@@ -75,7 +82,9 @@ export function itemTarget(routine, it, t) {
 }
 
 // The full exercise list of a routine, read-only. Shared with the coach page.
-export function RoutineExercises({ routine, nameOf, t, compact = false }) {
+// `exerciseOf` gives an item's library row (for the coach's chosen clip and
+// own video link), when the caller has the library.
+export function RoutineExercises({ routine, nameOf, exerciseOf = () => null, t, compact = false }) {
   const items = routine.exercises || []
   if (items.length === 0) return <p className="text-sm text-chalkdim">{t('routines.noExercisesAdded')}</p>
   return (
@@ -89,13 +98,20 @@ export function RoutineExercises({ routine, nameOf, t, compact = false }) {
           >
             <div className="flex items-center gap-3">
               <span className="w-5 shrink-0 text-chalkdim text-[13px] tabular-nums">{i + 1}</span>
+              <ExerciseThumb
+                size={compact ? 36 : 40}
+                chosen={exerciseOf(it)?.clip}
+                names={[exerciseOf(it)?.name, it.name]}
+                videoUrl={exerciseOf(it)?.video_url || it.videoUrl}
+                label={nameOf(it)}
+              />
               <span className={`flex-1 min-w-0 ${compact ? 'text-sm' : 'text-[15px]'} truncate`}>{nameOf(it)}</span>
               <bdi dir="ltr" className="num shrink-0 text-sm text-chalkdim">
                 {itemTarget(routine, it, t)}
               </bdi>
             </div>
             {(inSuperset || it.coachNote) && (
-              <div className="ps-8 flex flex-col gap-0.5 text-xs text-chalkdim">
+              <div className={`${compact ? 'ps-[80px]' : 'ps-[84px]'} flex flex-col gap-0.5 text-xs text-chalkdim`}>
                 {it.supersetWithNext && (
                   <span className="inline-flex items-center gap-1 text-accent">
                     <Link2 size={12} aria-hidden="true" /> {t('routines.supersetNext')}

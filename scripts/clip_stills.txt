@@ -1,0 +1,19 @@
+# Hand overrides for scripts/clip_still.py, one clip per line:
+#   <slug> [--frame N] [--crop CX,CY,SIDE]
+# Crops are in the clip's 720 px frame. Used for tall cable machines, where
+# the automatic crop keeps the whole stack and the figure ends up tiny.
+cable-biceps-curl --crop 450,380,500
+cable-crunch --crop 450,430,440
+close-grip-lat-pulldown --crop 400,440,500
+single-arm-lat-pulldown --crop 380,430,520
+# The re-render (Nov 4) has a new, closer camera, so no crop is needed;
+# frame 30 is the top of the rep (27-33), held steadier than the auto pick.
+cable-lateral-raise --frame 30
+# Forearm-pad rebuild (Nov 5): mid-sweep, so the face and chest show (at the
+# squeeze the upright forearms cover them).
+pec-deck-fly-machine --frame 16
+# Nov 6 re-render: frame 30 is the bottom of the dip (elbows ~86 deg).
+bench-dips --frame 30
+# Concentration curl re-render (Nov 6): the camera shows the whole bench, so crop
+# around the figure; frame 26 is the top of the curl, elbow on the thigh.
+concentration-curl --frame 26 --crop 250,350,530

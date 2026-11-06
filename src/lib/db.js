@@ -201,6 +201,9 @@ export async function addExercise(uid, exercise) {
       // Own rest between sets. Only sent when set, so adding an exercise works
       // even before the `rest_seconds` column exists in Supabase.
       ...(exercise.restSeconds != null ? { rest_seconds: exercise.restSeconds } : {}),
+      // The coach's pick of demo clip. Only sent when set, so adding an
+      // exercise works even before the `clip` column exists in Supabase.
+      ...(exercise.clip ? { clip: exercise.clip } : {}),
     })
     .select()
     .single()
@@ -222,6 +225,7 @@ export async function updateExercise(uid, id, patch) {
   if (patch.intensityType !== undefined) row.intensity_type = patch.intensityType
   if (patch.trackRir !== undefined) row.track_rir = patch.trackRir
   if (patch.restSeconds !== undefined) row.rest_seconds = patch.restSeconds
+  if (patch.clip !== undefined) row.clip = patch.clip || null
   const { error } = await supabase.from('exercises').update(row).eq('id', id).eq('user_id', uid)
   if (error) throw error
 }
@@ -284,6 +288,7 @@ export async function copyRoutineToUser(targetUid, routine) {
         restSeconds: src?.rest_seconds ?? null,
         videoUrl: src?.video_url || it.videoUrl || '',
         notes: src?.notes || '',
+        clip: src?.clip || null,
       })
       pool.push(match)
     }
