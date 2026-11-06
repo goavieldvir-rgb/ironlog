@@ -31,7 +31,7 @@ export const CLIPS = {
   'hanging-leg-raise': { v: '665e39bc', t: '433da190' },
   'hip-adductor-machine': { v: '62da045f', t: '4e75440e' },
   'incline-barbell-bench-press': { v: '9130aefe' },
-  'incline-dumbbell-bench-press': { v: '5f96e0ad' },
+  'incline-dumbbell-bench-press': { v: '12e29bcf' },
   'incline-smith-machine-press': { v: '72cf6da7' },
   'jump-rope': { v: 'c4afbe16' },
   'lat-pulldown': { v: '0b97bb98', t: '144a9f41' },
