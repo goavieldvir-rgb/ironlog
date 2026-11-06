@@ -17,3 +17,4 @@ bench-dips --frame 30
 # Concentration curl re-render (Nov 6): the camera shows the whole bench, so crop
 # around the figure; frame 26 is the top of the curl, elbow on the thigh.
 concentration-curl --frame 26 --crop 250,350,530
+lat-pulldown --crop 370,440,470
