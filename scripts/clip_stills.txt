@@ -14,3 +14,6 @@ cable-lateral-raise --frame 30
 pec-deck-fly-machine --frame 16
 # Nov 6 re-render: frame 30 is the bottom of the dip (elbows ~86 deg).
 bench-dips --frame 30
+# Concentration curl re-render (Nov 6): the camera shows the whole bench, so crop
+# around the figure; frame 26 is the top of the curl, elbow on the thigh.
+concentration-curl --frame 26 --crop 250,350,530

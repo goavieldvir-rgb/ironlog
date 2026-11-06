@@ -20,7 +20,7 @@ export const CLIPS = {
   'chest-press-machine': { v: '9c30fe38' },
   'chest-supported-row': { v: '46546b5b' },
   'close-grip-lat-pulldown': { v: 'c40ac4d0', t: '4c137159' },
-  'concentration-curl': { v: 'f52409a6' },
+  'concentration-curl': { v: '47ccfb5b' },
   'dumbbell-biceps-curl': { v: 'fc4a2ad1' },
   'dumbbell-lateral-raise': { v: 'fd756acd' },
   'dumbbell-overhead-triceps-extension': { v: '0fdda56c', t: '215e2fb3' },
