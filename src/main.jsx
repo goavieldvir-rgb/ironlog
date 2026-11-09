@@ -7,7 +7,7 @@ import { AdminProvider } from './context/AdminContext.jsx'
 import { LanguageProvider } from './context/LanguageContext.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { FeedbackProvider } from './context/FeedbackContext.jsx'
-import { captureInstallPrompt } from './components/InstallCard.jsx'
+import { captureInstallPrompt } from './lib/install.js'
 import './index.css'
 
 captureInstallPrompt()

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { ChevronDown, HelpCircle } from 'lucide-react'
 import { Card } from './ui.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import InstallCard from './InstallCard.jsx'
+import InstallGuide from './InstallGuide.jsx'
 
 export default function Help() {
   const { t } = useLanguage()
@@ -26,7 +26,7 @@ export default function Help() {
         <p className="text-chalkdim text-sm mt-1">{t('help.subtitle')}</p>
       </div>
 
-      <InstallCard />
+      <InstallGuide />
 
       <div className="flex flex-col gap-2">
         {sections.map((s, i) => (
