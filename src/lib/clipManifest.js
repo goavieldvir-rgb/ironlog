@@ -59,7 +59,7 @@ export const CLIPS = {
   'split-squat': { v: 'cb0b14c9' },
   'standing-calf-raise': { v: 'e026d9d1' },
   'static-lunge': { v: 'b2ea9d7e' },
-  'step-down': { v: 'b0e37f22' },
+  'step-down': { v: '50ace6e4' },
   't-bar-row': { v: '8079002b' },
   'treadmill-running': { v: 'c10200b6', t: 'a799cfd2' },
   'triceps-pushdown': { v: 'e5a7cf03' },
