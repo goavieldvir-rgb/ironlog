@@ -34,7 +34,7 @@ export const CLIPS = {
   'incline-dumbbell-bench-press': { v: '12e29bcf' },
   'incline-smith-machine-press': { v: '72cf6da7' },
   'jump-rope': { v: 'c4afbe16' },
-  'lat-pulldown': { v: '8245fe47', t: '144a9f41' },
+  'lat-pulldown': { v: '22baeabe', t: '144a9f41' },
   'leg-extension': { v: '811d5ffc' },
   'leg-press': { v: '68939dd9' },
   'lying-leg-curl': { v: '23642a03' },
