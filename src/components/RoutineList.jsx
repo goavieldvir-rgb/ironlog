@@ -9,6 +9,7 @@ import { clearDraft, loadDraft } from '../lib/draft.js'
 import { supabase } from '../supabase.js'
 import { Button, Card, CategoryTag, EmptyState, LoadError } from './ui.jsx'
 import { Tabs } from './ExerciseLibrary.jsx'
+import Tour, { useFirstTour } from './Tour.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { itemTarget } from './RoutineView.jsx'
@@ -53,8 +54,13 @@ export default function RoutineList() {
     }
   }
 
+  // First visit: how to build a routine, use it, and get it onto the week.
+  const [tourOpen, closeTour] = useFirstTour('routines', !loading && !loadFailed)
+  const tourSteps = ['build', 'start', 'edit', 'week'].map((k) => ({ target: k === 'week' ? 'tab-today' : `r-${k}`, ...t(`tour.r.${k}`) }))
+
   return (
     <div className="flex flex-col gap-5">
+      {tourOpen && <Tour steps={tourSteps} onClose={closeTour} />}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="eyebrow mb-1">{t('routines.plan')}</div>
@@ -63,7 +69,7 @@ export default function RoutineList() {
             <InfoTip text={t('routines.cardActionsTip')} />
           </h1>
         </div>
-        <Button to="/routines/new">
+        <Button to="/routines/new" data-tour="r-build">
           <Plus size={16} /> {t('routines.buildRoutine')}
         </Button>
       </div>
@@ -97,7 +103,7 @@ export default function RoutineList() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {filtered.map((r) => (
+        {filtered.map((r, i) => (
           <Card key={r.id} className="flex flex-col gap-3">
             <div className="flex items-start justify-between gap-2">
               <div>
@@ -132,7 +138,7 @@ export default function RoutineList() {
                     <Send size={15} />
                   </button>
                 )}
-                <Link to={`/routines/${r.id}/edit`} title={t('common.edit')} aria-label={t('common.edit')} className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-surface2 text-chalkdim hover:text-chalk">
+                <Link to={`/routines/${r.id}/edit`} data-tour={i === 0 ? 'r-edit' : undefined} title={t('common.edit')} aria-label={t('common.edit')} className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-surface2 text-chalkdim hover:text-chalk">
                   <Pencil size={15} />
                 </Link>
                 <button
@@ -168,7 +174,7 @@ export default function RoutineList() {
               {(r.exercises?.length || 0) > 4 && <li>{t('routines.moreCount')(r.exercises.length - 4)}</li>}
             </ul>
 
-            <Button to={`/workout/${r.id}`} variant="brass" className="w-full mt-1">
+            <Button to={`/workout/${r.id}`} data-tour={i === 0 ? 'r-start' : undefined} variant="brass" className="w-full mt-1">
               <Play size={15} /> {loadDraft(effectiveUid, r.id) ? t('routines.resumeSession') : t('routines.startSession')}
             </Button>
           </Card>

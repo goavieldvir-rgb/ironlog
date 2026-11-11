@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
+import { useAdmin } from '../context/AdminContext.jsx'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 
 // A first-run walkthrough: dims the screen, cuts a lit window around one real
@@ -32,6 +34,26 @@ export function tourSeen(uid, name) {
 
 export function markTourSeen(uid, name) {
   try { localStorage.setItem(TOUR_KEY(uid, name), 'done') } catch { /* private mode: it shows again next time */ }
+}
+
+// Opens the named tour once, the first time `ready` turns true, for a new
+// trainee's own account (not the coach, not while managing someone).
+// Returns [open, close]; closing marks it seen.
+export function useFirstTour(name, ready) {
+  const { user } = useAuth()
+  const { isAdmin, actingAs } = useAdmin()
+  const [open, setOpen] = useState(false)
+  const want = !!ready && !!user && !isAdmin && !actingAs && isNewAccount(user) && !tourSeen(user.uid, name)
+  useEffect(() => {
+    if (!want || open) return
+    const id = setTimeout(() => setOpen(true), 500)
+    return () => clearTimeout(id)
+  }, [want, open])
+  const close = useCallback(() => {
+    if (user) markTourSeen(user.uid, name)
+    setOpen(false)
+  }, [user, name])
+  return [open, close]
 }
 
 function findTarget(key) {

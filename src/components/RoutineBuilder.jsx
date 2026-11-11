@@ -12,6 +12,7 @@ import ExerciseSelect from './ExerciseSelect.jsx'
 import { normalizeVideoUrl, safeVideoUrl } from '../lib/url.js'
 import { ExerciseModal, emptyExerciseForm } from './ExerciseLibrary.jsx'
 import { InfoTip } from './InfoTip.jsx'
+import Tour, { useFirstTour } from './Tour.jsx'
 import { disambiguateLabels } from '../lib/disambiguate.js'
 import { useScrollLock } from '../lib/scrollLock.js'
 import RestSelect from './RestSelect.jsx'
@@ -239,8 +240,13 @@ export default function RoutineBuilder() {
     return <p className="text-chalkdim">{t('routines.notFound')}</p>
   }
 
+  // First new routine: what each part of the form is for.
+  const [tourOpen, closeTour] = useFirstTour('builder', !id && !loading)
+  const tourSteps = ['name', 'category', 'catalogue', 'save'].map((k) => ({ target: `b-${k}`, ...t(`tour.b.${k}`) }))
+
   return (
     <div className="flex flex-col gap-5 max-w-2xl">
+      {tourOpen && <Tour steps={tourSteps} onClose={closeTour} />}
       <Link to="/routines" onClick={leave} className="text-chalkdim text-sm inline-flex items-center gap-1 hover:text-chalk w-fit min-h-11">
         <BackChevron size={15} /> {t('routines.title')}
       </Link>
@@ -249,9 +255,12 @@ export default function RoutineBuilder() {
 
       <Card className="flex flex-col gap-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div data-tour="b-name">
           <Field label={t('routines.routineName')}>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('routines.routineNamePlaceholder')} required />
           </Field>
+          </div>
+          <div data-tour="b-category">
           <Field
             label={
               <>
@@ -265,6 +274,7 @@ export default function RoutineBuilder() {
               <option value="cardio">{t('tabs.cardio')}</option>
             </select>
           </Field>
+          </div>
         </div>
       </Card>
 
@@ -469,7 +479,7 @@ export default function RoutineBuilder() {
           <Button type="button" variant="ghost" onClick={addItem} disabled={!pickId}>
             <Plus size={16} /> {t('common.add')}
           </Button>
-          <Button type="button" variant="brass" onClick={() => setPicking(true)}>
+          <Button type="button" variant="brass" data-tour="b-catalogue" onClick={() => setPicking(true)}>
             <Library size={16} /> {t('routines.browseLibrary')}
           </Button>
         </div>
@@ -542,7 +552,7 @@ export default function RoutineBuilder() {
         <Button variant="ghost" onClick={leave}>
           {t('common.cancel')}
         </Button>
-        <Button onClick={handleSave} disabled={saving || !name.trim() || items.length === 0}>
+        <Button onClick={handleSave} data-tour="b-save" disabled={saving || !name.trim() || items.length === 0}>
           {saving ? t('common.saving') : t('routines.saveRoutine')}
         </Button>
       </div>
