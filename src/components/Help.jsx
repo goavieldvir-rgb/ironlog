@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { ChevronDown, HelpCircle } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { ChevronDown, HelpCircle, Sparkles } from 'lucide-react'
+import { ForwardChevron } from './DirectionalIcon.jsx'
+import { useAdmin } from '../context/AdminContext.jsx'
 import { Card } from './ui.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import InstallGuide from './InstallGuide.jsx'
@@ -8,6 +10,8 @@ import InstallGuide from './InstallGuide.jsx'
 export default function Help() {
   const { t } = useLanguage()
   const [openIndex, setOpenIndex] = useState(0)
+  const navigate = useNavigate()
+  const { isAdmin, actingAs } = useAdmin()
 
   // Finishing (11) follows logging, and reminders (12) and language/privacy
   // (13) sit before the troubleshooting section so that stays last.
@@ -25,6 +29,22 @@ export default function Help() {
         <h1 className="text-3xl">{t('help.title')}</h1>
         <p className="text-chalkdim text-sm mt-1">{t('help.subtitle')}</p>
       </div>
+
+      {/* Replays the first-run walkthrough on the home screen. */}
+      {!isAdmin && !actingAs && (
+        <button
+          type="button"
+          onClick={() => navigate('/', { state: { tour: true } })}
+          className="press-row card !p-4 flex items-center gap-3 text-start hover:bg-surface2"
+        >
+          <Sparkles size={18} className="text-accent shrink-0" aria-hidden="true" />
+          <span className="flex-1 min-w-0">
+            <span className="block text-chalk">{t('tour.replay')}</span>
+            <span className="block text-chalkdim text-sm">{t('tour.replayBody')}</span>
+          </span>
+          <ForwardChevron size={16} className="text-chalkdim/70 shrink-0" />
+        </button>
+      )}
 
       <InstallGuide />
 

@@ -55,7 +55,7 @@ export function AuthProvider({ children }) {
 
   const value = {
     user: user
-      ? { uid: user.id, email: user.email, displayName: user.user_metadata?.full_name || '' }
+      ? { uid: user.id, email: user.email, displayName: user.user_metadata?.full_name || '', createdAt: user.created_at || null }
       : null,
     loading: loading || (!!user && !mfa),
     recovery,

@@ -10,6 +10,9 @@ import { useScrollLock, resetLockedScroll } from '../lib/scrollLock.js'
 import { useDialog } from './Modal.jsx'
 import { useMessagesState } from '../lib/messages.js'
 
+// data-tour keys the first-run walkthrough points at (phone tabs and desktop links).
+const TOUR_KEYS = { '/': 'tab-today', '/routines': 'tab-routines', '/nutrition': 'tab-nutrition', '/history': 'tab-history', '/stats': 'tab-progress', '/people': 'tab-people' }
+
 const links = [
   { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard, end: true },
   { to: '/routines', labelKey: 'nav.routines', icon: ListChecks },
@@ -148,6 +151,7 @@ export default function Layout() {
                 key={l.to}
                 to={l.to}
                 end={l.end}
+                data-tour={TOUR_KEYS[l.to]}
                 className={({ isActive }) =>
                   `flex items-center gap-1.5 px-3 py-2 rounded-md text-sm transition-colors whitespace-nowrap ${
                     isActive ? 'bg-surface2 text-chalk' : 'text-chalkdim hover:text-chalk'
@@ -350,6 +354,7 @@ export default function Layout() {
                 key={tab.to}
                 to={tab.to}
                 end={tab.end}
+                data-tour={TOUR_KEYS[tab.to]}
                 className={({ isActive }) =>
                   `press flex flex-col items-center justify-center gap-0.5 rounded-[18px] text-xs font-medium transition-colors duration-150 ${
                     isActive ? 'bg-white/[0.08] text-chalk' : 'text-[#8A8A90]'
@@ -366,6 +371,7 @@ export default function Layout() {
             <button
               type="button"
               onClick={() => setOpen(true)}
+              data-tour="tab-more"
               aria-expanded={open}
               aria-haspopup="dialog"
               className="press flex flex-col items-center justify-center gap-0.5 rounded-[18px] text-xs font-medium text-[#8A8A90]"

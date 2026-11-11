@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Play, Plus, Check, Circle, MessageSquareText } from 'lucide-react'
 import { InfoTip } from './InfoTip.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -14,6 +14,7 @@ import { listDrafts, clearDraft } from '../lib/draft.js'
 import { Button, Card, LoadError, FeedbackDot } from './ui.jsx'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import WeeklySchedule from './WeeklySchedule.jsx'
+import Tour, { tourSeen, markTourSeen } from './Tour.jsx'
 import { itemTarget } from './RoutineView.jsx'
 import { useMessagesState } from '../lib/messages.js'
 import { setVolume } from '../lib/bodyweight.js'
@@ -88,7 +89,9 @@ export default function Dashboard() {
   const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
   const { unread: unreadMessages, latest: latestMessage, threads: coachThreads } = useMessagesState()
-  const { isAdmin } = useAdmin()
+  const { isAdmin, nutritionAllowed } = useAdmin()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [exercises, exercisesLoading, refreshExercises, exercisesError] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [routines, routinesLoading, refreshRoutines, routinesError] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
   const [sessions, sessionsLoading, refreshSessions, sessionsError] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
@@ -224,6 +227,34 @@ export default function Dashboard() {
   const unreadFeedback = actingAs ? [] : sessions.filter(hasUnreadFeedback)
   const firstName = (user.displayName || user.email || '').split(/[\s@]/)[0]
 
+  // First-run walkthrough. Shown once to a new trainee (account under two
+  // weeks old) after today's screen has loaded, and again on request from
+  // Help. Not for the coach or while managing someone else's account.
+  const [tourOpen, setTourOpen] = useState(false)
+  const tourRequested = !!location.state?.tour
+  const newAccount = user.createdAt && Date.now() - new Date(user.createdAt).getTime() < 14 * 864e5
+  const tourReady = loadedPlan && !weightsLoading && !actingAs && !isAdmin
+  useEffect(() => {
+    if (!tourReady || tourOpen) return
+    if (!tourRequested && (!newAccount || tourSeen(user.uid))) return
+    const id = setTimeout(() => setTourOpen(true), 500)
+    return () => clearTimeout(id)
+  }, [tourReady, tourRequested, newAccount, tourOpen, user.uid])
+  function closeTour() {
+    markTourSeen(user.uid)
+    setTourOpen(false)
+    if (tourRequested) navigate('.', { replace: true, state: null })
+  }
+  const tourSteps = [
+    { target: 'week', ...t('tour.week') },
+    { target: 'start', ...t('tour.start') },
+    { target: 'weight', ...t('tour.weight') },
+    nutritionAllowed ? { target: 'tab-nutrition', ...t('tour.nutrition') } : { target: 'tab-routines', ...t('tour.routines') },
+    { target: 'tab-history', ...t('tour.history') },
+    { target: 'tab-progress', ...t('tour.progress') },
+    { target: 'tab-more', ...t('tour.more') },
+  ]
+
   const restLink = (label) => (
     <button
       type="button"
@@ -315,6 +346,9 @@ export default function Dashboard() {
 
       {loadFailed && <LoadError onRetry={retryAll} />}
 
+      {tourOpen && <Tour steps={tourSteps} onClose={closeTour} />}
+
+      <div data-tour="week">
       <WeeklySchedule
         effectiveUid={effectiveUid}
         routines={routines}
@@ -325,6 +359,7 @@ export default function Dashboard() {
         refreshSchedule={refreshSchedule}
         openRequest={panelReq}
       />
+      </div>
 
       {showChecklist && <OnboardingChecklist steps={steps} t={t} />}
 
@@ -446,7 +481,7 @@ function TodayHero({ routine, others, eyebrow = null, othersLabel = null, sessio
   if (last?.duration_minutes) parts.push(t('dashboard.aboutMin', { min: last.duration_minutes }))
   if (last?.date) parts.push(t('dashboard.lastDone', { day: fmtDate(lang, new Date(last.date + 'T00:00:00'), { weekday: 'long' }) }))
   return (
-    <section className="bg-surface rounded-[22px] p-5 flex flex-col gap-4">
+    <section data-tour="start" className="bg-surface rounded-[22px] p-5 flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         {eyebrow && <div className="eyebrow">{eyebrow}</div>}
         <h2 className="text-2xl leading-[30px] tracking-[-0.015em]">{routine.name}</h2>
@@ -548,7 +583,7 @@ function WeightQuickCard({ last, t, onSave, onHide }) {
     setSaving(false)
   }
   return (
-    <Card className="!p-4">
+    <Card className="!p-4" data-tour="weight">
       <form onSubmit={submit} className="flex flex-col gap-2">
         <label htmlFor="quick-weight" className="text-[15px] font-medium">
           {t('dashboard.logWeightTitle')}
