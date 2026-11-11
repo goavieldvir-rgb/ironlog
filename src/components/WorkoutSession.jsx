@@ -26,6 +26,7 @@ import { entryName, exerciseMap } from '../lib/names.js'
 import { preloadShareFonts } from '../lib/shareCard.js'
 import { weeklyStreak } from '../lib/streak.js'
 import WorkoutDone from './WorkoutDone.jsx'
+import Tour, { useFirstTour } from './Tour.jsx'
 
 function todayISO() {
   return toLocalISODate()
@@ -923,6 +924,11 @@ export default function WorkoutSession() {
 
   // A failed load is not a missing routine: keep the draft and offer a retry,
   // so a bad connection at the gym never throws away a half-logged workout.
+  // First-workout walkthrough: how to log a set, tick it off and save.
+  // Once per new account, as soon as the first exercise card is on screen.
+  const [tourOpen, closeTour] = useFirstTour('workout', entries.length > 0 && !summary)
+  const tourSteps = ['prev', 'row', 'done', 'video', 'menu', 'finish'].map((k) => ({ target: `ws-${k}`, ...t(`tour.ws.${k}`) }))
+
   if (!isFreestyle && !routinesLoading && !routine && routinesError) {
     return <LoadError onRetry={refreshRoutines} />
   }
@@ -1017,6 +1023,7 @@ export default function WorkoutSession() {
           <button
             type="button"
             onClick={handleFinish}
+            data-tour="ws-finish"
             disabled={saving || saved || entries.length === 0 || (gymsOn && gymChoice === undefined)}
             className="press justify-self-end h-11 px-3 text-[15px] font-semibold text-accent disabled:opacity-40 disabled:pointer-events-none"
           >
@@ -1086,6 +1093,7 @@ export default function WorkoutSession() {
           >
           <SessionEntryCard
             entry={entry}
+            tourAnchors={i === 0}
             liveExercise={gymExercises.find((e) => e.id === entry.exerciseId)}
             previousFrom={(() => {
               const from = gymExercises.find((e) => e.id === entry.exerciseId)?.fromGymId
@@ -1282,6 +1290,7 @@ export default function WorkoutSession() {
       )}
 
       <RestTimer ref={restRef} />
+      {tourOpen && <Tour steps={tourSteps} onClose={closeTour} />}
     </div>
   )
 }

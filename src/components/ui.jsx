@@ -29,8 +29,8 @@ export function Button({ children, variant = 'primary', className = '', to, ...p
   )
 }
 
-export function Card({ children, className = '' }) {
-  return <div className={`card p-4 ${className}`}>{children}</div>
+export function Card({ children, className = '', ...rest }) {
+  return <div className={`card p-4 ${className}`} {...rest}>{children}</div>
 }
 
 // Unread coach feedback on a workout row.

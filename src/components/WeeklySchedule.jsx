@@ -10,6 +10,7 @@ import { Button, Field } from './ui.jsx'
 import { toLocalISODate } from '../lib/dates.js'
 import { InfoTip } from './InfoTip.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
+import Tour, { useFirstTour } from './Tour.jsx'
 
 // 0 = Sunday ... 6 = Saturday — matches JS's native Date.getDay() and the
 // weekly_schedule table's day_of_week column directly.
@@ -172,8 +173,13 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
   const dayRoutines = openDay == null ? [] : routinesForDay(openDay)
   const isTodayOpen = openDay === today
 
+  // First time the week editor opens: pick a day, fill its slots, save.
+  const [tourOpen, closeTour] = useFirstTour('week', openDay != null && mode === 'edit')
+  const tourSteps = ['days', 'slots', 'save'].map((k) => ({ target: `w-${k}`, ...t(`tour.w.${k}`) }))
+
   return (
     <div className="flex flex-col gap-2">
+      {tourOpen && openDay != null && mode === 'edit' && <Tour steps={tourSteps} onClose={closeTour} />}
       <div className="flex items-center justify-between gap-2">
         <h2 className="eyebrow inline-flex items-center gap-1">
           {t('dashboard.weeklySchedule')} <InfoTip text={t('dashboard.weeklyScheduleTip')} />
@@ -318,7 +324,7 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
               <>
                 {/* Day switcher so the whole week can be set up without
                     closing and reopening seven times. */}
-                <div className="grid grid-cols-7 gap-1 mb-4">
+                <div className="grid grid-cols-7 gap-1 mb-4" data-tour="w-days">
                   {DAYS.map((dow) => (
                     <button
                       key={dow}
@@ -335,7 +341,7 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
                 </div>
 
                 <p className="text-chalkdim text-xs mb-3">{t('dashboard.upToThree')}</p>
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-3" data-tour="w-slots">
                   {SLOTS.map((slot) => (
                     <Field key={slot} label={t(`dashboard.${SLOT_LABEL_KEYS[slot]}`)}>
                       <select
@@ -361,7 +367,7 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
                   <Button type="button" variant="ghost" onClick={close}>
                     {t('common.cancel')}
                   </Button>
-                  <Button type="button" onClick={saveDay} disabled={saving || dirtyDays.length === 0}>
+                  <Button type="button" data-tour="w-save" onClick={saveDay} disabled={saving || dirtyDays.length === 0}>
                     {t('common.save')}
                   </Button>
                 </div>

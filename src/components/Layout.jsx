@@ -10,6 +10,9 @@ import { useScrollLock, resetLockedScroll } from '../lib/scrollLock.js'
 import { useDialog } from './Modal.jsx'
 import { useMessagesState } from '../lib/messages.js'
 
+// data-tour keys the first-run walkthrough points at (phone tabs and desktop links).
+const TOUR_KEYS = { '/': 'tab-today', '/routines': 'tab-routines', '/nutrition': 'tab-nutrition', '/history': 'tab-history', '/stats': 'tab-progress', '/people': 'tab-people' }
+
 const links = [
   { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard, end: true },
   { to: '/routines', labelKey: 'nav.routines', icon: ListChecks },
@@ -142,12 +145,13 @@ export default function Layout() {
             </NavLink>
           )}
 
-          <nav className="hidden md:flex items-center gap-1">
+          <nav data-tour="tabs" className="hidden md:flex items-center gap-1">
             {desktopLinks.map((l) => (
               <NavLink
                 key={l.to}
                 to={l.to}
                 end={l.end}
+                data-tour={TOUR_KEYS[l.to]}
                 className={({ isActive }) =>
                   `flex items-center gap-1.5 px-3 py-2 rounded-md text-sm transition-colors whitespace-nowrap ${
                     isActive ? 'bg-surface2 text-chalk' : 'text-chalkdim hover:text-chalk'
@@ -341,6 +345,7 @@ export default function Layout() {
               half-legible behind the blur. */}
           <div aria-hidden="true" className="md:hidden fixed inset-x-0 bottom-0 z-20 h-32 pointer-events-none bg-gradient-to-b from-ink/0 to-ink/90" />
           <nav
+            data-tour="tabs"
             aria-label={t('nav.tabs')}
             className="md:hidden fixed inset-x-4 z-30 h-16 p-1.5 rounded-[24px] grid grid-cols-5 gap-1 bg-[#242428]/75 backdrop-blur-xl backdrop-saturate-150 shadow-[inset_0_0.5px_0_rgba(255,255,255,0.14),0_12px_32px_rgba(0,0,0,0.5)]"
             style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 14px)' }}
@@ -350,6 +355,7 @@ export default function Layout() {
                 key={tab.to}
                 to={tab.to}
                 end={tab.end}
+                data-tour={TOUR_KEYS[tab.to]}
                 className={({ isActive }) =>
                   `press flex flex-col items-center justify-center gap-0.5 rounded-[18px] text-xs font-medium transition-colors duration-150 ${
                     isActive ? 'bg-white/[0.08] text-chalk' : 'text-[#8A8A90]'
@@ -366,6 +372,7 @@ export default function Layout() {
             <button
               type="button"
               onClick={() => setOpen(true)}
+              data-tour="tab-more"
               aria-expanded={open}
               aria-haspopup="dialog"
               className="press flex flex-col items-center justify-center gap-0.5 rounded-[18px] text-xs font-medium text-[#8A8A90]"
