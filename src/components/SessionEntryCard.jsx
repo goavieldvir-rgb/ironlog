@@ -160,6 +160,8 @@ export default function SessionEntryCard({
   // Called with the set's index when it's ticked off, so the page can start
   // the rest timer (or move on to the next exercise in a superset).
   onSetDone,
+  // Marks this card's parts for the first-workout walkthrough (first card only).
+  tourAnchors = false,
   removable = false,
   // 'start' | 'mid' | 'end' when this card is part of a superset chain.
   supersetPos = null,
@@ -544,6 +546,7 @@ export default function SessionEntryCard({
     return (
       <button
         type="button"
+        data-tour={tourAnchors && j === 0 ? 'ws-done' : undefined}
         onClick={() => toggleDone(j)}
         aria-pressed={done}
         aria-label={doneLabel}
@@ -613,12 +616,14 @@ export default function SessionEntryCard({
             {/* Next to the name rather than in the icon row: sitting among
                 the icons it made that row so wide on a phone that the name
                 and the notes were squeezed into a narrow column. */}
+            <span className="contents" data-tour={tourAnchors ? 'ws-video' : undefined}>
             <ExerciseVideo
               name={displayName}
               matchNames={[liveExercise?.name, entry.nameEn]}
               videoUrl={entry.videoUrl}
               className="text-[13px] !text-chalkdim hover:!text-chalk"
             />
+            </span>
           </div>
           {/* The coach's cue for this exercise, set in the routine, with the
               label in primary text so it isn't mistaken for the lifter's own
@@ -662,6 +667,7 @@ export default function SessionEntryCard({
             </p>
           )}
         </div>
+        <span className="shrink-0" data-tour={tourAnchors ? 'ws-menu' : undefined}>
         <OverflowMenu
           label={t('sessionCard.moreActions')}
           items={[
@@ -680,6 +686,7 @@ export default function SessionEntryCard({
             { key: 'remove', label: t('sessionCard.removeExercise'), icon: <Trash2 size={16} />, onClick: () => onRemoveEntry?.(), danger: true, hidden: !removable },
           ]}
         />
+        </span>
       </div>
 
       {/* Body weight counts as the base load; the weight column is only for
@@ -726,7 +733,7 @@ export default function SessionEntryCard({
       ) : null)}
 
       {showFillRow && (
-        <div className="flex flex-wrap items-center gap-2 px-0.5">
+        <div className="flex flex-wrap items-center gap-2 px-0.5" data-tour={tourAnchors ? 'ws-prev' : undefined}>
           {hasChoice && <span className="hidden min-[560px]:inline text-[13px] text-chalkdim">{t('sessionCard.fillFrom')}</span>}
           {nextWeight != null && (
             <button
@@ -835,6 +842,7 @@ export default function SessionEntryCard({
             <React.Fragment key={j}>
             <div
               data-set-row={j}
+              data-tour={tourAnchors && j === 0 ? 'ws-row' : undefined}
               className={`${rowBase} ${justFilled.includes(j) ? 'flash-fill' : ''} ${isWarmup(s) ? '[&>*:not(:first-child):not(:last-child)]:opacity-70' : ''}`}
             >
               {setMenu(j)}

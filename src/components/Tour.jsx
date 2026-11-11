@@ -17,21 +17,30 @@ const PAD = 8 // space between the element and the edge of the lit window
 const GAP = 14 // space between the lit window and the card
 const EDGE = 16 // the card keeps this far from the screen edges
 
-const TOUR_KEY = (uid) => `ironlog:tour:v1:${uid}`
+// One flag per tour ('home', 'workout'), per account, on this device.
+const TOUR_KEY = (uid, name) => `ironlog:tour:${name}:${uid}`
 
-export function tourSeen(uid) {
-  try { return localStorage.getItem(TOUR_KEY(uid)) === 'done' } catch { return true }
+// A new account: under two weeks old. Older accounts never get the tours
+// on their own; Help can still replay the home one.
+export function isNewAccount(user) {
+  return !!user?.createdAt && Date.now() - new Date(user.createdAt).getTime() < 14 * 864e5
 }
 
-export function markTourSeen(uid) {
-  try { localStorage.setItem(TOUR_KEY(uid), 'done') } catch { /* private mode: it shows again next time */ }
+export function tourSeen(uid, name) {
+  try { return localStorage.getItem(TOUR_KEY(uid, name)) === 'done' } catch { return true }
+}
+
+export function markTourSeen(uid, name) {
+  try { localStorage.setItem(TOUR_KEY(uid, name), 'done') } catch { /* private mode: it shows again next time */ }
 }
 
 function findTarget(key) {
   // Phone tab bar and desktop header both carry the key; use the one that's shown.
-  for (const el of document.querySelectorAll(`[data-tour="${key}"]`)) {
-    const r = el.getBoundingClientRect()
-    if (r.width > 0 && r.height > 0) return el
+  for (const node of document.querySelectorAll(`[data-tour="${key}"]`)) {
+    // A display:contents wrapper has no box of its own; use what it wraps.
+    const el = getComputedStyle(node).display === 'contents' ? node.firstElementChild : node
+    const r = el?.getBoundingClientRect()
+    if (r && r.width > 0 && r.height > 0) return el
   }
   return null
 }
@@ -59,7 +68,11 @@ export default function Tour({ steps, onClose }) {
     const el = step && findTarget(step.target)
     if (!el) return setRect(null)
     const r = el.getBoundingClientRect()
-    setRect({ top: r.top - PAD, left: r.left - PAD, width: r.width + PAD * 2, height: r.height + PAD * 2 })
+    // Keep the lit window on screen, e.g. for a button in the corner.
+    const left = Math.max(4, r.left - PAD)
+    const right = Math.min(window.innerWidth - 4, r.right + PAD)
+    const top = Math.max(4, r.top - PAD)
+    setRect({ top, left, width: right - left, height: r.bottom + PAD - top })
   }, [step])
 
   // Bring the target on screen, then light it.

@@ -14,7 +14,7 @@ import { listDrafts, clearDraft } from '../lib/draft.js'
 import { Button, Card, LoadError, FeedbackDot } from './ui.jsx'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import WeeklySchedule from './WeeklySchedule.jsx'
-import Tour, { tourSeen, markTourSeen } from './Tour.jsx'
+import Tour, { tourSeen, markTourSeen, isNewAccount } from './Tour.jsx'
 import { itemTarget } from './RoutineView.jsx'
 import { useMessagesState } from '../lib/messages.js'
 import { setVolume } from '../lib/bodyweight.js'
@@ -232,26 +232,26 @@ export default function Dashboard() {
   // Help. Not for the coach or while managing someone else's account.
   const [tourOpen, setTourOpen] = useState(false)
   const tourRequested = !!location.state?.tour
-  const newAccount = user.createdAt && Date.now() - new Date(user.createdAt).getTime() < 14 * 864e5
+  const newAccount = isNewAccount(user)
   const tourReady = loadedPlan && !weightsLoading && !actingAs && !isAdmin
   useEffect(() => {
     if (!tourReady || tourOpen) return
-    if (!tourRequested && (!newAccount || tourSeen(user.uid))) return
+    if (!tourRequested && (!newAccount || tourSeen(user.uid, 'home'))) return
     const id = setTimeout(() => setTourOpen(true), 500)
     return () => clearTimeout(id)
   }, [tourReady, tourRequested, newAccount, tourOpen, user.uid])
   function closeTour() {
-    markTourSeen(user.uid)
+    markTourSeen(user.uid, 'home')
     setTourOpen(false)
     if (tourRequested) navigate('.', { replace: true, state: null })
   }
+  // Home: what to do today, then how to get around. How to log a set is
+  // taught on the workout screen itself, the first time it opens.
   const tourSteps = [
-    { target: 'week', ...t('tour.week') },
     { target: 'start', ...t('tour.start') },
+    { target: 'week', ...t('tour.week') },
     { target: 'weight', ...t('tour.weight') },
-    nutritionAllowed ? { target: 'tab-nutrition', ...t('tour.nutrition') } : { target: 'tab-routines', ...t('tour.routines') },
-    { target: 'tab-history', ...t('tour.history') },
-    { target: 'tab-progress', ...t('tour.progress') },
+    { target: 'tabs', ...t(nutritionAllowed ? 'tour.tabsNutrition' : 'tour.tabs') },
     { target: 'tab-more', ...t('tour.more') },
   ]
 

@@ -145,7 +145,7 @@ export default function Layout() {
             </NavLink>
           )}
 
-          <nav className="hidden md:flex items-center gap-1">
+          <nav data-tour="tabs" className="hidden md:flex items-center gap-1">
             {desktopLinks.map((l) => (
               <NavLink
                 key={l.to}
@@ -345,6 +345,7 @@ export default function Layout() {
               half-legible behind the blur. */}
           <div aria-hidden="true" className="md:hidden fixed inset-x-0 bottom-0 z-20 h-32 pointer-events-none bg-gradient-to-b from-ink/0 to-ink/90" />
           <nav
+            data-tour="tabs"
             aria-label={t('nav.tabs')}
             className="md:hidden fixed inset-x-4 z-30 h-16 p-1.5 rounded-[24px] grid grid-cols-5 gap-1 bg-[#242428]/75 backdrop-blur-xl backdrop-saturate-150 shadow-[inset_0_0.5px_0_rgba(255,255,255,0.14),0_12px_32px_rgba(0,0,0,0.5)]"
             style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 14px)' }}
