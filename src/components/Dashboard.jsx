@@ -14,7 +14,7 @@ import { listDrafts, clearDraft } from '../lib/draft.js'
 import { Button, Card, LoadError, FeedbackDot } from './ui.jsx'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import WeeklySchedule from './WeeklySchedule.jsx'
-import Tour, { tourSeen, markTourSeen, isNewAccount } from './Tour.jsx'
+import Tour, { useFirstTour } from './Tour.jsx'
 import { itemTarget } from './RoutineView.jsx'
 import { useMessagesState } from '../lib/messages.js'
 import { setVolume } from '../lib/bodyweight.js'
@@ -230,21 +230,13 @@ export default function Dashboard() {
   // First-run walkthrough. Shown once to a new trainee (account under two
   // weeks old) after today's screen has loaded, and again on request from
   // Help. Not for the coach or while managing someone else's account.
-  const [tourOpen, setTourOpen] = useState(false)
   const tourRequested = !!location.state?.tour
-  const newAccount = isNewAccount(user)
-  const tourReady = loadedPlan && !weightsLoading && !actingAs && !isAdmin
+  const [tourOpen, closeTour] = useFirstTour('home', loadedPlan && !weightsLoading, tourRequested)
+  // The replay request is used up once the tour is on screen, so a reload
+  // or going back doesn't bring it up again.
   useEffect(() => {
-    if (!tourReady || tourOpen) return
-    if (!tourRequested && (!newAccount || tourSeen(user.uid, 'home'))) return
-    const id = setTimeout(() => setTourOpen(true), 500)
-    return () => clearTimeout(id)
-  }, [tourReady, tourRequested, newAccount, tourOpen, user.uid])
-  function closeTour() {
-    markTourSeen(user.uid, 'home')
-    setTourOpen(false)
-    if (tourRequested) navigate('.', { replace: true, state: null })
-  }
+    if (tourOpen && tourRequested) navigate('.', { replace: true, state: null })
+  }, [tourOpen, tourRequested, navigate])
   // Home: what to do today, then how to get around. How to log a set is
   // taught on the workout screen itself, the first time it opens.
   const tourSteps = [

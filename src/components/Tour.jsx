@@ -36,23 +36,46 @@ export function markTourSeen(uid, name) {
   try { localStorage.setItem(TOUR_KEY(uid, name), 'done') } catch { /* private mode: it shows again next time */ }
 }
 
+// Only one tour on screen at a time (the home tour and the week editor's
+// could otherwise both be due at once).
+let activeTours = 0
+
+// Someone typing in a box shouldn't have the cursor pulled into a tour.
+function typing() {
+  const el = document.activeElement
+  return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)
+}
+
 // Opens the named tour once, the first time `ready` turns true, for a new
 // trainee's own account (not the coach, not while managing someone).
-// Returns [open, close]; closing marks it seen.
-export function useFirstTour(name, ready) {
+// `force` opens it anyway (the replay from Help). Returns [open, close];
+// closing marks it seen.
+export function useFirstTour(name, ready, force = false) {
   const { user } = useAuth()
   const { isAdmin, actingAs } = useAdmin()
   const [open, setOpen] = useState(false)
-  const want = !!ready && !!user && !isAdmin && !actingAs && isNewAccount(user) && !tourSeen(user.uid, name)
+  const [retry, setRetry] = useState(0)
+  // A tour that found nothing to point at closes without being marked seen,
+  // and doesn't try again until the screen is opened again.
+  const gaveUp = useRef(false)
+  const want =
+    !!ready && !!user && !isAdmin && !actingAs && !gaveUp.current && (force || (isNewAccount(user) && !tourSeen(user.uid, name)))
   useEffect(() => {
     if (!want || open) return
-    const id = setTimeout(() => setOpen(true), 500)
+    const id = setTimeout(() => {
+      if (activeTours > 0 || typing()) setRetry((n) => n + 1)
+      else setOpen(true)
+    }, retry ? 1000 : 500)
     return () => clearTimeout(id)
-  }, [want, open])
-  const close = useCallback(() => {
-    if (user) markTourSeen(user.uid, name)
-    setOpen(false)
-  }, [user, name])
+  }, [want, open, retry])
+  const close = useCallback(
+    (completed, empty) => {
+      if (empty) gaveUp.current = true
+      else if (user) markTourSeen(user.uid, name)
+      setOpen(false)
+    },
+    [user, name],
+  )
   return [open, close]
 }
 
@@ -82,6 +105,17 @@ export default function Tour({ steps, onClose }) {
   const [rect, setRect] = useState(null)
   const [cardH, setCardH] = useState(180)
   const cardRef = useRef(null)
+
+  // Count this tour as on screen, and give focus back to wherever it was
+  // when the tour closes.
+  useEffect(() => {
+    activeTours += 1
+    const before = document.activeElement
+    return () => {
+      activeTours -= 1
+      if (before && before !== document.body && document.contains(before)) before.focus?.({ preventScroll: true })
+    }
+  }, [])
   const step = shown[i]
   const last = i === shown.length - 1
   const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -112,11 +146,20 @@ export default function Tour({ steps, onClose }) {
   useEffect(() => {
     window.addEventListener('resize', measure)
     window.addEventListener('scroll', measure, true)
+    // The target can also move or change size on its own (an image loading,
+    // a banner appearing above it).
+    const el = step && findTarget(step.target)
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => measure()) : null
+    if (ro) {
+      if (el) ro.observe(el)
+      ro.observe(document.body)
+    }
     return () => {
       window.removeEventListener('resize', measure)
       window.removeEventListener('scroll', measure, true)
+      ro?.disconnect()
     }
-  }, [measure])
+  }, [measure, step])
 
   useLayoutEffect(() => {
     if (cardRef.current) setCardH(cardRef.current.offsetHeight)
@@ -128,42 +171,59 @@ export default function Tour({ steps, onClose }) {
     cardRef.current?.focus({ preventScroll: true })
   }, [i])
 
-  const finish = useCallback((completed) => onClose?.(completed), [onClose])
+  const finish = useCallback((completed, empty = false) => onClose?.(completed, empty), [onClose])
   const next = useCallback(() => (last ? finish(true) : setI((n) => n + 1)), [last, finish])
   const back = useCallback(() => setI((n) => Math.max(0, n - 1)), [])
 
+  // Keys are caught on the way down (capture), before a dialog underneath
+  // (the week editor) can act on them: Escape closes only the tour, and Tab
+  // stays inside the card.
   useEffect(() => {
     function onKey(e) {
-      if (e.key === 'Escape') finish(false)
-      // Arrow keys follow reading direction.
       const fwd = dir === 'rtl' ? 'ArrowLeft' : 'ArrowRight'
       const bwd = dir === 'rtl' ? 'ArrowRight' : 'ArrowLeft'
-      if (e.key === fwd) next()
-      if (e.key === bwd) back()
+      if (e.key === 'Escape') finish(false)
+      else if (e.key === fwd) next()
+      else if (e.key === bwd) back()
+      else if (e.key === 'Tab') {
+        const card = cardRef.current
+        const buttons = card ? [...card.querySelectorAll('button')] : []
+        if (buttons.length) {
+          const at = buttons.indexOf(document.activeElement)
+          const to = e.shiftKey ? (at <= 0 ? buttons.length - 1 : at - 1) : at === -1 || at === buttons.length - 1 ? 0 : at + 1
+          buttons[to].focus()
+        }
+        e.preventDefault()
+      } else return
+      e.stopPropagation()
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [dir, next, back, finish])
 
   // Nothing to point at (an empty or failed screen): don't show an empty tour.
   useEffect(() => {
-    if (shown.length === 0) finish(false)
+    if (shown.length === 0) finish(false, true)
   }, [shown.length, finish])
   if (!step) return null
 
-  // Card goes below the lit window when it fits, otherwise above it.
+  // Card goes below the lit window when it fits, otherwise above it. A
+  // target too tall for either gets the card on its roomier side, against
+  // the screen edge.
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800
   let cardTop = vh / 2 - cardH / 2
   if (rect) {
     const below = rect.top + rect.height + GAP
     const above = rect.top - GAP - cardH
-    cardTop = below + cardH <= vh - EDGE ? below : Math.max(EDGE, above)
+    if (below + cardH <= vh - EDGE) cardTop = below
+    else if (above >= EDGE) cardTop = above
+    else cardTop = vh - (rect.top + rect.height) > rect.top ? vh - cardH - EDGE : EDGE
   }
   const glide = reduce ? 'none' : 'top 320ms cubic-bezier(.2,.8,.2,1), left 320ms cubic-bezier(.2,.8,.2,1), width 320ms cubic-bezier(.2,.8,.2,1), height 320ms cubic-bezier(.2,.8,.2,1)'
   const radius = rect && rect.height < 90 ? 20 : 26
 
   return createPortal(
-    <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-labelledby="tour-title" aria-describedby="tour-body">
+    <div className="fixed inset-0 z-[70]">
       {/* Catches taps so the app underneath can't be used mid-tour. */}
       <div className="absolute inset-0" onClick={(e) => e.stopPropagation()} />
       <div
@@ -186,6 +246,10 @@ export default function Tour({ steps, onClose }) {
       <div
         ref={cardRef}
         tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tour-title"
+        aria-describedby="tour-body"
         className="outline-none absolute inset-x-4 mx-auto max-w-[380px] rounded-[22px] bg-[#1E1E21] p-5 shadow-[inset_0_0.5px_0_rgba(255,255,255,0.12),0_18px_48px_rgba(0,0,0,0.55)]"
         style={{ top: cardTop, transition: reduce ? 'none' : 'top 320ms cubic-bezier(.2,.8,.2,1)' }}
       >

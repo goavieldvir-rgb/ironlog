@@ -667,7 +667,7 @@ export default function SessionEntryCard({
             </p>
           )}
         </div>
-        <span className="shrink-0" data-tour={tourAnchors ? 'ws-menu' : undefined}>
+        <span className={tourAnchors ? 'shrink-0' : 'contents'} data-tour={tourAnchors ? 'ws-menu' : undefined}>
         <OverflowMenu
           label={t('sessionCard.moreActions')}
           items={[

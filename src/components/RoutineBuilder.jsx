@@ -236,13 +236,13 @@ export default function RoutineBuilder() {
     }
   }
 
-  if (id && !loading && !existing) {
-    return <p className="text-chalkdim">{t('routines.notFound')}</p>
-  }
-
   // First new routine: what each part of the form is for.
   const [tourOpen, closeTour] = useFirstTour('builder', !id && !loading)
   const tourSteps = ['name', 'category', 'catalogue', 'save'].map((k) => ({ target: `b-${k}`, ...t(`tour.b.${k}`) }))
+
+  if (id && !loading && !existing) {
+    return <p className="text-chalkdim">{t('routines.notFound')}</p>
+  }
 
   return (
     <div className="flex flex-col gap-5 max-w-2xl">
