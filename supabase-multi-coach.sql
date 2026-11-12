@@ -65,8 +65,13 @@ as $$
     select 1 from public.profiles me
     join public.profiles t on t.id = target
     where me.id = auth.uid() and (me.is_admin or me.is_coach)
-      and t.id <> me.id and not t.is_admin and not t.is_coach
-      and (t.coach_id = me.id or (me.is_admin and t.coach_id is null))
+      and (
+        -- The owner keeps coach access to their own rows (own targets,
+        -- notes, goals, tasks and alerts), as before.
+        (me.is_admin and t.id = me.id)
+        or (t.id <> me.id and not t.is_admin and not t.is_coach
+            and (t.coach_id = me.id or (me.is_admin and t.coach_id is null)))
+      )
   );
 $$;
 
@@ -421,7 +426,7 @@ begin
   if not public.is_admin() then
     raise exception 'owner only' using errcode = '42501';
   end if;
-  if p_on and not public.can_coach(p_person) then
+  if p_on and (p_person = auth.uid() or not public.can_coach(p_person)) then
     raise exception 'not your trainee' using errcode = '42501';
   end if;
   if not p_on and not exists (select 1 from public.profiles where id = p_person and is_coach) then
@@ -443,7 +448,7 @@ begin
   if not public.is_admin() then
     raise exception 'owner only' using errcode = '42501';
   end if;
-  if not public.can_coach(p_person) then
+  if p_person = auth.uid() or not public.can_coach(p_person) then
     raise exception 'not your trainee' using errcode = '42501';
   end if;
   update public.profiles set coach_id = p_coach where id = p_person;
@@ -764,7 +769,9 @@ begin
   on conflict (dedupe_key) do nothing;
   get diagnostics c = row_count; added := added + c;
 
-  return case when auth.uid() is null or public.is_admin() then added else 0 end;
+  return case when auth.uid() is null then added
+    else (select count(*)::integer from coach_tasks t
+          where t.created_at = now() and t.trainee_id is not null and public.can_coach(t.trainee_id)) end;
 end;
 $function$;
 
@@ -796,11 +803,20 @@ begin
       body := jsonb_build_object('coach_tasks', true)
     );
   else
+    select count(*) into pending from coach_tasks
+      where done_at is null and notified_at is null
+        and case when trainee_id is null
+          then coach_id in (select id from profiles where is_admin)
+          else public.owner_gets_alerts(trainee_id) end;
+    if pending = 0 then return; end if;
     perform send_admin_push(
       'Ironlog: ' || pending || ' משימות למאמן',
       'יש ' || pending || ' דברים חדשים שדורשים תשומת לב. פתחו את מסך המתאמנים.'
     );
-    update coach_tasks set notified_at = now() where done_at is null and notified_at is null;
+    update coach_tasks set notified_at = now() where done_at is null and notified_at is null
+      and case when trainee_id is null
+          then coach_id in (select id from profiles where is_admin)
+          else public.owner_gets_alerts(trainee_id) end;
   end if;
 end;
 $function$;
