@@ -1,3 +1,4 @@
+import ExerciseThumb from './ExerciseThumb.jsx'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, Plus, Check } from 'lucide-react'
 import { useGlobalExercises } from '../lib/db.js'
@@ -141,7 +142,8 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
             const already = existingLower.has(displayName(g).toLowerCase()) || existingLower.has(g.name.toLowerCase()) || addedIds.has(g.id)
             return (
               <div key={g.id} className="flex items-center justify-between gap-2 px-2 py-2 rounded-md hover:bg-surface2">
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <ExerciseThumb size={36} names={[g.name]} label={displayName(g)} />
                   <span className="truncate min-w-0">{filteredLabels[i]}</span>
                   <CategoryTag category={g.category} />
                   {g.bodyweight && !g.timed && g.category !== 'cardio' && <Badge tone="brass">{t('sessionCard.bwShort')}</Badge>}

@@ -13,6 +13,13 @@ the app gets their own private login and their own history; nobody sees anyone e
   separately from strength work.
 - **Video links** — attach an example video URL to any exercise; it shows up wherever
   that exercise appears (library, routine, active session, history).
+- **Exercise clips** — each exercise shows a still of Ironlog's own animation next to its
+  name (workout, routine, builder, library, picker, history); tap it for the looping clip
+  and, where there is one, a technique-tips clip. Matched by English name, or picked per
+  exercise by the coach (needs `supabase-exercise-clips.sql`). The files live in
+  `public/clips/`; after an approved re-render run `ONLY=<slug> scripts/sync-clips.sh` (or with no `ONLY` for everything) to copy it in, remake
+  the stills (`scripts/clip_still.py`, overrides in `scripts/clip_stills.txt`) and update
+  `src/lib/clipManifest.js`.
 - **Accounts** — email/password sign-up. Everyone shares the same app, but Supabase
   Row Level Security keeps each account's data private (see `supabase.sql`).
 - **Admin mode** — optionally, one or more accounts can be marked admin. An admin sees

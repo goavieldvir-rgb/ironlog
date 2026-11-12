@@ -1,3 +1,4 @@
+import ExerciseThumb from './ExerciseThumb.jsx'
 import ExerciseVideo from './ExerciseVideo.jsx'
 import React, { useEffect, useRef, useState } from 'react'
 import { X, Plus, Trash2, Minus, CornerDownLeft, StickyNote, Repeat, ArrowUp, ArrowDown, Trophy, Link2, Check, Flame, ChevronDown, Play, Square, Scale } from 'lucide-react'
@@ -579,6 +580,16 @@ export default function SessionEntryCard({
     <section ref={sectionRef} className={`relative bg-surface rounded-[22px] pt-[18px] px-3.5 pb-1.5 flex flex-col gap-3 ${supersetClass}`}>
       {linkNext && <span className="absolute -start-[3px] top-full w-[3px] h-3 bg-chalkdim/50" aria-hidden="true" />}
       <div className="flex items-start justify-between gap-2 -mt-2.5 -me-2.5">
+        {/* Our clip's still at the start of the name (right in Hebrew); a
+            tap plays the clip. */}
+        <ExerciseThumb
+          size={52}
+          className="mt-1.5 me-1"
+          chosen={liveExercise?.clip}
+          names={[liveExercise?.name, entry.nameEn, entry.name]}
+          videoUrl={entry.videoUrl}
+          label={displayName}
+        />
         <div className="min-w-0 flex-1 pt-1.5 px-0.5 flex flex-col gap-1.5">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-[17px] leading-[22px] font-semibold">{displayName}</h2>
@@ -621,6 +632,7 @@ export default function SessionEntryCard({
               name={displayName}
               matchNames={[liveExercise?.name, entry.nameEn]}
               videoUrl={entry.videoUrl}
+              chosenClip={liveExercise?.clip}
               className="text-[13px] !text-chalkdim hover:!text-chalk"
             />
             </span>

@@ -5,6 +5,8 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { normalizeVideoUrl } from '../lib/url.js'
 import ExerciseVideo from './ExerciseVideo.jsx'
+import ExerciseThumb from './ExerciseThumb.jsx'
+import { ClipField } from './ClipPicker.jsx'
 import { useCollection, addExercise, updateExercise, deleteExercise } from '../lib/db.js'
 import { Button, Card, CategoryTag, Badge, EmptyState, LoadError, Field } from './ui.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
@@ -156,7 +158,15 @@ export default function ExerciseLibrary() {
         {filtered.map((ex) => (
           <Card key={ex.id} className="flex flex-col gap-2">
             <div className="flex items-start justify-between gap-2">
-              <div>
+              <div className="flex items-start gap-3 min-w-0">
+              <ExerciseThumb
+                size={40}
+                chosen={ex.clip}
+                names={[ex.name]}
+                videoUrl={ex.video_url}
+                label={(lang === 'he' && ex.name_he) || ex.name}
+              />
+              <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-lg leading-tight">{(lang === 'he' && ex.name_he) || ex.name}</h2>
                   <CategoryTag category={ex.category} />
@@ -166,6 +176,7 @@ export default function ExerciseLibrary() {
                   )}
                 </div>
                 {formatLast(ex, t) && <p className="num text-chalkdim text-xs mt-1"><bdi dir="ltr">{formatLast(ex, t)}</bdi></p>}
+              </div>
               </div>
               <div className="flex gap-1 shrink-0">
                 <button
@@ -189,6 +200,7 @@ export default function ExerciseLibrary() {
               name={(lang === 'he' && ex.name_he) || ex.name}
               matchNames={[ex.name]}
               videoUrl={ex.video_url}
+              chosenClip={ex.clip}
               className="text-sm"
               iconSize={14}
             />
@@ -249,6 +261,7 @@ export default function ExerciseLibrary() {
               name: currentForm.name,
               nameHe: currentForm.nameHe,
               videoUrl: currentForm.videoUrl,
+              clip: currentForm.clip,
               notes: currentForm.notes,
               category: currentForm.category,
               unit: currentForm.unit,
@@ -507,6 +520,19 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
               </Field>
             </>
           )}
+
+          {/* Not a <Field>: that is a <label>, and a tap anywhere on a label
+              is passed to its first button, which here plays the clip. */}
+          <div className="flex flex-col gap-1.5">
+            <span className="eyebrow">{t('clips.field')}</span>
+            <ClipField
+              value={form.clip || ''}
+              onChange={(clip) => setForm({ ...form, clip })}
+              names={[form.name]}
+              label={(lang === 'he' && form.nameHe) || form.name}
+            />
+            <p className="text-chalkdim text-xs mt-1">{t('clips.fieldHint')}</p>
+          </div>
 
           <Field label={t('exercises.videoLink')}>
             <input
