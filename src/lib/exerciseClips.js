@@ -53,6 +53,7 @@ const CLIP_BY_KEY = {
   plank: 'plank',
   preacher_curl: 'preacher-curl',
   pull_up: 'pull-up',
+  weighted_pull_up: 'pull-up',
   push_up: 'push-up',
   rear_delt_fly: 'rear-delt-fly',
   romanian_deadlift: 'romanian-deadlift',
