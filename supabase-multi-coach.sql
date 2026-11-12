@@ -61,7 +61,7 @@ as $$
     where me.id = auth.uid()
       and (me.is_admin
         or (me.is_coach and target is not null and target <> me.id and exists (
-              select 1 from public.profiles t where t.id = target and t.coach_id = me.id)))
+              select 1 from public.profiles t where t.id = target and t.coach_id = me.id and not t.is_admin)))
   );
 $$;
 
@@ -91,7 +91,7 @@ set search_path = ''
 as $$
   select not exists (
     select 1 from public.profiles t join public.profiles c on c.id = t.coach_id
-    where t.id = trainee and not c.is_admin
+    where t.id = trainee and c.is_coach and not c.is_admin
   );
 $$;
 
@@ -324,7 +324,13 @@ begin
     new.nutrition_enabled := false;
     new.is_coach := false;
     new.coach_id := null;
-  elsif not public.is_admin() then
+  elsif public.is_admin() then
+    -- A trainee's coach must be the owner or a coach.
+    if new.coach_id is distinct from old.coach_id and new.coach_id is not null and not exists (
+      select 1 from public.profiles c where c.id = new.coach_id and (c.is_admin or c.is_coach)) then
+      raise exception 'NOT_A_COACH';
+    end if;
+  else
     if new.is_admin is distinct from old.is_admin then
       raise exception 'ADMIN_FLAG_PROTECTED';
     end if;
@@ -343,6 +349,32 @@ begin
 end;
 $$;
 
+-- When someone stops being a coach, or a coach's account is deleted, their
+-- trainees go back to the owner, so nobody is left with a coach who can no
+-- longer see them.
+create or replace function public.coach_removed()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  gone uuid := case when tg_op = 'DELETE' then old.id else new.id end;
+begin
+  update public.profiles
+     set coach_id = (select o.id from public.profiles o where o.is_admin and o.id <> gone order by o.created_at limit 1)
+   where coach_id = gone and id <> gone;
+  return case when tg_op = 'DELETE' then old else new end;
+end;
+$$;
+revoke execute on function public.coach_removed() from public, anon, authenticated;
+drop trigger if exists trg_coach_removed on public.profiles;
+create trigger trg_coach_removed after update of is_coach on public.profiles
+  for each row when (old.is_coach and not new.is_coach) execute function public.coach_removed();
+drop trigger if exists trg_coach_deleted on public.profiles;
+create trigger trg_coach_deleted before delete on public.profiles
+  for each row when (old.is_coach) execute function public.coach_removed();
+
 -- New accounts get the coach who invited them, or the owner.
 create or replace function public.handle_new_user()
 returns trigger
@@ -357,7 +389,7 @@ begin
     coalesce(
       (select i.invited_by from public.signup_invites i
          join public.profiles c on c.id = i.invited_by and (c.is_admin or c.is_coach)
-        where i.email = lower(btrim(new.email))),
+        where i.email = lower(btrim(new.email)) and i.expires_at > now()),
       (select o.id from public.profiles o where o.is_admin order by o.created_at limit 1)))
   on conflict (id) do nothing;
   return new;
@@ -625,7 +657,7 @@ begin
   on conflict (dedupe_key) do nothing;
   get diagnostics c = row_count; added := added + c;
 
-  return added;
+  return case when auth.uid() is null or public.is_admin() then added else 0 end;
 end;
 $function$;
 

@@ -197,11 +197,16 @@ async function runCoachTasks() {
   const byId = Object.fromEntries((people || []).map((p) => [p.id, p]))
   const nameOf = (id: string | null) => (id ? byId[id]?.full_name || byId[id]?.email?.split('@')[0] || '' : '')
 
-  const { data: owners } = await db.from('profiles').select('id').eq('is_admin', true)
-  const ownerIds = new Set((owners || []).map((o) => o.id))
-  const ownerId = (owners || [])[0]?.id || null
-  // Whose task is it: the trainee's coach, else whoever wrote it, else the owner.
-  const coachOf = (t: any) => (t.trainee_id ? byId[t.trainee_id]?.coach_id : t.coach_id) || ownerId
+  const { data: coachRows } = await db.from('profiles').select('id, is_admin').or('is_admin.eq.true,is_coach.eq.true')
+  const ownerIds = new Set((coachRows || []).filter((c) => c.is_admin).map((c) => c.id))
+  const coachIds = new Set((coachRows || []).map((c) => c.id))
+  const ownerId = [...ownerIds][0] || null
+  // Whose task is it: the trainee's coach, else whoever wrote it, else the
+  // owner. Someone who is no longer a coach never gets it.
+  const coachOf = (t: any) => {
+    const c = t.trainee_id ? byId[t.trainee_id]?.coach_id : t.coach_id
+    return c && coachIds.has(c) ? c : ownerId
+  }
   const groups = new Map<string, any[]>()
   for (const t of tasks) {
     const c = coachOf(t)
@@ -253,9 +258,11 @@ async function runMessage(messageId: string) {
   let ownerIsCoach = false
   if (toCoach) {
     const { data: t } = await db.from('profiles').select('coach_id').eq('id', m.trainee_id).maybeSingle()
-    const { data: owners } = await db.from('profiles').select('id').eq('is_admin', true)
-    coachId = t?.coach_id || (owners || [])[0]?.id || null
-    ownerIsCoach = !!coachId && (owners || []).some((o) => o.id === coachId)
+    const { data: coachRows } = await db.from('profiles').select('id, is_admin').or('is_admin.eq.true,is_coach.eq.true')
+    const isCoach = (id: string | null | undefined) => !!id && (coachRows || []).some((c) => c.id === id)
+    // The trainee's coach while they are still a coach, otherwise the owner.
+    coachId = isCoach(t?.coach_id) ? t!.coach_id : (coachRows || []).find((c) => c.is_admin)?.id || null
+    ownerIsCoach = !!coachId && (coachRows || []).some((c) => c.id === coachId && c.is_admin)
     // A coach writing in their own thread needs no alert.
     recipients = coachId && coachId !== m.sender_id ? [coachId] : []
   } else {

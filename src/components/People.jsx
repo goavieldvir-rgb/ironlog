@@ -109,7 +109,7 @@ export default function People() {
     <div className="flex flex-col gap-5">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <div className="eyebrow mb-1">{t('people.admin')}</div>
+          <div className="eyebrow mb-1">{t(isOwner ? 'people.admin' : 'people.coachBadge')}</div>
           <h1 className="text-3xl">{t('people.title')}</h1>
           <p className="text-chalkdim text-sm mt-1 flex items-center gap-1.5 flex-wrap">
             {t('people.subtitle')}
