@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ResponsiveContainer, BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts'
-import { Apple, Pin, PinOff, Trash2, CheckCheck, Trophy, ChevronDown, Pencil, Plus, Check } from 'lucide-react'
+import { Apple, GraduationCap, Pin, PinOff, Trash2, CheckCheck, Trophy, ChevronDown, Pencil, Plus, Check } from 'lucide-react'
 import { BackChevron, ForwardChevron, ForwardArrow } from './DirectionalIcon.jsx'
 import { supabase } from '../supabase.js'
 import { useAdmin } from '../context/AdminContext.jsx'
@@ -20,6 +20,7 @@ import { useMessagesAvailable } from '../lib/messages.js'
 import { RoutineExercises } from './RoutineView.jsx'
 import {
   fetchTraineeDetail,
+  fetchRoster,
   weeklyCounts,
   needsReview,
   markSessionsReviewed,
@@ -44,7 +45,7 @@ function shortDate(lang, iso) {
 export default function PersonDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { isAdmin, setActingAs } = useAdmin()
+  const { isAdmin, isOwner, profile: myProfile, setActingAs } = useAdmin()
   const { t, lang } = useLanguage()
   const { toast, confirm } = useFeedback()
   const { user: me } = useAuth()
@@ -52,6 +53,7 @@ export default function PersonDetail() {
   const [data, setData] = useState(null)
   const [loadError, setLoadError] = useState(null)
   const [reload, setReload] = useState(0)
+  const [coaches, setCoaches] = useState([])
   const today = toLocalISODate()
 
   // Another trainee's page reuses this component: drop the previous one's
@@ -73,6 +75,15 @@ export default function PersonDetail() {
       cancelled = true
     }
   }, [id, reload, today])
+
+  // The coaches the owner can hand a trainee to: the owner plus anyone on
+  // the roster marked as a coach.
+  useEffect(() => {
+    if (!isOwner) return
+    fetchRoster(today)
+      .then((rows) => setCoaches(rows.filter((r) => r.is_coach)))
+      .catch((e) => console.error(e))
+  }, [isOwner, today, reload])
 
   const derived = useMemo(() => {
     if (!data) return null
@@ -138,6 +149,27 @@ export default function PersonDetail() {
     setData((d) => ({ ...d, profile: { ...d.profile, nutrition_enabled: next } }))
   }
 
+  async function toggleCoach() {
+    const next = !p.is_coach
+    const { error } = await supabase.from('profiles').update({ is_coach: next }).eq('id', p.id)
+    if (error) {
+      console.error(error)
+      toast(t('people.coachError'), 'error')
+      return
+    }
+    setData((d) => ({ ...d, profile: { ...d.profile, is_coach: next } }))
+  }
+
+  async function changeCoach(coachId) {
+    const { error } = await supabase.from('profiles').update({ coach_id: coachId }).eq('id', p.id)
+    if (error) {
+      console.error(error)
+      toast(t('people.coachChangeError'), 'error')
+      return
+    }
+    setData((d) => ({ ...d, profile: { ...d.profile, coach_id: coachId } }))
+  }
+
   async function markAllReviewed() {
     const ids = derived.toReview.map((s) => s.id)
     try {
@@ -189,11 +221,27 @@ export default function PersonDetail() {
           <Button variant="brass" onClick={() => openAccount('/')}>
             {t('person.openAccount')} <ForwardArrow size={15} />
           </Button>
-          {!p.is_admin && (
+          {!(p.is_admin || p.is_coach) && (
             <Button variant="ghost" onClick={toggleNutrition} aria-pressed={!!p.nutrition_enabled}>
               <Apple size={15} className={p.nutrition_enabled ? 'text-good' : ''} />
               {p.nutrition_enabled ? t('people.nutritionOn') : t('people.nutritionOff')}
             </Button>
+          )}
+          {isOwner && !p.is_admin && (
+            <Button variant="ghost" onClick={toggleCoach} aria-pressed={!!p.is_coach}>
+              <GraduationCap size={15} className={p.is_coach ? 'text-good' : ''} />
+              {p.is_coach ? t('people.coachOn') : t('people.coachOff')}
+            </Button>
+          )}
+          {isOwner && !p.is_admin && !p.is_coach && (
+            <Field label={t('people.coachOf')}>
+              <select value={p.coach_id || myProfile?.id || ''} onChange={(e) => changeCoach(e.target.value)}>
+                <option value={myProfile?.id}>{myProfile?.full_name || me?.email}</option>
+                {coaches.map((c) => (
+                  <option key={c.id} value={c.id}>{c.full_name || c.email}</option>
+                ))}
+              </select>
+            </Field>
           )}
         </div>
       </div>
@@ -312,13 +360,13 @@ export default function PersonDetail() {
             </Section>
           )}
 
-          {!p.is_admin && (
+          {!(p.is_admin || p.is_coach) && (
             <Section title={t('photos.title')}>
               <ProgressPhotos uid={p.id} mode="coach" />
             </Section>
           )}
 
-          {!p.is_admin && (
+          {!(p.is_admin || p.is_coach) && (
             <Section
               title={t('person.routines')}
               hint={data.routines.length > 0 ? t('person.routinesHint') : t('person.noRoutinesYet')}

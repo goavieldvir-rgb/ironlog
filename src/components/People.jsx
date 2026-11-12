@@ -20,7 +20,7 @@ import { fetchRoster, fetchRecentPrs, rosterFlags, attentionScore, adherence, da
 // their coach page (PersonDetail).
 export default function People() {
   const { user } = useAuth()
-  const { setActingAs } = useAdmin()
+  const { setActingAs, isOwner } = useAdmin()
   const { t } = useLanguage()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -117,9 +117,11 @@ export default function People() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="ghost" to="/errors">
-            <AlertTriangle size={16} /> {t('people.errorLogs')}
-          </Button>
+          {isOwner && (
+            <Button variant="ghost" to="/errors">
+              <AlertTriangle size={16} /> {t('people.errorLogs')}
+            </Button>
+          )}
           <Button variant="brass" onClick={() => setInviting(true)}>
             <UserPlus size={16} /> {t('people.inviteSomeone')}
           </Button>
@@ -262,6 +264,9 @@ export function FlagChips({ flags, t }) {
 }
 
 function TraineeRow({ p, today, t }) {
+  const { isOwner } = useAdmin()
+  const { user } = useAuth()
+  const ownerId = user?.uid
   const thisWeek = (p.week_counts || []).at(-1) || 0
   const quiet = daysSince(p.last_session, today)
   const dot = p.score > 0 ? 'bg-accent' : thisWeek > 0 ? 'bg-good' : p.last_session ? 'bg-chalkdim' : 'bg-chalkdim/40'
@@ -280,9 +285,14 @@ function TraineeRow({ p, today, t }) {
         <div className="flex items-center gap-2 min-w-0">
           <p className="truncate min-w-0">{p.full_name || p.email}</p>
           {p.is_admin && <Badge>{t('people.adminBadge')}</Badge>}
+          {p.is_coach && <Badge>{t('people.coachBadge')}</Badge>}
           {p.unread > 0 && <UnreadBadge n={p.unread} t={t} />}
         </div>
         <p className="text-xs text-chalkdim num">{stats.join(' · ')}</p>
+        {/* Only the owner sees other coaches' trainees, so only they need the name. */}
+        {isOwner && p.coach_name && p.coach_id !== ownerId && (
+          <p className="text-xs text-chalkdim truncate">{p.coach_name}</p>
+        )}
         <FlagChips flags={p.flags} t={t} />
         {p.pinned_note && (
           <p className="text-xs text-chalkdim inline-flex items-center gap-1 min-w-0">

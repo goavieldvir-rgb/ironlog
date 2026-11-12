@@ -64,7 +64,7 @@ const COPY_LOOKBACK = 14
 function Diary() {
   const { t, lang } = useLanguage()
   const { user } = useAuth()
-  const { isAdmin, effectiveUid, actingAs } = useAdmin()
+  const { isAdmin, isOwner, effectiveUid, actingAs } = useAdmin()
   const { toast } = useFeedback()
   const uid = effectiveUid
   const today = toLocalISODate()
@@ -609,7 +609,7 @@ function Diary() {
                 )
                 break
               case 'detail':
-                body = <FoodDetail {...common} food={v.food} meal={meal} setMeal={setMeal} targets={targets} totals={totals} favUid={uid} isAdmin={isAdmin} onLog={logFood} />
+                body = <FoodDetail {...common} food={v.food} meal={meal} setMeal={setMeal} targets={targets} totals={totals} favUid={uid} isAdmin={isOwner} onLog={logFood} />
                 break
               case 'label':
                 body = (
@@ -618,7 +618,7 @@ function Diary() {
                     barcode={v.barcode}
                     prefill={v.prefill}
                     uid={user.uid}
-                    isAdmin={isAdmin}
+                    isAdmin={isOwner}
                     onSaved={onLabelSaved}
                     onUseExisting={(food) => setStack((s) => [...s.slice(0, -1), { type: 'detail', food }])}
                   />

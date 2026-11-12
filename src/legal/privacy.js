@@ -137,3 +137,25 @@ export const privacy = {
     ],
   },
 }
+
+// The notice for someone whose coach is not the owner: it names their coach
+// and says the owner can also see the data. Owner or unknown coach gives the
+// original notice untouched.
+export function privacyFor(lang, coach) {
+  const doc = privacy[lang] || privacy.en
+  if (!coach || coach.isOwner) return doc
+  const contact = coach.contact || COACH_CONTACT
+  const he = doc === privacy.he
+  const who = he
+    ? `${coach.name}, המאמן שלכם, אחראי למידע ב-Ironlog. לכל שאלה על המידע שלכם אפשר לכתוב אל ${contact}. האפליקציה מופעלת על ידי ${COACH_NAME}, שיכול לראות גם הוא את המידע שלכם כדי לתמוך באפליקציה.`
+    : `${coach.name}, your coach, is responsible for the information in Ironlog. For any question about your data, write to ${contact}. The app is run by ${COACH_NAME}, who can also see your information to support the app.`
+  return {
+    ...doc,
+    sections: doc.sections.map((s, i) => {
+      // 0 is "Who is responsible", 8 is "Your rights" in both languages.
+      if (i === 0) return { ...s, body: who }
+      if (i === 8) return { ...s, body: s.body.replace(COACH_CONTACT, contact) }
+      return s
+    }),
+  }
+}

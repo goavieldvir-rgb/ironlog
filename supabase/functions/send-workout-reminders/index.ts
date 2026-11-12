@@ -181,44 +181,64 @@ async function runRestAlerts() {
   return json({ sent, stale, removed, failed })
 }
 
-// New open tasks go to every admin's devices; once one push lands they are
-// marked as sent so tomorrow's push only has the new ones.
+// Each coach gets the new open tasks for their own trainees on their own
+// devices (the owner also gets tasks for anyone without a coach, and their
+// own hand-written ones). Once a coach's push lands, those tasks are marked
+// as sent so tomorrow's push only has the new ones. ntfy is the owner's
+// phone only, so it is the fallback for the owner's tasks alone.
 async function runCoachTasks() {
   const { data: tasks, error } = await db.from('coach_tasks')
-    .select('id, kind, n, title, trainee_id').is('done_at', null).is('notified_at', null).order('created_at')
+    .select('id, kind, n, title, trainee_id, coach_id').is('done_at', null).is('notified_at', null).order('created_at')
   if (error) return json({ error: error.message }, 500)
   if (!tasks?.length) return json({ sent: 0 })
 
   const ids = [...new Set(tasks.map((t) => t.trainee_id).filter(Boolean))]
-  const { data: people } = ids.length ? await db.from('profiles').select('id, full_name, email').in('id', ids) : { data: [] }
-  const nameOf = Object.fromEntries((people || []).map((p) => [p.id, p.full_name || p.email?.split('@')[0] || '']))
-  const items = tasks.map((t) => ({ kind: t.kind, n: t.n, title: t.title, name: t.trainee_id ? nameOf[t.trainee_id] || '' : '' }))
+  const { data: people } = ids.length ? await db.from('profiles').select('id, full_name, email, coach_id').in('id', ids) : { data: [] }
+  const byId = Object.fromEntries((people || []).map((p) => [p.id, p]))
+  const nameOf = (id: string | null) => (id ? byId[id]?.full_name || byId[id]?.email?.split('@')[0] || '' : '')
 
-  const { data: admins } = await db.from('profiles').select('id').eq('is_admin', true)
-  const { data: subs } = await db.from('push_subscriptions').select('*').in('user_id', (admins || []).map((a) => a.id))
-  let sent = 0, removed = 0, failed = 0
-  for (const s of subs || []) {
-    try {
-      const r = await deliver(s, { ...coachTasksCopy(s.lang, items), url: '#/people' }, 'ironlog-coach-tasks', 43200)
-      if (r === 'sent') sent++
-      else removed++
-    } catch (e: any) {
-      console.error('coach tasks push failed', s.id, e?.message || e)
-      failed++
+  const { data: owners } = await db.from('profiles').select('id').eq('is_admin', true)
+  const ownerIds = new Set((owners || []).map((o) => o.id))
+  const ownerId = (owners || [])[0]?.id || null
+  // Whose task is it: the trainee's coach, else whoever wrote it, else the owner.
+  const coachOf = (t: any) => (t.trainee_id ? byId[t.trainee_id]?.coach_id : t.coach_id) || ownerId
+  const groups = new Map<string, any[]>()
+  for (const t of tasks) {
+    const c = coachOf(t)
+    if (!c) continue
+    groups.set(c, [...(groups.get(c) || []), t])
+  }
+
+  let sent = 0, removed = 0, failed = 0, ntfy = false
+  const delivered: string[] = []
+  for (const [coachId, list] of groups) {
+    const items = list.map((t) => ({ kind: t.kind, n: t.n, title: t.title, name: nameOf(t.trainee_id) }))
+    const { data: subs } = await db.from('push_subscriptions').select('*').eq('user_id', coachId)
+    let got = 0
+    for (const s of subs || []) {
+      try {
+        const r = await deliver(s, { ...coachTasksCopy(s.lang, items), url: '#/people' }, 'ironlog-coach-tasks', 43200)
+        if (r === 'sent') { sent++; got++ }
+        else removed++
+      } catch (e: any) {
+        console.error('coach tasks push failed', s.id, e?.message || e)
+        failed++
+      }
     }
+    // No phone of the owner took it (subscription expired, or push failed): ntfy instead.
+    if (!got && ownerIds.has(coachId)) {
+      const msg = coachTasksCopy('he', items)
+      if (!(await db.rpc('send_admin_push', { p_title: msg.title, p_message: msg.body })).error) { got = 1; ntfy = true }
+    }
+    if (got) delivered.push(...list.map((t) => t.id))
   }
-  // No phone took it (subscription expired, or push failed): ntfy instead.
-  let ntfy = false
-  if (!sent) {
-    const msg = coachTasksCopy('he', items)
-    ntfy = !(await db.rpc('send_admin_push', { p_title: msg.title, p_message: msg.body })).error
-  }
-  if (sent || ntfy) await db.from('coach_tasks').update({ notified_at: new Date().toISOString() }).in('id', tasks.map((t) => t.id))
+  if (delivered.length) await db.from('coach_tasks').update({ notified_at: new Date().toISOString() }).in('id', delivered)
   return json({ sent, removed, failed, ntfy })
 }
 
 // A new message goes to the other side of its thread: the trainee's devices
-// when the coach wrote, every coach's devices when the trainee wrote. One tag
+// when the coach wrote, the trainee's own coach's devices when the trainee
+// wrote (the owner's when they have no coach). One tag
 // per thread, so a phone shows one card per conversation. The unread count
 // also sets the app icon's badge where the phone supports it.
 async function runMessage(messageId: string) {
@@ -229,10 +249,15 @@ async function runMessage(messageId: string) {
 
   const toCoach = m.sender_id === m.trainee_id
   let recipients: string[]
+  let coachId: string | null = null
+  let ownerIsCoach = false
   if (toCoach) {
-    const { data: admins } = await db.from('profiles').select('id').eq('is_admin', true)
+    const { data: t } = await db.from('profiles').select('coach_id').eq('id', m.trainee_id).maybeSingle()
+    const { data: owners } = await db.from('profiles').select('id').eq('is_admin', true)
+    coachId = t?.coach_id || (owners || [])[0]?.id || null
+    ownerIsCoach = !!coachId && (owners || []).some((o) => o.id === coachId)
     // A coach writing in their own thread needs no alert.
-    recipients = (admins || []).map((a) => a.id).filter((id) => id !== m.sender_id)
+    recipients = coachId && coachId !== m.sender_id ? [coachId] : []
   } else {
     recipients = [m.trainee_id]
   }
@@ -250,9 +275,15 @@ async function runMessage(messageId: string) {
     ? await unreadQ().eq('trainee_id', m.trainee_id).eq('sender_id', m.trainee_id)
     : await unreadQ().eq('trainee_id', m.trainee_id).neq('sender_id', m.trainee_id)
   let total = inThread || 0
-  if (toCoach) {
+  if (toCoach && coachId) {
+    // Badge: unread messages from this coach's own trainees only (the owner
+    // also counts people without a coach).
+    const { data: mine } = ownerIsCoach
+      ? await db.from('profiles').select('id').or(`coach_id.eq.${coachId},coach_id.is.null`)
+      : await db.from('profiles').select('id').eq('coach_id', coachId)
+    const ids = new Set((mine || []).map((p) => p.id))
     const { data: rows } = await db.from('coach_messages').select('trainee_id, sender_id').is('read_at', null).limit(1000)
-    total = (rows || []).filter((r) => r.sender_id === r.trainee_id).length
+    total = (rows || []).filter((r) => r.sender_id === r.trainee_id && ids.has(r.trainee_id)).length
   }
 
   const { data: subs } = await db.from('push_subscriptions').select('*').in('user_id', recipients)
@@ -269,10 +300,10 @@ async function runMessage(messageId: string) {
       failed++
     }
   }
-  // No coach phone took it: ntfy instead, with the name only. The message
-  // text stays inside the app.
+  // No phone of the owner took it: ntfy (the owner's phone) instead, with
+  // the name only. The message text stays inside the app.
   let ntfy = false
-  if (toCoach && !sent) {
+  if (toCoach && !sent && ownerIsCoach) {
     const msg = messageCopy('he', { toCoach, name, text: '', unread: inThread || 1 })
     ntfy = !(await db.rpc('send_admin_push', { p_title: 'Ironlog: ' + msg.title, p_message: 'פתחו את Ironlog כדי לקרוא ולענות.' })).error
   }
