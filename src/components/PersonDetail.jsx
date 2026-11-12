@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ResponsiveContainer, BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts'
-import { Apple, Pin, PinOff, Trash2, CheckCheck, Trophy, ChevronDown, Pencil, Plus, Check } from 'lucide-react'
+import { Apple, GraduationCap, Pin, PinOff, Trash2, CheckCheck, Trophy, ChevronDown, Pencil, Plus, Check } from 'lucide-react'
 import { BackChevron, ForwardChevron, ForwardArrow } from './DirectionalIcon.jsx'
 import { supabase } from '../supabase.js'
 import { useAdmin } from '../context/AdminContext.jsx'
@@ -44,7 +44,7 @@ function shortDate(lang, iso) {
 export default function PersonDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { isAdmin, setActingAs } = useAdmin()
+  const { isAdmin, isOwner, profile: myProfile, setActingAs } = useAdmin()
   const { t, lang } = useLanguage()
   const { toast, confirm } = useFeedback()
   const { user: me } = useAuth()
@@ -52,6 +52,7 @@ export default function PersonDetail() {
   const [data, setData] = useState(null)
   const [loadError, setLoadError] = useState(null)
   const [reload, setReload] = useState(0)
+  const [coaches, setCoaches] = useState([])
   const today = toLocalISODate()
 
   // Another trainee's page reuses this component: drop the previous one's
@@ -73,6 +74,16 @@ export default function PersonDetail() {
       cancelled = true
     }
   }, [id, reload, today])
+
+  // The coaches the owner can hand a trainee to (names only; the owner
+  // never sees their trainees).
+  useEffect(() => {
+    if (!isOwner) return
+    supabase.rpc('list_coaches').then(({ data, error }) => {
+      if (error) return console.error(error)
+      setCoaches(data || [])
+    })
+  }, [isOwner])
 
   const derived = useMemo(() => {
     if (!data) return null
@@ -138,6 +149,35 @@ export default function PersonDetail() {
     setData((d) => ({ ...d, profile: { ...d.profile, nutrition_enabled: next } }))
   }
 
+  async function makeCoach() {
+    const name = p.full_name || p.email
+    if (!(await confirm({ title: t('people.makeCoachTitle', { name }), body: t('people.makeCoachBody'), confirmLabel: t('people.coachOff') }))) return
+    const { error } = await supabase.rpc('set_coach', { p_person: p.id, p_on: true })
+    if (error) {
+      console.error(error)
+      toast(t('people.coachError'), 'error')
+      return
+    }
+    toast(t('people.coachMade', { name }))
+    navigate('/people')
+  }
+
+  async function changeCoach(coachId) {
+    const name = p.full_name || p.email
+    const target = coachId === myProfile?.id ? null : coaches.find((c) => c.id === coachId)
+    const coachName = target ? target.name || target.email : myProfile?.full_name || me?.email
+    if (target && !(await confirm({ title: t('people.moveTitle', { name, coach: coachName }), body: t('people.moveBody'), confirmLabel: t('people.moveConfirm'), danger: true }))) return
+    const { error } = await supabase.rpc('assign_coach', { p_person: p.id, p_coach: coachId })
+    if (error) {
+      console.error(error)
+      toast(t('people.coachChangeError'), 'error')
+      return
+    }
+    toast(t('people.moved', { name, coach: coachName }))
+    if (target) navigate('/people')
+    else setData((d) => ({ ...d, profile: { ...d.profile, coach_id: coachId } }))
+  }
+
   async function markAllReviewed() {
     const ids = derived.toReview.map((s) => s.id)
     try {
@@ -189,11 +229,27 @@ export default function PersonDetail() {
           <Button variant="brass" onClick={() => openAccount('/')}>
             {t('person.openAccount')} <ForwardArrow size={15} />
           </Button>
-          {!p.is_admin && (
+          {!(p.is_admin || p.is_coach) && (
             <Button variant="ghost" onClick={toggleNutrition} aria-pressed={!!p.nutrition_enabled}>
               <Apple size={15} className={p.nutrition_enabled ? 'text-good' : ''} />
               {p.nutrition_enabled ? t('people.nutritionOn') : t('people.nutritionOff')}
             </Button>
+          )}
+          {isOwner && !p.is_admin && (
+            <Button variant="ghost" onClick={makeCoach}>
+              <GraduationCap size={15} />
+              {t('people.coachOff')}
+            </Button>
+          )}
+          {isOwner && !p.is_admin && (
+            <Field label={t('people.coachOf')}>
+              <select value={p.coach_id || myProfile?.id || ''} onChange={(e) => changeCoach(e.target.value)}>
+                <option value={myProfile?.id}>{myProfile?.full_name || me?.email}</option>
+                {coaches.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name || c.email}</option>
+                ))}
+              </select>
+            </Field>
           )}
         </div>
       </div>
@@ -312,13 +368,13 @@ export default function PersonDetail() {
             </Section>
           )}
 
-          {!p.is_admin && (
+          {!(p.is_admin || p.is_coach) && (
             <Section title={t('photos.title')}>
               <ProgressPhotos uid={p.id} mode="coach" />
             </Section>
           )}
 
-          {!p.is_admin && (
+          {!(p.is_admin || p.is_coach) && (
             <Section
               title={t('person.routines')}
               hint={data.routines.length > 0 ? t('person.routinesHint') : t('person.noRoutinesYet')}

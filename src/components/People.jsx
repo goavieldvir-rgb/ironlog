@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Users, UserPlus, Copy, Check, Share, AlertTriangle, Search, Pin, Trophy, CalendarCheck, ChevronUp, ChevronDown, MessageSquare } from 'lucide-react'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
+import { supabase } from '../supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -20,7 +21,7 @@ import { fetchRoster, fetchRecentPrs, rosterFlags, attentionScore, adherence, da
 // their coach page (PersonDetail).
 export default function People() {
   const { user } = useAuth()
-  const { setActingAs } = useAdmin()
+  const { setActingAs, isOwner } = useAdmin()
   const { t } = useLanguage()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -109,7 +110,7 @@ export default function People() {
     <div className="flex flex-col gap-5">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <div className="eyebrow mb-1">{t('people.admin')}</div>
+          <div className="eyebrow mb-1">{t(isOwner ? 'people.admin' : 'people.coachBadge')}</div>
           <h1 className="text-3xl">{t('people.title')}</h1>
           <p className="text-chalkdim text-sm mt-1 flex items-center gap-1.5 flex-wrap">
             {t('people.subtitle')}
@@ -117,9 +118,11 @@ export default function People() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="ghost" to="/errors">
-            <AlertTriangle size={16} /> {t('people.errorLogs')}
-          </Button>
+          {isOwner && (
+            <Button variant="ghost" to="/errors">
+              <AlertTriangle size={16} /> {t('people.errorLogs')}
+            </Button>
+          )}
           <Button variant="brass" onClick={() => setInviting(true)}>
             <UserPlus size={16} /> {t('people.inviteSomeone')}
           </Button>
@@ -194,6 +197,8 @@ export default function People() {
         {trainees.length > 0 && <SidePanel trainees={trainees} prs={recentPrs} today={today} t={t} />}
       </div>
 
+      {isOwner && <CoachesCard onChanged={() => setReload((r) => r + 1)} />}
+
       {me && (
         <Card className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex items-center gap-2">
@@ -208,6 +213,55 @@ export default function People() {
 
       {inviting && <InviteModal onClose={() => setInviting(false)} t={t} />}
     </div>
+  )
+}
+
+// Owner only: the independent coaches. Names and emails, never their trainees.
+function CoachesCard({ onChanged }) {
+  const { t } = useLanguage()
+  const { toast, confirm } = useFeedback()
+  const [coaches, setCoaches] = useState(null)
+
+  async function load() {
+    const { data, error } = await supabase.rpc('list_coaches')
+    if (error) return console.error(error)
+    setCoaches(data || [])
+  }
+  useEffect(() => {
+    load()
+  }, [])
+
+  async function remove(c) {
+    const name = c.name || c.email
+    if (!(await confirm({ title: t('people.removeCoachTitle', { name }), body: t('people.removeCoachBody'), confirmLabel: t('people.removeCoach'), danger: true }))) return
+    const { error } = await supabase.rpc('set_coach', { p_person: c.id, p_on: false })
+    if (error) {
+      console.error(error)
+      toast(t('people.coachError'), 'error')
+      return
+    }
+    toast(t('people.coachRemoved', { name }))
+    load()
+    onChanged()
+  }
+
+  if (coaches == null) return null
+  return (
+    <Card className="flex flex-col gap-2">
+      <h2 className="text-lg">{t('people.coachesTitle')}</h2>
+      {coaches.length === 0 && <p className="text-chalkdim text-sm">{t('people.coachesHint')}</p>}
+      {coaches.map((c) => (
+        <div key={c.id} className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate">{c.name || c.email}</p>
+            {c.name && <p className="text-xs text-chalkdim truncate">{c.email}</p>}
+          </div>
+          <button onClick={() => remove(c)} className="shrink-0 text-sm text-chalkdim">
+            {t('people.removeCoach')}
+          </button>
+        </div>
+      ))}
+    </Card>
   )
 }
 
@@ -280,6 +334,7 @@ function TraineeRow({ p, today, t }) {
         <div className="flex items-center gap-2 min-w-0">
           <p className="truncate min-w-0">{p.full_name || p.email}</p>
           {p.is_admin && <Badge>{t('people.adminBadge')}</Badge>}
+          {p.is_coach && <Badge>{t('people.coachBadge')}</Badge>}
           {p.unread > 0 && <UnreadBadge n={p.unread} t={t} />}
         </div>
         <p className="text-xs text-chalkdim num">{stats.join(' · ')}</p>

@@ -3,9 +3,10 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { fetchLatestConsent, recordConsent } from '../lib/db.js'
-import { privacy } from '../legal/privacy.js'
-import { terms, termsPlainText, hashText, TERMS_VERSION, TERMS_DOC_KEY } from '../legal/terms.js'
+import { privacyFor } from '../legal/privacy.js'
+import { termsFor, termsPlainText, hashText, TERMS_VERSION, TERMS_DOC_KEY } from '../legal/terms.js'
 import { Button, Card, Field } from './ui.jsx'
+import { useMyCoach } from '../lib/myCoach.js'
 import { PrivacySections } from './Privacy.jsx'
 import { ScreenLoader } from './Loading.jsx'
 
@@ -47,6 +48,7 @@ function clearCachedConsent(uid) {
 export default function ConsentGate({ uid, children }) {
   const { logout } = useAuth()
   const { t, lang, setLang } = useLanguage()
+  const coach = useMyCoach()
   const { toast } = useFeedback()
   const [state, setState] = useState('checking') // checking | needed | ok | error
   const [isMinor, setIsMinor] = useState(false)
@@ -118,7 +120,7 @@ export default function ConsentGate({ uid, children }) {
   }, [isMinor, lang, state])
 
   const variant = isMinor ? 'minor' : 'adult'
-  const doc = terms[lang]?.[variant] || terms.en[variant]
+  const doc = termsFor(lang, coach)[variant]
   const guardianOk = !isMinor || (guardianName.trim() && guardianContact.trim())
 
   async function accept() {
@@ -131,7 +133,7 @@ export default function ConsentGate({ uid, children }) {
         lang,
         // Fingerprint of the exact wording shown, so the record says what
         // was agreed to, not just that something was.
-        textSha256: await hashText(termsPlainText(lang, variant)),
+        textSha256: await hashText(termsPlainText(lang, variant, coach)),
         guardianName: guardianName.trim(),
         guardianContact: guardianContact.trim(),
       })
@@ -162,7 +164,7 @@ export default function ConsentGate({ uid, children }) {
     )
   }
 
-  const privacyDoc = privacy[lang] || privacy.en
+  const privacyDoc = privacyFor(lang, coach)
 
   return (
     <div
@@ -249,7 +251,7 @@ export default function ConsentGate({ uid, children }) {
 
         {!readToEnd && <p className="text-chalkdim text-xs text-center">{t('consent.scrollHint')}</p>}
 
-        <Button onClick={accept} disabled={!readToEnd || !guardianOk || saving} className="w-full">
+        <Button onClick={accept} disabled={!readToEnd || !guardianOk || saving || coach === undefined} className="w-full">
           {saving ? t('consent.saving') : doc.accept}
         </Button>
 
