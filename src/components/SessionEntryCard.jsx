@@ -1,5 +1,6 @@
 import ExerciseThumb from './ExerciseThumb.jsx'
 import ExerciseVideo from './ExerciseVideo.jsx'
+import { exerciseClipFor } from '../lib/exerciseClips.js'
 import React, { useEffect, useRef, useState } from 'react'
 import { X, Plus, Trash2, Minus, CornerDownLeft, StickyNote, Repeat, ArrowUp, ArrowDown, Trophy, Link2, Check, Flame, ChevronDown, Play, Square, Scale } from 'lucide-react'
 import { Badge } from './ui.jsx'
@@ -582,14 +583,27 @@ export default function SessionEntryCard({
       <div className="flex items-start justify-between gap-2 -mt-2.5 -me-2.5">
         {/* Our clip's still at the start of the name (right in Hebrew); a
             tap plays the clip. */}
-        <ExerciseThumb
-          size={52}
-          className="mt-1.5 me-1"
-          chosen={liveExercise?.clip}
-          names={[liveExercise?.name, entry.nameEn, entry.name]}
-          videoUrl={entry.videoUrl}
-          label={displayName}
-        />
+        {/* The workout tour's "See how it's done" step points here when the
+            tile plays something (our clip, or the coach's own link). A plain
+            grey tile isn't tappable, so the step falls back to the Example
+            link next to the name. */}
+        <span
+          className="contents"
+          data-tour={
+            tourAnchors && (exerciseClipFor(liveExercise?.clip, [liveExercise?.name, entry.nameEn, entry.name]) || String(entry.videoUrl || '').trim())
+              ? 'ws-video'
+              : undefined
+          }
+        >
+          <ExerciseThumb
+            size={52}
+            className="mt-1.5 me-1"
+            chosen={liveExercise?.clip}
+            names={[liveExercise?.name, entry.nameEn, entry.name]}
+            videoUrl={entry.videoUrl}
+            label={displayName}
+          />
+        </span>
         <div className="min-w-0 flex-1 pt-1.5 px-0.5 flex flex-col gap-1.5">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-[17px] leading-[22px] font-semibold">{displayName}</h2>
