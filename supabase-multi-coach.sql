@@ -2,13 +2,16 @@
 --
 -- Before this, the only coach was the account with profiles.is_admin, and
 -- every coach permission read "admin sees everyone". Now:
---   * is_admin  = the owner (Aviel). Still sees and manages everyone, and is
---                 the only one who runs the shared things: the exercise
---                 library, verifying shared foods, error logs, roles.
---   * is_coach  = another coach. Sees and manages only people whose
---                 coach_id is them.
+--   * is_admin  = the owner (Aviel). Sees and manages only their own
+--                 trainees, and is the only one who runs the shared things:
+--                 the exercise library, verifying shared foods, error logs,
+--                 who is a coach.
+--   * is_coach  = another, independent coach. Sees and manages only people
+--                 whose coach_id is them. The owner and another coach never
+--                 see each other's trainees.
 --   * coach_id  = a trainee's coach. Every existing trainee gets the owner,
---                 so nothing changes for anyone already here.
+--                 so nothing changes for anyone already here. A coach has
+--                 no coach.
 -- New sign-ups get the coach who invited them (signup_invites.invited_by).
 --
 -- Safe to run more than once. Run it in the SQL Editor, then deploy the
@@ -28,6 +31,8 @@ update public.profiles p
    set coach_id = (select o.id from public.profiles o where o.is_admin order by o.created_at limit 1)
  where not p.is_admin and p.coach_id is null;
 
+update public.profiles set coach_id = null where is_coach and coach_id is not null;
+
 update public.coach_tasks t
    set coach_id = (select o.id from public.profiles o where o.is_admin order by o.created_at limit 1)
  where t.trainee_id is null and t.coach_id is null;
@@ -45,10 +50,10 @@ as $$
      and coalesce(auth.jwt() ->> 'aal', '') = 'aal2';
 $$;
 
--- May the signed-in person act as coach for this person? The owner may for
--- anyone; another coach only for their own trainees. Two-step required,
--- as with is_admin(). Your own rows are covered by each policy's own
--- "auth.uid() = user_id" part, not by this.
+-- May the signed-in person act as coach for this person? Only for their own
+-- trainees (the owner also for anyone left without a coach). Never for a
+-- coach or the owner. Two-step required, as with is_admin(). Your own rows
+-- are covered by each policy's own "auth.uid() = user_id" part, not by this.
 create or replace function public.can_coach(target uuid)
 returns boolean
 language sql
@@ -58,10 +63,10 @@ set search_path = ''
 as $$
   select coalesce(auth.jwt() ->> 'aal', '') = 'aal2' and exists (
     select 1 from public.profiles me
-    where me.id = auth.uid()
-      and (me.is_admin
-        or (me.is_coach and target is not null and target <> me.id and exists (
-              select 1 from public.profiles t where t.id = target and t.coach_id = me.id and not t.is_admin)))
+    join public.profiles t on t.id = target
+    where me.id = auth.uid() and (me.is_admin or me.is_coach)
+      and t.id <> me.id and not t.is_admin and not t.is_coach
+      and (t.coach_id = me.id or (me.is_admin and t.coach_id is null))
   );
 $$;
 
@@ -253,13 +258,13 @@ create policy "admins manage coach goals" on public.coach_goals
   for all to authenticated using (public.can_coach(trainee_id)) with check (public.can_coach(trainee_id));
 
 -- A task about a trainee belongs to that trainee's coach; a hand-written
--- one with no trainee to whoever wrote it. The owner sees all of them.
+-- one with no trainee to whoever wrote it.
 drop policy if exists "admins manage coach tasks" on public.coach_tasks;
 create policy "admins manage coach tasks" on public.coach_tasks
   for all to authenticated
-  using (case when trainee_id is null then public.is_coach() and (coach_id = auth.uid() or public.is_admin())
+  using (case when trainee_id is null then public.is_coach() and coach_id = auth.uid()
               else public.can_coach(trainee_id) end)
-  with check (case when trainee_id is null then public.is_coach() and (coach_id = auth.uid() or public.is_admin())
+  with check (case when trainee_id is null then public.is_coach() and coach_id = auth.uid()
                    else public.can_coach(trainee_id) end);
 
 create or replace function public.coach_task_owner()
@@ -284,8 +289,14 @@ drop policy if exists "admins can read notification log" on public.admin_notific
 create policy "admins can read notification log" on public.admin_notifications
   for select using (public.can_coach(trainee_id));
 
--- The owner manages every invite; a coach only the ones they made, so each
--- new sign-up lands with the coach who invited them.
+-- Each coach (the owner too) manages only the invites they made, so each
+-- new sign-up lands with the coach who invited them. The owner also keeps
+-- the old invites that have no inviter.
+drop policy if exists "admins manage invites" on public.signup_invites;
+create policy "admins manage invites" on public.signup_invites
+  for all to authenticated
+  using (public.is_admin() and invited_by is null)
+  with check (public.is_admin() and invited_by is null);
 drop policy if exists "coaches manage own invites" on public.signup_invites;
 create policy "coaches manage own invites" on public.signup_invites
   for all to authenticated
@@ -325,6 +336,15 @@ begin
     new.is_coach := false;
     new.coach_id := null;
   elsif public.is_admin() then
+    -- Nobody becomes owner (or stops being one) through the app; that stays
+    -- a SQL Editor change, so the owner can't create a second owner by mistake.
+    if new.is_admin is distinct from old.is_admin then
+      raise exception 'ADMIN_FLAG_PROTECTED';
+    end if;
+    -- A coach is nobody's trainee.
+    if new.is_coach then
+      new.coach_id := null;
+    end if;
     -- A trainee's coach must be the owner or a coach.
     if new.coach_id is distinct from old.coach_id and new.coach_id is not null and not exists (
       select 1 from public.profiles c where c.id = new.coach_id and (c.is_admin or c.is_coach)) then
@@ -370,10 +390,97 @@ $$;
 revoke execute on function public.coach_removed() from public, anon, authenticated;
 drop trigger if exists trg_coach_removed on public.profiles;
 create trigger trg_coach_removed after update of is_coach on public.profiles
-  for each row when (old.is_coach and not new.is_coach) execute function public.coach_removed();
+  for each row when (old.is_coach and not new.is_coach and not new.is_admin) execute function public.coach_removed();
 drop trigger if exists trg_coach_deleted on public.profiles;
 create trigger trg_coach_deleted before delete on public.profiles
-  for each row when (old.is_coach) execute function public.coach_removed();
+  for each row when (old.is_coach and not old.is_admin) execute function public.coach_removed();
+
+-- The owner's list of coaches: names only, nothing about their trainees.
+create or replace function public.list_coaches()
+returns table (id uuid, name text, email text)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select p.id, coalesce(nullif(p.full_name, ''), p.email), p.email
+  from public.profiles p
+  where p.is_coach and not p.is_admin and public.is_admin()
+  order by 2;
+$$;
+
+-- The owner makes one of their own trainees a coach, or stops someone being
+-- a coach (their trainees then move to the owner, see coach_removed).
+create or replace function public.set_coach(p_person uuid, p_on boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'owner only' using errcode = '42501';
+  end if;
+  if p_on and not public.can_coach(p_person) then
+    raise exception 'not your trainee' using errcode = '42501';
+  end if;
+  if not p_on and not exists (select 1 from public.profiles where id = p_person and is_coach) then
+    raise exception 'not a coach' using errcode = '42501';
+  end if;
+  update public.profiles set is_coach = p_on where id = p_person and not is_admin;
+end;
+$$;
+
+-- The owner hands one of their own trainees to a coach. After that the
+-- owner no longer sees them (only removing that coach brings them back).
+create or replace function public.assign_coach(p_person uuid, p_coach uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'owner only' using errcode = '42501';
+  end if;
+  if not public.can_coach(p_person) then
+    raise exception 'not your trainee' using errcode = '42501';
+  end if;
+  update public.profiles set coach_id = p_coach where id = p_person;
+end;
+$$;
+revoke execute on function public.assign_coach(uuid, uuid) from public, anon;
+grant execute on function public.assign_coach(uuid, uuid) to authenticated;
+
+-- App alert to an independent coach when their trainee sets a record (the
+-- owner's trainees go by email and ntfy instead).
+create or replace function public.notify_coach_pr(trainee uuid, detail text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  secret text;
+begin
+  select value into secret from public.push_config where key = 'cron_secret';
+  if secret is null then return; end if;
+  perform net.http_post(
+    url := 'https://hwdgjkiwanxluicdpndh.supabase.co/functions/v1/send-workout-reminders',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret', secret),
+    body := jsonb_build_object('pr_trainee_id', trainee, 'pr_detail', detail)
+  );
+exception when others then
+  raise warning 'notify_coach_pr failed: %', sqlerrm;
+end;
+$$;
+
+revoke execute on function public.list_coaches() from public, anon;
+revoke execute on function public.set_coach(uuid, boolean) from public, anon;
+revoke execute on function public.notify_coach_pr(uuid, text) from public, anon, authenticated;
+grant execute on function public.list_coaches() to authenticated;
+grant execute on function public.set_coach(uuid, boolean) to authenticated;
+grant execute on function public.notify_coach_pr(uuid, text) to service_role;
 
 -- New accounts get the coach who invited them, or the owner.
 create or replace function public.handle_new_user()
@@ -831,6 +938,8 @@ begin
           '🏆 New PR: ' || trainee_name,
           ex_name || ' — ' || detail_text
         );
+        else
+          perform public.notify_coach_pr(NEW.user_id, ex_name || ' — ' || detail_text);
         end if;
 
         insert into admin_notifications (type, trainee_id, detail)
@@ -887,6 +996,8 @@ begin
             '🏆 New PR: ' || trainee_name,
             ex_name || ' — ' || detail_text
           );
+          else
+            perform public.notify_coach_pr(NEW.user_id, ex_name || ' — ' || detail_text);
           end if;
 
           insert into admin_notifications (type, trainee_id, detail)

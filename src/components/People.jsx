@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Users, UserPlus, Copy, Check, Share, AlertTriangle, Search, Pin, Trophy, CalendarCheck, ChevronUp, ChevronDown, MessageSquare } from 'lucide-react'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
+import { supabase } from '../supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -196,6 +197,8 @@ export default function People() {
         {trainees.length > 0 && <SidePanel trainees={trainees} prs={recentPrs} today={today} t={t} />}
       </div>
 
+      {isOwner && <CoachesCard onChanged={() => setReload((r) => r + 1)} />}
+
       {me && (
         <Card className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex items-center gap-2">
@@ -210,6 +213,55 @@ export default function People() {
 
       {inviting && <InviteModal onClose={() => setInviting(false)} t={t} />}
     </div>
+  )
+}
+
+// Owner only: the independent coaches. Names and emails, never their trainees.
+function CoachesCard({ onChanged }) {
+  const { t } = useLanguage()
+  const { toast, confirm } = useFeedback()
+  const [coaches, setCoaches] = useState(null)
+
+  async function load() {
+    const { data, error } = await supabase.rpc('list_coaches')
+    if (error) return console.error(error)
+    setCoaches(data || [])
+  }
+  useEffect(() => {
+    load()
+  }, [])
+
+  async function remove(c) {
+    const name = c.name || c.email
+    if (!(await confirm({ title: t('people.removeCoachTitle', { name }), body: t('people.removeCoachBody'), confirmLabel: t('people.removeCoach'), danger: true }))) return
+    const { error } = await supabase.rpc('set_coach', { p_person: c.id, p_on: false })
+    if (error) {
+      console.error(error)
+      toast(t('people.coachError'), 'error')
+      return
+    }
+    toast(t('people.coachRemoved', { name }))
+    load()
+    onChanged()
+  }
+
+  if (coaches == null) return null
+  return (
+    <Card className="flex flex-col gap-2">
+      <h2 className="text-lg">{t('people.coachesTitle')}</h2>
+      {coaches.length === 0 && <p className="text-chalkdim text-sm">{t('people.coachesHint')}</p>}
+      {coaches.map((c) => (
+        <div key={c.id} className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate">{c.name || c.email}</p>
+            {c.name && <p className="text-xs text-chalkdim truncate">{c.email}</p>}
+          </div>
+          <button onClick={() => remove(c)} className="shrink-0 text-sm text-chalkdim">
+            {t('people.removeCoach')}
+          </button>
+        </div>
+      ))}
+    </Card>
   )
 }
 
@@ -264,9 +316,6 @@ export function FlagChips({ flags, t }) {
 }
 
 function TraineeRow({ p, today, t }) {
-  const { isOwner } = useAdmin()
-  const { user } = useAuth()
-  const ownerId = user?.uid
   const thisWeek = (p.week_counts || []).at(-1) || 0
   const quiet = daysSince(p.last_session, today)
   const dot = p.score > 0 ? 'bg-accent' : thisWeek > 0 ? 'bg-good' : p.last_session ? 'bg-chalkdim' : 'bg-chalkdim/40'
@@ -289,10 +338,6 @@ function TraineeRow({ p, today, t }) {
           {p.unread > 0 && <UnreadBadge n={p.unread} t={t} />}
         </div>
         <p className="text-xs text-chalkdim num">{stats.join(' · ')}</p>
-        {/* Only the owner sees other coaches' trainees, so only they need the name. */}
-        {isOwner && p.coach_name && p.coach_id !== ownerId && (
-          <p className="text-xs text-chalkdim truncate">{p.coach_name}</p>
-        )}
         <FlagChips flags={p.flags} t={t} />
         {p.pinned_note && (
           <p className="text-xs text-chalkdim inline-flex items-center gap-1 min-w-0">

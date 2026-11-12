@@ -73,6 +73,8 @@ drop policy if exists "admins manage coach tasks" on public.coach_tasks;
 create policy "admins manage coach tasks" on public.coach_tasks as permissive for all to authenticated using (is_admin()) with check (is_admin());
 drop policy if exists "admins can read notification log" on public.admin_notifications;
 create policy "admins can read notification log" on public.admin_notifications as permissive for select to public using (is_admin());
+drop policy if exists "admins manage invites" on public.signup_invites;
+create policy "admins manage invites" on public.signup_invites as permissive for all to authenticated using (is_admin()) with check (is_admin());
 drop policy if exists "coaches manage own invites" on public.signup_invites;
 
 drop function if exists public.coach_roster(date);
@@ -694,6 +696,10 @@ $function$;
 revoke all on function public.coach_roster(date) from public, anon, authenticated;
 grant execute on function public.coach_roster(date) to service_role, authenticated;
 
+drop function if exists public.notify_coach_pr(uuid, text);
+drop function if exists public.assign_coach(uuid, uuid);
+drop function if exists public.set_coach(uuid, boolean);
+drop function if exists public.list_coaches();
 drop function if exists public.coach_task_owner();
 drop function if exists public.coach_removed();
 drop function if exists public.my_coach();

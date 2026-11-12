@@ -317,6 +317,34 @@ async function runMessage(messageId: string) {
   return json({ sent, removed, failed, ntfy })
 }
 
+// A record by an independent coach's trainee goes to that coach's devices
+// (the owner's trainees are announced by email and ntfy in the database).
+const PR_COPY = {
+  en: (name: string, detail: string) => ({ title: `🏆 New PR: ${name}`, body: detail }),
+  he: (name: string, detail: string) => ({ title: `🏆 שיא חדש: ${name}`, body: detail }),
+}
+async function runPrAlert(traineeId: string, detail: string) {
+  const { data: t } = await db.from('profiles').select('full_name, email, coach_id').eq('id', traineeId).maybeSingle()
+  if (!t?.coach_id) return json({ sent: 0 })
+  const { data: c } = await db.from('profiles').select('id, is_coach, is_admin').eq('id', t.coach_id).maybeSingle()
+  if (!c?.is_coach || c.is_admin) return json({ sent: 0 })
+  const name = t.full_name || t.email?.split('@')[0] || ''
+  const { data: subs } = await db.from('push_subscriptions').select('*').eq('user_id', c.id)
+  let sent = 0, removed = 0, failed = 0
+  for (const s of subs || []) {
+    try {
+      const msg = (PR_COPY[s.lang as 'en' | 'he'] || PR_COPY.en)(name, detail)
+      const r = await deliver(s, { ...msg, url: `#/people/${traineeId}` }, `ironlog-pr-${traineeId}`, 86400)
+      if (r === 'sent') sent++
+      else removed++
+    } catch (e: any) {
+      console.error('pr push failed', s.id, e?.message || e)
+      failed++
+    }
+  }
+  return json({ sent, removed, failed })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
   if (req.method !== 'POST') return json({ error: 'method' }, 405)
@@ -332,6 +360,7 @@ Deno.serve(async (req) => {
     if (body?.coach_tasks) return runCoachTasks()
     if (body?.rest_alerts) return runRestAlerts()
     if (body?.message_id) return runMessage(String(body.message_id))
+    if (body?.pr_trainee_id) return runPrAlert(String(body.pr_trainee_id), String(body.pr_detail || ''))
     return body?.feedback_session_id ? runFeedback(String(body.feedback_session_id)) : runReminders()
   }
   return runTest(req)

@@ -232,15 +232,15 @@ export const terms = {
 }
 
 // The terms for someone whose coach is not the owner: the "who can see it"
-// section also says the owner, who runs Ironlog, can see the data. Owner or
+// section also says the owner runs Ironlog but does not see the data. Owner or
 // unknown coach gives the original text untouched (it is hashed into the
 // consent record, so it must not change by a character).
 export function termsFor(lang, coach) {
   const docs = terms[lang] || terms.en
   if (!coach || coach.isOwner) return docs
   const extra = docs === terms.he
-    ? ` ${COACH_NAME}, שמפעיל את Ironlog, יכול לראות אותם גם.`
-    : ` ${COACH_NAME}, who runs Ironlog, can also see it.`
+    ? ` ${COACH_NAME} מפעיל את Ironlog אך אינו רואה אותם באפליקציה.`
+    : ` ${COACH_NAME} runs Ironlog but does not see it in the app.`
   // Adult "Who can see it" is section 3; the under-18 text merges it into
   // "What the app stores and who sees it", section 3 as well.
   const addTo = (doc) => ({

@@ -20,7 +20,6 @@ import { useMessagesAvailable } from '../lib/messages.js'
 import { RoutineExercises } from './RoutineView.jsx'
 import {
   fetchTraineeDetail,
-  fetchRoster,
   weeklyCounts,
   needsReview,
   markSessionsReviewed,
@@ -76,14 +75,15 @@ export default function PersonDetail() {
     }
   }, [id, reload, today])
 
-  // The coaches the owner can hand a trainee to: the owner plus anyone on
-  // the roster marked as a coach.
+  // The coaches the owner can hand a trainee to (names only; the owner
+  // never sees their trainees).
   useEffect(() => {
     if (!isOwner) return
-    fetchRoster(today)
-      .then((rows) => setCoaches(rows.filter((r) => r.is_coach)))
-      .catch((e) => console.error(e))
-  }, [isOwner, today, reload])
+    supabase.rpc('list_coaches').then(({ data, error }) => {
+      if (error) return console.error(error)
+      setCoaches(data || [])
+    })
+  }, [isOwner])
 
   const derived = useMemo(() => {
     if (!data) return null
@@ -149,25 +149,33 @@ export default function PersonDetail() {
     setData((d) => ({ ...d, profile: { ...d.profile, nutrition_enabled: next } }))
   }
 
-  async function toggleCoach() {
-    const next = !p.is_coach
-    const { error } = await supabase.from('profiles').update({ is_coach: next }).eq('id', p.id)
+  async function makeCoach() {
+    const name = p.full_name || p.email
+    if (!(await confirm({ title: t('people.makeCoachTitle', { name }), body: t('people.makeCoachBody'), confirmLabel: t('people.coachOff') }))) return
+    const { error } = await supabase.rpc('set_coach', { p_person: p.id, p_on: true })
     if (error) {
       console.error(error)
       toast(t('people.coachError'), 'error')
       return
     }
-    setData((d) => ({ ...d, profile: { ...d.profile, is_coach: next } }))
+    toast(t('people.coachMade', { name }))
+    navigate('/people')
   }
 
   async function changeCoach(coachId) {
-    const { error } = await supabase.from('profiles').update({ coach_id: coachId }).eq('id', p.id)
+    const name = p.full_name || p.email
+    const target = coachId === myProfile?.id ? null : coaches.find((c) => c.id === coachId)
+    const coachName = target ? target.name || target.email : myProfile?.full_name || me?.email
+    if (target && !(await confirm({ title: t('people.moveTitle', { name, coach: coachName }), body: t('people.moveBody'), confirmLabel: t('people.moveConfirm'), danger: true }))) return
+    const { error } = await supabase.rpc('assign_coach', { p_person: p.id, p_coach: coachId })
     if (error) {
       console.error(error)
       toast(t('people.coachChangeError'), 'error')
       return
     }
-    setData((d) => ({ ...d, profile: { ...d.profile, coach_id: coachId } }))
+    toast(t('people.moved', { name, coach: coachName }))
+    if (target) navigate('/people')
+    else setData((d) => ({ ...d, profile: { ...d.profile, coach_id: coachId } }))
   }
 
   async function markAllReviewed() {
@@ -228,17 +236,17 @@ export default function PersonDetail() {
             </Button>
           )}
           {isOwner && !p.is_admin && (
-            <Button variant="ghost" onClick={toggleCoach} aria-pressed={!!p.is_coach}>
-              <GraduationCap size={15} className={p.is_coach ? 'text-good' : ''} />
-              {p.is_coach ? t('people.coachOn') : t('people.coachOff')}
+            <Button variant="ghost" onClick={makeCoach}>
+              <GraduationCap size={15} />
+              {t('people.coachOff')}
             </Button>
           )}
-          {isOwner && !p.is_admin && !p.is_coach && (
+          {isOwner && !p.is_admin && (
             <Field label={t('people.coachOf')}>
               <select value={p.coach_id || myProfile?.id || ''} onChange={(e) => changeCoach(e.target.value)}>
                 <option value={myProfile?.id}>{myProfile?.full_name || me?.email}</option>
                 {coaches.map((c) => (
-                  <option key={c.id} value={c.id}>{c.full_name || c.email}</option>
+                  <option key={c.id} value={c.id}>{c.name || c.email}</option>
                 ))}
               </select>
             </Field>
