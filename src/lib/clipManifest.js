@@ -11,7 +11,7 @@ export const CLIPS = {
   'barbell-biceps-curl': { v: '35feb55b' },
   'bench-dips': { v: 'b2ac4d64' },
   'cable-biceps-curl': { v: '9cd33088' },
-  'cable-chest-fly-cable-crossover': { v: 'de5f2d33' },
+  'cable-chest-fly-cable-crossover': { v: 'db1acc82' },
   'cable-chest-press': { v: 'f10df78e' },
   'cable-crunch': { v: 'c9c78a0c', t: '53655498' },
   'cable-lateral-raise': { v: 'f9bf51ba' },
@@ -63,6 +63,6 @@ export const CLIPS = {
   't-bar-row': { v: '8079002b' },
   'treadmill-running': { v: 'ec2520d4', t: 'fe6d81d8' },
   'triceps-pushdown': { v: 'bd5e7466' },
-  'wall-slides': { v: 'a6060e25' },
+  'wall-slides': { v: '7f0d69de' },
   'wide-grip-lat-pulldown': { v: '36855887', t: 'ad14289d' },
 }
