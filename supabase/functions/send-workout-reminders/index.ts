@@ -30,7 +30,7 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'content-type': 'application/json' } })
 
 const COPY = {
-  en: (names: string) => ({ title: "Today's workout", body: `${names} is on the plan today. Let's go.` }),
+  en: (names: string) => ({ title: "Today's workout", body: `${names} is waiting for you today. Let's get started.` }),
   he: (names: string) => ({ title: 'האימון של היום', body: `${names} מחכה לכם היום. בואו נתחיל.` }),
 }
 const REST_COPY = {
@@ -122,7 +122,7 @@ async function runReminders() {
         msg = REST_COPY[s.lang as 'en' | 'he'] || REST_COPY.en
       } else {
         const { data: routines } = await db.from('routines').select('name').in('id', ids)
-        const names = (routines || []).map((r) => r.name).join(' + ') || 'Workout'
+        const names = (routines || []).map((r) => r.name).join(' + ') || (s.lang === 'he' ? 'אימון' : 'Workout')
         msg = (COPY[s.lang as 'en' | 'he'] || COPY.en)(names)
       }
 

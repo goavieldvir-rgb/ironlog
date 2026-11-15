@@ -55,6 +55,13 @@ export function reminderKind(plannedToday: number, plannedThisWeek: number, logg
   return loggedToday > 0 ? null : 'rest'
 }
 
+// Hebrew joins מ, ל and the like straight onto a word ("מדנה"), but a name in
+// English letters or starting with a number takes a hyphen ("מ-Dana"). The
+// app's own To do list uses the same rule.
+export function heJoin(prefix: string, name: string) {
+  return /^[\u0590-\u05FF]/.test(name) ? prefix + name : `${prefix}-${name}`
+}
+
 // The "your coach left feedback" push. The note itself is the body, cut to
 // what a lock screen shows.
 export function feedbackCopy(lang: string, routineName: string | null, comment: string) {
@@ -68,17 +75,20 @@ export function feedbackCopy(lang: string, routineName: string | null, comment: 
 }
 
 // The coach's morning "needs attention" push: a count in the title, then one
-// short line per task, as many as fit a lock screen.
+// line per task, as many as fit a lock screen. The lines are worded the same
+// as the app's To do list (tasks.kind in src/i18n/translations.js).
 export type CoachTask = { kind: string; name: string; n: number | null; title: string | null }
 
 export function coachTaskLine(lang: string, t: CoachTask) {
   const he = lang === 'he'
   switch (t.kind) {
-    case 'quiet': return he ? `${t.name} לא התאמן/ה ${t.n} ימים` : `${t.name}: no workout in ${t.n} days`
-    case 'food': return he ? `${t.name} לא רשם/ה אוכל${t.n ? ` ${t.n} ימים` : ''}` : `${t.name}: no food logged${t.n ? ` in ${t.n} days` : ''}`
-    case 'birthday': return he ? `🎂 יום הולדת ל${t.name}${t.n ? ` (${t.n})` : ''}` : `🎂 ${t.name}'s birthday${t.n ? ` (${t.n})` : ''}`
-    case 'checkin': return he ? `צ׳ק-אין עם ${t.name}` : `Check-in with ${t.name}`
-    case 'weigh': return he ? `${t.name} לא נשקל/ה ${t.n} ימים` : `${t.name}: no weigh-in in ${t.n} days`
+    case 'quiet': return he ? `לבדוק מה עם ${t.name}: לא התאמן/ה ${t.n} ימים` : `Check in with ${t.name}: no workout in ${t.n} days`
+    case 'food': return t.n
+      ? (he ? `לבדוק מה עם ${t.name}: לא רשם/ה אוכל ${t.n} ימים` : `Check in with ${t.name}: no food logged in ${t.n} days`)
+      : (he ? `לבדוק מה עם ${t.name}: עוד לא רשם/ה אוכל` : `Check in with ${t.name}: hasn't logged food yet`)
+    case 'birthday': return he ? `🎂 יום הולדת היום ${heJoin('ל', t.name)}${t.n ? ` (${t.n})` : ''}` : `🎂 ${t.name}'s birthday today${t.n ? ` (${t.n})` : ''}`
+    case 'checkin': return he ? `הגיע זמן הצ׳ק-אין עם ${t.name}` : `Check-in with ${t.name} is due`
+    case 'weigh': return he ? `לבקש ${heJoin('מ', t.name)} להישקל: השקילה האחרונה לפני ${t.n} ימים` : `Ask ${t.name} for a weigh-in: last one ${t.n} days ago`
     case 'welcome': return he ? `לבדוק איך עובר השבוע הראשון של ${t.name}` : `See how ${t.name}'s first week is going`
     case 'moved': return he ? `${t.name} עבר/ה אליכם` : `${t.name} moved to you`
     default: return t.name ? `${t.title} (${t.name})` : (t.title || '')
@@ -91,8 +101,8 @@ export function coachTasksCopy(lang: string, tasks: CoachTask[], max = 4) {
   const more = tasks.length - lines.length
   if (more > 0) lines.push(he ? `ועוד ${more}` : `and ${more} more`)
   const title = tasks.length === 1
-    ? (he ? 'משימה אחת למאמן' : '1 thing needs you')
-    : (he ? `${tasks.length} משימות למאמן` : `${tasks.length} things need you`)
+    ? (he ? 'משימה חדשה אחת' : '1 new To do item')
+    : (he ? `${tasks.length} משימות חדשות` : `${tasks.length} new To do items`)
   return { title, body: lines.join('\n') }
 }
 
@@ -105,7 +115,7 @@ export function messageCopy(lang: string, opts: { toCoach: boolean; name: string
   const body = text.length > 140 ? text.slice(0, 139) + '…' : text
   const name = opts.name.trim()
   let title = opts.toCoach
-    ? (name ? (he ? `הודעה מ${name}` : `Message from ${name}`) : (he ? 'הודעה ממתאמן/ת' : 'Message from a trainee'))
+    ? (name ? (he ? `הודעה ${heJoin('מ', name)}` : `Message from ${name}`) : (he ? 'הודעה ממתאמן/ת' : 'Message from a trainee'))
     : (he ? 'הודעה מהמאמן' : 'Message from your coach')
   if (opts.unread > 1) title += ` (${opts.unread})`
   return { title, body }
