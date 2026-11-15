@@ -257,7 +257,7 @@ export default function PersonDetail() {
               {t('people.coachOff')}
             </Button>
           )}
-          {isCoach && !isOwner && !p.is_admin && !p.is_coach && p.id !== myProfile?.id && (
+          {isCoach && !isOwner && ownerName && !p.is_admin && !p.is_coach && p.id !== myProfile?.id && (
             <Button variant="ghost" onClick={returnToOwner}>
               <Undo2 size={15} />
               {t('people.returnButton', { owner: ownerName })}
