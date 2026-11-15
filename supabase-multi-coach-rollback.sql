@@ -11,6 +11,7 @@ begin;
 drop trigger if exists trg_coach_task_owner on public.coach_tasks;
 drop trigger if exists trg_coach_removed on public.profiles;
 drop trigger if exists trg_coach_deleted on public.profiles;
+drop trigger if exists trg_coach_changed on public.profiles;
 drop trigger if exists trg_coach_note_author on public.coach_notes;
 drop trigger if exists trg_coach_goal_author on public.coach_goals;
 
@@ -708,6 +709,8 @@ drop function if exists public.take_back(uuid);
 drop function if exists public.return_to_owner(uuid);
 drop function if exists public.coach_task_owner();
 drop function if exists public.coach_removed();
+drop function if exists public.coach_changed();
+drop function if exists public.send_routine_to_coach(uuid, uuid);
 drop function if exists public.coach_row_author();
 drop function if exists public.my_coach();
 drop function if exists public.owner_gets_alerts(uuid);
@@ -730,7 +733,18 @@ begin
     alter table public.coach_goals drop column author_id;
     alter table public.coach_goals add constraint coach_goals_pkey primary key (trainee_id);
   end if;
+  -- Birthdays go back onto the owner's goals, where they lived before.
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'birthday') then
+    insert into public.coach_goals (trainee_id, birthday)
+      select p.id, p.birthday from public.profiles p where p.birthday is not null and not p.is_admin
+      on conflict (trainee_id) do update set birthday = excluded.birthday;
+    alter table public.profiles drop column birthday;
+  end if;
 end $$;
+
+delete from public.coach_tasks where kind = 'moved';
+alter table public.coach_tasks drop constraint if exists coach_tasks_kind_check;
+alter table public.coach_tasks add constraint coach_tasks_kind_check check (kind in ('quiet', 'food', 'birthday', 'checkin', 'weigh', 'welcome', 'custom'));
 
 
 drop index if exists public.coach_tasks_coach_idx;

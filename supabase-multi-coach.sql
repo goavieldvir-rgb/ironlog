@@ -50,6 +50,17 @@ alter table public.coach_goals alter column author_id set not null;
 alter table public.coach_goals drop constraint if exists coach_goals_pkey;
 alter table public.coach_goals add constraint coach_goals_pkey primary key (trainee_id, author_id);
 
+-- A birthday belongs to the person, so it stays when they change coach.
+alter table public.profiles add column if not exists birthday date;
+update public.profiles p set birthday = g.birthday
+  from public.coach_goals g
+ where g.trainee_id = p.id and g.birthday is not null and p.birthday is null;
+
+-- "{name} moved to you": a task for the coach who receives a trainee.
+alter table public.coach_tasks drop constraint if exists coach_tasks_kind_check;
+alter table public.coach_tasks add constraint coach_tasks_kind_check
+  check (kind in ('quiet', 'food', 'birthday', 'checkin', 'weigh', 'welcome', 'custom', 'moved'));
+
 -- A new note or goal is the writer's; written by the server, the trainee's coach's.
 create or replace function public.coach_row_author()
 returns trigger
@@ -528,6 +539,92 @@ revoke execute on function public.list_moved_by_me() from public, anon;
 grant execute on function public.list_moved_by_me() to authenticated;
 revoke execute on function public.take_back(uuid) from public, anon;
 grant execute on function public.take_back(uuid) to authenticated;
+-- A trainee who changes coach shows up in the receiving coach's To do.
+create or replace function public.coach_changed()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  -- An earlier "moved to you" was for the previous coach.
+  update public.coach_tasks set done_at = now(), auto_done = true
+   where trainee_id = new.id and kind = 'moved' and done_at is null;
+  insert into public.coach_tasks (trainee_id, kind, dedupe_key, due)
+  values (new.id, 'moved', 'moved:' || new.id || ':' || new.coach_id || ':' || current_date, current_date)
+  on conflict (dedupe_key) do nothing;
+  return new;
+end;
+$$;
+revoke execute on function public.coach_changed() from public, anon, authenticated;
+drop trigger if exists trg_coach_changed on public.profiles;
+create trigger trg_coach_changed after update of coach_id on public.profiles
+  for each row when (old.coach_id is distinct from new.coach_id and new.coach_id is not null
+                     and not new.is_coach and not new.is_admin)
+  execute function public.coach_changed();
+
+-- The owner copies one of their own routines into a coach's account. Each
+-- exercise is matched to the coach's library by name and category, or added.
+create or replace function public.send_routine_to_coach(p_routine uuid, p_coach uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  r public.routines%rowtype;
+  src public.exercises%rowtype;
+  it jsonb;
+  v_name text;
+  v_cat text;
+  m uuid;
+  items jsonb := '[]'::jsonb;
+begin
+  if not public.is_admin() then
+    raise exception 'owner only' using errcode = '42501';
+  end if;
+  if not exists (select 1 from public.profiles c where c.id = p_coach and c.is_coach and not c.is_admin) then
+    raise exception 'NOT_A_COACH' using errcode = '42501';
+  end if;
+  select * into r from public.routines where id = p_routine and user_id = auth.uid();
+  if not found then
+    raise exception 'not your routine' using errcode = '42501';
+  end if;
+  for it in select * from jsonb_array_elements(coalesce(r.exercises, '[]'::jsonb)) loop
+    src := null;
+    if coalesce(it ->> 'exerciseId', '') ~ '^[0-9a-fA-F-]{36}$' then
+      select * into src from public.exercises e where e.id = (it ->> 'exerciseId')::uuid and e.user_id = auth.uid();
+    end if;
+    v_name := coalesce(src.name, it ->> 'name');
+    v_cat := coalesce(src.category, it ->> 'category', r.category, 'strength');
+    m := null;
+    if v_name is not null then
+      select e.id into m from public.exercises e
+       where e.user_id = p_coach and e.category = v_cat
+         and lower(regexp_replace(btrim(e.name), '\s+', ' ', 'g')) = lower(regexp_replace(btrim(v_name), '\s+', ' ', 'g'))
+       order by e.created_at limit 1;
+      if m is null then
+        insert into public.exercises (user_id, name, name_he, category, unit, bodyweight, timed, intensity_type,
+                                      track_rir, rest_seconds, video_url, notes, clip)
+        values (p_coach, v_name, src.name_he, v_cat,
+                coalesce(src.unit, it ->> 'unit', 'kg'),
+                coalesce(src.bodyweight, (it ->> 'bodyweight')::boolean, false),
+                coalesce(src.timed, (it ->> 'timed')::boolean, false),
+                coalesce(src.intensity_type, it ->> 'intensityType', 'rpe'),
+                coalesce(src.track_rir, false), src.rest_seconds,
+                coalesce(src.video_url, it ->> 'videoUrl', ''), coalesce(src.notes, ''), src.clip)
+        returning id into m;
+      end if;
+      it := it || jsonb_build_object('exerciseId', m, 'name', v_name);
+    end if;
+    items := items || jsonb_build_array(it);
+  end loop;
+  insert into public.routines (user_id, name, category, exercises) values (p_coach, r.name, r.category, items);
+end;
+$$;
+revoke execute on function public.send_routine_to_coach(uuid, uuid) from public, anon;
+grant execute on function public.send_routine_to_coach(uuid, uuid) to authenticated;
+
 revoke execute on function public.return_to_owner(uuid) from public, anon;
 grant execute on function public.return_to_owner(uuid) to authenticated;
 
@@ -853,14 +950,12 @@ begin
 
   -- Birthday today (29 Feb birthdays on 28 Feb in other years).
   insert into coach_tasks (trainee_id, kind, dedupe_key, n, due)
-  select g.trainee_id, 'birthday', 'birthday:' || g.trainee_id || ':' || extract(year from p_today),
-         extract(year from age(p_today, g.birthday))::int, p_today
-  from coach_goals g
-  join profiles p on p.id = g.trainee_id and not p.is_admin and not p.is_coach
-    and g.author_id = coalesce(p.coach_id, (select o.id from profiles o where o.is_admin order by o.created_at limit 1))
-  where g.birthday is not null
-    and (to_char(g.birthday, 'MM-DD') = to_char(p_today, 'MM-DD')
-      or (to_char(g.birthday, 'MM-DD') = '02-29' and to_char(p_today, 'MM-DD') = '02-28'
+  select p.id, 'birthday', 'birthday:' || p.id || ':' || extract(year from p_today),
+         extract(year from age(p_today, p.birthday))::int, p_today
+  from profiles p
+  where not p.is_admin and not p.is_coach and p.birthday is not null
+    and (to_char(p.birthday, 'MM-DD') = to_char(p_today, 'MM-DD')
+      or (to_char(p.birthday, 'MM-DD') = '02-29' and to_char(p_today, 'MM-DD') = '02-28'
           and extract(day from (date_trunc('year', p_today) + interval '1 month 28 days')) <> 29))
   on conflict (dedupe_key) do nothing;
   get diagnostics c = row_count; added := added + c;

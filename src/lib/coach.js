@@ -197,7 +197,10 @@ export async function fetchTraineeDetail(uid, today = toLocalISODate()) {
     supabase.from('nutrition_targets').select('kcal, protein').eq('user_id', uid).maybeSingle().then(check),
     supabase.from('routines').select('id, name, category, exercises').eq('user_id', uid).order('created_at', { ascending: false }).then(check),
   ])
-  return { profile, sessions, weights, waists, prs, notes, goal, schedule, consent: consent[0] || null, food, targets, routines }
+  // The birthday lives on the person (it moves with them), the rest of the
+  // goal is this coach's own.
+  const withBirthday = goal || profile?.birthday ? { ...(goal || {}), birthday: profile?.birthday ?? null } : null
+  return { profile, sessions, weights, waists, prs, notes, goal: withBirthday, schedule, consent: consent[0] || null, food, targets, routines }
 }
 
 // Sessions per week for the last `n` weeks, oldest first.
@@ -236,13 +239,16 @@ export async function deleteCoachNote(id) {
 }
 
 export async function saveCoachGoal(traineeId, patch) {
-  return check(
+  const { birthday, ...rest } = patch
+  if (birthday !== undefined) check(await supabase.from('profiles').update({ birthday }).eq('id', traineeId))
+  const row = check(
     await supabase
       .from('coach_goals')
-      .upsert({ trainee_id: traineeId, ...patch, updated_at: new Date().toISOString() })
+      .upsert({ trainee_id: traineeId, ...rest, updated_at: new Date().toISOString() })
       .select()
       .single(),
   )
+  return birthday !== undefined ? { ...row, birthday } : row
 }
 
 // Sign-up is by invitation: an email can create an account for 30 days
