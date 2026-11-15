@@ -47,7 +47,7 @@ export const CLIPS = {
   'plank': { v: 'b29dbcac', t: '886ef2b2' },
   'preacher-curl': { v: '0fff8ccd' },
   'pull-up': { v: 'c715cd75', t: '4aee5d17' },
-  'push-up': { v: '6d758b23' },
+  'push-up': { v: '3069453a' },
   'rear-delt-fly': { v: 'ac36bb50' },
   'romanian-deadlift': { v: '5299f909' },
   'scapular-push-up': { v: '11c33e16' },
