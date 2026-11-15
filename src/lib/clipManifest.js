@@ -4,7 +4,7 @@ export const CLIPS = {
   'ab-wheel-rollout': { v: '3a51759e', t: '5c088581' },
   'arnold-press': { v: '7ab7f8ff', t: 'dd820c25' },
   'assault-air-bike': { v: 'bc0f1c89', t: '905ff888' },
-  'assisted-dips': { v: '23c0170c', t: 'f88e08b9' },
+  'assisted-dips': { v: 'd4794378', t: 'f88e08b9' },
   'assisted-pull-up': { v: '3261233b', t: '4f0c8d86' },
   'back-extension': { v: 'd6c7ddf4', t: '8bf2f9fc' },
   'barbell-bench-press': { v: '566a1780' },
