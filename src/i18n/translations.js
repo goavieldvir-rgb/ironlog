@@ -1,3 +1,7 @@
+// Hebrew joins מ, ל and the like straight onto a word ("מדנה"), but a name in
+// English letters or starting with a number takes a hyphen ("מ-Dana").
+const he = (prefix, name) => (/^[\u0590-\u05FF]/.test(name || '') ? prefix + name : `${prefix}-${name}`)
+
 export const translations = {
   en: {
     clips: {
@@ -723,12 +727,6 @@ export const translations = {
       doneTitle: 'Rest over',
       autoStart: 'Auto-start rest',
       doneBody: 'Time for your next set.',
-      lockLeft: 'Rest {time}',
-      lockNextAt: 'Next set at {at}',
-      lockOver: 'Rest over {time}',
-      lockUntil: 'Resting until {at}',
-      lockUntilBody: "You'll get an alert when it's time for your next set.",
-      lockEndedAt: 'Rest ended at {at}',
       notifyOn: 'Alerts on — you\'ll get a notification when rest ends while the app is in the background',
       notifyOff: 'Turn on an alert for when rest ends',
       start: 'Start rest timer',
@@ -1807,8 +1805,8 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       seen: 'נקראה',
       tooLong: (n) => `ארוך מדי: עד ${n} תווים.`,
       newFromCoach: 'הודעה חדשה מהמאמן',
-      newFrom: (name) => (name ? `הודעה חדשה מ${name}` : 'הודעה חדשה ממתאמן/ת'),
-      newFromMany: (name, others) => `הודעות חדשות מ${name || 'מתאמן/ת'} ועוד ${others === 1 ? 'אחד/ת' : others}`,
+      newFrom: (name) => (name ? `הודעה חדשה ${he('מ', name)}` : 'הודעה חדשה ממתאמן/ת'),
+      newFromMany: (name, others) => `הודעות חדשות ${name ? he('מ', name) : 'ממתאמן/ת'} ועוד ${others === 1 ? 'אחד/ת' : others}`,
       openReply: 'לפתוח ולענות',
       notifyTitle: 'התראה על הודעות חדשות',
       notifyBody: 'כשההתראות פועלות בטלפון הזה, תדעו מיד כשהמאמן כותב.',
@@ -2496,12 +2494,6 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       doneTitle: 'המנוחה נגמרה',
       autoStart: 'התחלת מנוחה אוטומטית',
       doneBody: 'זמן לסט הבא.',
-      lockLeft: 'מנוחה {time}',
-      lockNextAt: 'הסט הבא ב-{at}',
-      lockOver: 'המנוחה נגמרה {time}',
-      lockUntil: 'מנוחה עד {at}',
-      lockUntilBody: 'תקבלו התראה כשיגיע הזמן לסט הבא.',
-      lockEndedAt: 'המנוחה נגמרה ב-{at}',
       notifyOn: 'התראות פעילות — תקבלו התראה כשהמנוחה נגמרת גם כשהאפליקציה ברקע',
       notifyOff: 'הפעלת התראה לסיום המנוחה',
       start: 'התחלת טיימר מנוחה',
@@ -2850,9 +2842,9 @@ RIR הוא "חזרות בשמורה": כמה חזרות נוספות יכולת�
       kind: {
         quiet: (name, n) => `לבדוק מה עם ${name}: לא התאמן/ה ${n} ימים`,
         food: (name, n) => (n ? `לבדוק מה עם ${name}: לא רשם/ה אוכל ${n} ימים` : `לבדוק מה עם ${name}: עוד לא רשם/ה אוכל`),
-        birthday: (name, n) => `🎂 יום הולדת היום ל${name}${n ? ` (${n})` : ''}`,
+        birthday: (name, n) => `🎂 יום הולדת היום ${he('ל', name)}${n ? ` (${n})` : ''}`,
         checkin: (name) => `הגיע זמן הצ׳ק-אין עם ${name}`,
-        weigh: (name, n) => `לבקש מ${name} להישקל: השקילה האחרונה לפני ${n} ימים`,
+        weigh: (name, n) => `לבקש ${he('מ', name)} להישקל: השקילה האחרונה לפני ${n} ימים`,
         welcome: (name) => `לבדוק איך עובר השבוע הראשון של ${name}`,
         moved: (name) => `${name} עבר/ה אליכם. כדאי להגיד שלום ולבדוק את התוכנית`,
       },

@@ -1,5 +1,5 @@
 // Run with: deno test supabase/functions/send-workout-reminders/helpers.test.ts
-import { coachTasksCopy, feedbackCopy, messageCopy, isAllowedEndpoint, isDue, localParts, reminderKind } from './helpers.ts'
+import { coachTasksCopy, feedbackCopy, heJoin, messageCopy, isAllowedEndpoint, isDue, localParts, reminderKind } from './helpers.ts'
 
 const assert = (c: boolean, m: string) => { if (!c) throw new Error('FAIL ' + m) }
 
@@ -58,11 +58,14 @@ Deno.test('coach tasks push', () => {
     { kind: 'checkin', name: 'Noa', n: null, title: null },
   ]
   const he = coachTasksCopy('he', tasks)
-  assert(he.title === '5 משימות למאמן', 'he title')
+  assert(he.title === '5 משימות חדשות', 'he title')
   assert(he.body.split('\n').length === 5 && he.body.endsWith('ועוד 1'), 'four lines and a more line')
-  assert(he.body.startsWith('Dana לא התאמן/ה 6 ימים'), 'quiet line')
+  assert(he.body.startsWith('לבדוק מה עם Dana: לא התאמן/ה 6 ימים'), 'quiet line, same as To do')
+  assert(he.body.split('\n')[1] === '🎂 יום הולדת היום ל-Omer (30)', 'hyphen before an English name')
+  assert(he.body.split('\n')[2] === 'לבדוק מה עם Lior: עוד לא רשם/ה אוכל', 'food, nothing logged yet')
   const en = coachTasksCopy('en', tasks.slice(3, 4))
-  assert(en.title === '1 thing needs you' && en.body === 'Order bands', 'single custom task')
+  assert(en.title === '1 new To do item' && en.body === 'Order bands', 'single custom task')
+  assert(coachTasksCopy('en', tasks.slice(0, 1)).body === 'Check in with Dana: no workout in 6 days', 'en quiet line')
 })
 
 Deno.test('message push copy', () => {
@@ -71,4 +74,12 @@ Deno.test('message push copy', () => {
   const b = messageCopy('he', { toCoach: false, name: '', text: 'x'.repeat(200), unread: 3 })
   assert(b.title === 'הודעה מהמאמן (3)' && b.body.length === 140 && b.body.endsWith('…'), 'to trainee, cut, counted')
   assert(messageCopy('en', { toCoach: true, name: '', text: 'a', unread: 1 }).title === 'Message from a trainee', 'no name')
+})
+
+Deno.test('Hebrew prefix before a name', () => {
+  assert(heJoin('מ', 'דנה') === 'מדנה', 'Hebrew name joins')
+  assert(heJoin('מ', 'Dana') === 'מ-Dana', 'English name takes a hyphen')
+  assert(heJoin('ל', '3rd') === 'ל-3rd', 'number takes a hyphen')
+  assert(messageCopy('he', { toCoach: true, name: 'Dana', text: 'a', unread: 1 }).title === 'הודעה מ-Dana', 'message title')
+  assert(messageCopy('he', { toCoach: true, name: 'דנה', text: 'a', unread: 2 }).title === 'הודעה מדנה (2)', 'Hebrew name, counted')
 })

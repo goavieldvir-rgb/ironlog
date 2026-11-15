@@ -71,16 +71,10 @@ function beep() {
 // entirely rather than offering something that can't work.
 const canNotify = typeof window !== 'undefined' && 'Notification' in window
 
-// iPhone freezes the app the moment the screen locks, so its lock screen
-// notification can't count down: it names the time the rest ends instead.
-// Elsewhere (Android) the app keeps running and updates it every second.
+// iPhone freezes the app the moment the screen locks, so the "rest over"
+// alert there always comes from the server's push. Elsewhere (Android) the
+// app keeps running in the background and sounds the alert itself.
 const liveLockScreen = typeof navigator !== 'undefined' && !isIOS()
-
-// "1:05", always left to right.
-function clockText(seconds) {
-  const s = Math.abs(seconds)
-  return `\u200E${seconds < 0 ? '+' : ''}${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
-}
 
 // A floating dock that stays hidden until a rest is running. The page starts
 // it through the ref (`ref.current.start()`) when a set is ticked off.
@@ -153,23 +147,12 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
     [],
   )
 
-  // Puts the rest on the lock screen and in the notification shade while
-  // you're away from the app: a live countdown, then how far over you are.
+  // The one notification a rest gets while you're away from the app: "Rest
+  // over" when it ends. Nothing is shown while the rest is still running.
   function showLock(remaining, alert = false) {
     const end = endTimeRef.current
-    if (!notifyOn || !end) return
-    const at = new Date(end).toLocaleTimeString(lang === 'he' ? 'he-IL' : 'en-US', { hour: 'numeric', minute: '2-digit' })
-    const over = remaining <= 0
-    let title
-    let body
-    if (liveLockScreen) {
-      title = over ? t('restTimer.lockOver', { time: clockText(remaining) }) : t('restTimer.lockLeft', { time: clockText(remaining) })
-      body = over ? t('restTimer.doneBody') : t('restTimer.lockNextAt', { at })
-    } else {
-      title = over ? t('restTimer.lockEndedAt', { at }) : t('restTimer.lockUntil', { at })
-      body = over ? t('restTimer.doneBody') : t('restTimer.lockUntilBody')
-    }
-    showRestNotification({ title, body, endsAt: end, alert, lang })
+    if (!notifyOn || !end || remaining > 0) return
+    showRestNotification({ title: t('restTimer.doneTitle'), body: t('restTimer.doneBody'), endsAt: end, alert, lang })
   }
 
   function tick() {
@@ -183,16 +166,14 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
       setFinished(true)
       beep()
       if (navigator.vibrate) navigator.vibrate([200, 100, 200])
-      // Seen on screen already, or about to sound from the live lock screen
-      // card below, so the server's push would only repeat it.
+      // Seen on screen already, or about to sound from the app's own
+      // notification below, so the server's push would only repeat it.
       if (!away || (liveLockScreen && notifyOn)) pushRest(null)
       // Only worth a notification when you're not looking at the app —
       // otherwise the screen already shows it's done.
       // Woken long after the end (the phone froze the app), the server's
       // push has sounded already: update the card quietly.
       if (away) showLock(remaining, remaining > -15)
-    } else if (away && liveLockScreen) {
-      showLock(remaining)
     }
   }
 
@@ -201,12 +182,10 @@ const RestTimer = forwardRef(function RestTimer(_props, ref) {
     const interval = setInterval(tick, 1000)
     // Catch up immediately when the tab/app becomes visible again, rather
     // than waiting for the next (possibly long-delayed) interval tick. Coming
-    // back also takes the rest off the lock screen, since the dock shows it.
+    // back also clears the "Rest over" notification, since the dock shows it.
     function onVisibilityChange() {
       tick()
       if (document.visibilityState === 'visible') clearRestNotification()
-      // tick() keeps a live one up to date; iPhone gets its one still card here.
-      else if (!liveLockScreen && endTimeRef.current) showLock(Math.ceil((endTimeRef.current - Date.now()) / 1000))
     }
     document.addEventListener('visibilitychange', onVisibilityChange)
     return () => {
