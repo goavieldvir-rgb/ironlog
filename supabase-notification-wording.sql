@@ -4,6 +4,8 @@
 --  2. "Gone quiet" comes once: the separate morning alert and email stop,
 --     the coach's To do item (and its morning summary) stays.
 --  3. The morning summary's ntfy backup says "new tasks", like the app.
+--  4. A second coach's new-record push also gets the Hebrew detail line.
+-- Built on the live definitions from supabase-multi-coach.sql (PR 88).
 -- The Edge Function send-workout-reminders is deployed with it.
 -- Undo: supabase-notification-wording-rollback.sql.
 
@@ -51,12 +53,34 @@ end;
 $function$;
 revoke execute on function public.send_pr_alert(text, text, text, text) from public, anon, authenticated;
 
-create or replace function public.check_for_new_prs()
- returns trigger
- language plpgsql
- security definer
- set search_path to 'public'
-as $function$
+create or replace function public.notify_coach_pr(trainee uuid, detail text, detail_he text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  secret text;
+begin
+  select value into secret from public.push_config where key = 'cron_secret';
+  if secret is null then return; end if;
+  perform net.http_post(
+    url := 'https://hwdgjkiwanxluicdpndh.supabase.co/functions/v1/send-workout-reminders',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret', secret),
+    body := jsonb_build_object('pr_trainee_id', trainee, 'pr_detail', detail, 'pr_detail_he', detail_he)
+  );
+exception when others then
+  raise warning 'notify_coach_pr failed: %', sqlerrm;
+end;
+$$;
+revoke execute on function public.notify_coach_pr(uuid, text, text) from public, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.check_for_new_prs()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
 declare
   entry jsonb;
   set_row jsonb;
@@ -181,7 +205,11 @@ begin
           detail_he := detail_text;
         end if;
 
+        if public.owner_gets_alerts(NEW.user_id) then
         perform send_pr_alert(trainee_name, ex_name, detail_text, detail_he);
+        else
+          perform public.notify_coach_pr(NEW.user_id, ex_name || ' — ' || detail_text, ex_name || ' — ' || detail_he);
+        end if;
 
         insert into admin_notifications (type, trainee_id, detail)
         values ('pr', NEW.user_id, ex_name || ': ' || detail_text);
@@ -228,7 +256,11 @@ begin
           detail_text := 'Reps PR ' || (reps_set->>'weight') || ex_unit || ' × ' || (reps_set->>'reps') || ' reps';
           detail_he := 'שיא חזרות: ' || (reps_set->>'weight') || ex_unit || ' × ' || (reps_set->>'reps');
 
+          if public.owner_gets_alerts(NEW.user_id) then
           perform send_pr_alert(trainee_name, ex_name, detail_text, detail_he);
+          else
+            perform public.notify_coach_pr(NEW.user_id, ex_name || ' — ' || detail_text, ex_name || ' — ' || detail_he);
+          end if;
 
           insert into admin_notifications (type, trainee_id, detail)
           values ('pr', NEW.user_id, ex_name || ': ' || detail_text);
@@ -243,12 +275,12 @@ begin
 end;
 $function$;
 
-create or replace function public.run_coach_tasks()
- returns void
- language plpgsql
- security definer
- set search_path to 'public'
-as $function$
+CREATE OR REPLACE FUNCTION public.run_coach_tasks()
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
 declare
   today date := (now() at time zone 'Asia/Jerusalem')::date;
   secret text;
@@ -260,8 +292,10 @@ begin
   if pending = 0 then return; end if;
 
   select value into secret from push_config where key = 'cron_secret';
+  -- The function sends each coach their own trainees' tasks, and falls back
+  -- to ntfy (the owner's phone) for the owner's tasks.
   if secret is not null and exists (
-    select 1 from push_subscriptions s join profiles p on p.id = s.user_id where p.is_admin
+    select 1 from push_subscriptions s join profiles p on p.id = s.user_id where p.is_admin or p.is_coach
   ) then
     perform net.http_post(
       url := 'https://hwdgjkiwanxluicdpndh.supabase.co/functions/v1/send-workout-reminders',
@@ -269,16 +303,28 @@ begin
       body := jsonb_build_object('coach_tasks', true)
     );
   else
+    select count(*) into pending from coach_tasks
+      where done_at is null and notified_at is null
+        and case when trainee_id is null
+          then coach_id in (select id from profiles where is_admin)
+          else public.owner_gets_alerts(trainee_id) end;
+    if pending = 0 then return; end if;
     perform send_admin_push(
       'Ironlog: ' || case when pending = 1 then 'משימה חדשה אחת' else pending || ' משימות חדשות' end,
       case when pending = 1 then 'יש דבר חדש אחד שדורש תשומת לב.' else 'יש ' || pending || ' דברים חדשים שדורשים תשומת לב.' end || ' פתחו את מסך המתאמנים.'
     );
-    update coach_tasks set notified_at = now() where done_at is null and notified_at is null;
+    update coach_tasks set notified_at = now() where done_at is null and notified_at is null
+      and case when trainee_id is null
+          then coach_id in (select id from profiles where is_admin)
+          else public.owner_gets_alerts(trainee_id) end;
   end if;
 end;
 $function$;
 
 revoke execute on function public.run_coach_tasks() from public, anon, authenticated;
+
+-- The two-argument version is replaced by the one above.
+drop function if exists public.notify_coach_pr(uuid, text);
 
 do $$
 begin

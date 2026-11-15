@@ -90,7 +90,7 @@ export function coachTaskLine(lang: string, t: CoachTask) {
     case 'checkin': return he ? `הגיע זמן הצ׳ק-אין עם ${t.name}` : `Check-in with ${t.name} is due`
     case 'weigh': return he ? `לבקש ${heJoin('מ', t.name)} להישקל: השקילה האחרונה לפני ${t.n} ימים` : `Ask ${t.name} for a weigh-in: last one ${t.n} days ago`
     case 'welcome': return he ? `לבדוק איך עובר השבוע הראשון של ${t.name}` : `See how ${t.name}'s first week is going`
-    case 'moved': return he ? `${t.name} עבר/ה אליכם` : `${t.name} moved to you`
+    case 'moved': return he ? `${t.name} עבר/ה אליכם. כדאי להגיד שלום ולבדוק את התוכנית` : `${t.name} moved to you. Say hello and check their plan`
     default: return t.name ? `${t.title} (${t.name})` : (t.title || '')
   }
 }
