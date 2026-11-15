@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Users, UserPlus, Copy, Check, Share, AlertTriangle, Search, Pin, Trophy, CalendarCheck, ChevronUp, ChevronDown, MessageSquare } from 'lucide-react'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
@@ -12,9 +12,10 @@ import { Card, Badge, EmptyState, Button, Field, LoadError } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { PageLoader } from './Loading.jsx'
 import CoachTasks from './CoachTasks.jsx'
+import Tour, { useFirstTour } from './Tour.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { useMessagesState } from '../lib/messages.js'
-import { fetchRoster, fetchRecentPrs, rosterFlags, attentionScore, adherence, daysSince, recordInvite, fetchMyCoachLimit } from '../lib/coach.js'
+import { fetchRoster, fetchRecentPrs, rosterFlags, attentionScore, adherence, daysSince, recordInvite, fetchMyCoachLimit, fetchOwnerName } from '../lib/coach.js'
 
 // The coach's roster: who needs attention first, how each trainee is doing
 // against their plan, and what is waiting for review. Tapping a trainee opens
@@ -29,8 +30,13 @@ export default function People() {
   const [reload, setReload] = useState(0)
   // A coach's own trainee count and limit, set by the owner.
   const [myLimit, setMyLimit] = useState(null)
+  const [limitLoaded, setLimitLoaded] = useState(false)
   useEffect(() => {
-    if (isCoach && !isOwner) fetchMyCoachLimit().then(setMyLimit)
+    if (isCoach && !isOwner)
+      fetchMyCoachLimit().then((l) => {
+        setMyLimit(l)
+        setLimitLoaded(true)
+      })
   }, [isCoach, isOwner, reload])
   const [inviting, setInviting] = useState(false)
   const [query, setQuery] = useState('')
@@ -104,6 +110,28 @@ export default function People() {
     })
   }, [trainees, query, view])
 
+  // The coach walkthrough: once for a coach other than the owner, the first
+  // time this page has loaded after they became a coach (a new coach, or an
+  // existing trainee the owner made one). Home and Help can ask for it again.
+  const location = useLocation()
+  const navigate = useNavigate()
+  const isOtherCoach = isCoach && !isOwner
+  // The owner's name goes into the cards; if it can't be read, they say
+  // "Ironlog's owner" instead of waiting forever.
+  const [ownerName, setOwnerName] = useState(null)
+  useEffect(() => {
+    if (!isOtherCoach) return
+    let live = true
+    fetchOwnerName().then((n) => live && setOwnerName(n), () => live && setOwnerName(''))
+    return () => { live = false }
+  }, [isOtherCoach])
+  const tourRequested = !!location.state?.coachTour
+  const [tourOpen, closeTour] = useFirstTour('coach', isOtherCoach && !loading && limitLoaded && ownerName != null, tourRequested, { coach: true })
+  useEffect(() => {
+    if (tourOpen && tourRequested) navigate('.', { replace: true, state: null })
+  }, [tourOpen, tourRequested, navigate])
+  const tourSteps = coachTourSteps(t, ownerName)
+
   const views = [
     ['attention', t('people.viewAttention')],
     ['review', t('people.viewReview')],
@@ -113,8 +141,9 @@ export default function People() {
 
   return (
     <div className="flex flex-col gap-5">
+      {tourOpen && <Tour steps={tourSteps} onClose={closeTour} />}
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
+        <div data-tour="coach-own">
           <div className="eyebrow mb-1">{t(isOwner ? 'people.admin' : 'people.coachBadge')}</div>
           <h1 className="text-3xl">{t('people.title')}</h1>
           <p className="text-chalkdim text-sm mt-1 flex items-center gap-1.5 flex-wrap">
@@ -122,7 +151,7 @@ export default function People() {
             <InfoTip text={t('people.dotTip')} />
           </p>
           {myLimit?.trainee_limit != null && (
-            <p className="text-chalkdim text-sm mt-1 num">{t('people.myLimit')(myLimit.trainees, myLimit.trainee_limit)}</p>
+            <p data-tour="coach-places" className="text-chalkdim text-sm mt-1 num">{t('people.myLimit')(myLimit.trainees, myLimit.trainee_limit)}</p>
           )}
         </div>
         <div className="flex gap-2">
@@ -131,9 +160,11 @@ export default function People() {
               <AlertTriangle size={16} /> {t('people.errorLogs')}
             </Button>
           )}
-          <Button variant="brass" onClick={() => setInviting(true)}>
-            <UserPlus size={16} /> {t('people.inviteSomeone')}
-          </Button>
+          <span data-tour="coach-invite" className="contents">
+            <Button variant="brass" onClick={() => setInviting(true)}>
+              <UserPlus size={16} /> {t('people.inviteSomeone')}
+            </Button>
+          </span>
         </div>
       </div>
 
@@ -193,11 +224,17 @@ export default function People() {
       <div className="flex flex-col gap-5 2xl:grid 2xl:grid-cols-[minmax(0,1fr)_300px] 2xl:items-start">
         <div className="flex flex-col gap-2">
           <div className="flex flex-col gap-2 lg:hidden">
-            {shown.map((p) => (
-              <TraineeRow key={p.id} p={p} today={today} t={t} />
+            {shown.map((p, i) => (
+              <span key={p.id} data-tour={i === 0 ? 'coach-trainee' : undefined} className="contents">
+                <TraineeRow p={p} today={today} t={t} />
+              </span>
             ))}
           </div>
-          {shown.length > 0 && <RosterTable rows={shown} today={today} t={t} />}
+          {shown.length > 0 && (
+            <span data-tour="coach-trainee" className="contents">
+              <RosterTable rows={shown} today={today} t={t} />
+            </span>
+          )}
           {trainees.length > 0 && shown.length === 0 && (
             <p className="text-chalkdim text-sm text-center py-6">{view === 'review' && !query ? t('people.nothingToReview') : t('people.noMatches')}</p>
           )}
@@ -222,6 +259,27 @@ export default function People() {
       {inviting && <InviteModal onClose={() => setInviting(false)} t={t} />}
     </div>
   )
+}
+
+// The coach walkthrough's cards, with the owner's name filled in. Steps
+// with a target light that part of this page and are skipped when it isn't
+// shown (no limit set, no trainees yet); the rest are plain cards.
+export function coachTourSteps(t, ownerName) {
+  const owner = ownerName || t('tour.coach.ownerFallback')
+  const fill = (key) => {
+    const s = t(`tour.coach.${key}`)
+    const f = (x) => x.replace(/\{owner\}/g, owner)
+    return { eyebrow: f(s.eyebrow), title: f(s.title), body: f(s.body) }
+  }
+  return [
+    { target: 'coach-own', ...fill('own') },
+    { target: 'coach-invite', ...fill('invite') },
+    { target: 'coach-places', ...fill('places') },
+    { target: 'coach-trainee', ...fill('trainee') },
+    fill('routines'),
+    fill('remove'),
+    fill('owner'),
+  ]
 }
 
 // Owner only: the independent coaches. Names, emails and how many trainees
