@@ -416,10 +416,25 @@ function InviteModal({ onClose, t }) {
 
   const message = t('people.inviteMessage')(name, link)
 
+  // Records the invite first. Another coach's live invite for this email
+  // stops here, since signing up would land them with that coach. Anything
+  // else is best effort: the link still works if invite-only is off.
+  async function invite() {
+    try {
+      await recordInvite(email)
+      return true
+    } catch (err) {
+      console.error(err)
+      if (String(err?.message || '').includes('INVITED_BY_OTHER_COACH')) {
+        toast(t('people.invitedByOther'), 'error')
+        return false
+      }
+      return true
+    }
+  }
+
   async function copy(text, setCopied) {
-    // Best effort: the link still works today if this fails, as long as
-    // invite-only sign-up hasn't been switched on.
-    recordInvite(email).catch((err) => console.error(err))
+    if (!(await invite())) return
     try {
       await navigator.clipboard.writeText(text)
       setCopied(true)
@@ -434,7 +449,7 @@ function InviteModal({ onClose, t }) {
   // copy-and-paste step. Only offered where the browser supports it.
   const canShare = typeof navigator !== 'undefined' && !!navigator.share
   async function share() {
-    recordInvite(email).catch((err) => console.error(err))
+    if (!(await invite())) return
     try {
       await navigator.share({ text: message })
     } catch (err) {

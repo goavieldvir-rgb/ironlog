@@ -706,6 +706,44 @@ grant execute on function public.list_coaches() to authenticated;
 grant execute on function public.set_coach(uuid, boolean) to authenticated;
 grant execute on function public.notify_coach_pr(uuid, text) to service_role;
 
+-- A coach records (or renews) an invite. One that another coach made can be
+-- taken over once it has expired, or when that person is no longer a coach;
+-- a live one gives INVITED_BY_OTHER_COACH, so the app can say so.
+create or replace function public.record_invite(p_email text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  e text := lower(btrim(p_email));
+  cur public.signup_invites%rowtype;
+  holder uuid;
+begin
+  if not public.is_coach() then
+    raise exception 'coaches only' using errcode = '42501';
+  end if;
+  if e is null or e !~ '^[^@[:space:]]+@[^@[:space:]]+$' then
+    raise exception 'BAD_EMAIL' using errcode = '22023';
+  end if;
+  select * into cur from public.signup_invites where email = e;
+  if found then
+    -- Old invites with no inviter are the owner's.
+    holder := coalesce(cur.invited_by, (select o.id from public.profiles o where o.is_admin order by o.created_at limit 1));
+    if holder is distinct from auth.uid() and cur.expires_at > now()
+       and exists (select 1 from public.profiles c where c.id = holder and (c.is_admin or c.is_coach)) then
+      raise exception 'INVITED_BY_OTHER_COACH' using errcode = '42501';
+    end if;
+  end if;
+  insert into public.signup_invites (email, invited_by, created_at, expires_at)
+  values (e, auth.uid(), now(), now() + interval '30 days')
+  on conflict (email) do update
+    set invited_by = excluded.invited_by, created_at = excluded.created_at, expires_at = excluded.expires_at;
+end;
+$$;
+revoke execute on function public.record_invite(text) from public, anon;
+grant execute on function public.record_invite(text) to authenticated;
+
 -- New accounts get the coach who invited them, or the owner. An expired
 -- invite still names its coach: whether an expired invite may sign up at
 -- all is the invite-only hook's job, not a reason to hand the person over.
