@@ -706,6 +706,21 @@ grant execute on function public.list_coaches() to authenticated;
 grant execute on function public.set_coach(uuid, boolean) to authenticated;
 grant execute on function public.notify_coach_pr(uuid, text) to service_role;
 
+-- The owner's display name, for coach screens ("Return to …"), so the app
+-- doesn't carry it in code.
+create or replace function public.app_owner_name()
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(nullif(btrim(o.full_name), ''), 'Ironlog')
+  from public.profiles o where o.is_admin order by o.created_at limit 1;
+$$;
+revoke execute on function public.app_owner_name() from public, anon;
+grant execute on function public.app_owner_name() to authenticated;
+
 -- A coach records (or renews) an invite. One that another coach made can be
 -- taken over once it has expired, or when that person is no longer a coach;
 -- a live one gives INVITED_BY_OTHER_COACH, so the app can say so.

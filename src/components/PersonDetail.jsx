@@ -12,7 +12,6 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
 import { TERMS_VERSION } from '../legal/terms.js'
-import { COACH_NAME } from '../legal/privacy.js'
 import { Card, Badge, Button, Field, LoadError } from './ui.jsx'
 import { PageLoader } from './Loading.jsx'
 import ProgressPhotos from './ProgressPhotos.jsx'
@@ -31,6 +30,7 @@ import {
   adherence,
   daysSince,
   shiftDay,
+  useOwnerName,
 } from '../lib/coach.js'
 import { sessionTitle } from '../lib/names.js'
 import { ACCENT, CHALK, CHALKDIM, MUTED, SURFACE } from '../theme.js'
@@ -46,6 +46,7 @@ export default function PersonDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { isAdmin, isOwner, isCoach, profile: myProfile, setActingAs } = useAdmin()
+  const ownerName = useOwnerName(isCoach && !isOwner)
   const { t, lang } = useLanguage()
   const { toast, confirm } = useFeedback()
   const { user: me } = useAuth()
@@ -166,14 +167,14 @@ export default function PersonDetail() {
   // A coach hands one of their trainees back to the owner.
   async function returnToOwner() {
     const name = p.full_name || p.email
-    if (!(await confirm({ title: t('people.returnTitle', { name, owner: COACH_NAME }), body: t('people.returnBody', { owner: COACH_NAME }), confirmLabel: t('people.returnConfirm'), danger: true }))) return
+    if (!(await confirm({ title: t('people.returnTitle', { name, owner: ownerName }), body: t('people.returnBody', { owner: ownerName }), confirmLabel: t('people.returnConfirm'), danger: true }))) return
     const { error } = await supabase.rpc('return_to_owner', { p_person: p.id })
     if (error) {
       console.error(error)
       toast(t('people.coachChangeError'), 'error')
       return
     }
-    toast(t('people.returned', { name, owner: COACH_NAME }))
+    toast(t('people.returned', { name, owner: ownerName }))
     navigate('/people')
   }
 
@@ -259,7 +260,7 @@ export default function PersonDetail() {
           {isCoach && !isOwner && !p.is_admin && !p.is_coach && p.id !== myProfile?.id && (
             <Button variant="ghost" onClick={returnToOwner}>
               <Undo2 size={15} />
-              {t('people.returnButton', { owner: COACH_NAME })}
+              {t('people.returnButton', { owner: ownerName })}
             </Button>
           )}
           {isOwner && !p.is_admin && (

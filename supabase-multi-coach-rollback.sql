@@ -711,6 +711,7 @@ drop function if exists public.coach_task_owner();
 drop function if exists public.coach_removed();
 drop function if exists public.coach_changed();
 drop function if exists public.record_invite(text);
+drop function if exists public.app_owner_name();
 drop function if exists public.send_routine_to_coach(uuid, uuid);
 drop function if exists public.coach_row_author();
 drop function if exists public.my_coach();

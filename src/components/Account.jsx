@@ -4,7 +4,7 @@ import { Download, FileSpreadsheet, ShieldCheck, Trash2, KeyRound, LogOut } from
 import { useAuth } from '../context/AuthContext.jsx'
 import { applyCurrentTimed } from '../lib/timed.js'
 import { useAdmin } from '../context/AdminContext.jsx'
-import { COACH_NAME } from '../legal/privacy.js'
+import { useOwnerName } from '../lib/coach.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
@@ -198,6 +198,7 @@ function TwoStepCard() {
 export default function Account() {
   const { user, logout } = useAuth()
   const { actingAs, isAdmin, isOwner, effectiveUid, effectiveName } = useAdmin()
+  const ownerName = useOwnerName(isAdmin && !isOwner)
   const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
   const navigate = useNavigate()
@@ -310,7 +311,7 @@ export default function Account() {
             </div>
           </>
         ) : (
-          <p className="text-chalkdim text-sm">{actingAs ? t('account.deleteNotWhileActing') : (isOwner ? t('account.deleteAdminBlocked') : t('account.deleteCoachBlocked', { owner: COACH_NAME }))}</p>
+          <p className="text-chalkdim text-sm">{actingAs ? t('account.deleteNotWhileActing') : (isOwner ? t('account.deleteAdminBlocked') : t('account.deleteCoachBlocked', { owner: ownerName }))}</p>
         )}
       </Card>
 

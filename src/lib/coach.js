@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { supabase } from '../supabase.js'
 import { toLocalISODate, weekStartOf } from './dates.js'
 import { TERMS_VERSION, TERMS_DOC_KEY } from '../legal/terms.js'
@@ -257,4 +258,31 @@ export async function saveCoachGoal(traineeId, patch) {
 // Another coach's live invite for the same email gives INVITED_BY_OTHER_COACH.
 export async function recordInvite(email) {
   check(await supabase.rpc('record_invite', { p_email: email.trim().toLowerCase() }))
+}
+
+// The owner's display name for coach screens, read from the database (not
+// built into the app). Asked once per session.
+let ownerNamePromise = null
+export function fetchOwnerName() {
+  if (!ownerNamePromise) {
+    ownerNamePromise = supabase.rpc('app_owner_name').then(({ data, error }) => {
+      if (error) {
+        ownerNamePromise = null
+        throw error
+      }
+      return data || ''
+    })
+  }
+  return ownerNamePromise
+}
+
+export function useOwnerName(enabled = true) {
+  const [name, setName] = useState('')
+  useEffect(() => {
+    if (!enabled) return
+    let live = true
+    fetchOwnerName().then((n) => live && setName(n), (e) => console.error(e))
+    return () => { live = false }
+  }, [enabled])
+  return name
 }
