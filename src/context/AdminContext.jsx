@@ -40,7 +40,10 @@ export function AdminProvider({ children }) {
   // A frozen coach keeps their account but, like a trainee, sees only their
   // own data until the owner unfreezes them.
   const coachFrozen = !isOwner && !!profile?.is_coach && !!profile?.coach_frozen
-  const isCoach = isOwner || (!!profile?.is_coach && !coachFrozen)
+  // Someone removed from the app can only download their data or delete
+  // their account (see Account's removed view).
+  const removed = !isOwner && !!profile?.removed_at
+  const isCoach = isOwner || (!!profile?.is_coach && !coachFrozen && !removed)
   const isAdmin = isCoach
   // Nutrition is a beta: coaches, plus trainees a coach switched on. The
   // column may not exist before the migration, which reads as off.
@@ -56,6 +59,7 @@ export function AdminProvider({ children }) {
     isOwner,
     isCoach,
     coachFrozen,
+    removed,
     nutritionAllowed,
     loadingProfile,
     actingAs,

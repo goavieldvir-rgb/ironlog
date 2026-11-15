@@ -14,19 +14,24 @@ import { PageLoader } from './Loading.jsx'
 import CoachTasks from './CoachTasks.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { useMessagesState } from '../lib/messages.js'
-import { fetchRoster, fetchRecentPrs, rosterFlags, attentionScore, adherence, daysSince, recordInvite } from '../lib/coach.js'
+import { fetchRoster, fetchRecentPrs, rosterFlags, attentionScore, adherence, daysSince, recordInvite, fetchMyCoachLimit } from '../lib/coach.js'
 
 // The coach's roster: who needs attention first, how each trainee is doing
 // against their plan, and what is waiting for review. Tapping a trainee opens
 // their coach page (PersonDetail).
 export default function People() {
   const { user } = useAuth()
-  const { setActingAs, isOwner } = useAdmin()
+  const { setActingAs, isOwner, isCoach } = useAdmin()
   const { t } = useLanguage()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
   const [reload, setReload] = useState(0)
+  // A coach's own trainee count and limit, set by the owner.
+  const [myLimit, setMyLimit] = useState(null)
+  useEffect(() => {
+    if (isCoach && !isOwner) fetchMyCoachLimit().then(setMyLimit)
+  }, [isCoach, isOwner, reload])
   const [inviting, setInviting] = useState(false)
   const [query, setQuery] = useState('')
   const [view, setView] = useState('attention')
@@ -116,6 +121,9 @@ export default function People() {
             {t('people.subtitle')}
             <InfoTip text={t('people.dotTip')} />
           </p>
+          {myLimit?.trainee_limit != null && (
+            <p className="text-chalkdim text-sm mt-1 num">{t('people.myLimit')(myLimit.trainees, myLimit.trainee_limit)}</p>
+          )}
         </div>
         <div className="flex gap-2">
           {isOwner && (
@@ -222,6 +230,44 @@ function CoachesCard({ onChanged }) {
   const { t } = useLanguage()
   const { toast, confirm } = useFeedback()
   const [coaches, setCoaches] = useState(null)
+  // The coach whose trainee limit is being edited, and the typed value.
+  const [editing, setEditing] = useState(null)
+
+  async function saveLimit(c) {
+    const raw = String(editing?.value ?? '').trim()
+    const limit = raw === '' ? null : Number(raw)
+    if (limit != null && (!Number.isInteger(limit) || limit < 0)) {
+      toast(t('people.limitInvalid'), 'error')
+      return
+    }
+    const { error } = await supabase.rpc('set_coach_limit', { p_coach: c.id, p_limit: limit })
+    if (error) {
+      console.error(error)
+      toast(t('people.coachError'), 'error')
+      return
+    }
+    setEditing(null)
+    toast(limit == null ? t('people.limitCleared', { name: c.name || c.email }) : t('people.limitSaved', { name: c.name || c.email, n: limit }))
+    load()
+  }
+
+  async function setRemovedCoach(c, removed) {
+    const name = c.name || c.email
+    const ok = await confirm(
+      removed
+        ? { title: t('people.removeAppTitle', { name }), body: t('people.removeAppCoachBody', { name }), confirmLabel: t('people.removeApp'), danger: true }
+        : { title: t('people.restoreTitle', { name }), body: t('people.restoreCoachBody', { name }), confirmLabel: t('people.restore') }
+    )
+    if (!ok) return
+    const { error } = await supabase.rpc('set_removed', { p_person: c.id, p_removed: removed })
+    if (error) {
+      console.error(error)
+      toast(t('people.coachError'), 'error')
+      return
+    }
+    toast(t(removed ? 'people.removedApp' : 'people.restored', { name }))
+    load()
+  }
 
   async function load() {
     const { data, error } = await supabase.rpc('list_coaches')
@@ -272,35 +318,59 @@ function CoachesCard({ onChanged }) {
       <h2 className="text-lg">{t('people.coachesTitle')}</h2>
       {coaches.length === 0 && <p className="text-chalkdim text-sm">{t('people.coachesHint')}</p>}
       {coaches.map((c) => (
-        <div key={c.id} className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="truncate">
-              {c.name || c.email}
-              {c.frozen && <span className="ms-2"><Badge>{t('people.frozenBadge')}</Badge></span>}
-            </p>
-            <p className="text-xs text-chalkdim truncate">
-              {c.name ? `${c.email} · ` : ''}
-              {t('people.coachTrainees')(c.trainees || 0)}
-            </p>
+        <div key={c.id} className="flex flex-col gap-1 py-2 border-t border-line first-of-type:border-t-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <p className="truncate min-w-0">{c.name || c.email}</p>
+            {c.frozen && <Badge>{t('people.frozenBadge')}</Badge>}
+            {c.removed && <Badge>{t('people.removedBadge')}</Badge>}
           </div>
-          <div className="shrink-0 flex gap-3">
-            {c.frozen ? (
-              <button onClick={() => setFrozen(c, false)} className="text-sm text-chalkdim">
-                {t('people.unfreezeCoach')}
-              </button>
-            ) : (
-              c.trainees > 0 && (
-                <button onClick={() => setFrozen(c, true)} className="text-sm text-chalkdim">
-                  {t('people.freezeCoach')}
+          {c.name && <p className="text-xs text-chalkdim truncate">{c.email}</p>}
+          <p className="text-xs text-chalkdim num">
+            {c.trainee_limit != null ? t('people.coachTraineesOf')(c.trainees || 0, c.trainee_limit) : t('people.coachTrainees')(c.trainees || 0)}
+          </p>
+          {editing?.id === c.id ? (
+            <div className="flex items-center gap-3 mt-1">
+              <input
+                type="number"
+                min="0"
+                inputMode="numeric"
+                className="w-28"
+                value={editing.value}
+                placeholder={t('people.limitNone')}
+                aria-label={t('people.limitLabel')}
+                onChange={(e) => setEditing({ id: c.id, value: e.target.value })}
+              />
+              <button onClick={() => saveLimit(c)} className="text-sm text-brass">{t('people.limitSave')}</button>
+              <button onClick={() => setEditing(null)} className="text-sm text-chalkdim">{t('people.limitCancel')}</button>
+            </div>
+          ) : (
+            <div className="flex gap-x-4 gap-y-1 flex-wrap mt-1">
+              {!c.removed && (
+                <button onClick={() => setEditing({ id: c.id, value: c.trainee_limit ?? '' })} className="text-sm text-chalkdim">
+                  {t('people.limitButton')}
                 </button>
-              )
-            )}
-            {!c.trainees && (
-              <button onClick={() => remove(c)} className="text-sm text-chalkdim">
-                {t('people.removeCoach')}
+              )}
+              {c.frozen ? (
+                <button onClick={() => setFrozen(c, false)} className="text-sm text-chalkdim">
+                  {t('people.unfreezeCoach')}
+                </button>
+              ) : (
+                c.trainees > 0 && (
+                  <button onClick={() => setFrozen(c, true)} className="text-sm text-chalkdim">
+                    {t('people.freezeCoach')}
+                  </button>
+                )
+              )}
+              <button onClick={() => setRemovedCoach(c, !c.removed)} className="text-sm text-chalkdim">
+                {c.removed ? t('people.restore') : t('people.removeApp')}
               </button>
-            )}
-          </div>
+              {!c.trainees && (
+                <button onClick={() => remove(c)} className="text-sm text-chalkdim">
+                  {t('people.removeCoach')}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       ))}
     </Card>
@@ -377,6 +447,7 @@ function TraineeRow({ p, today, t }) {
           <p className="truncate min-w-0">{p.full_name || p.email}</p>
           {p.is_admin && <Badge>{t('people.adminBadge')}</Badge>}
           {p.is_coach && <Badge>{t('people.coachBadge')}</Badge>}
+          {p.removed && <Badge>{t('people.removedBadge')}</Badge>}
           {p.unread > 0 && <UnreadBadge n={p.unread} t={t} />}
         </div>
         <p className="text-xs text-chalkdim num">{stats.join(' · ')}</p>
@@ -437,6 +508,10 @@ function InviteModal({ onClose, t }) {
       console.error(err)
       if (String(err?.message || '').includes('INVITED_BY_OTHER_COACH')) {
         toast(t('people.invitedByOther'), 'error')
+        return false
+      }
+      if (String(err?.message || '').includes('COACH_LIMIT_REACHED')) {
+        toast(t('people.limitReached'), 'error')
         return false
       }
       return true

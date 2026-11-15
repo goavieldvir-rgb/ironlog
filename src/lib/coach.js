@@ -24,7 +24,20 @@ export function daysSince(iso, today = toLocalISODate()) {
 }
 
 export async function fetchRoster(today = toLocalISODate()) {
-  return check(await supabase.rpc('coach_roster', { p_today: today })) || []
+  const rows = check(await supabase.rpc('coach_roster', { p_today: today })) || []
+  // Who has been removed from the app (only people this coach may see come
+  // back). Before the SQL is run the column doesn't exist: nobody is removed.
+  const { data, error } = await supabase.from('profiles').select('id').not('removed_at', 'is', null)
+  if (error) return rows
+  const removed = new Set((data || []).map((r) => r.id))
+  return rows.map((r) => ({ ...r, removed: removed.has(r.id) }))
+}
+
+// A coach's own trainee count and limit (null when there is no limit).
+export async function fetchMyCoachLimit() {
+  const { data, error } = await supabase.rpc('my_coach_limit')
+  if (error) return null
+  return data?.[0] || null
 }
 
 // The team's records from the last week, newest first, for the desktop panel.

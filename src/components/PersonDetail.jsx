@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ResponsiveContainer, BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts'
-import { Apple, GraduationCap, Undo2, Pin, PinOff, Trash2, CheckCheck, Trophy, ChevronDown, Pencil, Plus, Check } from 'lucide-react'
+import { Apple, GraduationCap, Undo2, UserX, UserCheck, Pin, PinOff, Trash2, CheckCheck, Trophy, ChevronDown, Pencil, Plus, Check } from 'lucide-react'
 import { BackChevron, ForwardChevron, ForwardArrow } from './DirectionalIcon.jsx'
 import { supabase } from '../supabase.js'
 import { useAdmin } from '../context/AdminContext.jsx'
@@ -179,6 +179,25 @@ export default function PersonDetail() {
     navigate('/people')
   }
 
+  // Remove a trainee from the app, or let them back in.
+  async function setRemoved(removed) {
+    const name = p.full_name || p.email
+    const ok = await confirm(
+      removed
+        ? { title: t('people.removeAppTitle', { name }), body: t('people.removeAppBody', { name }), confirmLabel: t('people.removeApp'), danger: true }
+        : { title: t('people.restoreTitle', { name }), body: t('people.restoreBody', { name }), confirmLabel: t('people.restore') }
+    )
+    if (!ok) return
+    const { error } = await supabase.rpc('set_removed', { p_person: p.id, p_removed: removed })
+    if (error) {
+      console.error(error)
+      toast(t(/COACH_LIMIT_REACHED/.test(error.message || '') ? 'people.limitReachedRestore' : 'people.coachChangeError'), 'error')
+      return
+    }
+    toast(t(removed ? 'people.removedApp' : 'people.restored', { name }))
+    setData((d) => ({ ...d, profile: { ...d.profile, removed_at: removed ? new Date().toISOString() : null } }))
+  }
+
   async function changeCoach(coachId) {
     const name = p.full_name || p.email
     const target = coachId === myProfile?.id ? null : coaches.find((c) => c.id === coachId)
@@ -187,7 +206,7 @@ export default function PersonDetail() {
     const { error } = await supabase.rpc('assign_coach', { p_person: p.id, p_coach: coachId })
     if (error) {
       console.error(error)
-      toast(t('people.coachChangeError'), 'error')
+      toast(t(/COACH_LIMIT_REACHED/.test(error.message || '') ? 'people.limitReachedMove' : 'people.coachChangeError'), 'error')
       return
     }
     toast(t('people.moved', { name, coach: coachName }))
@@ -238,6 +257,7 @@ export default function PersonDetail() {
             <BackChevron size={14} /> {t('people.title')}
           </Link>
           <h1 className="text-3xl break-words">{name}</h1>
+          {p.removed_at && <p className="text-irontext text-sm mt-1">{t('people.removedNotice')}</p>}
           <p className="text-chalkdim text-sm mt-0.5 truncate" dir="ltr" style={{ textAlign: 'start' }}>
             {p.email}
           </p>
@@ -256,6 +276,12 @@ export default function PersonDetail() {
             <Button variant="ghost" onClick={makeCoach}>
               <GraduationCap size={15} />
               {t('people.coachOff')}
+            </Button>
+          )}
+          {isCoach && !p.is_admin && !p.is_coach && p.id !== myProfile?.id && 'removed_at' in p && (
+            <Button variant="ghost" onClick={() => setRemoved(!p.removed_at)}>
+              {p.removed_at ? <UserCheck size={15} /> : <UserX size={15} />}
+              {p.removed_at ? t('people.restore') : t('people.removeApp')}
             </Button>
           )}
           {isCoach && !isOwner && ownerName && !p.is_admin && !p.is_coach && p.id !== myProfile?.id && (
