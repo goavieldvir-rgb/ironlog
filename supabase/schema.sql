@@ -473,6 +473,51 @@ begin
 end;
 $function$;
 
+-- ===== Notification wording (supabase-notification-wording.sql) =====
+-- The language for the owner's own alerts (ntfy and email): the language of
+-- the owner's most recent phone with app notifications, Hebrew otherwise.
+create or replace function public.owner_lang()
+ returns text
+ language sql
+ stable
+ security definer
+ set search_path to 'public'
+as $function$
+  select coalesce((
+    select s.lang from push_subscriptions s join profiles p on p.id = s.user_id
+    where p.is_admin order by s.updated_at desc limit 1
+  ), 'he')
+$function$;
+revoke execute on function public.owner_lang() from public, anon, authenticated;
+
+-- A trainee's new record, to the owner by email and ntfy, in the owner's
+-- language. detail_en is also what the app stores and shows.
+create or replace function public.send_pr_alert(trainee_name text, ex_name text, detail_en text, detail_he text)
+ returns void
+ language plpgsql
+ security definer
+ set search_path to 'public'
+as $function$
+begin
+  if owner_lang() = 'he' then
+    perform send_admin_email(
+      'שיא חדש של ' || trainee_name || ' 🏆',
+      '<p dir="rtl">שיא אישי חדש של <strong>' || public.html_escape(trainee_name) || '</strong> ב-<strong>' ||
+      public.html_escape(ex_name) || '</strong>: <span dir="ltr">' || public.html_escape(detail_he) || '</span>.</p>'
+    );
+    perform send_admin_push('🏆 שיא חדש: ' || trainee_name, ex_name || ' — ' || detail_he);
+  else
+    perform send_admin_email(
+      trainee_name || ' just hit a new PR 🏆',
+      '<p><strong>' || public.html_escape(trainee_name) || '</strong> just set a new personal record on <strong>' ||
+      public.html_escape(ex_name) || '</strong>: ' || public.html_escape(detail_en) || '.</p>'
+    );
+    perform send_admin_push('🏆 New PR: ' || trainee_name, ex_name || ' — ' || detail_en);
+  end if;
+end;
+$function$;
+revoke execute on function public.send_pr_alert(text, text, text, text) from public, anon, authenticated;
+
 -- html_escape, check_for_new_prs and check_inactive_trainees (from supabase-security-round2.sql)
 create or replace function public.html_escape(t text)
  returns text
@@ -506,6 +551,7 @@ declare
   prev_cnt int;
   trainee_name text;
   detail_text text;
+  detail_he text;
   numeric_pattern text := '^-?[0-9]+\.?[0-9]*$';
 begin
   begin
@@ -586,35 +632,33 @@ begin
         -- headline number.
         if ex_category = 'cardio' then
           detail_text := this_top || ' min';
+          detail_he := this_top || ' דק׳';
           if nullif(this_top_set->>'intensity', '') is not null then
             detail_text := detail_text || ' · intensity ' || (this_top_set->>'intensity');
+            detail_he := detail_he || ' · עצימות ' || (this_top_set->>'intensity');
           end if;
           if nullif(this_top_set->>'distance', '') is not null then
             detail_text := detail_text || ' · ' || (this_top_set->>'distance') || ' ' || ex_unit;
+            detail_he := detail_he || ' · ' || (this_top_set->>'distance') || ' ' || ex_unit;
           end if;
         elsif ex_bodyweight then
           detail_text := this_top || ' reps';
+          detail_he := this_top || ' חזרות';
           if nullif(this_top_set->>'weight', '') is not null
             and (this_top_set->>'weight') ~ numeric_pattern
             and (this_top_set->>'weight')::numeric > 0 then
             detail_text := '+' || (this_top_set->>'weight') || ex_unit || ' × ' || detail_text;
+            detail_he := '+' || (this_top_set->>'weight') || ex_unit || ' × ' || detail_he;
           end if;
         else
           detail_text := this_top || ex_unit;
           if nullif(this_top_set->>'reps', '') is not null then
             detail_text := detail_text || ' × ' || (this_top_set->>'reps');
           end if;
+          detail_he := detail_text;
         end if;
 
-        perform send_admin_email(
-          trainee_name || ' just hit a new PR 🏆',
-          '<p><strong>' || public.html_escape(trainee_name) || '</strong> just set a new personal record on <strong>' ||
-          public.html_escape(ex_name) || '</strong>: ' || public.html_escape(detail_text) || '.</p>'
-        );
-        perform send_admin_push(
-          '🏆 New PR: ' || trainee_name,
-          ex_name || ' — ' || detail_text
-        );
+        perform send_pr_alert(trainee_name, ex_name, detail_text, detail_he);
 
         insert into admin_notifications (type, trainee_id, detail)
         values ('pr', NEW.user_id, ex_name || ': ' || detail_text);
@@ -659,16 +703,9 @@ begin
         if reps_set is not null then
           select coalesce(full_name, email) into trainee_name from profiles where id = NEW.user_id;
           detail_text := 'Reps PR ' || (reps_set->>'weight') || ex_unit || ' × ' || (reps_set->>'reps') || ' reps';
+          detail_he := 'שיא חזרות: ' || (reps_set->>'weight') || ex_unit || ' × ' || (reps_set->>'reps');
 
-          perform send_admin_email(
-            trainee_name || ' just hit a new PR 🏆',
-            '<p><strong>' || public.html_escape(trainee_name) || '</strong> just set a new personal record on <strong>' ||
-            public.html_escape(ex_name) || '</strong>: ' || public.html_escape(detail_text) || '.</p>'
-          );
-          perform send_admin_push(
-            '🏆 New PR: ' || trainee_name,
-            ex_name || ' — ' || detail_text
-          );
+          perform send_pr_alert(trainee_name, ex_name, detail_text, detail_he);
 
           insert into admin_notifications (type, trainee_id, detail)
           values ('pr', NEW.user_id, ex_name || ': ' || detail_text);
@@ -1032,14 +1069,12 @@ create trigger protect_admin_flag_trg before insert or update on public.profiles
 -- ===== 6. Scheduled jobs (needs the pg_cron and pg_net extensions) =====
 do $$
 begin
+  -- "Gone quiet" comes once, as the coach's To do item (refresh_coach_tasks),
+  -- so the separate morning alert and email (check_inactive_trainees) no
+  -- longer run.
   if exists (select 1 from cron.job where jobname = 'daily-inactivity-check') then
     perform cron.unschedule('daily-inactivity-check');
   end if;
-  perform cron.schedule(
-    'daily-inactivity-check',
-    '0 5 * * *',
-    $job$select check_inactive_trainees();$job$
-  );
   if exists (select 1 from cron.job where jobname = 'workout-reminders') then
     perform cron.unschedule('workout-reminders');
   end if;
@@ -1904,8 +1939,8 @@ begin
     );
   else
     perform send_admin_push(
-      'Ironlog: ' || pending || ' משימות למאמן',
-      'יש ' || pending || ' דברים חדשים שדורשים תשומת לב. פתחו את מסך המתאמנים.'
+      'Ironlog: ' || case when pending = 1 then 'משימה חדשה אחת' else pending || ' משימות חדשות' end,
+      case when pending = 1 then 'יש דבר חדש אחד שדורש תשומת לב.' else 'יש ' || pending || ' דברים חדשים שדורשים תשומת לב.' end || ' פתחו את מסך המתאמנים.'
     );
     update coach_tasks set notified_at = now() where done_at is null and notified_at is null;
   end if;

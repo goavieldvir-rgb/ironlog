@@ -30,7 +30,7 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'content-type': 'application/json' } })
 
 const COPY = {
-  en: (names: string) => ({ title: "Today's workout", body: `${names} is on the plan today. Let's go.` }),
+  en: (names: string) => ({ title: "Today's workout", body: `${names} is waiting for you today. Let's get started.` }),
   he: (names: string) => ({ title: 'האימון של היום', body: `${names} מחכה לכם היום. בואו נתחיל.` }),
 }
 const REST_COPY = {
@@ -122,7 +122,7 @@ async function runReminders() {
         msg = REST_COPY[s.lang as 'en' | 'he'] || REST_COPY.en
       } else {
         const { data: routines } = await db.from('routines').select('name').in('id', ids)
-        const names = (routines || []).map((r) => r.name).join(' + ') || 'Workout'
+        const names = (routines || []).map((r) => r.name).join(' + ') || (s.lang === 'he' ? 'אימון' : 'Workout')
         msg = (COPY[s.lang as 'en' | 'he'] || COPY.en)(names)
       }
 
@@ -328,7 +328,7 @@ const PR_COPY = {
   en: (name: string, detail: string) => ({ title: `🏆 New PR: ${name}`, body: detail }),
   he: (name: string, detail: string) => ({ title: `🏆 שיא חדש: ${name}`, body: detail }),
 }
-async function runPrAlert(traineeId: string, detail: string) {
+async function runPrAlert(traineeId: string, detail: string, detailHe: string) {
   const { data: t } = await db.from('profiles').select('full_name, email, coach_id').eq('id', traineeId).maybeSingle()
   if (!t?.coach_id) return json({ sent: 0 })
   const { data: c } = await db.from('profiles').select('id, is_coach, is_admin, coach_frozen').eq('id', t.coach_id).maybeSingle()
@@ -338,7 +338,7 @@ async function runPrAlert(traineeId: string, detail: string) {
   let sent = 0, removed = 0, failed = 0
   for (const s of subs || []) {
     try {
-      const msg = (PR_COPY[s.lang as 'en' | 'he'] || PR_COPY.en)(name, detail)
+      const msg = s.lang === 'he' ? PR_COPY.he(name, detailHe || detail) : PR_COPY.en(name, detail)
       const r = await deliver(s, { ...msg, url: `#/people/${traineeId}` }, `ironlog-pr-${traineeId}`, 86400)
       if (r === 'sent') sent++
       else removed++
@@ -365,7 +365,7 @@ Deno.serve(async (req) => {
     if (body?.coach_tasks) return runCoachTasks()
     if (body?.rest_alerts) return runRestAlerts()
     if (body?.message_id) return runMessage(String(body.message_id))
-    if (body?.pr_trainee_id) return runPrAlert(String(body.pr_trainee_id), String(body.pr_detail || ''))
+    if (body?.pr_trainee_id) return runPrAlert(String(body.pr_trainee_id), String(body.pr_detail || ''), String(body.pr_detail_he || ''))
     return body?.feedback_session_id ? runFeedback(String(body.feedback_session_id)) : runReminders()
   }
   return runTest(req)
