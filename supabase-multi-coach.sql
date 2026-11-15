@@ -706,7 +706,9 @@ grant execute on function public.list_coaches() to authenticated;
 grant execute on function public.set_coach(uuid, boolean) to authenticated;
 grant execute on function public.notify_coach_pr(uuid, text) to service_role;
 
--- New accounts get the coach who invited them, or the owner.
+-- New accounts get the coach who invited them, or the owner. An expired
+-- invite still names its coach: whether an expired invite may sign up at
+-- all is the invite-only hook's job, not a reason to hand the person over.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -720,7 +722,7 @@ begin
     coalesce(
       (select i.invited_by from public.signup_invites i
          join public.profiles c on c.id = i.invited_by and (c.is_admin or c.is_coach)
-        where i.email = lower(btrim(new.email)) and i.expires_at > now()),
+        where i.email = lower(btrim(new.email))),
       (select o.id from public.profiles o where o.is_admin order by o.created_at limit 1)))
   on conflict (id) do nothing;
   return new;
