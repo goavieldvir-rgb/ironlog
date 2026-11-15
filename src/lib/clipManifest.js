@@ -9,7 +9,7 @@ export const CLIPS = {
   'back-extension': { v: 'd6c7ddf4', t: '8bf2f9fc' },
   'barbell-bench-press': { v: '566a1780' },
   'barbell-biceps-curl': { v: '43f539fd' },
-  'bench-dips': { v: '137a215f' },
+  'bench-dips': { v: '80691de6' },
   'cable-biceps-curl': { v: 'aa0083cc' },
   'cable-chest-fly-cable-crossover': { v: '9e7e5ea4' },
   'cable-chest-press': { v: 'c7541361' },
