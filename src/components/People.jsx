@@ -216,44 +216,49 @@ export default function People() {
   )
 }
 
-// Owner only: the independent coaches. Names and emails, never their trainees.
+// Owner only: the independent coaches. Names, emails and how many trainees
+// they have, never the trainees themselves.
 function CoachesCard({ onChanged }) {
   const { t } = useLanguage()
   const { toast, confirm } = useFeedback()
   const [coaches, setCoaches] = useState(null)
-  const [moved, setMoved] = useState([])
 
   async function load() {
-    const [c, m] = await Promise.all([supabase.rpc('list_coaches'), supabase.rpc('list_moved_by_me')])
-    if (c.error) return console.error(c.error)
-    if (m.error) console.error(m.error)
-    setCoaches(c.data || [])
-    setMoved(m.data || [])
-  }
-
-  async function takeBack(m) {
-    if (!(await confirm({ title: t('people.takeBackTitle', { name: m.name, coach: m.coach_name }), body: t('people.takeBackBody', { coach: m.coach_name }), confirmLabel: t('people.takeBack') }))) return
-    const { error } = await supabase.rpc('take_back', { p_person: m.id })
-    if (error) {
-      console.error(error)
-      toast(t('people.coachChangeError'), 'error')
-      return
-    }
-    toast(t('people.tookBack', { name: m.name }))
-    load()
-    onChanged()
+    const { data, error } = await supabase.rpc('list_coaches')
+    if (error) return console.error(error)
+    setCoaches(data || [])
   }
   useEffect(() => {
     load()
   }, [])
 
+  async function setFrozen(c, frozen) {
+    const name = c.name || c.email
+    const ok = await confirm(
+      frozen
+        ? { title: t('people.freezeTitle', { name }), body: t('people.freezeBody', { name }), confirmLabel: t('people.freezeCoach'), danger: true }
+        : { title: t('people.unfreezeTitle', { name }), body: t('people.unfreezeBody', { name }), confirmLabel: t('people.unfreezeCoach') }
+    )
+    if (!ok) return
+    const { error } = await supabase.rpc('set_coach_frozen', { p_coach: c.id, p_frozen: frozen })
+    if (error) {
+      console.error(error)
+      toast(t('people.coachError'), 'error')
+      return
+    }
+    toast(t(frozen ? 'people.coachFrozen' : 'people.coachUnfrozen', { name }))
+    load()
+  }
+
+  // Only a coach with no trainees left can stop being a coach.
   async function remove(c) {
     const name = c.name || c.email
     if (!(await confirm({ title: t('people.removeCoachTitle', { name }), body: t('people.removeCoachBody'), confirmLabel: t('people.removeCoach'), danger: true }))) return
     const { error } = await supabase.rpc('set_coach', { p_person: c.id, p_on: false })
     if (error) {
       console.error(error)
-      toast(t('people.coachError'), 'error')
+      toast(t(/COACH_HAS_TRAINEES/.test(error.message || '') ? 'people.coachHasTrainees' : 'people.coachError'), 'error')
+      load()
       return
     }
     toast(t('people.coachRemoved', { name }))
@@ -269,30 +274,35 @@ function CoachesCard({ onChanged }) {
       {coaches.map((c) => (
         <div key={c.id} className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="truncate">{c.name || c.email}</p>
-            {c.name && <p className="text-xs text-chalkdim truncate">{c.email}</p>}
+            <p className="truncate">
+              {c.name || c.email}
+              {c.frozen && <span className="ms-2"><Badge>{t('people.frozenBadge')}</Badge></span>}
+            </p>
+            <p className="text-xs text-chalkdim truncate">
+              {c.name ? `${c.email} · ` : ''}
+              {t('people.coachTrainees')(c.trainees || 0)}
+            </p>
           </div>
-          <button onClick={() => remove(c)} className="shrink-0 text-sm text-chalkdim">
-            {t('people.removeCoach')}
-          </button>
+          <div className="shrink-0 flex gap-3">
+            {c.frozen ? (
+              <button onClick={() => setFrozen(c, false)} className="text-sm text-chalkdim">
+                {t('people.unfreezeCoach')}
+              </button>
+            ) : (
+              c.trainees > 0 && (
+                <button onClick={() => setFrozen(c, true)} className="text-sm text-chalkdim">
+                  {t('people.freezeCoach')}
+                </button>
+              )
+            )}
+            {!c.trainees && (
+              <button onClick={() => remove(c)} className="text-sm text-chalkdim">
+                {t('people.removeCoach')}
+              </button>
+            )}
+          </div>
         </div>
       ))}
-      {moved.length > 0 && (
-        <>
-          <h3 className="text-sm text-chalkdim mt-2">{t('people.movedTitle')}</h3>
-          {moved.map((m) => (
-            <div key={m.id} className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate">{m.name}</p>
-                <p className="text-xs text-chalkdim truncate">{t('people.withCoach', { coach: m.coach_name })}</p>
-              </div>
-              <button onClick={() => takeBack(m)} className="shrink-0 text-sm text-chalkdim">
-                {t('people.takeBack')}
-              </button>
-            </div>
-          ))}
-        </>
-      )}
     </Card>
   )
 }

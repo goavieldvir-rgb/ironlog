@@ -37,7 +37,10 @@ export function AdminProvider({ children }) {
   // trainees. isAdmin stays as "any coach" so coach features work for both,
   // and owner-only things (error logs, verifying shared foods) use isOwner.
   const isOwner = !!profile?.is_admin
-  const isCoach = isOwner || !!profile?.is_coach
+  // A frozen coach keeps their account but, like a trainee, sees only their
+  // own data until the owner unfreezes them.
+  const coachFrozen = !isOwner && !!profile?.is_coach && !!profile?.coach_frozen
+  const isCoach = isOwner || (!!profile?.is_coach && !coachFrozen)
   const isAdmin = isCoach
   // Nutrition is a beta: coaches, plus trainees a coach switched on. The
   // column may not exist before the migration, which reads as off.
@@ -52,6 +55,7 @@ export function AdminProvider({ children }) {
     isAdmin,
     isOwner,
     isCoach,
+    coachFrozen,
     nutritionAllowed,
     loadingProfile,
     actingAs,

@@ -83,7 +83,8 @@ export default function PersonDetail() {
     if (!isOwner) return
     supabase.rpc('list_coaches').then(({ data, error }) => {
       if (error) return console.error(error)
-      setCoaches(data || [])
+      // A frozen coach can't take new trainees.
+      setCoaches((data || []).filter((c) => !c.frozen))
     })
   }, [isOwner])
 

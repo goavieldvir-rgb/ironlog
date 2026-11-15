@@ -222,7 +222,7 @@ function CopyToPersonModal({ routine, onClose }) {
     if (isOwner) {
       supabase.rpc('list_coaches').then(({ data, error }) => {
         if (error) console.error(error)
-        setCoaches(data || [])
+        setCoaches((data || []).filter((c) => !c.frozen))
       })
     }
   }, [attempt, isOwner])

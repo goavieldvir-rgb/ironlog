@@ -197,14 +197,17 @@ async function runCoachTasks() {
   const byId = Object.fromEntries((people || []).map((p) => [p.id, p]))
   const nameOf = (id: string | null) => (id ? byId[id]?.full_name || byId[id]?.email?.split('@')[0] || '' : '')
 
-  const { data: coachRows } = await db.from('profiles').select('id, is_admin').or('is_admin.eq.true,is_coach.eq.true')
+  const { data: coachRows } = await db.from('profiles').select('id, is_admin, coach_frozen').or('is_admin.eq.true,is_coach.eq.true')
+  const frozenIds = new Set((coachRows || []).filter((c) => c.coach_frozen && !c.is_admin).map((c) => c.id))
   const ownerIds = new Set((coachRows || []).filter((c) => c.is_admin).map((c) => c.id))
   const coachIds = new Set((coachRows || []).map((c) => c.id))
   const ownerId = [...ownerIds][0] || null
   // Whose task is it: the trainee's coach, else whoever wrote it, else the
-  // owner. Someone who is no longer a coach never gets it.
+  // owner. Someone who is no longer a coach never gets it, and a frozen
+  // coach's tasks go to nobody (not the owner either).
   const coachOf = (t: any) => {
     const c = t.trainee_id ? byId[t.trainee_id]?.coach_id : t.coach_id
+    if (c && frozenIds.has(c)) return null
     return c && coachIds.has(c) ? c : ownerId
   }
   const groups = new Map<string, any[]>()
@@ -258,10 +261,12 @@ async function runMessage(messageId: string) {
   let ownerIsCoach = false
   if (toCoach) {
     const { data: t } = await db.from('profiles').select('coach_id').eq('id', m.trainee_id).maybeSingle()
-    const { data: coachRows } = await db.from('profiles').select('id, is_admin').or('is_admin.eq.true,is_coach.eq.true')
+    const { data: coachRows } = await db.from('profiles').select('id, is_admin, coach_frozen').or('is_admin.eq.true,is_coach.eq.true')
     const isCoach = (id: string | null | undefined) => !!id && (coachRows || []).some((c) => c.id === id)
+    const frozen = (coachRows || []).some((c) => c.id === t?.coach_id && c.coach_frozen && !c.is_admin)
     // The trainee's coach while they are still a coach, otherwise the owner.
-    coachId = isCoach(t?.coach_id) ? t!.coach_id : (coachRows || []).find((c) => c.is_admin)?.id || null
+    // A frozen coach's trainee alerts nobody.
+    coachId = frozen ? null : isCoach(t?.coach_id) ? t!.coach_id : (coachRows || []).find((c) => c.is_admin)?.id || null
     ownerIsCoach = !!coachId && (coachRows || []).some((c) => c.id === coachId && c.is_admin)
     // A coach writing in their own thread needs no alert.
     recipients = coachId && coachId !== m.sender_id ? [coachId] : []
@@ -326,8 +331,8 @@ const PR_COPY = {
 async function runPrAlert(traineeId: string, detail: string) {
   const { data: t } = await db.from('profiles').select('full_name, email, coach_id').eq('id', traineeId).maybeSingle()
   if (!t?.coach_id) return json({ sent: 0 })
-  const { data: c } = await db.from('profiles').select('id, is_coach, is_admin').eq('id', t.coach_id).maybeSingle()
-  if (!c?.is_coach || c.is_admin) return json({ sent: 0 })
+  const { data: c } = await db.from('profiles').select('id, is_coach, is_admin, coach_frozen').eq('id', t.coach_id).maybeSingle()
+  if (!c?.is_coach || c.is_admin || c.coach_frozen) return json({ sent: 0 })
   const name = t.full_name || t.email?.split('@')[0] || ''
   const { data: subs } = await db.from('push_subscriptions').select('*').eq('user_id', c.id)
   let sent = 0, removed = 0, failed = 0

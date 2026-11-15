@@ -20,8 +20,13 @@
 -- ---------- columns ----------
 alter table public.profiles add column if not exists is_coach boolean not null default false;
 alter table public.profiles add column if not exists coach_id uuid references public.profiles (id) on delete set null;
--- Who handed this trainee to their current coach (the owner), so the owner can take them back.
-alter table public.profiles add column if not exists moved_by uuid references public.profiles (id) on delete set null;
+-- A frozen coach keeps their trainees, but nobody (not them, not the owner)
+-- can see or change those trainees until the owner unfreezes them.
+alter table public.profiles add column if not exists coach_frozen boolean not null default false;
+-- Earlier test versions of this script had a "take back" feature; it is gone.
+drop function if exists public.take_back(uuid);
+drop function if exists public.list_moved_by_me();
+alter table public.profiles drop column if exists moved_by;
 create index if not exists profiles_coach_id_idx on public.profiles (coach_id);
 
 -- Hand-written tasks with no trainee belong to whoever wrote them.
@@ -96,7 +101,7 @@ stable
 security definer
 set search_path = ''
 as $$
-  select coalesce((select is_admin or is_coach from public.profiles where id = auth.uid()), false)
+  select coalesce((select is_admin or (is_coach and not coach_frozen) from public.profiles where id = auth.uid()), false)
      and coalesce(auth.jwt() ->> 'aal', '') = 'aal2';
 $$;
 
@@ -114,7 +119,7 @@ as $$
   select coalesce(auth.jwt() ->> 'aal', '') = 'aal2' and exists (
     select 1 from public.profiles me
     join public.profiles t on t.id = target
-    where me.id = auth.uid() and (me.is_admin or me.is_coach)
+    where me.id = auth.uid() and (me.is_admin or (me.is_coach and not me.coach_frozen))
       and (
         -- The owner keeps coach access to their own rows (own targets,
         -- notes, goals, tasks and alerts), as before.
@@ -394,7 +399,7 @@ begin
     new.nutrition_enabled := false;
     new.is_coach := false;
     new.coach_id := null;
-    new.moved_by := null;
+    new.coach_frozen := false;
   elsif public.is_admin() then
     -- Nobody becomes owner (or stops being one) through the app; that stays
     -- a SQL Editor change, so the owner can't create a second owner by mistake.
@@ -405,16 +410,15 @@ begin
     if new.is_coach then
       new.coach_id := null;
     end if;
-    -- A trainee's coach must be the owner or a coach.
-    if new.coach_id is distinct from old.coach_id and new.coach_id is not null and not exists (
-      select 1 from public.profiles c where c.id = new.coach_id and (c.is_admin or c.is_coach)) then
-      raise exception 'NOT_A_COACH';
-    end if;
-    -- Remember who handed a trainee to a coach; back with the owner, it's cleared.
-    if new.coach_id is distinct from old.coach_id then
-      new.moved_by := case when new.coach_id is null or new.coach_id = auth.uid() then null else auth.uid() end;
-    elsif new.moved_by is distinct from old.moved_by then
+    -- Freezing goes through set_coach_frozen(), never a plain update.
+    if new.coach_frozen is distinct from old.coach_frozen
+       and coalesce(current_setting('ironlog.set_coach_frozen', true), '') <> 'on' then
       raise exception 'COACH_FIELDS_PROTECTED';
+    end if;
+    -- A trainee's coach must be the owner or an active (not frozen) coach.
+    if new.coach_id is distinct from old.coach_id and new.coach_id is not null and not exists (
+      select 1 from public.profiles c where c.id = new.coach_id and (c.is_admin or (c.is_coach and not c.coach_frozen))) then
+      raise exception 'NOT_A_COACH';
     end if;
   else
     if new.is_admin is distinct from old.is_admin then
@@ -425,10 +429,11 @@ begin
     if coalesce(current_setting('ironlog.return_to_owner', true), '') = 'on'
        and new.is_coach is not distinct from old.is_coach
        and old.coach_id = auth.uid()
-       and new.coach_id = (select o.id from public.profiles o where o.is_admin order by o.created_at limit 1) then
-      new.moved_by := null;
+       and new.coach_id = (select o.id from public.profiles o where o.is_admin order by o.created_at limit 1)
+       and new.coach_frozen is not distinct from old.coach_frozen then
+      null;
     elsif new.is_coach is distinct from old.is_coach or new.coach_id is distinct from old.coach_id
-       or new.moved_by is distinct from old.moved_by then
+       or new.coach_frozen is distinct from old.coach_frozen then
       raise exception 'COACH_FIELDS_PROTECTED';
     end if;
     if not public.can_coach(old.id) then
@@ -443,64 +448,50 @@ begin
 end;
 $$;
 
--- When someone stops being a coach, or a coach's account is deleted, their
--- trainees go back to the owner, so nobody is left with a coach who can no
--- longer see them.
+-- A coach who still has trainees can't stop being a coach or be deleted:
+-- their trainees would otherwise land with the owner. Freeze them instead
+-- (set_coach_frozen), or have them hand their trainees back first.
 create or replace function public.coach_removed()
 returns trigger
 language plpgsql
 security definer
 set search_path = ''
 as $$
-declare
-  gone uuid := case when tg_op = 'DELETE' then old.id else new.id end;
 begin
-  update public.profiles
-     set coach_id = (select o.id from public.profiles o where o.is_admin and o.id <> gone order by o.created_at limit 1),
-         moved_by = null
-   where coach_id = gone and id <> gone;
+  if exists (select 1 from public.profiles t where t.coach_id = old.id and t.id <> old.id) then
+    raise exception 'COACH_HAS_TRAINEES';
+  end if;
   return case when tg_op = 'DELETE' then old else new end;
 end;
 $$;
 revoke execute on function public.coach_removed() from public, anon, authenticated;
 drop trigger if exists trg_coach_removed on public.profiles;
-create trigger trg_coach_removed after update of is_coach on public.profiles
+create trigger trg_coach_removed before update of is_coach on public.profiles
   for each row when (old.is_coach and not new.is_coach and not new.is_admin) execute function public.coach_removed();
 drop trigger if exists trg_coach_deleted on public.profiles;
 create trigger trg_coach_deleted before delete on public.profiles
   for each row when (old.is_coach and not old.is_admin) execute function public.coach_removed();
 
 -- The owner's list of coaches: names only, nothing about their trainees.
+drop function if exists public.list_coaches();
 create or replace function public.list_coaches()
-returns table (id uuid, name text, email text)
+returns table (id uuid, name text, email text, frozen boolean, trainees integer)
 language sql
 stable
 security definer
 set search_path = ''
 as $$
-  select p.id, coalesce(nullif(p.full_name, ''), p.email), p.email
+  select p.id, coalesce(nullif(p.full_name, ''), p.email), p.email, p.coach_frozen,
+         (select count(*)::integer from public.profiles t where t.coach_id = p.id and t.id <> p.id)
   from public.profiles p
   where p.is_coach and not p.is_admin and public.is_admin()
   order by 2;
 $$;
 
--- Trainees the owner handed to a coach and can take back: name and coach only.
-create or replace function public.list_moved_by_me()
-returns table (id uuid, name text, coach_name text)
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select p.id, coalesce(nullif(p.full_name, ''), p.email), coalesce(nullif(c.full_name, ''), c.email)
-  from public.profiles p
-  join public.profiles c on c.id = p.coach_id and c.is_coach and not c.is_admin
-  where public.is_admin() and p.moved_by = auth.uid() and not p.is_coach and not p.is_admin
-  order by 2;
-$$;
-
--- The owner takes back a trainee they handed to a coach.
-create or replace function public.take_back(p_person uuid)
+-- The owner freezes or unfreezes a coach. A frozen coach loses access to
+-- their trainees, and the owner gains none: the trainees stay with that
+-- coach, out of everyone's sight, until unfrozen.
+create or replace function public.set_coach_frozen(p_coach uuid, p_frozen boolean)
 returns void
 language plpgsql
 security definer
@@ -510,12 +501,16 @@ begin
   if not public.is_admin() then
     raise exception 'owner only' using errcode = '42501';
   end if;
-  if not exists (select 1 from public.list_moved_by_me() m where m.id = p_person) then
-    raise exception 'not moved by you' using errcode = '42501';
+  if not exists (select 1 from public.profiles where id = p_coach and is_coach and not is_admin) then
+    raise exception 'not a coach' using errcode = '42501';
   end if;
-  update public.profiles set coach_id = auth.uid() where id = p_person;
+  perform set_config('ironlog.set_coach_frozen', 'on', true);
+  update public.profiles set coach_frozen = p_frozen where id = p_coach;
+  perform set_config('ironlog.set_coach_frozen', '', true);
 end;
 $$;
+revoke execute on function public.set_coach_frozen(uuid, boolean) from public, anon;
+grant execute on function public.set_coach_frozen(uuid, boolean) to authenticated;
 
 -- A coach hands one of their trainees back to the owner.
 create or replace function public.return_to_owner(p_person uuid)
@@ -535,10 +530,6 @@ begin
   perform set_config('ironlog.return_to_owner', '', true);
 end;
 $$;
-revoke execute on function public.list_moved_by_me() from public, anon;
-grant execute on function public.list_moved_by_me() to authenticated;
-revoke execute on function public.take_back(uuid) from public, anon;
-grant execute on function public.take_back(uuid) to authenticated;
 -- A trainee who changes coach shows up in the receiving coach's To do.
 create or replace function public.coach_changed()
 returns trigger
@@ -629,7 +620,7 @@ revoke execute on function public.return_to_owner(uuid) from public, anon;
 grant execute on function public.return_to_owner(uuid) to authenticated;
 
 -- The owner makes one of their own trainees a coach, or stops someone being
--- a coach (their trainees then move to the owner, see coach_removed).
+-- a coach who has no trainees left (see coach_removed; otherwise freeze them).
 create or replace function public.set_coach(p_person uuid, p_on boolean)
 returns void
 language plpgsql
@@ -646,7 +637,12 @@ begin
   if not p_on and not exists (select 1 from public.profiles where id = p_person and is_coach) then
     raise exception 'not a coach' using errcode = '42501';
   end if;
-  update public.profiles set is_coach = p_on where id = p_person and not is_admin;
+  if not p_on and exists (select 1 from public.profiles where coach_id = p_person and id <> p_person) then
+    raise exception 'COACH_HAS_TRAINEES' using errcode = '42501';
+  end if;
+  perform set_config('ironlog.set_coach_frozen', 'on', true);
+  update public.profiles set is_coach = p_on, coach_frozen = false where id = p_person and not is_admin;
+  perform set_config('ironlog.set_coach_frozen', '', true);
   -- A new coach edits their own nutrition targets; targets the owner set
   -- while they were a trainee would otherwise stay locked to them.
   if p_on then
@@ -656,7 +652,7 @@ end;
 $$;
 
 -- The owner hands one of their own trainees to a coach. After that the
--- owner no longer sees them (only removing that coach brings them back).
+-- owner no longer sees them (only the coach handing them back brings them back).
 create or replace function public.assign_coach(p_person uuid, p_coach uuid)
 returns void
 language plpgsql

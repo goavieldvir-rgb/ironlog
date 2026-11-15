@@ -89,7 +89,7 @@ export default function Dashboard() {
   const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
   const { unread: unreadMessages, latest: latestMessage, threads: coachThreads } = useMessagesState()
-  const { isAdmin, nutritionAllowed } = useAdmin()
+  const { isAdmin, nutritionAllowed, coachFrozen } = useAdmin()
   const location = useLocation()
   const navigate = useNavigate()
   const [exercises, exercisesLoading, refreshExercises, exercisesError] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
@@ -269,6 +269,13 @@ export default function Dashboard() {
           {fmtDate(lang, now, { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
       </div>
+
+      {coachFrozen && !actingAs && (
+        <Card className="!p-5 flex flex-col gap-1">
+          <p className="font-medium">{t('dashboard.coachFrozenTitle')}</p>
+          <p className="text-chalkdim text-sm">{t('dashboard.coachFrozenBody')}</p>
+        </Card>
+      )}
 
       {/* New messages lead the page, for both sides: a trainee sees their
           coach's newest message, the coach sees who wrote. Hidden while the
