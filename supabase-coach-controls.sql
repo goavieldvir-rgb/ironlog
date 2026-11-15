@@ -110,9 +110,9 @@ begin
     where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity
   loop
     execute format('drop policy if exists "removed people cannot add" on public.%I', r.relname);
+    execute format('drop policy if exists "removed people cannot change" on public.%I', r.relname);
     continue when r.relname = 'error_logs';
     execute format('create policy "removed people cannot add" on public.%I as restrictive for insert to authenticated with check (not public.am_removed())', r.relname);
-    execute format('drop policy if exists "removed people cannot change" on public.%I', r.relname);
     execute format('create policy "removed people cannot change" on public.%I as restrictive for update to authenticated using (not public.am_removed()) with check (not public.am_removed())', r.relname);
   end loop;
 end $$;
