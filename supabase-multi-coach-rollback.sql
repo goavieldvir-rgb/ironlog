@@ -1,7 +1,8 @@
 -- Undo supabase-multi-coach.sql: every policy and function goes back to its
 -- definition from before the change (copied from the live database on
 -- 2026-11-12), the new functions, triggers and columns are dropped.
--- Coach assignments are lost; nobody else's data is touched.
+-- Coach assignments, and any notes and goals written by a second coach,
+-- are lost; nobody else's data is touched.
 -- Run in the SQL Editor, then redeploy send-workout-reminders and the app
 -- from the commit before the multi-coach change (bc6bdd7).
 
@@ -10,6 +11,8 @@ begin;
 drop trigger if exists trg_coach_task_owner on public.coach_tasks;
 drop trigger if exists trg_coach_removed on public.profiles;
 drop trigger if exists trg_coach_deleted on public.profiles;
+drop trigger if exists trg_coach_note_author on public.coach_notes;
+drop trigger if exists trg_coach_goal_author on public.coach_goals;
 
 drop policy if exists "read own or admin reads all profiles" on public.profiles;
 create policy "read own or admin reads all profiles" on public.profiles as permissive for select to public using (((auth.uid() = id) OR is_admin()));
@@ -705,11 +708,30 @@ drop function if exists public.take_back(uuid);
 drop function if exists public.return_to_owner(uuid);
 drop function if exists public.coach_task_owner();
 drop function if exists public.coach_removed();
+drop function if exists public.coach_row_author();
 drop function if exists public.my_coach();
 drop function if exists public.owner_gets_alerts(uuid);
 drop function if exists public.can_coach_folder(text);
 drop function if exists public.can_coach(uuid);
 drop function if exists public.is_coach();
+
+-- Notes and goals written by other coaches are removed: before this change
+-- every coach note was visible to the owner.
+do $$
+declare owner uuid := (select o.id from public.profiles o where o.is_admin order by o.created_at limit 1);
+begin
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_notes' and column_name = 'author_id') then
+    delete from public.coach_notes where author_id is distinct from owner;
+    alter table public.coach_notes drop column author_id;
+  end if;
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_goals' and column_name = 'author_id') then
+    delete from public.coach_goals where author_id is distinct from owner;
+    alter table public.coach_goals drop constraint if exists coach_goals_pkey;
+    alter table public.coach_goals drop column author_id;
+    alter table public.coach_goals add constraint coach_goals_pkey primary key (trainee_id);
+  end if;
+end $$;
+
 
 drop index if exists public.coach_tasks_coach_idx;
 alter table public.coach_tasks drop column if exists coach_id;

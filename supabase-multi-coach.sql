@@ -39,6 +39,43 @@ update public.coach_tasks t
    set coach_id = (select o.id from public.profiles o where o.is_admin order by o.created_at limit 1)
  where t.trainee_id is null and t.coach_id is null;
 
+-- Coach notes and goals belong to the coach who wrote them and stay with that
+-- coach when the trainee moves. Every existing one is the owner's.
+alter table public.coach_notes add column if not exists author_id uuid references public.profiles (id) on delete cascade;
+update public.coach_notes set author_id = (select o.id from public.profiles o where o.is_admin order by o.created_at limit 1) where author_id is null;
+alter table public.coach_notes alter column author_id set not null;
+alter table public.coach_goals add column if not exists author_id uuid references public.profiles (id) on delete cascade;
+update public.coach_goals set author_id = (select o.id from public.profiles o where o.is_admin order by o.created_at limit 1) where author_id is null;
+alter table public.coach_goals alter column author_id set not null;
+alter table public.coach_goals drop constraint if exists coach_goals_pkey;
+alter table public.coach_goals add constraint coach_goals_pkey primary key (trainee_id, author_id);
+
+-- A new note or goal is the writer's; written by the server, the trainee's coach's.
+create or replace function public.coach_row_author()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if auth.uid() is not null then
+    new.author_id := auth.uid();
+  elsif new.author_id is null then
+    new.author_id := coalesce(
+      (select p.coach_id from public.profiles p where p.id = new.trainee_id),
+      (select o.id from public.profiles o where o.is_admin order by o.created_at limit 1));
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.coach_row_author() from public, anon, authenticated;
+drop trigger if exists trg_coach_note_author on public.coach_notes;
+create trigger trg_coach_note_author before insert on public.coach_notes
+  for each row execute function public.coach_row_author();
+drop trigger if exists trg_coach_goal_author on public.coach_goals;
+create trigger trg_coach_goal_author before insert on public.coach_goals
+  for each row execute function public.coach_row_author();
+
 -- ---------- checks used by the policies ----------
 -- Any coach (owner included), signed in with two-step.
 create or replace function public.is_coach()
@@ -258,11 +295,15 @@ create policy "write own thread or coach" on public.coach_messages
 
 drop policy if exists "admins manage coach notes" on public.coach_notes;
 create policy "admins manage coach notes" on public.coach_notes
-  for all to authenticated using (public.can_coach(trainee_id)) with check (public.can_coach(trainee_id));
+  for all to authenticated
+  using (public.can_coach(trainee_id) and author_id = auth.uid())
+  with check (public.can_coach(trainee_id) and author_id = auth.uid());
 
 drop policy if exists "admins manage coach goals" on public.coach_goals;
 create policy "admins manage coach goals" on public.coach_goals
-  for all to authenticated using (public.can_coach(trainee_id)) with check (public.can_coach(trainee_id));
+  for all to authenticated
+  using (public.can_coach(trainee_id) and author_id = auth.uid())
+  with check (public.can_coach(trainee_id) and author_id = auth.uid());
 
 -- A task about a trainee belongs to that trainee's coach; a hand-written
 -- one with no trainee to whoever wrote it.
@@ -728,12 +769,12 @@ begin
     nt.kcal, nt.protein,
     c.version, c.variant, c.accepted_at, c.guardian_name,
     g.goal, g.target_weight, g.next_checkin,
-    (select cn.body from coach_notes cn where cn.trainee_id = p.id and cn.pinned
+    (select cn.body from coach_notes cn where cn.trainee_id = p.id and cn.pinned and cn.author_id = auth.uid()
       order by cn.created_at desc limit 1),
     p.is_coach, p.coach_id, coalesce(nullif(co.full_name, ''), co.email)
   from profiles p
   left join profiles co on co.id = p.coach_id
-  left join coach_goals g on g.trainee_id = p.id
+  left join coach_goals g on g.trainee_id = p.id and g.author_id = auth.uid()
   left join nutrition_targets nt on nt.user_id = p.id
   left join lateral (
     select b.weight, b.unit, b.date from body_weight_logs b
@@ -816,6 +857,7 @@ begin
          extract(year from age(p_today, g.birthday))::int, p_today
   from coach_goals g
   join profiles p on p.id = g.trainee_id and not p.is_admin and not p.is_coach
+    and g.author_id = coalesce(p.coach_id, (select o.id from profiles o where o.is_admin order by o.created_at limit 1))
   where g.birthday is not null
     and (to_char(g.birthday, 'MM-DD') = to_char(p_today, 'MM-DD')
       or (to_char(g.birthday, 'MM-DD') = '02-29' and to_char(p_today, 'MM-DD') = '02-28'
@@ -828,6 +870,7 @@ begin
   select g.trainee_id, 'checkin', 'checkin:' || g.trainee_id || ':' || g.next_checkin, g.next_checkin, g.next_checkin
   from coach_goals g
   join profiles p on p.id = g.trainee_id and not p.is_admin and not p.is_coach
+    and g.author_id = coalesce(p.coach_id, (select o.id from profiles o where o.is_admin order by o.created_at limit 1))
   where g.next_checkin is not null and g.next_checkin <= p_today
   on conflict (dedupe_key) do nothing;
   get diagnostics c = row_count; added := added + c;
