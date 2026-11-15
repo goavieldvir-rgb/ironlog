@@ -287,7 +287,9 @@ function Diary() {
 
   async function onSaveTargets(values) {
     try {
-      const saved = await saveTargets(uid, values, isAdmin ? 'coach' : 'self')
+      // 'coach' locks the targets for the trainee. Another coach's own targets
+      // are his to edit, so they stay 'self'.
+      const saved = await saveTargets(uid, values, isAdmin && (isOwner || actingAs) ? 'coach' : 'self')
       setTargets(saved)
       targetsCache.set(uid, saved)
       showToast(t('nutrition.targetsSaved'))

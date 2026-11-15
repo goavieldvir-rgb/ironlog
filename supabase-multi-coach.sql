@@ -509,6 +509,11 @@ begin
     raise exception 'not a coach' using errcode = '42501';
   end if;
   update public.profiles set is_coach = p_on where id = p_person and not is_admin;
+  -- A new coach edits their own nutrition targets; targets the owner set
+  -- while they were a trainee would otherwise stay locked to them.
+  if p_on then
+    update public.nutrition_targets set set_by = 'self' where user_id = p_person and set_by = 'coach';
+  end if;
 end;
 $$;
 
