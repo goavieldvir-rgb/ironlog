@@ -98,7 +98,10 @@ $$;
 
 -- ---------- a removed person can read and delete, but not add or change ----------
 -- Restrictive policies are ANDed with the existing ones, so nothing else
--- changes for anyone who isn't removed.
+-- changes for anyone who isn't removed. Any table added later needs these
+-- two policies as well: re-running this script adds them.
+-- Error reports are exempt, so problems on the removed screen still reach
+-- the owner.
 do $$
 declare r record;
 begin
@@ -107,6 +110,7 @@ begin
     where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity
   loop
     execute format('drop policy if exists "removed people cannot add" on public.%I', r.relname);
+    continue when r.relname = 'error_logs';
     execute format('create policy "removed people cannot add" on public.%I as restrictive for insert to authenticated with check (not public.am_removed())', r.relname);
     execute format('drop policy if exists "removed people cannot change" on public.%I', r.relname);
     execute format('create policy "removed people cannot change" on public.%I as restrictive for update to authenticated using (not public.am_removed()) with check (not public.am_removed())', r.relname);

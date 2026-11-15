@@ -324,7 +324,7 @@ export default function PersonDetail() {
 
           {messagesOn && (
             <Section title={t('messages.title')} hint={t('messages.coachHint')}>
-              <MessageThread traineeId={p.id} viewerId={me.uid} side="coach" />
+              <MessageThread traineeId={p.id} viewerId={me.uid} side="coach" readOnlyNote={p.removed_at ? t('people.removedNoMessages') : null} />
             </Section>
           )}
 
