@@ -50,7 +50,7 @@ export const CLIPS = {
   'push-up': { v: '3069453a' },
   'rear-delt-fly': { v: 'ac36bb50' },
   'romanian-deadlift': { v: '5299f909' },
-  'scapular-push-up': { v: '11c33e16' },
+  'scapular-push-up': { v: '89f83bc7' },
   'seated-cable-row': { v: '7ce7ae84', t: '567111d3' },
   'seated-dumbbell-curl': { v: '05df05c6' },
   'seated-dumbbell-shoulder-press': { v: 'a9cbf3c3', t: '4c0d40a8' },
