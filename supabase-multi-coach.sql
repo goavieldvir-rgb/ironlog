@@ -20,6 +20,8 @@
 -- ---------- columns ----------
 alter table public.profiles add column if not exists is_coach boolean not null default false;
 alter table public.profiles add column if not exists coach_id uuid references public.profiles (id) on delete set null;
+-- Who handed this trainee to their current coach (the owner), so the owner can take them back.
+alter table public.profiles add column if not exists moved_by uuid references public.profiles (id) on delete set null;
 create index if not exists profiles_coach_id_idx on public.profiles (coach_id);
 
 -- Hand-written tasks with no trainee belong to whoever wrote them.
@@ -340,6 +342,7 @@ begin
     new.nutrition_enabled := false;
     new.is_coach := false;
     new.coach_id := null;
+    new.moved_by := null;
   elsif public.is_admin() then
     -- Nobody becomes owner (or stops being one) through the app; that stays
     -- a SQL Editor change, so the owner can't create a second owner by mistake.
@@ -355,11 +358,25 @@ begin
       select 1 from public.profiles c where c.id = new.coach_id and (c.is_admin or c.is_coach)) then
       raise exception 'NOT_A_COACH';
     end if;
+    -- Remember who handed a trainee to a coach; back with the owner, it's cleared.
+    if new.coach_id is distinct from old.coach_id then
+      new.moved_by := case when new.coach_id is null or new.coach_id = auth.uid() then null else auth.uid() end;
+    elsif new.moved_by is distinct from old.moved_by then
+      raise exception 'COACH_FIELDS_PROTECTED';
+    end if;
   else
     if new.is_admin is distinct from old.is_admin then
       raise exception 'ADMIN_FLAG_PROTECTED';
     end if;
-    if new.is_coach is distinct from old.is_coach or new.coach_id is distinct from old.coach_id then
+    -- The one coach-field change a coach may make: return_to_owner() hands
+    -- their own trainee back to the owner.
+    if coalesce(current_setting('ironlog.return_to_owner', true), '') = 'on'
+       and new.is_coach is not distinct from old.is_coach
+       and old.coach_id = auth.uid()
+       and new.coach_id = (select o.id from public.profiles o where o.is_admin order by o.created_at limit 1) then
+      new.moved_by := null;
+    elsif new.is_coach is distinct from old.is_coach or new.coach_id is distinct from old.coach_id
+       or new.moved_by is distinct from old.moved_by then
       raise exception 'COACH_FIELDS_PROTECTED';
     end if;
     if not public.can_coach(old.id) then
@@ -387,7 +404,8 @@ declare
   gone uuid := case when tg_op = 'DELETE' then old.id else new.id end;
 begin
   update public.profiles
-     set coach_id = (select o.id from public.profiles o where o.is_admin and o.id <> gone order by o.created_at limit 1)
+     set coach_id = (select o.id from public.profiles o where o.is_admin and o.id <> gone order by o.created_at limit 1),
+         moved_by = null
    where coach_id = gone and id <> gone;
   return case when tg_op = 'DELETE' then old else new end;
 end;
@@ -413,6 +431,64 @@ as $$
   where p.is_coach and not p.is_admin and public.is_admin()
   order by 2;
 $$;
+
+-- Trainees the owner handed to a coach and can take back: name and coach only.
+create or replace function public.list_moved_by_me()
+returns table (id uuid, name text, coach_name text)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select p.id, coalesce(nullif(p.full_name, ''), p.email), coalesce(nullif(c.full_name, ''), c.email)
+  from public.profiles p
+  join public.profiles c on c.id = p.coach_id and c.is_coach and not c.is_admin
+  where public.is_admin() and p.moved_by = auth.uid() and not p.is_coach and not p.is_admin
+  order by 2;
+$$;
+
+-- The owner takes back a trainee they handed to a coach.
+create or replace function public.take_back(p_person uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'owner only' using errcode = '42501';
+  end if;
+  if not exists (select 1 from public.list_moved_by_me() m where m.id = p_person) then
+    raise exception 'not moved by you' using errcode = '42501';
+  end if;
+  update public.profiles set coach_id = auth.uid() where id = p_person;
+end;
+$$;
+
+-- A coach hands one of their trainees back to the owner.
+create or replace function public.return_to_owner(p_person uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_coach() or public.is_admin() or not public.can_coach(p_person) then
+    raise exception 'not your trainee' using errcode = '42501';
+  end if;
+  perform set_config('ironlog.return_to_owner', 'on', true);
+  update public.profiles
+     set coach_id = (select o.id from public.profiles o where o.is_admin order by o.created_at limit 1)
+   where id = p_person;
+  perform set_config('ironlog.return_to_owner', '', true);
+end;
+$$;
+revoke execute on function public.list_moved_by_me() from public, anon;
+grant execute on function public.list_moved_by_me() to authenticated;
+revoke execute on function public.take_back(uuid) from public, anon;
+grant execute on function public.take_back(uuid) to authenticated;
+revoke execute on function public.return_to_owner(uuid) from public, anon;
+grant execute on function public.return_to_owner(uuid) to authenticated;
 
 -- The owner makes one of their own trainees a coach, or stops someone being
 -- a coach (their trainees then move to the owner, see coach_removed).

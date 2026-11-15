@@ -221,11 +221,27 @@ function CoachesCard({ onChanged }) {
   const { t } = useLanguage()
   const { toast, confirm } = useFeedback()
   const [coaches, setCoaches] = useState(null)
+  const [moved, setMoved] = useState([])
 
   async function load() {
-    const { data, error } = await supabase.rpc('list_coaches')
-    if (error) return console.error(error)
-    setCoaches(data || [])
+    const [c, m] = await Promise.all([supabase.rpc('list_coaches'), supabase.rpc('list_moved_by_me')])
+    if (c.error) return console.error(c.error)
+    if (m.error) console.error(m.error)
+    setCoaches(c.data || [])
+    setMoved(m.data || [])
+  }
+
+  async function takeBack(m) {
+    if (!(await confirm({ title: t('people.takeBackTitle', { name: m.name, coach: m.coach_name }), body: t('people.takeBackBody', { coach: m.coach_name }), confirmLabel: t('people.takeBack') }))) return
+    const { error } = await supabase.rpc('take_back', { p_person: m.id })
+    if (error) {
+      console.error(error)
+      toast(t('people.coachChangeError'), 'error')
+      return
+    }
+    toast(t('people.tookBack', { name: m.name }))
+    load()
+    onChanged()
   }
   useEffect(() => {
     load()
@@ -261,6 +277,22 @@ function CoachesCard({ onChanged }) {
           </button>
         </div>
       ))}
+      {moved.length > 0 && (
+        <>
+          <h3 className="text-sm text-chalkdim mt-2">{t('people.movedTitle')}</h3>
+          {moved.map((m) => (
+            <div key={m.id} className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate">{m.name}</p>
+                <p className="text-xs text-chalkdim truncate">{t('people.withCoach', { coach: m.coach_name })}</p>
+              </div>
+              <button onClick={() => takeBack(m)} className="shrink-0 text-sm text-chalkdim">
+                {t('people.takeBack')}
+              </button>
+            </div>
+          ))}
+        </>
+      )}
     </Card>
   )
 }

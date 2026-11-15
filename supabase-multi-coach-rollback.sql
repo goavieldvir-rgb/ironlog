@@ -700,6 +700,9 @@ drop function if exists public.notify_coach_pr(uuid, text);
 drop function if exists public.assign_coach(uuid, uuid);
 drop function if exists public.set_coach(uuid, boolean);
 drop function if exists public.list_coaches();
+drop function if exists public.list_moved_by_me();
+drop function if exists public.take_back(uuid);
+drop function if exists public.return_to_owner(uuid);
 drop function if exists public.coach_task_owner();
 drop function if exists public.coach_removed();
 drop function if exists public.my_coach();
@@ -711,6 +714,7 @@ drop function if exists public.is_coach();
 drop index if exists public.coach_tasks_coach_idx;
 alter table public.coach_tasks drop column if exists coach_id;
 drop index if exists public.profiles_coach_id_idx;
+alter table public.profiles drop column if exists moved_by;
 alter table public.profiles drop column if exists coach_id;
 alter table public.profiles drop column if exists is_coach;
 

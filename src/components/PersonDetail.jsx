@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ResponsiveContainer, BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts'
-import { Apple, GraduationCap, Pin, PinOff, Trash2, CheckCheck, Trophy, ChevronDown, Pencil, Plus, Check } from 'lucide-react'
+import { Apple, GraduationCap, Undo2, Pin, PinOff, Trash2, CheckCheck, Trophy, ChevronDown, Pencil, Plus, Check } from 'lucide-react'
 import { BackChevron, ForwardChevron, ForwardArrow } from './DirectionalIcon.jsx'
 import { supabase } from '../supabase.js'
 import { useAdmin } from '../context/AdminContext.jsx'
@@ -12,6 +12,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
 import { TERMS_VERSION } from '../legal/terms.js'
+import { COACH_NAME } from '../legal/privacy.js'
 import { Card, Badge, Button, Field, LoadError } from './ui.jsx'
 import { PageLoader } from './Loading.jsx'
 import ProgressPhotos from './ProgressPhotos.jsx'
@@ -44,7 +45,7 @@ function shortDate(lang, iso) {
 export default function PersonDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { isAdmin, isOwner, profile: myProfile, setActingAs } = useAdmin()
+  const { isAdmin, isOwner, isCoach, profile: myProfile, setActingAs } = useAdmin()
   const { t, lang } = useLanguage()
   const { toast, confirm } = useFeedback()
   const { user: me } = useAuth()
@@ -162,6 +163,20 @@ export default function PersonDetail() {
     navigate('/people')
   }
 
+  // A coach hands one of their trainees back to the owner.
+  async function returnToOwner() {
+    const name = p.full_name || p.email
+    if (!(await confirm({ title: t('people.returnTitle', { name, owner: COACH_NAME }), body: t('people.returnBody', { owner: COACH_NAME }), confirmLabel: t('people.returnConfirm'), danger: true }))) return
+    const { error } = await supabase.rpc('return_to_owner', { p_person: p.id })
+    if (error) {
+      console.error(error)
+      toast(t('people.coachChangeError'), 'error')
+      return
+    }
+    toast(t('people.returned', { name, owner: COACH_NAME }))
+    navigate('/people')
+  }
+
   async function changeCoach(coachId) {
     const name = p.full_name || p.email
     const target = coachId === myProfile?.id ? null : coaches.find((c) => c.id === coachId)
@@ -239,6 +254,12 @@ export default function PersonDetail() {
             <Button variant="ghost" onClick={makeCoach}>
               <GraduationCap size={15} />
               {t('people.coachOff')}
+            </Button>
+          )}
+          {isCoach && !isOwner && !p.is_admin && !p.is_coach && p.id !== myProfile?.id && (
+            <Button variant="ghost" onClick={returnToOwner}>
+              <Undo2 size={15} />
+              {t('people.returnButton', { owner: COACH_NAME })}
             </Button>
           )}
           {isOwner && !p.is_admin && (
