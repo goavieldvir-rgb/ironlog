@@ -552,7 +552,7 @@ begin
    where trainee_id = new.id and kind = 'moved' and done_at is null;
   insert into public.coach_tasks (trainee_id, kind, dedupe_key, due)
   values (new.id, 'moved', 'moved:' || new.id || ':' || new.coach_id || ':' || current_date, current_date)
-  on conflict (dedupe_key) do nothing;
+  on conflict (dedupe_key) do update set done_at = null, auto_done = false, notified_at = null;
   return new;
 end;
 $$;
