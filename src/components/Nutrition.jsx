@@ -64,7 +64,7 @@ const COPY_LOOKBACK = 14
 function Diary() {
   const { t, lang } = useLanguage()
   const { user } = useAuth()
-  const { isAdmin, effectiveUid, actingAs } = useAdmin()
+  const { isAdmin, isOwner, effectiveUid, actingAs } = useAdmin()
   const { toast } = useFeedback()
   const uid = effectiveUid
   const today = toLocalISODate()
@@ -287,7 +287,9 @@ function Diary() {
 
   async function onSaveTargets(values) {
     try {
-      const saved = await saveTargets(uid, values, isAdmin ? 'coach' : 'self')
+      // 'coach' locks the targets for the trainee. Another coach's own targets
+      // are his to edit, so they stay 'self'.
+      const saved = await saveTargets(uid, values, isAdmin && (isOwner || actingAs) ? 'coach' : 'self')
       setTargets(saved)
       targetsCache.set(uid, saved)
       showToast(t('nutrition.targetsSaved'))
@@ -609,7 +611,7 @@ function Diary() {
                 )
                 break
               case 'detail':
-                body = <FoodDetail {...common} food={v.food} meal={meal} setMeal={setMeal} targets={targets} totals={totals} favUid={uid} isAdmin={isAdmin} onLog={logFood} />
+                body = <FoodDetail {...common} food={v.food} meal={meal} setMeal={setMeal} targets={targets} totals={totals} favUid={uid} isAdmin={isOwner} onLog={logFood} />
                 break
               case 'label':
                 body = (
@@ -618,7 +620,7 @@ function Diary() {
                     barcode={v.barcode}
                     prefill={v.prefill}
                     uid={user.uid}
-                    isAdmin={isAdmin}
+                    isAdmin={isOwner}
                     onSaved={onLabelSaved}
                     onUseExisting={(food) => setStack((s) => [...s.slice(0, -1), { type: 'detail', food }])}
                   />

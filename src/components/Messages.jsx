@@ -26,7 +26,7 @@ function stamp(lang, iso) {
 
 // The chat itself, used by the trainee's Messages screen and by a trainee's
 // coach page. `side` is who is looking: 'trainee' or 'coach'.
-export function MessageThread({ traineeId, viewerId, side, listClass = 'max-h-[28rem]', onRead }) {
+export function MessageThread({ traineeId, viewerId, side, listClass = 'max-h-[28rem]', onRead, readOnlyNote = null }) {
   const { t, lang } = useLanguage()
   const [rows, setRows] = useState(null)
   const [loadError, setLoadError] = useState(null)
@@ -155,6 +155,9 @@ export function MessageThread({ traineeId, viewerId, side, listClass = 'max-h-[2
         ))}
       </div>
 
+      {readOnlyNote ? (
+        <p className="text-chalkdim text-sm">{readOnlyNote}</p>
+      ) : (
       <div className="flex items-end gap-2">
         <textarea
           ref={areaRef}
@@ -177,7 +180,8 @@ export function MessageThread({ traineeId, viewerId, side, listClass = 'max-h-[2
           <SendHorizontal size={20} className="rtl:-scale-x-100" aria-hidden="true" />
         </button>
       </div>
-      {tooLong && <p className="text-xs text-accent num">{t('messages.tooLong')(MESSAGE_MAX)}</p>}
+      )}
+      {!readOnlyNote && tooLong && <p className="text-xs text-accent num">{t('messages.tooLong')(MESSAGE_MAX)}</p>}
     </div>
   )
 }

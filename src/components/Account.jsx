@@ -4,6 +4,7 @@ import { Download, FileSpreadsheet, ShieldCheck, Trash2, KeyRound, LogOut } from
 import { useAuth } from '../context/AuthContext.jsx'
 import { applyCurrentTimed } from '../lib/timed.js'
 import { useAdmin } from '../context/AdminContext.jsx'
+import { useOwnerName } from '../lib/coach.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
@@ -194,9 +195,10 @@ function TwoStepCard() {
   )
 }
 
-export default function Account() {
+export default function Account({ removed = false }) {
   const { user, logout } = useAuth()
-  const { actingAs, isAdmin, effectiveUid, effectiveName } = useAdmin()
+  const { actingAs, isAdmin, isOwner, effectiveUid, effectiveName, profile } = useAdmin()
+  const ownerName = useOwnerName(isAdmin && !isOwner)
   const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
   const navigate = useNavigate()
@@ -238,7 +240,8 @@ export default function Account() {
   // Deletion is only ever for your OWN account, never while viewing a
   // trainee — the database function enforces this too, since it only acts
   // on the signed-in user.
-  const canDelete = !actingAs && !isAdmin
+  // A removed coach is still a coach account, which can't delete itself.
+  const canDelete = !actingAs && !isAdmin && !(removed && profile?.is_coach)
   const typedMatches = typed.trim().toLowerCase() === (user?.email || '').toLowerCase()
 
   async function deleteAccount() {
@@ -267,13 +270,21 @@ export default function Account() {
 
   return (
     <div className="flex flex-col gap-5 max-w-2xl">
-      <div>
-        <div className="eyebrow mb-1">{t('account.eyebrow')}</div>
-        <h1 className="text-3xl">{t('account.title')}</h1>
-        <p className="text-chalkdim text-sm mt-1">{who}</p>
-      </div>
+      {removed ? (
+        <Card className="flex flex-col gap-2">
+          <h1 className="text-2xl">{t('account.removedTitle')}</h1>
+          <p className="text-chalkdim text-sm">{t('account.removedBody')}</p>
+          <p className="text-chalkdim text-sm">{who}</p>
+        </Card>
+      ) : (
+        <div>
+          <div className="eyebrow mb-1">{t('account.eyebrow')}</div>
+          <h1 className="text-3xl">{t('account.title')}</h1>
+          <p className="text-chalkdim text-sm mt-1">{who}</p>
+        </div>
+      )}
 
-      <GymSettings uid={effectiveUid} />
+      {!removed && <GymSettings uid={effectiveUid} />}
 
       <Card className="flex flex-col gap-3">
         <h2 className="eyebrow">{t('account.exportTitle')}</h2>
@@ -290,9 +301,9 @@ export default function Account() {
         </div>
       </Card>
 
-      {!actingAs && <PasswordCard />}
+      {!actingAs && !removed && <PasswordCard />}
 
-      {!actingAs && <TwoStepCard />}
+      {!actingAs && !removed && <TwoStepCard />}
 
       <Card className="flex flex-col gap-3 border-ironsoft">
         <h2 className="eyebrow text-irontext">{t('account.deleteTitle')}</h2>
@@ -309,14 +320,18 @@ export default function Account() {
             </div>
           </>
         ) : (
-          <p className="text-chalkdim text-sm">{actingAs ? t('account.deleteNotWhileActing') : t('account.deleteAdminBlocked')}</p>
+          <p className="text-chalkdim text-sm">{actingAs ? t('account.deleteNotWhileActing') : isOwner ? t('account.deleteAdminBlocked') : removed ? t('account.deleteRemovedCoach') : t('account.deleteCoachBlocked', { owner: ownerName })}</p>
         )}
       </Card>
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Link to="/privacy" className="text-chalkdim text-sm hover:text-brass w-fit">
-          {t('privacy.link')}
-        </Link>
+        {removed ? (
+          <span />
+        ) : (
+          <Link to="/privacy" className="text-chalkdim text-sm hover:text-brass w-fit">
+            {t('privacy.link')}
+          </Link>
+        )}
         {!actingAs && (
           <Button variant="ghost" onClick={logout}>
             <LogOut size={16} /> {t('nav.logout')}

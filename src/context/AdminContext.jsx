@@ -33,10 +33,21 @@ export function AdminProvider({ children }) {
     setActingAsState(null)
   }, [user?.uid])
 
-  const isAdmin = !!profile?.is_admin
-  // Nutrition is a beta: admins, plus trainees an admin switched on. The
+  // The owner is the original admin; other coaches only manage their own
+  // trainees. isAdmin stays as "any coach" so coach features work for both,
+  // and owner-only things (error logs, verifying shared foods) use isOwner.
+  const isOwner = !!profile?.is_admin
+  // A frozen coach keeps their account but, like a trainee, sees only their
+  // own data until the owner unfreezes them.
+  const coachFrozen = !isOwner && !!profile?.is_coach && !!profile?.coach_frozen
+  // Someone removed from the app can only download their data or delete
+  // their account (see Account's removed view).
+  const removed = !isOwner && !!profile?.removed_at
+  const isCoach = isOwner || (!!profile?.is_coach && !coachFrozen && !removed)
+  const isAdmin = isCoach
+  // Nutrition is a beta: coaches, plus trainees a coach switched on. The
   // column may not exist before the migration, which reads as off.
-  const nutritionAllowed = isAdmin || profile?.nutrition_enabled === true
+  const nutritionAllowed = isCoach || profile?.nutrition_enabled === true
 
   function setActingAs(uid, name, email) {
     setActingAsState(uid ? { uid, name, email } : null)
@@ -45,6 +56,10 @@ export function AdminProvider({ children }) {
   const value = {
     profile,
     isAdmin,
+    isOwner,
+    isCoach,
+    coachFrozen,
+    removed,
     nutritionAllowed,
     loadingProfile,
     actingAs,

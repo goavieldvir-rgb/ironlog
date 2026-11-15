@@ -9,6 +9,8 @@
 // clear and calm rather than dramatic. Have an Israeli lawyer review it
 // before relying on it — especially the injury and minors sections.
 
+import { COACH_NAME } from './privacy.js'
+
 export const TERMS_VERSION = 2
 export const TERMS_DOC_KEY = 'training-terms'
 
@@ -229,10 +231,30 @@ export const terms = {
   },
 }
 
+// The terms for someone whose coach is not the owner: the "who can see it"
+// section also says what the owner, who runs Ironlog, can and cannot see. Owner or
+// unknown coach gives the original text untouched (it is hashed into the
+// consent record, so it must not change by a character).
+export function termsFor(lang, coach) {
+  const docs = terms[lang] || terms.en
+  if (!coach || coach.isOwner) return docs
+  const extra = docs === terms.he
+    ? ` ${COACH_NAME} מפעיל את Ironlog אך אינו רואה באפליקציה את הפרופיל, האימונים, המדידות, יומן האוכל, התמונות או ההודעות שלכם, אלא רק דיווחי תקלות ומאכלים שאתם מוסיפים לרשימת המאכלים המשותפת.`
+    : ` ${COACH_NAME} runs Ironlog but does not see your profile, workouts, measurements, food diary, photos or messages in the app, only error reports and foods you add to the shared food list.`
+  // Adult "Who can see it" is section 3; the under-18 text merges it into
+  // "What the app stores and who sees it", section 3 as well.
+  const addTo = (doc) => ({
+    ...doc,
+    sections: doc.sections.map((s, i) => (i === 3 ? { ...s, body: s.body + extra } : s)),
+  })
+  return { ...docs, adult: addTo(docs.adult), minor: addTo(docs.minor) }
+}
+
 // The exact text someone was shown, flattened the same way every time so
 // the fingerprint is reproducible.
-export function termsPlainText(lang, variant) {
-  const doc = terms[lang]?.[variant] || terms.en[variant]
+export function termsPlainText(lang, variant, coach) {
+  const docs = termsFor(lang, coach)
+  const doc = docs[variant] || terms.en[variant]
   return [doc.title, doc.intro, ...doc.sections.flatMap((s) => [s.heading, s.body]), doc.accept].join('\n\n')
 }
 

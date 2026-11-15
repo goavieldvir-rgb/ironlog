@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { supabase } from '../supabase.js'
 import { toLocalISODate, weekStartOf } from './dates.js'
 import { TERMS_VERSION, TERMS_DOC_KEY } from '../legal/terms.js'
@@ -23,7 +24,20 @@ export function daysSince(iso, today = toLocalISODate()) {
 }
 
 export async function fetchRoster(today = toLocalISODate()) {
-  return check(await supabase.rpc('coach_roster', { p_today: today })) || []
+  const rows = check(await supabase.rpc('coach_roster', { p_today: today })) || []
+  // Who has been removed from the app (only people this coach may see come
+  // back). Before the SQL is run the column doesn't exist: nobody is removed.
+  const { data, error } = await supabase.from('profiles').select('id').not('removed_at', 'is', null)
+  if (error) return rows
+  const removed = new Set((data || []).map((r) => r.id))
+  return rows.map((r) => ({ ...r, removed: removed.has(r.id) }))
+}
+
+// A coach's own trainee count and limit (null when there is no limit).
+export async function fetchMyCoachLimit() {
+  const { data, error } = await supabase.rpc('my_coach_limit')
+  if (error) return null
+  return data?.[0] || null
 }
 
 // The team's records from the last week, newest first, for the desktop panel.
@@ -197,7 +211,10 @@ export async function fetchTraineeDetail(uid, today = toLocalISODate()) {
     supabase.from('nutrition_targets').select('kcal, protein').eq('user_id', uid).maybeSingle().then(check),
     supabase.from('routines').select('id, name, category, exercises').eq('user_id', uid).order('created_at', { ascending: false }).then(check),
   ])
-  return { profile, sessions, weights, waists, prs, notes, goal, schedule, consent: consent[0] || null, food, targets, routines }
+  // The birthday lives on the person (it moves with them), the rest of the
+  // goal is this coach's own.
+  const withBirthday = goal || profile?.birthday ? { ...(goal || {}), birthday: profile?.birthday ?? null } : null
+  return { profile, sessions, weights, waists, prs, notes, goal: withBirthday, schedule, consent: consent[0] || null, food, targets, routines }
 }
 
 // Sessions per week for the last `n` weeks, oldest first.
@@ -236,20 +253,49 @@ export async function deleteCoachNote(id) {
 }
 
 export async function saveCoachGoal(traineeId, patch) {
-  return check(
+  const { birthday, ...rest } = patch
+  if (birthday !== undefined) check(await supabase.from('profiles').update({ birthday }).eq('id', traineeId))
+  const row = check(
     await supabase
       .from('coach_goals')
-      .upsert({ trainee_id: traineeId, ...patch, updated_at: new Date().toISOString() })
+      .upsert({ trainee_id: traineeId, ...rest, updated_at: new Date().toISOString() })
       .select()
       .single(),
   )
+  return birthday !== undefined ? { ...row, birthday } : row
 }
 
 // Sign-up is by invitation: an email can create an account for 30 days
 // after the coach copies its invite (see supabase-security-round3.sql).
 // Copying again renews it.
+// Another coach's live invite for the same email gives INVITED_BY_OTHER_COACH.
 export async function recordInvite(email) {
-  const clean = email.trim().toLowerCase()
-  const expires = new Date(Date.now() + 30 * 86400_000).toISOString()
-  check(await supabase.from('signup_invites').upsert({ email: clean, expires_at: expires }, { onConflict: 'email' }))
+  check(await supabase.rpc('record_invite', { p_email: email.trim().toLowerCase() }))
+}
+
+// The owner's display name for coach screens, read from the database (not
+// built into the app). Asked once per session.
+let ownerNamePromise = null
+export function fetchOwnerName() {
+  if (!ownerNamePromise) {
+    ownerNamePromise = supabase.rpc('app_owner_name').then(({ data, error }) => {
+      if (error) {
+        ownerNamePromise = null
+        throw error
+      }
+      return data || ''
+    })
+  }
+  return ownerNamePromise
+}
+
+export function useOwnerName(enabled = true) {
+  const [name, setName] = useState('')
+  useEffect(() => {
+    if (!enabled) return
+    let live = true
+    fetchOwnerName().then((n) => live && setName(n), (e) => console.error(e))
+    return () => { live = false }
+  }, [enabled])
+  return name
 }

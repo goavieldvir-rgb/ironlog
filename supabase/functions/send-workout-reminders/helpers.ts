@@ -80,6 +80,7 @@ export function coachTaskLine(lang: string, t: CoachTask) {
     case 'checkin': return he ? `צ׳ק-אין עם ${t.name}` : `Check-in with ${t.name}`
     case 'weigh': return he ? `${t.name} לא נשקל/ה ${t.n} ימים` : `${t.name}: no weigh-in in ${t.n} days`
     case 'welcome': return he ? `לבדוק איך עובר השבוע הראשון של ${t.name}` : `See how ${t.name}'s first week is going`
+    case 'moved': return he ? `${t.name} עבר/ה אליכם` : `${t.name} moved to you`
     default: return t.name ? `${t.title} (${t.name})` : (t.title || '')
   }
 }

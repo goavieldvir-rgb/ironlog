@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ResponsiveContainer, BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts'
-import { Apple, Pin, PinOff, Trash2, CheckCheck, Trophy, ChevronDown, Pencil, Plus, Check } from 'lucide-react'
+import { Apple, GraduationCap, Undo2, UserX, UserCheck, Pin, PinOff, Trash2, CheckCheck, Trophy, ChevronDown, Pencil, Plus, Check } from 'lucide-react'
 import { BackChevron, ForwardChevron, ForwardArrow } from './DirectionalIcon.jsx'
 import { supabase } from '../supabase.js'
 import { useAdmin } from '../context/AdminContext.jsx'
@@ -30,6 +30,7 @@ import {
   adherence,
   daysSince,
   shiftDay,
+  useOwnerName,
 } from '../lib/coach.js'
 import { sessionTitle } from '../lib/names.js'
 import { ACCENT, CHALK, CHALKDIM, MUTED, SURFACE } from '../theme.js'
@@ -44,7 +45,8 @@ function shortDate(lang, iso) {
 export default function PersonDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { isAdmin, setActingAs } = useAdmin()
+  const { isAdmin, isOwner, isCoach, profile: myProfile, setActingAs } = useAdmin()
+  const ownerName = useOwnerName(isCoach && !isOwner)
   const { t, lang } = useLanguage()
   const { toast, confirm } = useFeedback()
   const { user: me } = useAuth()
@@ -52,6 +54,7 @@ export default function PersonDetail() {
   const [data, setData] = useState(null)
   const [loadError, setLoadError] = useState(null)
   const [reload, setReload] = useState(0)
+  const [coaches, setCoaches] = useState([])
   const today = toLocalISODate()
 
   // Another trainee's page reuses this component: drop the previous one's
@@ -73,6 +76,17 @@ export default function PersonDetail() {
       cancelled = true
     }
   }, [id, reload, today])
+
+  // The coaches the owner can hand a trainee to (names only; the owner
+  // never sees their trainees).
+  useEffect(() => {
+    if (!isOwner) return
+    supabase.rpc('list_coaches').then(({ data, error }) => {
+      if (error) return console.error(error)
+      // A frozen coach can't take new trainees.
+      setCoaches((data || []).filter((c) => !c.frozen))
+    })
+  }, [isOwner])
 
   const derived = useMemo(() => {
     if (!data) return null
@@ -138,6 +152,68 @@ export default function PersonDetail() {
     setData((d) => ({ ...d, profile: { ...d.profile, nutrition_enabled: next } }))
   }
 
+  async function makeCoach() {
+    const name = p.full_name || p.email
+    if (!(await confirm({ title: t('people.makeCoachTitle', { name }), body: t('people.makeCoachBody'), confirmLabel: t('people.coachOff') }))) return
+    const { error } = await supabase.rpc('set_coach', { p_person: p.id, p_on: true })
+    if (error) {
+      console.error(error)
+      toast(t('people.coachError'), 'error')
+      return
+    }
+    toast(t('people.coachMade', { name }))
+    navigate('/people')
+  }
+
+  // A coach hands one of their trainees back to the owner.
+  async function returnToOwner() {
+    const name = p.full_name || p.email
+    if (!(await confirm({ title: t('people.returnTitle', { name, owner: ownerName }), body: t('people.returnBody', { owner: ownerName }), confirmLabel: t('people.returnConfirm'), danger: true }))) return
+    const { error } = await supabase.rpc('return_to_owner', { p_person: p.id })
+    if (error) {
+      console.error(error)
+      toast(t('people.coachChangeError'), 'error')
+      return
+    }
+    toast(t('people.returned', { name, owner: ownerName }))
+    navigate('/people')
+  }
+
+  // Remove a trainee from the app, or let them back in.
+  async function setRemoved(removed) {
+    const name = p.full_name || p.email
+    const ok = await confirm(
+      removed
+        ? { title: t('people.removeAppTitle', { name }), body: t('people.removeAppBody', { name }), confirmLabel: t('people.removeApp'), danger: true }
+        : { title: t('people.restoreTitle', { name }), body: t('people.restoreBody', { name }), confirmLabel: t('people.restore') }
+    )
+    if (!ok) return
+    const { error } = await supabase.rpc('set_removed', { p_person: p.id, p_removed: removed })
+    if (error) {
+      console.error(error)
+      toast(t(/COACH_LIMIT_REACHED/.test(error.message || '') ? 'people.limitReachedRestore' : 'people.coachChangeError'), 'error')
+      return
+    }
+    toast(t(removed ? 'people.removedApp' : 'people.restored', { name }))
+    setData((d) => ({ ...d, profile: { ...d.profile, removed_at: removed ? new Date().toISOString() : null } }))
+  }
+
+  async function changeCoach(coachId) {
+    const name = p.full_name || p.email
+    const target = coachId === myProfile?.id ? null : coaches.find((c) => c.id === coachId)
+    const coachName = target ? target.name || target.email : myProfile?.full_name || me?.email
+    if (target && !(await confirm({ title: t('people.moveTitle', { name, coach: coachName }), body: t('people.moveBody'), confirmLabel: t('people.moveConfirm'), danger: true }))) return
+    const { error } = await supabase.rpc('assign_coach', { p_person: p.id, p_coach: coachId })
+    if (error) {
+      console.error(error)
+      toast(t(/COACH_LIMIT_REACHED/.test(error.message || '') ? 'people.limitReachedMove' : 'people.coachChangeError'), 'error')
+      return
+    }
+    toast(t('people.moved', { name, coach: coachName }))
+    if (target) navigate('/people')
+    else setData((d) => ({ ...d, profile: { ...d.profile, coach_id: coachId } }))
+  }
+
   async function markAllReviewed() {
     const ids = derived.toReview.map((s) => s.id)
     try {
@@ -181,6 +257,7 @@ export default function PersonDetail() {
             <BackChevron size={14} /> {t('people.title')}
           </Link>
           <h1 className="text-3xl break-words">{name}</h1>
+          {p.removed_at && <p className="text-irontext text-sm mt-1">{t('people.removedNotice')}</p>}
           <p className="text-chalkdim text-sm mt-0.5 truncate" dir="ltr" style={{ textAlign: 'start' }}>
             {p.email}
           </p>
@@ -189,11 +266,39 @@ export default function PersonDetail() {
           <Button variant="brass" onClick={() => openAccount('/')}>
             {t('person.openAccount')} <ForwardArrow size={15} />
           </Button>
-          {!p.is_admin && (
+          {!(p.is_admin || p.is_coach) && (
             <Button variant="ghost" onClick={toggleNutrition} aria-pressed={!!p.nutrition_enabled}>
               <Apple size={15} className={p.nutrition_enabled ? 'text-good' : ''} />
               {p.nutrition_enabled ? t('people.nutritionOn') : t('people.nutritionOff')}
             </Button>
+          )}
+          {isOwner && !p.is_admin && (
+            <Button variant="ghost" onClick={makeCoach}>
+              <GraduationCap size={15} />
+              {t('people.coachOff')}
+            </Button>
+          )}
+          {isCoach && !p.is_admin && !p.is_coach && p.id !== myProfile?.id && 'removed_at' in p && (
+            <Button variant="ghost" onClick={() => setRemoved(!p.removed_at)}>
+              {p.removed_at ? <UserCheck size={15} /> : <UserX size={15} />}
+              {p.removed_at ? t('people.restore') : t('people.removeApp')}
+            </Button>
+          )}
+          {isCoach && !isOwner && ownerName && !p.is_admin && !p.is_coach && p.id !== myProfile?.id && (
+            <Button variant="ghost" onClick={returnToOwner}>
+              <Undo2 size={15} />
+              {t('people.returnButton', { owner: ownerName })}
+            </Button>
+          )}
+          {isOwner && !p.is_admin && (
+            <Field label={t('people.coachOf')}>
+              <select value={p.coach_id || myProfile?.id || ''} onChange={(e) => changeCoach(e.target.value)}>
+                <option value={myProfile?.id}>{myProfile?.full_name || me?.email}</option>
+                {coaches.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name || c.email}</option>
+                ))}
+              </select>
+            </Field>
           )}
         </div>
       </div>
@@ -219,7 +324,7 @@ export default function PersonDetail() {
 
           {messagesOn && (
             <Section title={t('messages.title')} hint={t('messages.coachHint')}>
-              <MessageThread traineeId={p.id} viewerId={me.uid} side="coach" />
+              <MessageThread traineeId={p.id} viewerId={me.uid} side="coach" readOnlyNote={p.removed_at ? t('people.removedNoMessages') : null} />
             </Section>
           )}
 
@@ -312,13 +417,13 @@ export default function PersonDetail() {
             </Section>
           )}
 
-          {!p.is_admin && (
+          {!(p.is_admin || p.is_coach) && (
             <Section title={t('photos.title')}>
               <ProgressPhotos uid={p.id} mode="coach" />
             </Section>
           )}
 
-          {!p.is_admin && (
+          {!(p.is_admin || p.is_coach) && (
             <Section
               title={t('person.routines')}
               hint={data.routines.length > 0 ? t('person.routinesHint') : t('person.noRoutinesYet')}

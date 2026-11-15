@@ -1,4 +1,4 @@
-import React, { lazy, useEffect, useState } from 'react'
+import React, { lazy, Suspense, useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext.jsx'
 import { useLanguage } from './context/LanguageContext.jsx'
@@ -43,7 +43,7 @@ const Messages = lazyRetry(() => import('./components/Messages.jsx'))
 
 export default function App() {
   const { user, loading, recovery, needsCode, hasTwoStep } = useAuth()
-  const { isAdmin, profile, loadingProfile } = useAdmin()
+  const { isAdmin, profile, loadingProfile, removed } = useAdmin()
   const { t } = useLanguage()
   const location = useLocation()
   const [linkProblem, setLinkProblem] = useState(null)
@@ -79,6 +79,17 @@ export default function App() {
   if (needsCode) return <TwoStepChallenge />
 
   if (loadingProfile && !profile) return <ScreenLoader />
+
+  // Removed from the app: only downloading their data and deleting the
+  // account are left. The database blocks everything else too.
+  if (removed)
+    return (
+      <Suspense fallback={<ScreenLoader />}>
+        <div className="min-h-screen p-4 sm:p-8 flex justify-center">
+          <Account removed />
+        </div>
+      </Suspense>
+    )
 
   // The coach account sees every trainee's data, so it can't be used
   // without two-step verification.

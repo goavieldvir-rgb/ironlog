@@ -3,6 +3,7 @@ import { Bell, Share, SquarePlus, Smartphone, Send } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
+import { useAdmin } from '../context/AdminContext.jsx'
 import { Card, Button } from './ui.jsx'
 import { DEFAULT_REMIND_TIME, ALL_DAYS, remindDaysSupported, pushStatus, getMyReminder, getTrainingDays, enableReminder, updateReminder, disableReminder, sendTestNotification, isIOS } from '../lib/push.js'
 
@@ -10,6 +11,7 @@ export default function Notifications() {
   const { user } = useAuth()
   const { t, lang } = useLanguage()
   const { toast } = useFeedback()
+  const { isCoach, isOwner } = useAdmin()
   // Bumped after a permission prompt so pushStatus() is read again and a
   // denied answer shows the blocked card right away.
   const [, setStatusTick] = useState(0)
@@ -200,6 +202,7 @@ export default function Notifications() {
             <div className="min-w-0">
               <div className="font-medium">{t('notifications.toggleLabel')}</div>
               <div className="text-chalkdim text-sm">{t('notifications.toggleHint')}</div>
+              {isCoach && !isOwner && <div className="text-chalkdim text-sm mt-1">{t('notifications.coachHint')}</div>}
             </div>
             <button
               type="button"

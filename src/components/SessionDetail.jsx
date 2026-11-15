@@ -90,7 +90,7 @@ function prSets(entry, baseline) {
 }
 
 export default function SessionDetail() {
-  const { effectiveUid, isAdmin, actingAs } = useAdmin()
+  const { effectiveUid, isAdmin, isOwner, actingAs } = useAdmin()
   const { t, lang } = useLanguage()
   const { id } = useParams()
   const navigate = useNavigate()
@@ -201,7 +201,7 @@ export default function SessionDetail() {
         </div>
       </div>
 
-      <TrainerComment session={session} effectiveUid={effectiveUid} isAdmin={isAdmin} isNew={unseen} onSaved={refresh} t={t} />
+      <TrainerComment session={session} effectiveUid={effectiveUid} isAdmin={isAdmin && (isOwner || !!actingAs)} isNew={unseen} onSaved={refresh} t={t} />
 
       {session.notes && <p className="text-chalkdim text-[15px] px-1">{session.notes}</p>}
 

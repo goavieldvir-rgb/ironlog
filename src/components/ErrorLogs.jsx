@@ -21,7 +21,7 @@ function formatDate(lang, iso) {
 export default function ErrorLogs() {
   const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
-  const { isAdmin } = useAdmin()
+  const { isOwner } = useAdmin()
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
   const [openId, setOpenId] = useState(null)
@@ -44,8 +44,8 @@ export default function ErrorLogs() {
   }
 
   useEffect(() => {
-    if (isAdmin) load()
-  }, [isAdmin])
+    if (isOwner) load()
+  }, [isOwner])
 
   async function clearAll() {
     // The list shows the newest 100, but "clear all" deletes every row: ask the database for the real number.
@@ -60,7 +60,7 @@ export default function ErrorLogs() {
     load()
   }
 
-  if (!isAdmin) return null
+  if (!isOwner) return null
 
   return (
     <div className="flex flex-col gap-5">
