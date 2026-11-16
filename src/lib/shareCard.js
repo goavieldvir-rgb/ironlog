@@ -325,6 +325,13 @@ function drawBrand(ctx, x, y, { rtl, color, size = 44, maxW = W - M * 2 }) {
   })
 }
 
+// Under a coach's name, a small "Powered by Ironlog" so the app is always
+// credited. Nothing when the card already says Ironlog.
+function drawCredit(ctx, x, y, { rtl, labels, color, size = 30 }) {
+  if (WORDMARK === 'Ironlog' || !labels?.poweredBy) return
+  drawLabel(ctx, labels.poweredBy, x, y, { rtl, size, weight: 500, color, maxW: W - M * 2 })
+}
+
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath()
   if (ctx.roundRect) ctx.roundRect(x, y, w, h, r)
@@ -477,6 +484,7 @@ function drawPlain(ctx, summary, { rtl, labels }) {
   // top row: wordmark at the start, the date at the end
   // the name gets a bit over half the width; the date keeps the rest
   drawBrand(ctx, x0, 316, { rtl, color: C.chalk, maxW: Math.round(full * 0.58) })
+  drawCredit(ctx, x0, 366, { rtl, labels, color: C.dim })
   if (summary.date) {
     const d = new Date(`${summary.date}T00:00:00`)
     const text = d.toLocaleDateString(rtl ? 'he-IL' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -526,7 +534,7 @@ function drawPlain(ctx, summary, { rtl, labels }) {
 }
 
 // variant: 'plain' (default), 'photo' (needs `photo`) or 'sticker'.
-// labels: { eyebrow, totalVolume, duration, volume, distance, sets, streak, weekUnit, min, records }
+// labels: { eyebrow, totalVolume, duration, volume, distance, sets, streak, weekUnit, min, records, poweredBy }
 // accent: a #RRGGBB color, else the app's accent right now (the coach's).
 // brandName: shown in place of "Ironlog" when given.
 export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo = null, accent = null, brandName = null }) {
@@ -558,6 +566,7 @@ export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo
       drawPhoto(ctx, photo)
       FX = { sticker: true, shadow: { color: 'rgba(0,0,0,0.22)', blur: 6, y: 1 } }
       drawBrand(ctx, rtl ? W - M : M, 316, { rtl, color: '#FFFFFF' })
+      drawCredit(ctx, rtl ? W - M : M, 366, { rtl, labels, color: 'rgba(255,255,255,0.88)' })
       const white = 'rgba(255,255,255,0.92)'
       drawOverlayBlock(ctx, summary, { rtl, labels, bottom: 1640, labelColor: white, unitColor: white })
       return canvas
@@ -590,6 +599,7 @@ function renderSticker(summary, { rtl, labels }) {
   // units in white too: the accent can vanish on a light story
   const bottom = drawOverlayBlock(sctx, summary, { rtl, labels, top: 120, labelColor: 'rgba(255,255,255,0.9)', unitColor: 'rgba(255,255,255,0.9)' })
   drawBrand(sctx, rtl ? W - M : M, bottom + 100, { rtl, color: '#FFFFFF', size: 38 })
+  drawCredit(sctx, rtl ? W - M : M, bottom + 146, { rtl, labels, color: 'rgba(255,255,255,0.88)', size: 28 })
 
   const { data, width, height } = sctx.getImageData(0, 0, scratch.width, scratch.height)
   let x0 = width

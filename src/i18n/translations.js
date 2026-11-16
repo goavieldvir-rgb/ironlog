@@ -536,6 +536,7 @@ export const translations = {
       viewOnly: 'View only',
     },
     share: {
+      poweredBy: 'Powered by Ironlog',
       title: 'Nice work!',
       subtitle: 'Your workout is saved.',
       share: 'Share',
@@ -2447,6 +2448,7 @@ Rest timer alerts are separate and only work while Ironlog is open.`,
       viewOnly: 'צפייה בלבד',
     },
     share: {
+      poweredBy: 'מופעל על ידי Ironlog',
       title: 'כל הכבוד!',
       subtitle: 'האימון נשמר.',
       share: 'שיתוף',
