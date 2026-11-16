@@ -522,9 +522,9 @@ function Diary() {
               <section key={m} aria-labelledby={`meal-${m}`} className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
                   <h2 id={`meal-${m}`} className="text-[17px] font-semibold flex items-baseline gap-2 min-w-0">
-                    <span className="truncate">{t(MEAL_KEY[m])}</span>
+                    <span className="shrink-0">{t(MEAL_KEY[m])}</span>
                     {rows.length > 0 && (
-                      <span className="text-chalkdim text-sm font-normal whitespace-nowrap">
+                      <span className="text-chalkdim text-sm font-normal whitespace-nowrap truncate min-w-0">
                         <N mono>{fmt(mt.protein, 0)}</N> {g} {t('nutrition.proteinWord')} · <N mono>{fmt(mt.kcal, 0)}</N> {k}
                       </span>
                     )}

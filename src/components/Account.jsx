@@ -197,7 +197,7 @@ function TwoStepCard() {
 
 export default function Account({ removed = false }) {
   const { user, logout } = useAuth()
-  const { actingAs, isAdmin, isOwner, effectiveUid, effectiveName, profile } = useAdmin()
+  const { actingAs, isAdmin, isOwner, effectiveUid, effectiveName, profile, coachFrozen } = useAdmin()
   const ownerName = useOwnerName(isAdmin && !isOwner)
   const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
@@ -240,8 +240,10 @@ export default function Account({ removed = false }) {
   // Deletion is only ever for your OWN account, never while viewing a
   // trainee — the database function enforces this too, since it only acts
   // on the signed-in user.
-  // A removed coach is still a coach account, which can't delete itself.
-  const canDelete = !actingAs && !isAdmin && !(removed && profile?.is_coach)
+  // A coach account can't delete itself, including a frozen or removed coach
+  // (isAdmin is false for those): the database refuses it, and the photos
+  // would already be gone by then.
+  const canDelete = !actingAs && !isAdmin && !profile?.is_coach
   const typedMatches = typed.trim().toLowerCase() === (user?.email || '').toLowerCase()
 
   async function deleteAccount() {
@@ -320,7 +322,7 @@ export default function Account({ removed = false }) {
             </div>
           </>
         ) : (
-          <p className="text-chalkdim text-sm">{actingAs ? t('account.deleteNotWhileActing') : isOwner ? t('account.deleteAdminBlocked') : removed ? t('account.deleteRemovedCoach') : t('account.deleteCoachBlocked', { owner: ownerName })}</p>
+          <p className="text-chalkdim text-sm">{actingAs ? t('account.deleteNotWhileActing') : isOwner ? t('account.deleteAdminBlocked') : removed || coachFrozen ? t('account.deleteRemovedCoach') : t('account.deleteCoachBlocked', { owner: ownerName })}</p>
         )}
       </Card>
 
