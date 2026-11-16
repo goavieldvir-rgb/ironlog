@@ -39,7 +39,7 @@ export const CLIPS = {
   'leg-press': { v: 'dbb3e490' },
   'lying-leg-curl': { v: 'd1bce236' },
   'machine-lateral-raise': { v: '9989c07e' },
-  'machine-shoulder-press': { v: '799ee542', t: '1f10d399' },
+  'machine-shoulder-press': { v: 'ed6a98a5', t: '1f10d399' },
   'machine-single-arm-row': { v: 'b8d2a8bb' },
   'one-arm-dumbbell-row': { v: 'afcce322', t: 'd79f7385' },
   'parallel-bar-dips': { v: '59f678d0', t: 'e727f3ee' },
