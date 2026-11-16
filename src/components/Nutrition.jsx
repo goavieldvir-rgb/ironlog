@@ -531,7 +531,7 @@ function Diary() {
             return (
               <section key={m} aria-labelledby={`meal-${m}`} className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
-                  <h2 id={`meal-${m}`} className="text-[17px] font-semibold flex items-baseline gap-2 min-w-0">
+                  <h2 id={`meal-${m}`} className="text-[17px] font-semibold flex items-baseline gap-2 min-w-0 flex-1">
                     {/* The meal name stays whole and the totals shorten instead; a long
                         custom meal name (coach-set slots) still cuts off at 60%. */}
                     <span className="shrink-0 max-w-[60%] truncate">{mealLabel(t, m)}</span>
