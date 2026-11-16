@@ -58,7 +58,7 @@ export const CLIPS = {
   'single-arm-lat-pulldown': { v: '85e624e2', t: '7db83512' },
   'split-squat': { v: '6b2fa65e' },
   'standing-calf-raise': { v: 'ff2dc506', t: 'd51056a5' },
-  'static-lunge': { v: 'e18e3d98' },
+  'static-lunge': { v: 'cc25ce0c' },
   'step-down': { v: 'dab1f16f' },
   't-bar-row': { v: '179bc35f' },
   'treadmill-running': { v: 'b954e714', t: 'fe6d81d8' },
