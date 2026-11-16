@@ -7,6 +7,7 @@ import { supabase } from '../supabase.js'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useCollection, copyRoutineToUser } from '../lib/db.js'
+import { useCoachSettings } from '../lib/coachSettings.js'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
@@ -61,6 +62,7 @@ export default function PersonDetail() {
   const navigate = useNavigate()
   const { isAdmin, isOwner, isCoach, profile: myProfile, setActingAs } = useAdmin()
   const ownerName = useOwnerName(isCoach && !isOwner)
+  const [coachSettings] = useCoachSettings(isCoach ? myProfile?.id : null)
   const { t, lang } = useLanguage()
   const { toast, confirm } = useFeedback()
   const { user: me } = useAuth()
@@ -496,6 +498,7 @@ export default function PersonDetail() {
             traineeId={p.id}
             goal={data.goal}
             scheduled={derived.scheduled}
+            checkinDays={coachSettings?.settings.checkin_days ?? 7}
             today={today}
             t={t}
             lang={lang}
@@ -716,7 +719,7 @@ function RoutineListView({ routines, t, onEdit }) {
   )
 }
 
-function GoalForm({ traineeId, goal, scheduled, today, t, lang, onSaved, onError }) {
+function GoalForm({ traineeId, goal, scheduled, checkinDays = 7, today, t, lang, onSaved, onError }) {
   const [text, setText] = useState(goal?.goal || '')
   const [target, setTarget] = useState(goal?.target_weight ?? '')
   const [perWeek, setPerWeek] = useState(goal?.sessions_per_week ?? '')
@@ -790,8 +793,8 @@ function GoalForm({ traineeId, goal, scheduled, today, t, lang, onSaved, onError
           </Button>
         )}
         {due && !dirty && (
-          <Button variant="ghost" onClick={() => save({ next_checkin: shiftDay(today, 7) })} disabled={saving}>
-            {t('person.checkinDone')}
+          <Button variant="ghost" onClick={() => save({ next_checkin: shiftDay(today, checkinDays) })} disabled={saving}>
+            {checkinDays === 7 ? t('person.checkinDone') : t('person.checkinDoneDays', { n: checkinDays })}
           </Button>
         )}
       </div>
