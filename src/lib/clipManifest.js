@@ -13,7 +13,7 @@ export const CLIPS = {
   'cable-biceps-curl': { v: 'aa0083cc' },
   'cable-chest-fly-cable-crossover': { v: '9e7e5ea4' },
   'cable-chest-press': { v: 'c7541361' },
-  'cable-crunch': { v: '580a0dbc', t: '53655498' },
+  'cable-crunch': { v: '521c2792', t: '53655498' },
   'cable-lateral-raise': { v: 'ce86b489' },
   'cable-overhead-triceps-extension': { v: '7416afe3', t: 'b52ed766' },
   'captains-chair-leg-raise': { v: 'd4e901dd', t: 'b342600a' },
