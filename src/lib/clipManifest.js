@@ -53,7 +53,7 @@ export const CLIPS = {
   'scapular-push-up': { v: '89f83bc7' },
   'seated-cable-row': { v: '7ce7ae84', t: '567111d3' },
   'seated-dumbbell-curl': { v: '05df05c6' },
-  'seated-dumbbell-shoulder-press': { v: 'a9cbf3c3', t: '4c0d40a8' },
+  'seated-dumbbell-shoulder-press': { v: '8ded493f', t: '4c0d40a8' },
   'seated-leg-curl': { v: '0f0adfc9' },
   'single-arm-lat-pulldown': { v: '85e624e2', t: '7db83512' },
   'split-squat': { v: '0529adcb' },
