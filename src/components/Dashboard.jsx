@@ -14,7 +14,8 @@ import { listDrafts, clearDraft } from '../lib/draft.js'
 import { Button, Card, LoadError, FeedbackDot } from './ui.jsx'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import WeeklySchedule from './WeeklySchedule.jsx'
-import Tour, { useFirstTour } from './Tour.jsx'
+import Tour, { useFirstTour, tourSeen, markTourSeen } from './Tour.jsx'
+import { useOwnerName } from '../lib/coach.js'
 import { itemTarget } from './RoutineView.jsx'
 import { useMessagesState } from '../lib/messages.js'
 import { setVolume } from '../lib/bodyweight.js'
@@ -269,6 +270,8 @@ export default function Dashboard() {
           {fmtDate(lang, now, { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
       </div>
+
+      {!actingAs && <CoachWelcome />}
 
       {coachFrozen && !actingAs && (
         <Card className="!p-5 flex flex-col gap-1">
@@ -669,5 +672,41 @@ function MessageBanner({ to, title, preview, count, t }) {
       </span>
       <ForwardChevron size={16} className="text-chalkdim shrink-0 self-center" />
     </Link>
+  )
+}
+
+// For a coach other than the owner who hasn't had the coach walkthrough yet
+// (just joined, or just made a coach): it lives on People, so Home points
+// there. Gone once the walkthrough is seen or skipped, or after Not now.
+function CoachWelcome() {
+  const { user } = useAuth()
+  const { isCoach, isOwner } = useAdmin()
+  const { t } = useLanguage()
+  const navigate = useNavigate()
+  const show = isCoach && !isOwner && !!user && !tourSeen(user.uid, 'coach')
+  const ownerName = useOwnerName(show)
+  const [hidden, setHidden] = useState(false)
+  if (!show || hidden) return null
+  return (
+    <Card className="!p-5 flex flex-col gap-3">
+      <div>
+        <p className="font-medium">{t('tour.coach.homeTitle')}</p>
+        <p className="text-chalkdim text-sm mt-1">{t('tour.coach.homeBody', { owner: ownerName || t('tour.coach.ownerFallback') })}</p>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <Button variant="brass" onClick={() => navigate('/people', { state: { coachTour: true } })}>
+          {t('tour.coach.homeButton')} <ForwardChevron size={15} />
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            markTourSeen(user.uid, 'coach')
+            setHidden(true)
+          }}
+        >
+          {t('tour.coach.notNow')}
+        </Button>
+      </div>
+    </Card>
   )
 }

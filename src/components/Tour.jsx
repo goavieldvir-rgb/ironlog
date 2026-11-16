@@ -13,7 +13,9 @@ import { ForwardChevron } from './DirectionalIcon.jsx'
 //
 // steps: [{ target, eyebrow, title, body }]. A step whose target isn't on
 // screen (no weigh-in card today, desktop has no More button) is skipped, so
-// the same list works for every account and screen size.
+// the same list works for every account and screen size. A step with no
+// target at all is a plain card in the middle of the dimmed screen, for
+// things that have no button to point at.
 
 const PAD = 8 // space between the element and the edge of the lit window
 const GAP = 14 // space between the lit window and the card
@@ -50,16 +52,21 @@ function typing() {
 // trainee's own account (not the coach, not while managing someone).
 // `force` opens it anyway (the replay from Help). Returns [open, close];
 // closing marks it seen.
-export function useFirstTour(name, ready, force = false) {
+//
+// With { coach: true } it is for a coach other than the owner instead, of
+// any account age: someone the owner has just made a coach is usually an
+// existing trainee.
+export function useFirstTour(name, ready, force = false, { coach = false } = {}) {
   const { user } = useAuth()
-  const { isAdmin, actingAs } = useAdmin()
+  const { isAdmin, isCoach, isOwner, actingAs } = useAdmin()
   const [open, setOpen] = useState(false)
   const [retry, setRetry] = useState(0)
   // A tour that found nothing to point at closes without being marked seen,
   // and doesn't try again until the screen is opened again.
   const gaveUp = useRef(false)
+  const who = coach ? isCoach && !isOwner : !isAdmin
   const want =
-    !!ready && !!user && !isAdmin && !actingAs && !gaveUp.current && (force || (isNewAccount(user) && !tourSeen(user.uid, name)))
+    !!ready && !!user && who && !actingAs && !gaveUp.current && (force || ((coach || isNewAccount(user)) && !tourSeen(user.uid, name)))
   useEffect(() => {
     if (!want || open) return
     const id = setTimeout(() => {
@@ -100,7 +107,7 @@ function isFixed(el) {
 export default function Tour({ steps, onClose }) {
   const { t, dir } = useLanguage()
   // Steps are checked once, when the tour opens.
-  const [shown] = useState(() => steps.filter((s) => findTarget(s.target)))
+  const [shown] = useState(() => steps.filter((s) => !s.target || findTarget(s.target)))
   const [i, setI] = useState(0)
   const [rect, setRect] = useState(null)
   const [cardH, setCardH] = useState(180)
@@ -121,7 +128,7 @@ export default function Tour({ steps, onClose }) {
   const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
   const measure = useCallback(() => {
-    const el = step && findTarget(step.target)
+    const el = step?.target && findTarget(step.target)
     if (!el) return setRect(null)
     const r = el.getBoundingClientRect()
     // Keep the lit window on screen, e.g. for a button in the corner.
@@ -133,8 +140,8 @@ export default function Tour({ steps, onClose }) {
 
   // Bring the target on screen, then light it.
   useLayoutEffect(() => {
-    const el = step && findTarget(step.target)
-    if (!el) return
+    const el = step?.target && findTarget(step.target)
+    if (!el) return setRect(null)
     if (!isFixed(el)) {
       const r = el.getBoundingClientRect()
       const room = window.innerHeight - cardH - GAP * 2 - 120 // leave space for the card and tab bar
@@ -148,7 +155,7 @@ export default function Tour({ steps, onClose }) {
     window.addEventListener('scroll', measure, true)
     // The target can also move or change size on its own (an image loading,
     // a banner appearing above it).
-    const el = step && findTarget(step.target)
+    const el = step?.target && findTarget(step.target)
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => measure()) : null
     if (ro) {
       if (el) ro.observe(el)
