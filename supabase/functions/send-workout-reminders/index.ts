@@ -101,7 +101,7 @@ async function runReminders() {
   // A coach can set a trainee's time and weekdays (trainee_settings, from
   // supabase-coach-reminders.sql); they win over the phone's own choice.
   // Missing table or columns: everyone keeps their own.
-  const { data: overrideRows } = await db.from('trainee_settings').select('user_id, remind_time, remind_days')
+  const { data: overrideRows } = await db.from('trainee_settings').select('user_id, remind_time, remind_days').or('remind_time.not.is.null,remind_days.not.is.null')
   const overrides = new Map((overrideRows || []).map((o: any) => [o.user_id, o]))
 
   let sent = 0, skipped = 0, removed = 0, failed = 0
