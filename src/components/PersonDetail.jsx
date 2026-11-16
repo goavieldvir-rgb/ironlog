@@ -19,6 +19,20 @@ import { MessageThread } from './Messages.jsx'
 import { useMessagesAvailable } from '../lib/messages.js'
 import { RoutineExercises } from './RoutineView.jsx'
 import {
+  BUILT_IN,
+  customKey,
+  typeFor,
+  measurementLabel,
+  convert,
+  round1,
+  fetchMeasurementSetup,
+  setPersonMeasurements,
+  clearPersonMeasurements,
+  setDefaultMeasurements,
+  addMeasurementType,
+  setMeasurementTypeArchived,
+} from '../lib/measurements.js'
+import {
   fetchTraineeDetail,
   weeklyCounts,
   needsReview,
@@ -402,20 +416,7 @@ export default function PersonDetail() {
             </Section>
           )}
 
-          {data.waists.length > 1 && (
-            <Section title={t('person.waist')}>
-              <div className="h-36 lg:h-56 -mx-1">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data.waists.filter((w) => w.date >= shiftDay(today, -182) && w.unit === data.waists.at(-1).unit).map((w) => ({ ...w, waist: Number(w.waist), label: shortDate(lang, w.date) }))}>
-                    <XAxis dataKey="label" stroke={CHALKDIM} fontSize={10} tickLine={false} axisLine={false} minTickGap={24} reversed={lang === 'he'} />
-                    <YAxis hide domain={[(min) => Math.floor(min - 1), (max) => Math.ceil(max + 1)]} />
-                    <Tooltip contentStyle={{ background: SURFACE, border: 0, borderRadius: 12, fontSize: 13 }} labelStyle={{ color: CHALK }} formatter={(v) => [`${v}${data.waists.at(-1).unit}`, t('person.waist')]} />
-                    <Line type="monotone" dataKey="waist" stroke={ACCENT} strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </Section>
-          )}
+          <MeasurementCharts entries={data.measurements} types={data.measurementSetup.types} today={today} t={t} lang={lang} />
 
           {!(p.is_admin || p.is_coach) && (
             <Section title={t('photos.title')}>
@@ -472,6 +473,22 @@ export default function PersonDetail() {
                 ))}
               </ul>
             </Section>
+          )}
+
+          {!(p.is_admin || p.is_coach) && (
+            <TrackingSettings
+              key={`tracking-${p.id}`}
+              person={p}
+              name={name}
+              setup={data.measurementSetup}
+              coachId={myProfile?.id}
+              t={t}
+              lang={lang}
+              confirm={confirm}
+              toast={toast}
+              onProfile={(patch) => setData((d) => ({ ...d, profile: { ...d.profile, ...patch } }))}
+              onSetup={(measurementSetup) => setData((d) => ({ ...d, measurementSetup }))}
+            />
           )}
 
           <GoalForm
@@ -852,6 +869,219 @@ function Notes({ traineeId, notes, t, lang, confirm, onChange, onError }) {
           ))}
         </ul>
       )}
+    </Section>
+  )
+}
+
+// One small chart per measurement with at least two entries in the last six
+// months, in the unit of the latest entry.
+function MeasurementCharts({ entries, types, today, t, lang }) {
+  const since = shiftDay(today, -182)
+  const kinds = [...new Set(entries.map((e) => e.kind))].filter((k) => typeFor(k, types))
+  return kinds.map((k) => {
+    const list = entries.filter((e) => e.kind === k && e.date >= since)
+    if (list.length < 2) return null
+    const unit = list.at(-1).unit || ''
+    const series = list.map((e) => ({ v: round1(convert(e.value, e.unit, unit)), label: shortDate(lang, e.date) }))
+    const name = measurementLabel(k, types, t, lang)
+    return (
+      <Section key={k} title={<bdi>{name}</bdi>}>
+        <div className="h-36 lg:h-56 -mx-1">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={series}>
+              <XAxis dataKey="label" stroke={CHALKDIM} fontSize={10} tickLine={false} axisLine={false} minTickGap={24} reversed={lang === 'he'} />
+              <YAxis hide domain={[(min) => Math.floor(min - 1), (max) => Math.ceil(max + 1)]} />
+              <Tooltip contentStyle={{ background: SURFACE, border: 0, borderRadius: 12, fontSize: 13 }} labelStyle={{ color: CHALK }} formatter={(v) => [`${v}${unit}`, name]} />
+              <Line type="monotone" dataKey="v" stroke={ACCENT} strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </Section>
+    )
+  })
+}
+
+// What this trainee logs on their body page (built-in or the coach's own
+// measurements), the coach's default list, and the quiet-alert days.
+function TrackingSettings({ person, name, setup, coachId, t, lang, confirm, toast, onProfile, onSetup }) {
+  const [busy, setBusy] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [labelEn, setLabelEn] = useState('')
+  const [labelHe, setLabelHe] = useState('')
+  const [unitKind, setUnitKind] = useState('length')
+  const [quiet, setQuiet] = useState(String(person.inactivity_alert_days ?? 5))
+
+  const types = setup.types
+  const kinds = setup.kinds
+  const options = [
+    ...BUILT_IN.map((b) => b.key),
+    ...types.filter((ct) => !ct.archived || kinds.includes(customKey(ct.id))).map((ct) => customKey(ct.id)),
+  ]
+  const sameAsDefault = kinds.length === setup.defaultKinds.length && kinds.every((k) => setup.defaultKinds.includes(k))
+
+  async function run(fn) {
+    setBusy(true)
+    try {
+      await fn()
+      onSetup(await fetchMeasurementSetup(person.id))
+    } catch (e) {
+      console.error(e)
+      toast(t('feedback.saveFailed'), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const toggle = (k) => run(() => setPersonMeasurements(person.id, kinds.includes(k) ? kinds.filter((x) => x !== k) : [...kinds, k]))
+
+  async function addType(e) {
+    e.preventDefault()
+    if (!labelEn.trim() && !labelHe.trim()) return
+    await run(async () => {
+      const row = await addMeasurementType(coachId, { labelEn, labelHe, unitKind })
+      await setPersonMeasurements(person.id, [...kinds, customKey(row.id)])
+      setLabelEn('')
+      setLabelHe('')
+      setUnitKind('length')
+      setAdding(false)
+    })
+  }
+
+  async function archive(k) {
+    const ty = types.find((ct) => customKey(ct.id) === k)
+    const label = measurementLabel(k, types, t, lang)
+    if (!ty || !(await confirm({ title: t('measure.archiveConfirm', { name: label }), body: t('measure.archiveBody'), confirmLabel: t('common.delete'), danger: true }))) return
+    run(async () => {
+      await setMeasurementTypeArchived(ty.id, true)
+      await setPersonMeasurements(person.id, kinds.filter((x) => x !== k))
+    })
+  }
+
+  async function saveQuiet() {
+    const n = Math.min(60, Math.max(1, Math.round(Number(quiet)) || 5))
+    setQuiet(String(n))
+    if (n === (person.inactivity_alert_days ?? 5)) return
+    const { error } = await supabase.from('profiles').update({ inactivity_alert_days: n }).eq('id', person.id)
+    if (error) {
+      console.error(error)
+      toast(t('feedback.saveFailed'), 'error')
+      return
+    }
+    onProfile({ inactivity_alert_days: n })
+  }
+
+  return (
+    <Section title={t('measure.settingsTitle')} hint={t('measure.settingsHint', { name })}>
+      <div className="flex items-center gap-2 flex-wrap text-sm">
+        <span>{t('measure.quietDays')}</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min="1"
+          max="60"
+          step="1"
+          value={quiet}
+          onChange={(e) => setQuiet(e.target.value)}
+          onBlur={saveQuiet}
+          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+          className="w-16 text-center"
+          aria-label={`${t('measure.quietDays')} ${t('measure.quietDaysUnit')}`}
+        />
+        <span>{t('measure.quietDaysUnit')}</span>
+      </div>
+      <p className="text-xs text-chalkdim -mt-1">{t('measure.quietDaysHint')}</p>
+
+      <div className="border-t border-line pt-3 flex flex-col gap-2">
+        <span className="eyebrow">{t('measure.listLabel')}</span>
+        {!setup.available ? (
+          <p className="text-xs text-chalkdim">{t('measure.notReady')}</p>
+        ) : (
+          <>
+            <div className="flex gap-2 flex-wrap">
+              {options.map((k) => {
+                const on = kinds.includes(k)
+                const custom = !typeFor(k, types)?.builtIn
+                return (
+                  <span key={k} className="inline-flex items-center">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      aria-pressed={on}
+                      onClick={() => toggle(k)}
+                      className={`min-h-9 px-3 rounded-full text-sm border inline-flex items-center gap-1 ${on ? 'bg-accent text-ink border-accent' : 'border-line text-chalkdim hover:text-chalk'}`}
+                    >
+                      {on && <Check size={13} />}
+                      <bdi>{measurementLabel(k, types, t, lang)}</bdi>
+                    </button>
+                    {custom && (
+                      <button type="button" disabled={busy} onClick={() => archive(k)} className="hit text-chalkdim p-1" aria-label={t('measure.archive', { name: measurementLabel(k, types, t, lang) })}>
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </span>
+                )
+              })}
+              {!adding && (
+                <button type="button" onClick={() => setAdding(true)} className="min-h-9 px-3 rounded-full text-sm border border-dashed border-line text-chalkdim hover:text-chalk inline-flex items-center gap-1">
+                  <Plus size={13} /> {t('measure.addOwn')}
+                </button>
+              )}
+            </div>
+            {kinds.length === 0 && <p className="text-xs text-chalkdim">{t('measure.noneOn')}</p>}
+
+            {adding && (
+              <form onSubmit={addType} className="flex flex-col gap-2 rounded-[14px] border border-line p-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label={t('measure.nameEn')}>
+                    <input value={labelEn} onChange={(e) => setLabelEn(e.target.value)} maxLength={40} dir="ltr" />
+                  </Field>
+                  <Field label={t('measure.nameHe')}>
+                    <input value={labelHe} onChange={(e) => setLabelHe(e.target.value)} maxLength={40} dir="rtl" />
+                  </Field>
+                </div>
+                <p className="text-xs text-chalkdim">{t('measure.nameHint')}</p>
+                <Field label={t('measure.unitKind')}>
+                  <select value={unitKind} onChange={(e) => setUnitKind(e.target.value)}>
+                    <option value="length">{t('measure.unitLength')}</option>
+                    <option value="percent">{t('measure.unitPercent')}</option>
+                    <option value="number">{t('measure.unitNumber')}</option>
+                  </select>
+                </Field>
+                <div className="flex gap-2">
+                  <Button type="submit" variant="brass" disabled={busy || (!labelEn.trim() && !labelHe.trim())}>
+                    {t('common.add')}
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => setAdding(false)}>
+                    {t('common.cancel')}
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            <p className="text-xs text-chalkdim">{setup.own ? t('measure.ownList') : t('measure.followsDefault')}</p>
+            <div className="flex gap-2 flex-wrap">
+              {!sameAsDefault && (
+                <Button
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => run(async () => {
+                    await setDefaultMeasurements(coachId, kinds)
+                    toast(t('measure.defaultSaved'))
+                  })}
+                >
+                  {t('measure.makeDefault')}
+                </Button>
+              )}
+              {setup.own && (
+                <Button variant="ghost" disabled={busy} onClick={() => run(() => clearPersonMeasurements(person.id))}>
+                  {t('measure.useDefault')}
+                </Button>
+              )}
+            </div>
+            {!sameAsDefault && <p className="text-xs text-chalkdim">{t('measure.makeDefaultHint')}</p>}
+          </>
+        )}
+      </div>
     </Section>
   )
 }
