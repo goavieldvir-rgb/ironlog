@@ -1,11 +1,41 @@
--- Ironlog: coach tools, all seven parts in one script (PR #93).
+-- Ironlog: coach tools (PR #93), all seven parts in one script.
 -- Supabase -> SQL Editor -> New query -> paste all of this -> Run.
--- Needs the earlier SQL already run (coach controls / second coach / nutrition).
--- Safe to run more than once. Safe to run before PR #93 is merged: the
--- live app ignores the new tables and columns until the new version ships.
--- After it runs, also redeploy the reminders function:
---   supabase functions deploy send-workout-reminders
+--
+-- All or nothing: the whole script is one transaction. If anything fails,
+-- nothing is changed and you see the error. Running it twice is harmless.
+--
+-- It first checks that the earlier SQL (second coach, notification wording,
+-- nutrition, coach tasks) is already in the database, and stops with
+-- "MISSING: ..." if not.
+--
+-- Changes to things the live app already uses (identical behaviour while no
+-- coach has saved Coach settings): refresh_coach_tasks, send_pr_alert,
+-- notify_coach_pr, the food_logs meal check (two more slots allowed),
+-- new columns on nutrition_targets, and a "messages switched off" rule on
+-- coach_messages. supabase-coach-tools-rollback.sql puts those back.
 
+begin;
+
+do $$
+declare
+  missing text[] := '{}';
+  t text;
+begin
+  foreach t in array array['profiles','nutrition_targets','food_logs','coach_messages','coach_tasks','push_config','waist_logs','body_weight_logs','sessions'] loop
+    if to_regclass('public.' || t) is null then missing := missing || ('table ' || t); end if;
+  end loop;
+  foreach t in array array['can_coach(uuid)','is_coach()','am_removed()','refresh_coach_tasks(date)','send_pr_alert(text,text,text,text)','notify_coach_pr(uuid,text,text)','owner_lang()','html_escape(text)'] loop
+    if to_regprocedure('public.' || t) is null then missing := missing || ('function ' || t); end if;
+  end loop;
+  if to_regprocedure('public.refresh_coach_tasks(date)') is not null then
+    if pg_get_functiondef(to_regprocedure('public.refresh_coach_tasks(date)')) not like '%g.author_id = coalesce(p.coach_id%' then
+      missing := missing || 'the second-coach version of refresh_coach_tasks'::text;
+    end if;
+  end if;
+  if array_length(missing, 1) > 0 then
+    raise exception 'MISSING: %. Run the earlier SQL first; nothing was changed.', array_to_string(missing, ', ');
+  end if;
+end $$;
 
 -- ================= supabase-custom-measurements.sql =================
 -- Ironlog: each coach chooses which body measurements their trainees log.
@@ -666,3 +696,5 @@ revoke execute on function public.my_brand() from public, anon;
 grant execute on function public.my_brand() to authenticated;
 
 notify pgrst, 'reload schema';
+
+commit;
