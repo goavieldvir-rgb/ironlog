@@ -347,6 +347,13 @@ function Diary() {
   // ----- derived
   // The coach's meal slots for this person (four by default).
   setMealLayout(targets?.meals, lang)
+  // The first meal was picked before the coach's slots loaded: move off a
+  // slot this person doesn't have.
+  const mealKeys = (targets?.meals || []).map((m) => m?.key).join(',')
+  useEffect(() => {
+    if (!activeMeals().includes(meal)) setMeal(defaultMeal())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mealKeys])
   const totals = sumLogs(logs)
   // Copy sources: the last day anything was logged, and per meal the last day
   // that meal was. Usually yesterday; a skipped day falls back further.

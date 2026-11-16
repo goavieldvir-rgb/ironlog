@@ -151,6 +151,7 @@ $$;
 revoke execute on function public.notify_coach_pr(uuid, text, text) from public, anon, authenticated;
 
 drop policy if exists "messages switched off" on public.coach_messages;
+drop trigger if exists keep_coach_meals on public.nutrition_targets;
 
 -- The meal check goes back to four slots, unless someone already logged
 -- food in the new ones (then it stays wider so their food isn't lost).

@@ -11,7 +11,8 @@
 -- Changes to things the live app already uses (identical behaviour while no
 -- coach has saved Coach settings): refresh_coach_tasks, send_pr_alert,
 -- notify_coach_pr, the food_logs meal check (two more slots allowed),
--- new columns on nutrition_targets, and a "messages switched off" rule on
+-- new columns and a "meal slots are the coach's" trigger on nutrition_targets,
+-- and a "messages switched off" rule on
 -- coach_messages. supabase-coach-tools-rollback.sql puts those back.
 
 begin;
@@ -27,10 +28,9 @@ begin
   foreach t in array array['can_coach(uuid)','is_coach()','am_removed()','refresh_coach_tasks(date)','send_pr_alert(text,text,text,text)','notify_coach_pr(uuid,text,text)','owner_lang()','html_escape(text)'] loop
     if to_regprocedure('public.' || t) is null then missing := missing || ('function ' || t); end if;
   end loop;
-  if to_regprocedure('public.refresh_coach_tasks(date)') is not null then
-    if pg_get_functiondef(to_regprocedure('public.refresh_coach_tasks(date)')) not like '%g.author_id = coalesce(p.coach_id%' then
-      missing := missing || 'the second-coach version of refresh_coach_tasks'::text;
-    end if;
+  if to_regprocedure('public.refresh_coach_tasks(date)') is not null
+     and pg_get_functiondef('public.refresh_coach_tasks(date)'::regprocedure) not like '%g.author_id = coalesce(p.coach_id%' then
+    missing := missing || 'the second-coach version of refresh_coach_tasks'::text;
   end if;
   if array_length(missing, 1) > 0 then
     raise exception 'MISSING: %. Run the earlier SQL first; nothing was changed.', array_to_string(missing, ', ');
@@ -465,6 +465,32 @@ alter table public.nutrition_targets add constraint nutrition_targets_meals_chec
 alter table public.food_logs drop constraint if exists food_logs_meal_check;
 alter table public.food_logs add constraint food_logs_meal_check
   check (meal in ('breakfast', 'lunch', 'dinner', 'snack', 'snack2', 'snack3'));
+
+-- Meal slots are the coach's choice: a trainee who edits their own targets
+-- keeps whatever slots the coach set.
+create or replace function public.keep_coach_meals()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if auth.uid() is null or public.can_coach(new.user_id)
+     or (new.user_id = auth.uid() and public.is_coach()) then
+    return new;
+  end if;
+  if tg_op = 'UPDATE' then
+    new.meals := old.meals;
+  else
+    new.meals := null;
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.keep_coach_meals() from public, anon, authenticated;
+drop trigger if exists keep_coach_meals on public.nutrition_targets;
+create trigger keep_coach_meals before insert or update on public.nutrition_targets
+  for each row execute function public.keep_coach_meals();
 
 notify pgrst, 'reload schema';
 

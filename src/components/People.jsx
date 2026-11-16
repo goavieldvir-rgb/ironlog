@@ -26,6 +26,7 @@ export default function People() {
   const { setActingAs, isOwner, isCoach, profile } = useAdmin()
   const [coachSettings] = useCoachSettings(isCoach ? profile?.id : null)
   const behindPct = coachSettings?.settings.behind_pct ?? 60
+  const tasksOff = coachSettings?.settings.tasks_off || []
   const { t } = useLanguage()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -79,10 +80,10 @@ export default function People() {
       rows
         .filter((p) => p.id !== user.uid)
         .map((p) => {
-          const flags = rosterFlags(p, today, behindPct)
+          const flags = rosterFlags(p, today, behindPct, tasksOff)
           return { ...p, unread: unreadMsgs[p.id] || 0, flags, score: attentionScore(flags), adh: adherence(p.week_counts, p.planned_per_week, p.created_at, today) }
         }),
-    [rows, user.uid, today, unreadMsgs, behindPct],
+    [rows, user.uid, today, unreadMsgs, behindPct, tasksOff],
   )
   const me = rows.find((p) => p.id === user.uid)
 

@@ -45,4 +45,30 @@ alter table public.food_logs drop constraint if exists food_logs_meal_check;
 alter table public.food_logs add constraint food_logs_meal_check
   check (meal in ('breakfast', 'lunch', 'dinner', 'snack', 'snack2', 'snack3'));
 
+-- Meal slots are the coach's choice: a trainee who edits their own targets
+-- keeps whatever slots the coach set.
+create or replace function public.keep_coach_meals()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if auth.uid() is null or public.can_coach(new.user_id)
+     or (new.user_id = auth.uid() and public.is_coach()) then
+    return new;
+  end if;
+  if tg_op = 'UPDATE' then
+    new.meals := old.meals;
+  else
+    new.meals := null;
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.keep_coach_meals() from public, anon, authenticated;
+drop trigger if exists keep_coach_meals on public.nutrition_targets;
+create trigger keep_coach_meals before insert or update on public.nutrition_targets
+  for each row execute function public.keep_coach_meals();
+
 notify pgrst, 'reload schema';

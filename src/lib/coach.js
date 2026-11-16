@@ -78,7 +78,7 @@ export function adherence(weekCounts, planned, createdAt, today = toLocalISODate
 
 // Everything worth a coach's attention on one trainee, most urgent first.
 // Each flag is a translation key plus its values; score orders the list.
-export function rosterFlags(p, today = toLocalISODate(), behindPct = 60) {
+export function rosterFlags(p, today = toLocalISODate(), behindPct = 60, tasksOff = []) {
   const flags = []
   const quietDays = daysSince(p.last_session, today)
   const adh = adherence(p.week_counts, p.planned_per_week, p.created_at, today)
@@ -94,7 +94,7 @@ export function rosterFlags(p, today = toLocalISODate(), behindPct = 60) {
   if (adh != null && adh < behindPct && (p.week_counts || []).slice(0, -1).some((n) => n > 0)) {
     flags.push({ key: 'behind', tone: 'warn', score: 2, n: adh })
   }
-  if (p.next_checkin && p.next_checkin <= today) {
+  if (p.next_checkin && p.next_checkin <= today && !tasksOff.includes('checkin')) {
     flags.push({ key: 'checkin', tone: 'warn', score: 2, n: daysSince(p.next_checkin, today) })
   }
   if (p.nutrition_enabled && p.kcal_target && (p.food_days_7 || 0) < 3) {
