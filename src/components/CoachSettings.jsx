@@ -307,9 +307,13 @@ export default function CoachSettings() {
                     {isCustomColor(form.brand_color) && <Check size={16} style={{ color: fgOf(form.brand_color) }} />}
                   </label>
                 </div>
-                <p className="text-xs text-chalkdim">
-                  {isCustomColor(form.brand_color) ? `${t('brand.colors.custom')}: ${form.brand_color}` : t(`brand.colors.${form.brand_color || 'ember'}`)}
-                </p>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <p className="text-xs text-chalkdim">
+                    {isCustomColor(form.brand_color) ? t('brand.colors.custom') : t(`brand.colors.${form.brand_color || 'ember'}`)}
+                  </p>
+                  {/* Or type the exact code from the coach's brand guide. */}
+                  <HexField value={isCustomColor(form.brand_color) ? form.brand_color : ''} onValid={(hex) => set({ brand_color: hex })} label={t('brand.hexLabel')} />
+                </div>
               </div>
               <div className="flex items-center gap-3 flex-wrap">
                 {form.brand_logo ? (
@@ -370,5 +374,30 @@ export default function CoachSettings() {
         )}
       </div>
     </div>
+  )
+}
+
+// A #RRGGBB box: takes the coach's code as they type and applies it once it
+// is a full, valid color.
+function HexField({ value, onValid, label }) {
+  const [text, setText] = useState(value)
+  useEffect(() => setText(value), [value])
+  return (
+    <input
+      aria-label={label}
+      placeholder="#1E3A8A"
+      dir="ltr"
+      maxLength={7}
+      spellCheck={false}
+      autoCapitalize="characters"
+      className="w-28 num text-sm"
+      value={text}
+      onChange={(e) => {
+        let v = e.target.value.trim().toUpperCase()
+        if (v && !v.startsWith('#')) v = '#' + v
+        setText(v)
+        if (/^#[0-9A-F]{6}$/.test(v)) onValid(v)
+      }}
+    />
   )
 }

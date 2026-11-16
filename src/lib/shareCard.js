@@ -290,9 +290,17 @@ function drawName(ctx, nm, x, y, { rtl, color }) {
 }
 
 // The wordmark: a small accent dot and the name.
-function drawBrand(ctx, x, y, { rtl, color, size = 44 }) {
+function drawBrand(ctx, x, y, { rtl, color, size = 44, maxW = W - M * 2 }) {
+  // A long coach name first shrinks (to 70%), then is cut with an ellipsis.
+  const base = size
+  const dotW = () => Math.round(size * 0.3) + Math.round(size * 0.24)
   setFont(ctx, 600, size, -0.02)
-  const tw = ctx.measureText(WORDMARK).width
+  while (size > Math.round(base * 0.7) && dotW() + ctx.measureText(WORDMARK).width > maxW) {
+    size -= 1
+    setFont(ctx, 600, size, -0.02)
+  }
+  const word = fit(ctx, WORDMARK, maxW - dotW())
+  const tw = ctx.measureText(word).width
   const d = Math.round(size * 0.3) // dot diameter
   const gap = Math.round(size * 0.24)
   const total = d + gap + tw
@@ -308,12 +316,12 @@ function drawBrand(ctx, x, y, { rtl, color, size = 44 }) {
       ctx.restore()
     }
     // A Hebrew name reads right to left; it still starts after the dot.
-    const he = /[\u0590-\u05FF]/.test(WORDMARK)
+    const he = /[\u0590-\u05FF]/.test(word)
     ctx.direction = he ? 'rtl' : 'ltr'
     ctx.textAlign = he ? 'right' : 'left'
     ctx.fillStyle = color
     setFont(ctx, 600, size, -0.02)
-    put(ctx, WORDMARK, he ? left + d + gap + tw : left + d + gap, y)
+    put(ctx, word, he ? left + d + gap + tw : left + d + gap, y)
   })
 }
 
@@ -467,7 +475,8 @@ function drawPlain(ctx, summary, { rtl, labels }) {
   ctx.textBaseline = 'alphabetic'
 
   // top row: wordmark at the start, the date at the end
-  drawBrand(ctx, x0, 316, { rtl, color: C.chalk })
+  // the name gets a bit over half the width; the date keeps the rest
+  drawBrand(ctx, x0, 316, { rtl, color: C.chalk, maxW: Math.round(full * 0.58) })
   if (summary.date) {
     const d = new Date(`${summary.date}T00:00:00`)
     const text = d.toLocaleDateString(rtl ? 'he-IL' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -531,7 +540,7 @@ export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo
     C.accentFg = accentNow('--accent-fg', C.ink)
     C.accentText = accentNow('--accent-text', C.accent)
   }
-  WORDMARK = (brandName || '').trim().slice(0, 30) || 'Ironlog'
+  WORDMARK = (brandName || '').trim().slice(0, 40) || 'Ironlog'
   // On a photo or a see-through sticker the card can land on anything, light
   // or dark. Any coach color but the usual one could fade there, so the
   // records number goes white like the units.
