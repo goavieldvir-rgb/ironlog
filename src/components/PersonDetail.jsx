@@ -643,7 +643,7 @@ function Section({ title, hint, count, action, children }) {
         <div className="min-w-0">
           <h2 className="text-base text-chalk inline-flex items-center gap-2">
             {title}
-            {count > 0 && <span className="num text-xs rounded-full bg-accent text-ink px-1.5 min-w-5 text-center">{count}</span>}
+            {count > 0 && <span className="num text-xs rounded-full bg-accent text-onaccent px-1.5 min-w-5 text-center">{count}</span>}
           </h2>
           {hint && <p className="text-xs text-chalkdim mt-0.5">{hint}</p>}
         </div>
@@ -1058,7 +1058,7 @@ function TrackingSettings({ person, name, setup, coachId, t, lang, confirm, toas
                       disabled={busy}
                       aria-pressed={on}
                       onClick={() => toggle(k)}
-                      className={`min-h-9 px-3 rounded-full text-sm border inline-flex items-center gap-1 ${on ? 'bg-accent text-ink border-accent' : 'border-line text-chalkdim hover:text-chalk'}`}
+                      className={`min-h-9 px-3 rounded-full text-sm border inline-flex items-center gap-1 ${on ? 'bg-accent text-onaccent border-accent' : 'border-line text-chalkdim hover:text-chalk'}`}
                     >
                       {on && <Check size={13} />}
                       <bdi>{measurementLabel(k, types, t, lang)}</bdi>
@@ -1213,7 +1213,7 @@ function ReminderControl({ settings, lang, t, onSave }) {
                   const next = on ? base.filter((x) => x !== d) : [...base, d].sort()
                   if (next.length) onSave({ remind_days: next.length === 7 ? null : next })
                 }}
-                className={`w-9 h-9 rounded-full text-xs ${on ? 'bg-accent text-ink' : 'bg-surface2 text-chalkdim'}`}
+                className={`w-9 h-9 rounded-full text-xs ${on ? 'bg-accent text-onaccent' : 'bg-surface2 text-chalkdim'}`}
               >
                 {n}
               </button>

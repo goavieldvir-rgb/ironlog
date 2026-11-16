@@ -151,7 +151,7 @@ export default function MeasurementTracker({ uid }) {
               role="tab"
               aria-selected={k === kind}
               onClick={() => setSelected(k)}
-              className={`min-h-9 px-3 rounded-full text-sm border ${k === kind ? 'bg-accent text-ink border-accent' : 'border-line text-chalkdim hover:text-chalk'}`}
+              className={`min-h-9 px-3 rounded-full text-sm border ${k === kind ? 'bg-accent text-onaccent border-accent' : 'border-line text-chalkdim hover:text-chalk'}`}
             >
               <bdi>{label(k)}</bdi>
             </button>

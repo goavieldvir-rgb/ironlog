@@ -101,7 +101,7 @@ export default function CheckinCard({ uid }) {
                     role="radio"
                     aria-checked={values[q.id] === n}
                     onClick={() => setValues((v) => ({ ...v, [q.id]: n }))}
-                    className={`min-h-11 rounded-[12px] num text-base ${values[q.id] === n ? 'bg-accent text-ink' : 'bg-surface2 text-chalkdim hover:text-chalk'}`}
+                    className={`min-h-11 rounded-[12px] num text-base ${values[q.id] === n ? 'bg-accent text-onaccent' : 'bg-surface2 text-chalkdim hover:text-chalk'}`}
                   >
                     {n}
                   </button>

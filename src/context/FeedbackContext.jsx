@@ -73,7 +73,7 @@ export function FeedbackProvider({ children }) {
                 onClick={() => close(true)}
                 autoFocus={!dialog.danger}
                 className={`rounded-md px-3.5 py-2 min-h-[44px] text-sm font-medium ${
-                  dialog.danger ? 'bg-ironbtn text-chalk hover:bg-ironbtn/90' : 'bg-brass text-ink hover:bg-brass/90'
+                  dialog.danger ? 'bg-ironbtn text-chalk hover:bg-ironbtn/90' : 'bg-brass text-onaccent hover:bg-brass/90'
                 }`}
               >
                 {dialog.confirmLabel || t('feedback.confirm')}

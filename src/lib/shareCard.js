@@ -18,12 +18,13 @@
 // only ever drawn on this phone.
 import tailwind from '../../tailwind.config.js'
 import { ACCENT, accentNow } from '../theme.js'
+import { accentTokens, hexOf } from './accent.js'
 
 const W = 1080
 const H = 1920
 const M = 96 // side margin
 const T = tailwind.theme.extend.colors
-const C = { ink: T.ink, chalk: T.chalk, dim: T.chalkdim, line: T.line, accent: ACCENT }
+const C = { ink: T.ink, chalk: T.chalk, dim: T.chalkdim, line: T.line, accent: ACCENT, accentFg: T.ink, accentText: ACCENT }
 // The wordmark on the card. renderShareCard sets both for one drawing: the
 // accent follows the coach's color, and `brandName` (when given) replaces
 // "Ironlog" with the coach's own name.
@@ -155,12 +156,6 @@ function setFont(ctx, weight, px, em = 0) {
   if ('letterSpacing' in ctx) ctx.letterSpacing = `${(px * em).toFixed(2)}px`
 }
 
-function luminance(hex) {
-  const n = parseInt(hex.slice(1), 16)
-  const ch = (v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
-  return 0.2126 * ch((n >> 16) & 255) + 0.7152 * ch((n >> 8) & 255) + 0.0722 * ch(n & 255)
-}
-
 // '#FF5B3A' + alpha -> 'rgba(255,91,58,a)'
 function tint(hex, a) {
   const n = parseInt(hex.slice(1), 16)
@@ -233,7 +228,7 @@ function drawValue(ctx, f, x, y, { rtl, gap, color, unitColor }) {
   const { st, size, unitPx } = f
   ctx.direction = 'ltr'
   ctx.textAlign = rtl ? 'right' : 'left'
-  ctx.fillStyle = st.accent ? C.accentNum || C.accent : color
+  ctx.fillStyle = st.accent ? C.accentNum || C.accentText : color
   setFont(ctx, 600, size, -0.04)
   put(ctx, st.value, x, y)
   if (!st.unit) return
@@ -349,8 +344,9 @@ function drawPill(ctx, text, x, top, { rtl, size = 30 }) {
     ctx.fill()
     ctx.restore()
     if (FX?.sticker && PASS === 'stroke') return
-    // a small ink dot, then the words, in ink on the accent
-    ctx.fillStyle = C.ink
+    // a small dot, then the words, in the accent's own text color (dark, or
+    // white on a dark coach color)
+    ctx.fillStyle = C.accentFg
     const cx = rtl ? left + w - pad - dot : left + pad + dot
     ctx.beginPath()
     ctx.arc(cx, top + h / 2, dot, 0, Math.PI * 2)
@@ -369,7 +365,7 @@ function drawPill(ctx, text, x, top, { rtl, size = 30 }) {
 // are one design. Anchored by the pill's top (`top`) or by the last label's
 // baseline (`bottom`); a two-line name grows away from the anchor. Returns
 // the baseline of the last row.
-function drawOverlayBlock(ctx, summary, { rtl, labels, top, bottom, labelColor, unitColor = C.accent }) {
+function drawOverlayBlock(ctx, summary, { rtl, labels, top, bottom, labelColor, unitColor = C.accentText }) {
   const x0 = rtl ? W - M : M
   const full = W - M * 2
   const { hero, small } = pickStats(summary, labels)
@@ -502,7 +498,7 @@ function drawPlain(ctx, summary, { rtl, labels }) {
 
   drawPill(ctx, labels.eyebrow, x0, dy, { rtl, size: 30 })
   drawName(ctx, nm, x0, dy + nameY, { rtl, color: C.chalk })
-  drawValue(ctx, heroFit, x0, dy + heroY, { rtl, gap: 18, color: C.chalk, unitColor: C.accent })
+  drawValue(ctx, heroFit, x0, dy + heroY, { rtl, gap: 18, color: C.chalk, unitColor: C.accentText })
   drawLabel(ctx, heroLabel, x0, dy + heroLabelY, { rtl, size: 34, color: C.dim, maxW: full })
 
   smallFits.forEach((f, i) => {
@@ -515,7 +511,7 @@ function drawPlain(ctx, summary, { rtl, labels }) {
     ctx.lineWidth = 2
     ctx.stroke()
     const x = rtl ? left + tileW - 32 : left + 32
-    drawValue(ctx, f, x, top + 52 + Math.round(smallSize * 0.72), { rtl, gap: 8, color: C.chalk, unitColor: C.accent })
+    drawValue(ctx, f, x, top + 52 + Math.round(smallSize * 0.72), { rtl, gap: 8, color: C.chalk, unitColor: C.accentText })
     drawLabel(ctx, f.st.label, x, top + tileH - 36, { rtl, size: 28, color: C.dim, maxW: tileW - 64 })
   })
 }
@@ -525,12 +521,21 @@ function drawPlain(ctx, summary, { rtl, labels }) {
 // accent: a #RRGGBB color, else the app's accent right now (the coach's).
 // brandName: shown in place of "Ironlog" when given.
 export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo = null, accent = null, brandName = null }) {
-  C.accent = /^#[0-9A-Fa-f]{6}$/.test(accent || '') ? accent : accentNow()
+  if (/^#[0-9A-Fa-f]{6}$/.test(accent || '')) {
+    const tk = accentTokens(accent)
+    C.accent = hexOf(tk.accent)
+    C.accentFg = hexOf(tk.fg)
+    C.accentText = hexOf(tk.text)
+  } else {
+    C.accent = accentNow()
+    C.accentFg = accentNow('--accent-fg', C.ink)
+    C.accentText = accentNow('--accent-text', C.accent)
+  }
   WORDMARK = (brandName || '').trim().slice(0, 30) || 'Ironlog'
-  // On a photo or a see-through sticker the card can land on something
-  // light. A coach color lighter than the usual accent (gold, lime...) would
-  // fade there, so the records number goes white like the units.
-  C.accentNum = (variant === 'sticker' || (variant === 'photo' && photo)) && luminance(C.accent) > luminance(ACCENT) ? '#FFFFFF' : null
+  // On a photo or a see-through sticker the card can land on anything, light
+  // or dark. Any coach color but the usual one could fade there, so the
+  // records number goes white like the units.
+  C.accentNum = (variant === 'sticker' || (variant === 'photo' && photo)) && C.accent.toUpperCase() !== ACCENT.toUpperCase() ? '#FFFFFF' : null
   const canvas = document.createElement('canvas')
   canvas.width = W
   const ctx = canvas.getContext('2d')
@@ -555,6 +560,8 @@ export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo
     FX = null
     PASS = 'fill'
     C.accent = ACCENT
+    C.accentFg = C.ink
+    C.accentText = ACCENT
     C.accentNum = null
     WORDMARK = 'Ironlog'
   }

@@ -556,7 +556,7 @@ export default function SessionEntryCard({
           done ? 'bg-accent border-transparent' : 'border-[#3A3A40]'
         }`}
       >
-        <Check size={18} strokeWidth={2.6} className={`text-ink transition-[opacity,transform] duration-150 ${done ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} />
+        <Check size={18} strokeWidth={2.6} className={`text-onaccent transition-[opacity,transform] duration-150 ${done ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} />
       </button>
     )
   }

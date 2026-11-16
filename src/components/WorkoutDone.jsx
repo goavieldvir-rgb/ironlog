@@ -233,7 +233,7 @@ export default function WorkoutDone({ summary, onDone, fromHistory = false }) {
                   // first visit to the photo tab: go straight to the picker
                   if (key === 'photo' && !made.photo && !photoBusy) fileInput.current?.click()
                 }}
-                className={`min-h-[44px] rounded-md text-sm font-medium ${variant === key ? 'bg-brass text-ink' : 'text-chalkdim'}`}
+                className={`min-h-[44px] rounded-md text-sm font-medium ${variant === key ? 'bg-brass text-onaccent' : 'text-chalkdim'}`}
               >
                 {label}
               </button>
@@ -308,7 +308,7 @@ export default function WorkoutDone({ summary, onDone, fromHistory = false }) {
             <span className="min-w-0 flex items-center gap-2">
               <span className="truncate">{r.name}</span>
               {r.prKind && (
-                <span className="shrink-0 text-xs bg-brass text-ink rounded-full px-2 py-0.5 font-semibold">
+                <span className="shrink-0 text-xs bg-brass text-onaccent rounded-full px-2 py-0.5 font-semibold">
                   {r.prKind === 'reps' ? t('sessionCard.repsPrBadge') : r.single ? t('sessionCard.prBadge') : t('sessionCard.weightPrBadge')}
                 </span>
               )}

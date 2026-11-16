@@ -532,7 +532,7 @@ function TraineeRow({ p, today, t }) {
 
 function UnreadBadge({ n, t }) {
   return (
-    <span role="img" aria-label={t('messages.unreadLabel')(n)} title={t('messages.unreadLabel')(n)} className="shrink-0 inline-flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 font-medium bg-accent text-ink num">
+    <span role="img" aria-label={t('messages.unreadLabel')(n)} title={t('messages.unreadLabel')(n)} className="shrink-0 inline-flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 font-medium bg-accent text-onaccent num">
       <MessageSquare size={11} aria-hidden="true" /> {n}
     </span>
   )

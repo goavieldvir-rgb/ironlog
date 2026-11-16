@@ -175,7 +175,7 @@ export function MessageThread({ traineeId, viewerId, side, listClass = 'max-h-[2
           disabled={!text.trim() || tooLong}
           aria-label={t('messages.send')}
           title={t('messages.send')}
-          className="press shrink-0 w-11 h-11 rounded-full bg-accent text-ink flex items-center justify-center disabled:opacity-40 disabled:pointer-events-none"
+          className="press shrink-0 w-11 h-11 rounded-full bg-accent text-onaccent flex items-center justify-center disabled:opacity-40 disabled:pointer-events-none"
         >
           <SendHorizontal size={20} className="rtl:-scale-x-100" aria-hidden="true" />
         </button>
@@ -189,7 +189,7 @@ export function MessageThread({ traineeId, viewerId, side, listClass = 'max-h-[2
 function Bubble({ own, body, meta, seen, failed, onRetry, onDiscard, t }) {
   return (
     <div className={`flex flex-col gap-0.5 ${own ? 'items-end' : 'items-start'}`}>
-      <div className={`max-w-[85%] rounded-[18px] px-3.5 py-2 text-[15px] leading-5 whitespace-pre-wrap break-words ${own ? 'bg-accent text-ink' : 'bg-surface2 text-chalk'} ${failed ? 'opacity-60' : ''}`}>
+      <div className={`max-w-[85%] rounded-[18px] px-3.5 py-2 text-[15px] leading-5 whitespace-pre-wrap break-words ${own ? 'bg-accent text-onaccent' : 'bg-surface2 text-chalk'} ${failed ? 'opacity-60' : ''}`}>
         <bdi dir="auto">{body}</bdi>
       </div>
       <div className="flex items-center gap-2 px-1 text-[11px] text-chalkdim">

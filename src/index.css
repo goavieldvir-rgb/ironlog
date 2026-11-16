@@ -4,8 +4,12 @@
 
 @layer base {
   :root {
-    /* The one accent colour, as RGB channels. */
+    /* The one accent colour, as RGB channels: the fill, the text on it and
+       accent-coloured words on the dark background (brand.js sets all three
+       for a coach's color). */
     --accent: 255 91 58;
+    --accent-fg: 11 11 12;
+    --accent-text: 255 91 58;
     --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
     --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
   }
