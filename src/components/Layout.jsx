@@ -25,7 +25,8 @@ const links = [
 
 export default function Layout() {
   const { user, logout } = useAuth()
-  const { isAdmin, nutritionAllowed, actingAs, setActingAs } = useAdmin()
+  const { isAdmin, nutritionAllowed, actingAs, setActingAs, brand } = useAdmin()
+  const logoMark = brand?.logo ? <img src={brand.logo} alt="" className="w-7 h-7 rounded-md object-cover" /> : <Dumbbell className="text-irontext" size={22} strokeWidth={2.5} />
   const { t, lang, setLang } = useLanguage()
   const { enabled: messagesOn, unread: unreadMessages } = useMessagesState()
   // Where the unread count shows: People for the coach, Messages (under More
@@ -135,12 +136,12 @@ export default function Layout() {
               shouldn't pull you out of the session. */}
           {inWorkout ? (
             <div className="flex items-center gap-2">
-              <Dumbbell className="text-irontext" size={22} strokeWidth={2.5} />
+              {logoMark}
               <span className="font-display text-2xl tracking-wide">Ironlog</span>
             </div>
           ) : (
             <NavLink to="/" className="flex items-center gap-2" aria-label={t('nav.dashboard')}>
-              <Dumbbell className="text-irontext" size={22} strokeWidth={2.5} />
+              {logoMark}
               <span className="font-display text-2xl tracking-wide">Ironlog</span>
             </NavLink>
           )}

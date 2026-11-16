@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../supabase.js'
 import { useAuth } from './AuthContext.jsx'
+import { fetchMyBrand, applyBrandColor } from '../lib/brand.js'
 
 const AdminContext = createContext(null)
 
@@ -12,6 +13,26 @@ export function AdminProvider({ children }) {
   // What the person's coach switched off for them (supabase-coach-extras.sql);
   // empty until that runs.
   const [traineeSettings, setTraineeSettings] = useState({})
+  // The coach's look (supabase-coach-branding.sql): name, accent, logo.
+  const [brand, setBrand] = useState({})
+  const [brandTick, setBrandTick] = useState(0)
+
+  useEffect(() => {
+    if (!user) {
+      setBrand({})
+      applyBrandColor(null)
+      return
+    }
+    let cancelled = false
+    fetchMyBrand().then((b) => {
+      if (cancelled) return
+      setBrand(b)
+      applyBrandColor(b.color)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [user, brandTick])
 
   useEffect(() => {
     if (!user) return setTraineeSettings({})
@@ -75,6 +96,8 @@ export function AdminProvider({ children }) {
     removed,
     nutritionAllowed,
     traineeSettings,
+    brand,
+    refreshBrand: () => setBrandTick((n) => n + 1),
     loadingProfile,
     actingAs,
     setActingAs,

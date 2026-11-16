@@ -7,6 +7,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCoachSettings, saveCoachSettings, TASK_KINDS } from '../lib/coachSettings.js'
 import { BUILT_IN, customKey, measurementLabel, fetchMeasurementSetup } from '../lib/measurements.js'
+import { PALETTE, rgbOf, resizeLogo } from '../lib/brand.js'
 import { SUGGESTED_QUESTIONS, QUESTION_TYPES, MAX_QUESTIONS, newQuestionId } from '../lib/checkins.js'
 import { Card, Button } from './ui.jsx'
 import { PageLoader } from './Loading.jsx'
@@ -15,7 +16,7 @@ import { PageLoader } from './Loading.jsx'
 // list, which To do items show up and when, the People "behind" flag, the
 // check-in interval and record alerts.
 export default function CoachSettings() {
-  const { isCoach, profile } = useAdmin()
+  const { isCoach, profile, refreshBrand } = useAdmin()
   const { t, lang } = useLanguage()
   const { toast } = useFeedback()
   const [state] = useCoachSettings(isCoach ? profile?.id : null)
@@ -64,6 +65,11 @@ export default function CoachSettings() {
           .map((q) => ({ id: q.id, type: q.type, en: (q.en || '').trim(), he: (q.he || '').trim() }))
           .filter((q) => q.en || q.he)
       }
+      if (state.brandAvailable) {
+        patch.brand_name = form.brand_name?.trim() || null
+        patch.brand_color = form.brand_color || null
+        patch.brand_logo = form.brand_logo || null
+      }
       if (state.extrasAvailable) {
         patch.snippets = form.snippets
         patch.invite_text = form.invite_text?.trim() || null
@@ -72,6 +78,7 @@ export default function CoachSettings() {
       setLastSaved(row)
       setForm(row)
       toast(t('coachSettings.saved'))
+      refreshBrand()
     } catch (e) {
       console.error(e)
       toast(t('feedback.saveFailed'), 'error')
@@ -245,6 +252,74 @@ export default function CoachSettings() {
                   </Button>
                 )}
               </div>
+            </>
+          )}
+        </Card>
+
+        <Card className="flex flex-col gap-3">
+          <h2 className="text-base text-chalk">{t('brand.title')}</h2>
+          <p className="text-xs text-chalkdim -mt-2">{t('brand.hint')}</p>
+          {!state.brandAvailable ? (
+            <p className="text-xs text-accent">{t('brand.notReady')}</p>
+          ) : (
+            <>
+              <label className="flex flex-col gap-1.5">
+                <span className="eyebrow">{t('brand.name')}</span>
+                <input value={form.brand_name || ''} onChange={(e) => set({ brand_name: e.target.value })} maxLength={40} dir="auto" placeholder={profile?.full_name || ''} />
+              </label>
+              <div className="flex flex-col gap-1.5">
+                <span className="eyebrow">{t('brand.color')}</span>
+                <div className="flex gap-2 flex-wrap" role="radiogroup" aria-label={t('brand.color')}>
+                  {Object.keys(PALETTE).map((c) => {
+                    const on = (form.brand_color || 'ember') === c
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        aria-label={t(`brand.colors.${c}`)}
+                        title={t(`brand.colors.${c}`)}
+                        onClick={() => set({ brand_color: c === 'ember' ? null : c })}
+                        className={`w-10 h-10 rounded-full inline-flex items-center justify-center ${on ? 'ring-2 ring-chalk ring-offset-2 ring-offset-surface' : ''}`}
+                        style={{ background: rgbOf(c) }}
+                      >
+                        {on && <Check size={16} className="text-ink" />}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div className="flex items-center gap-3 flex-wrap">
+                {form.brand_logo ? (
+                  <img src={form.brand_logo} alt={t('brand.logo')} className="w-14 h-14 rounded-xl object-cover" />
+                ) : (
+                  <div className="w-14 h-14 rounded-xl bg-surface2" />
+                )}
+                <label className="inline-flex items-center gap-2 min-h-11 px-4 rounded-full border border-line text-sm cursor-pointer hover:text-chalk">
+                  {form.brand_logo ? t('brand.changeLogo') : t('brand.addLogo')}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      e.target.value = ''
+                      try {
+                        set({ brand_logo: await resizeLogo(file) })
+                      } catch {
+                        toast(t('brand.logoFailed'), 'error')
+                      }
+                    }}
+                  />
+                </label>
+                {form.brand_logo && (
+                  <button type="button" onClick={() => set({ brand_logo: null })} className="text-sm text-chalkdim underline min-h-11">
+                    {t('brand.removeLogo')}
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-chalkdim">{t('brand.preview', { name: form.brand_name?.trim() || profile?.full_name || '' })}</p>
             </>
           )}
         </Card>
