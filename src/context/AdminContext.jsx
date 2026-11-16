@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../supabase.js'
 import { useAuth } from './AuthContext.jsx'
+import { fetchMyBrand, applyBrandColor } from '../lib/brand.js'
 
 const AdminContext = createContext(null)
 
@@ -9,6 +10,39 @@ export function AdminProvider({ children }) {
   const [profile, setProfile] = useState(null)
   const [loadingProfile, setLoadingProfile] = useState(true)
   const [actingAs, setActingAsState] = useState(null)
+  // What the person's coach switched off for them (supabase-coach-extras.sql);
+  // empty until that runs.
+  const [traineeSettings, setTraineeSettings] = useState({})
+  // The coach's look (supabase-coach-branding.sql): name, accent, logo.
+  const [brand, setBrand] = useState({})
+  const [brandTick, setBrandTick] = useState(0)
+
+  useEffect(() => {
+    if (!user) {
+      setBrand({})
+      applyBrandColor(null)
+      return
+    }
+    let cancelled = false
+    fetchMyBrand().then((b) => {
+      if (cancelled) return
+      setBrand(b)
+      applyBrandColor(b.color)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [user, brandTick])
+
+  useEffect(() => {
+    if (!user) return setTraineeSettings({})
+    supabase
+      .from('trainee_settings')
+      .select('*')
+      .eq('user_id', user.uid)
+      .maybeSingle()
+      .then(({ data }) => setTraineeSettings(data || {}), () => setTraineeSettings({}))
+  }, [user])
 
   useEffect(() => {
     if (!user) {
@@ -61,6 +95,9 @@ export function AdminProvider({ children }) {
     coachFrozen,
     removed,
     nutritionAllowed,
+    traineeSettings,
+    brand,
+    refreshBrand: () => setBrandTick((n) => n + 1),
     loadingProfile,
     actingAs,
     setActingAs,

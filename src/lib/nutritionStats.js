@@ -58,8 +58,10 @@ export async function getLogTotalsRange(uid, from, to) {
   )
 }
 
-export function kcalOnTarget(kcal, target) {
-  return target > 0 && Math.abs(kcal - target) <= target * KCAL_BAND
+// band: the coach's on-target range in % (targets.kcal_band), 10 by default.
+export function kcalOnTarget(kcal, target, band) {
+  const b = band > 0 ? band / 100 : KCAL_BAND
+  return target > 0 && Math.abs(kcal - target) <= target * b
 }
 
 // days: one row per calendar day of the period, with the day's totals.
@@ -95,7 +97,7 @@ export function periodStats({ from, to, today, foodRows, waterRows, targets, wat
     loggedDays: fed.length,
     avg: { kcal: avg(fed, 'kcal'), protein: avg(fed, 'protein'), carbs: avg(fed, 'carbs'), fat: avg(fed, 'fat') },
     proteinHits: tp > 0 ? fed.filter((d) => d.protein >= tp).length : null,
-    kcalHits: tk > 0 ? fed.filter((d) => kcalOnTarget(d.kcal, tk)).length : null,
+    kcalHits: tk > 0 ? fed.filter((d) => kcalOnTarget(d.kcal, tk, targets?.kcal_band)).length : null,
     waterDays: watered.length,
     waterAvg: avg(watered, 'ml'),
     waterHits: waterGoal > 0 ? watered.filter((d) => d.ml >= waterGoal).length : null,

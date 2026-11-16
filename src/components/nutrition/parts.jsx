@@ -4,7 +4,7 @@ import { BadgeCheck, CheckCircle2, ChevronLeft, ChevronRight, Minus, Plus, X } f
 import { useLanguage } from '../../context/LanguageContext.jsx'
 import { useFeedback } from '../../context/FeedbackContext.jsx'
 import { useScrollLock } from '../../lib/scrollLock.js'
-import { badgeKind, fmt, logUnit, MEALS, MEAL_KEY } from '../../lib/nutrition.js'
+import { badgeKind, fmt, logUnit, activeMeals, customMealName, MEAL_KEY } from '../../lib/nutrition.js'
 
 // Number that never gets reordered inside Hebrew text.
 export function N({ children, mono = false, className = '' }) {
@@ -108,29 +108,31 @@ export function ToneLabel({ children, plain = false }) {
   )
 }
 
-const MEAL_SHORT = { breakfast: 'mealShortBreakfast', lunch: 'mealShortLunch', dinner: 'mealShortDinner', snack: 'mealShortSnack' }
+const MEAL_SHORT = { breakfast: 'mealShortBreakfast', lunch: 'mealShortLunch', dinner: 'mealShortDinner', snack: 'mealShortSnack', snack2: 'mealShortSnack2', snack3: 'mealShortSnack3' }
+const COLS = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3', 4: 'grid-cols-4', 5: 'grid-cols-5', 6: 'grid-cols-6' }
 
 // Selected chip look shared with the rest of the app (Stats metric toggles).
 const ON = 'bg-chalk text-ink font-medium'
 const OFF = 'bg-surface2 text-chalkdim hover:text-chalk'
 
-// Four meals as one segmented row: the choice is visible without opening
-// anything, and it takes one tap.
+// The meals as one segmented row (four unless the coach set others): the
+// choice is visible without opening anything, and it takes one tap.
 export function MealTabs({ value, onChange, className = '' }) {
   const { t } = useLanguage()
+  const meals = activeMeals().includes(value) || !value ? activeMeals() : [...activeMeals(), value]
   return (
-    <div role="radiogroup" aria-label={t('nutrition.meal')} className={`grid grid-cols-4 gap-1 p-1 rounded-[14px] bg-surface2 ${className}`}>
-      {MEALS.map((m) => (
+    <div role="radiogroup" aria-label={t('nutrition.meal')} className={`grid ${COLS[meals.length] || 'grid-cols-4'} gap-1 p-1 rounded-[14px] bg-surface2 ${className}`}>
+      {meals.map((m) => (
         <button
           key={m}
           type="button"
           role="radio"
           aria-checked={value === m}
-          aria-label={t(MEAL_KEY[m])}
+          aria-label={mealLabel(t, m)}
           onClick={() => onChange(m)}
           className={`min-h-[40px] px-1 rounded-[11px] text-sm font-medium truncate press transition-colors ${value === m ? 'bg-chalk text-ink' : 'text-chalkdim hover:text-chalk'}`}
         >
-          {t(`nutrition.${MEAL_SHORT[m]}`)}
+          <bdi>{customMealName(m) || t(`nutrition.${MEAL_SHORT[m]}`)}</bdi>
         </button>
       ))}
     </div>
@@ -474,7 +476,7 @@ export function UndoToast({ toast, onUndo }) {
   )
 }
 
-export const mealLabel = (t, m) => t(MEAL_KEY[m])
+export const mealLabel = (t, m) => customMealName(m) || t(MEAL_KEY[m])
 
 // "2 medium slices · 68 g" with every number and name isolated, so a Hebrew
 // unit name inside an English page (or the reverse) keeps its order.

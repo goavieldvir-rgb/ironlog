@@ -11,7 +11,9 @@ export default function Notifications() {
   const { user } = useAuth()
   const { t, lang } = useLanguage()
   const { toast } = useFeedback()
-  const { isCoach, isOwner } = useAdmin()
+  const { isCoach, isOwner, traineeSettings } = useAdmin()
+  // The coach can set the reminder time; it wins over the one picked here.
+  const coachTime = traineeSettings?.remind_time ? String(traineeSettings.remind_time).slice(0, 5) : null
   // Bumped after a permission prompt so pushStatus() is read again and a
   // denied answer shows the blocked card right away.
   const [, setStatusTick] = useState(0)
@@ -161,6 +163,7 @@ export default function Notifications() {
         <div className="eyebrow mb-1 flex items-center gap-1.5"><Bell size={13} /> {t('notifications.eyebrow')}</div>
         <h1 className="text-3xl">{t('notifications.title')}</h1>
         <p className="text-chalkdim text-sm mt-1">{t('notifications.subtitle')}</p>
+        {coachTime && <p className="text-accent text-sm mt-2">{t('notifications.coachTime', { time: coachTime })}</p>}
       </div>
 
       {status === 'needs-install' && (
