@@ -602,9 +602,25 @@ const TOOLTIP = {
   itemStyle: { color: CHALK },
 }
 
+// The two date labels under a weekly chart sit at its edges: the first one
+// starts at the left edge and the last one ends at the right, so neither is
+// cut off (centred, a longer date like "15 בנוב׳" ran past the edge).
+function EdgeTick({ x, y, payload, first }) {
+  const anchor = payload.value === first ? 'start' : 'end'
+  return (
+    <text x={x} y={y} dy={12} textAnchor={anchor} fill={AXIS.tick.fill} fontSize={AXIS.tick.fontSize}>
+      {payload.value}
+    </text>
+  )
+}
+
 // One neutral bar per week; the current week carries the accent.
 function WeeklyChart({ title, caption, data, dataKey, yWidth, allowDecimals = true, note, tooltipFormatter }) {
   const last = data.length - 1
+  // Room for the widest axis number. The top tick can round up past the
+  // biggest week (11,000 kg gets a 14000 tick), so size for half as much again.
+  const top = Math.max(0, ...data.map((d) => Number(d[dataKey]) || 0))
+  const axisWidth = Math.max(yWidth, String(Math.round(top * 1.5)).length * 8 + 12)
   return (
     <section className="bg-surface rounded-[22px] pt-[18px] px-[18px] pb-3.5 flex flex-col gap-4">
       <div className="flex items-baseline justify-between gap-3">
@@ -614,8 +630,8 @@ function WeeklyChart({ title, caption, data, dataKey, yWidth, allowDecimals = tr
       <div dir="ltr">
         <ResponsiveContainer width="100%" height={150}>
           <BarChart data={data} margin={{ left: 0, right: 0, top: 4, bottom: 0 }} barCategoryGap="22%">
-            <XAxis dataKey="label" {...AXIS} ticks={[data[0].label, data[last].label]} interval={0} padding={{ left: 0, right: 0 }} />
-            <YAxis {...AXIS} allowDecimals={allowDecimals} tickCount={3} width={yWidth} />
+            <XAxis dataKey="label" {...AXIS} ticks={[data[0].label, data[last].label]} interval={0} padding={{ left: 0, right: 0 }} tick={<EdgeTick first={data[0].label} />} />
+            <YAxis {...AXIS} allowDecimals={allowDecimals} tickCount={3} width={axisWidth} />
             <Tooltip {...TOOLTIP} cursor={{ fill: 'rgba(255,255,255,0.04)' }} formatter={tooltipFormatter} />
             <Bar dataKey={dataKey} radius={[6, 6, 2, 2]} minPointSize={2}>
               {data.map((d, i) => (

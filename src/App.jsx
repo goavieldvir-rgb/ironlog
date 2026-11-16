@@ -113,7 +113,8 @@ export default function App() {
         <Route path="/history/:id" element={<SessionDetail />} />
         <Route path="/history/:id/edit" element={<EditSession />} />
         <Route path="/history/:id/share" element={<SessionShare />} />
-        <Route path="/people" element={<People />} />
+        {/* Coaches only: a trainee, or a coach the owner froze, goes Home. */}
+        <Route path="/people" element={isAdmin ? <People /> : <Navigate to="/" replace />} />
         <Route path="/people/:id" element={<PersonDetail />} />
         <Route path="/coach-settings" element={<CoachSettings />} />
         <Route path="/errors" element={<ErrorLogs />} />
