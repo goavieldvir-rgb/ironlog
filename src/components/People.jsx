@@ -13,7 +13,7 @@ import { InfoTip } from './InfoTip.jsx'
 import { PageLoader } from './Loading.jsx'
 import CoachTasks from './CoachTasks.jsx'
 import { useCoachSettings } from '../lib/coachSettings.js'
-import Tour, { useFirstTour } from './Tour.jsx'
+import Tour, { useFirstTour, tourSeen, markTourSeen, COACH_NEW_TOUR } from './Tour.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { useMessagesState } from '../lib/messages.js'
 import { fetchRoster, fetchRecentPrs, rosterFlags, attentionScore, adherence, daysSince, recordInvite, fetchMyCoachLimit, fetchOwnerName } from '../lib/coach.js'
@@ -130,11 +130,21 @@ export default function People() {
     return () => { live = false }
   }, [isOtherCoach])
   const tourRequested = !!location.state?.coachTour
-  const [tourOpen, closeTour] = useFirstTour('coach', isOtherCoach && !loading && limitLoaded && ownerName != null, tourRequested, { coach: true })
+  const tourReady = isOtherCoach && !loading && limitLoaded && ownerName != null
+  const [tourOpen, closeFullTour] = useFirstTour('coach', tourReady, tourRequested, { coach: true })
+  // The full walkthrough already covers what's new, so finishing or
+  // skipping it also counts as having seen the "what's new" one.
+  const closeTour = (completed, empty) => {
+    if (!empty && user) markTourSeen(user.uid, COACH_NEW_TOUR)
+    closeFullTour(completed, empty)
+  }
   useEffect(() => {
     if (tourOpen && tourRequested) navigate('.', { replace: true, state: null })
   }, [tourOpen, tourRequested, navigate])
   const tourSteps = coachTourSteps(t, ownerName)
+  // Coaches who finished the walkthrough before Coach settings and the
+  // Tracking card existed get a short "what's new" instead, once.
+  const [newOpen, closeNew] = useFirstTour(COACH_NEW_TOUR, tourReady && !tourOpen && !!user && tourSeen(user.uid, 'coach'), false, { coach: true })
 
   const views = [
     ['attention', t('people.viewAttention')],
@@ -146,6 +156,7 @@ export default function People() {
   return (
     <div className="flex flex-col gap-5">
       {tourOpen && <Tour steps={tourSteps} onClose={closeTour} />}
+      {newOpen && !tourOpen && <Tour steps={coachNewSteps(t)} onClose={closeNew} />}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div data-tour="coach-own">
           <div className="eyebrow mb-1">{t(isOwner ? 'people.admin' : 'people.coachBadge')}</div>
@@ -159,9 +170,11 @@ export default function People() {
           )}
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="ghost" to="/coach-settings" aria-label={t('coachSettings.title')}>
-            <Settings size={16} /> <span className="hidden sm:inline">{t('coachSettings.title')}</span>
-          </Button>
+          <span data-tour="coach-settings" className="contents">
+            <Button variant="ghost" to="/coach-settings" aria-label={t('coachSettings.title')}>
+              <Settings size={16} /> <span className="hidden sm:inline">{t('coachSettings.title')}</span>
+            </Button>
+          </span>
           {isOwner && (
             <Button variant="ghost" to="/errors">
               <AlertTriangle size={16} /> {t('people.errorLogs')}
@@ -280,13 +293,26 @@ export function coachTourSteps(t, ownerName) {
   }
   return [
     { target: 'coach-own', ...fill('own') },
+    { target: 'coach-settings', ...fill('settings') },
     { target: 'coach-invite', ...fill('invite') },
     { target: 'coach-places', ...fill('places') },
     { target: 'coach-trainee', ...fill('trainee') },
+    fill('setup'),
     fill('routines'),
     fill('remove'),
     fill('owner'),
   ]
+}
+
+// The short "what's new" for coaches who had the walkthrough before Coach
+// settings and the Tracking card arrived.
+export function coachNewSteps(t) {
+  const eyebrow = t('tour.coach.newEyebrow')
+  const pick = (key) => {
+    const s = t(`tour.coach.${key}`)
+    return { eyebrow, title: s.title, body: s.body }
+  }
+  return [{ target: 'coach-settings', ...pick('settings') }, pick('setup')]
 }
 
 // Owner only: the independent coaches. Names, emails and how many trainees
