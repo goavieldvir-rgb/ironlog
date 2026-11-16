@@ -338,7 +338,7 @@ export default function PersonDetail() {
             </div>
           ))}
 
-          {messagesOn && (
+          {messagesOn && !data.traineeSettings?.messages_off && (
             <Section title={t('messages.title')} hint={t('messages.coachHint')}>
               <MessageThread traineeId={p.id} viewerId={me.uid} side="coach" readOnlyNote={p.removed_at ? t('people.removedNoMessages') : null} />
             </Section>
@@ -490,6 +490,8 @@ export default function PersonDetail() {
               toast={toast}
               onProfile={(patch) => setData((d) => ({ ...d, profile: { ...d.profile, ...patch } }))}
               onSetup={(measurementSetup) => setData((d) => ({ ...d, measurementSetup }))}
+              traineeSettings={data.traineeSettings}
+              onTraineeSettings={(traineeSettings) => setData((d) => ({ ...d, traineeSettings }))}
             />
           )}
 
@@ -906,7 +908,7 @@ function MeasurementCharts({ entries, types, today, t, lang }) {
 
 // What this trainee logs on their body page (built-in or the coach's own
 // measurements), the coach's default list, and the quiet-alert days.
-function TrackingSettings({ person, name, setup, coachId, t, lang, confirm, toast, onProfile, onSetup }) {
+function TrackingSettings({ person, name, setup, coachId, t, lang, confirm, toast, onProfile, onSetup, traineeSettings, onTraineeSettings }) {
   const [busy, setBusy] = useState(false)
   const [adding, setAdding] = useState(false)
   const [labelEn, setLabelEn] = useState('')
@@ -960,6 +962,19 @@ function TrackingSettings({ person, name, setup, coachId, t, lang, confirm, toas
     })
   }
 
+  async function toggleFeature(key) {
+    const next = { ...(traineeSettings || {}), [key]: !traineeSettings?.[key] }
+    const { error } = await supabase
+      .from('trainee_settings')
+      .upsert({ user_id: person.id, [key]: next[key], updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+    if (error) {
+      console.error(error)
+      toast(t('feedback.saveFailed'), 'error')
+      return
+    }
+    onTraineeSettings(next)
+  }
+
   async function saveQuiet() {
     const n = Math.min(60, Math.max(1, Math.round(Number(quiet)) || 5))
     setQuiet(String(n))
@@ -993,6 +1008,21 @@ function TrackingSettings({ person, name, setup, coachId, t, lang, confirm, toas
         <span>{t('measure.quietDaysUnit')}</span>
       </div>
       <p className="text-xs text-chalkdim -mt-1">{t('measure.quietDaysHint')}</p>
+
+      {traineeSettings && (
+        <div className="border-t border-line pt-3 flex flex-col gap-1">
+          <span className="eyebrow">{t('measure.featuresLabel')}</span>
+          {[
+            ['messages_off', 'featureMessages'],
+            ['weigh_prompt_off', 'featureWeighCard'],
+          ].map(([key, label]) => (
+            <label key={key} className="flex items-center gap-3 min-h-10 cursor-pointer text-sm">
+              <input type="checkbox" checked={!traineeSettings[key]} onChange={() => toggleFeature(key)} className="w-5 h-5" />
+              {t(`measure.${label}`)}
+            </label>
+          ))}
+        </div>
+      )}
 
       <div className="border-t border-line pt-3 flex flex-col gap-2">
         <span className="eyebrow">{t('measure.listLabel')}</span>

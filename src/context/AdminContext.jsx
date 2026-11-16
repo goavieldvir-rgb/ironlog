@@ -9,6 +9,19 @@ export function AdminProvider({ children }) {
   const [profile, setProfile] = useState(null)
   const [loadingProfile, setLoadingProfile] = useState(true)
   const [actingAs, setActingAsState] = useState(null)
+  // What the person's coach switched off for them (supabase-coach-extras.sql);
+  // empty until that runs.
+  const [traineeSettings, setTraineeSettings] = useState({})
+
+  useEffect(() => {
+    if (!user) return setTraineeSettings({})
+    supabase
+      .from('trainee_settings')
+      .select('*')
+      .eq('user_id', user.uid)
+      .maybeSingle()
+      .then(({ data }) => setTraineeSettings(data || {}), () => setTraineeSettings({}))
+  }, [user])
 
   useEffect(() => {
     if (!user) {
@@ -61,6 +74,7 @@ export function AdminProvider({ children }) {
     coachFrozen,
     removed,
     nutritionAllowed,
+    traineeSettings,
     loadingProfile,
     actingAs,
     setActingAs,

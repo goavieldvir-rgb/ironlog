@@ -540,6 +540,9 @@ function UnreadBadge({ n, t }) {
 function InviteModal({ onClose, t }) {
   useScrollLock(true)
   const { toast } = useFeedback()
+  const { profile } = useAdmin()
+  const [coachSettings] = useCoachSettings(profile?.id)
+  const ownText = coachSettings?.settings.invite_text?.trim()
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)
@@ -559,7 +562,10 @@ function InviteModal({ onClose, t }) {
     return `${base}${query ? `?${query}` : ''}#/`
   })()
 
-  const message = t('people.inviteMessage')(name, link)
+  // The coach's own wording (Coach settings) when they wrote one.
+  const message = ownText
+    ? (/\{link\}/.test(ownText) ? ownText : `${ownText}\n${'{link}'}`).replace(/\{name\}/g, name).replace(/\{link\}/g, link)
+    : t('people.inviteMessage')(name, link)
 
   // Records the invite first. Another coach's live invite for this email
   // stops here, since signing up would land them with that coach. Anything

@@ -90,7 +90,7 @@ export default function Dashboard() {
   const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
   const { unread: unreadMessages, latest: latestMessage, threads: coachThreads } = useMessagesState()
-  const { isAdmin, nutritionAllowed, coachFrozen } = useAdmin()
+  const { isAdmin, nutritionAllowed, coachFrozen, traineeSettings } = useAdmin()
   const location = useLocation()
   const navigate = useNavigate()
   const [exercises, exercisesLoading, refreshExercises, exercisesError] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
@@ -383,7 +383,7 @@ export default function Dashboard() {
       )}
 
       {/* A morning weigh-in is the person's own; a coach viewing their account doesn't get it. */}
-      {!actingAs && !weightSaved && !weightHidden && !weightsLoading && !weightsError && !loadFailed && !weights.some((w) => w.date === todayIso) && (
+      {!actingAs && !traineeSettings?.weigh_prompt_off && !weightSaved && !weightHidden && !weightsLoading && !weightsError && !loadFailed && !weights.some((w) => w.date === todayIso) && (
         <WeightQuickCard
           last={weights[0]}
           t={t}

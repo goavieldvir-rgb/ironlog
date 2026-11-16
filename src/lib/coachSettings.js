@@ -12,6 +12,8 @@ export const COACH_DEFAULTS = {
   behind_pct: 60,
   checkin_days: 7,
   pr_alerts: true,
+  snippets: [],
+  invite_text: null,
 }
 
 export const TASK_KINDS = ['quiet', 'checkin', 'weigh', 'food', 'birthday', 'welcome']
@@ -22,10 +24,16 @@ export async function fetchCoachSettings(coachId) {
   const { data, error } = await supabase.from('coach_settings').select('*').eq('coach_id', coachId).maybeSingle()
   if (error) {
     if (!['42P01', 'PGRST205'].includes(error.code)) console.error(error)
-    return { settings: COACH_DEFAULTS, available: false, prefsAvailable: false }
+    return { settings: COACH_DEFAULTS, available: false, prefsAvailable: false, extrasAvailable: false }
   }
-  const prefsAvailable = !data || 'pr_alerts' in data
-  return { settings: { ...COACH_DEFAULTS, ...(data || {}) }, available: true, prefsAvailable }
+  // Before any row exists, ask whether the newer columns are there.
+  let prefsAvailable = !!data && 'pr_alerts' in data
+  let extrasAvailable = !!data && 'snippets' in data
+  if (!data) {
+    prefsAvailable = !(await supabase.from('coach_settings').select('pr_alerts').limit(0)).error
+    extrasAvailable = !(await supabase.from('coach_settings').select('snippets').limit(0)).error
+  }
+  return { settings: { ...COACH_DEFAULTS, ...(data || {}) }, available: true, prefsAvailable, extrasAvailable }
 }
 
 export function useCoachSettings(coachId) {

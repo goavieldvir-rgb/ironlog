@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Check } from 'lucide-react'
+import { Check, Plus, Trash2 } from 'lucide-react'
 import { BackChevron } from './DirectionalIcon.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -22,6 +22,7 @@ export default function CoachSettings() {
   const [types, setTypes] = useState([])
   const [saving, setSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
+  const [snippetDraft, setSnippetDraft] = useState('')
 
   useEffect(() => {
     if (state) setForm(state.settings)
@@ -55,6 +56,10 @@ export default function CoachSettings() {
       const patch = { default_measurements: form.default_measurements }
       if (state.prefsAvailable) {
         for (const k of ['tasks_off', 'weigh_days', 'food_days', 'behind_pct', 'checkin_days', 'pr_alerts']) patch[k] = form[k]
+      }
+      if (state.extrasAvailable) {
+        patch.snippets = form.snippets
+        patch.invite_text = form.invite_text?.trim() || null
       }
       const row = await saveCoachSettings(profile.id, patch)
       setLastSaved(row)
@@ -153,6 +158,56 @@ export default function CoachSettings() {
             <span className="text-base text-chalk">{t('coachSettings.prAlerts')}</span>
           </label>
           <p className="text-xs text-chalkdim ps-8">{t('coachSettings.prAlertsHint')}</p>
+        </Card>
+      </fieldset>
+
+      {state.prefsAvailable && !state.extrasAvailable && <p className="text-sm text-accent">{t('coachSettings.extrasNotReady')}</p>}
+
+      <fieldset disabled={!state.extrasAvailable} className="flex flex-col gap-5 disabled:opacity-60">
+        <Card className="flex flex-col gap-3">
+          <h2 className="text-base text-chalk">{t('coachSettings.snippetsTitle')}</h2>
+          <p className="text-xs text-chalkdim -mt-2">{t('coachSettings.snippetsHint')}</p>
+          {form.snippets.length > 0 && (
+            <ul className="flex flex-col divide-y divide-line">
+              {form.snippets.map((sn, i) => (
+                <li key={i} className="py-2 flex items-start gap-2">
+                  <p className="flex-1 text-sm whitespace-pre-wrap break-words" dir="auto">{sn}</p>
+                  <button type="button" onClick={() => set({ snippets: form.snippets.filter((_, j) => j !== i) })} className="hit text-chalkdim p-1" aria-label={t('common.delete')}>
+                    <Trash2 size={15} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {form.snippets.length < 30 && (
+            <div className="flex gap-2 items-start">
+              <textarea value={snippetDraft} onChange={(e) => setSnippetDraft(e.target.value)} rows={2} maxLength={500} placeholder={t('coachSettings.snippetPlaceholder')} className="flex-1" dir="auto" />
+              <Button
+                variant="ghost"
+                disabled={!snippetDraft.trim()}
+                onClick={() => {
+                  set({ snippets: [...form.snippets, snippetDraft.trim()] })
+                  setSnippetDraft('')
+                }}
+                aria-label={t('common.add')}
+              >
+                <Plus size={16} />
+              </Button>
+            </div>
+          )}
+        </Card>
+
+        <Card className="flex flex-col gap-3">
+          <h2 className="text-base text-chalk">{t('coachSettings.inviteTitle')}</h2>
+          <p className="text-xs text-chalkdim -mt-2">{t('coachSettings.inviteHint')}</p>
+          <textarea
+            value={form.invite_text || ''}
+            onChange={(e) => set({ invite_text: e.target.value })}
+            rows={5}
+            maxLength={1000}
+            dir="auto"
+            placeholder={t('people.inviteMessage')('{name}', '{link}')}
+          />
         </Card>
       </fieldset>
 
