@@ -22,7 +22,7 @@ import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
 import { formatPace } from '../lib/cardio.js'
 import CardioTotals from './CardioTotals.jsx'
 import { sameKindSessions, matchingEntry, targetFor, entryStats, trend, sessionVolume } from '../lib/sessionCompare.js'
-import { ACCENT, CHALK, CHALKDIM, MUTED, SURFACE } from '../theme.js'
+import { accentNow, CHALK, CHALKDIM, MUTED, SURFACE } from '../theme.js'
 
 function formatDate(lang, iso) {
   if (!iso) return ''
@@ -579,7 +579,7 @@ function ComparePanel({ session, previous, compared, count, setCount, exById, la
                   dot={(props) => {
                     const { cx, cy, payload } = props
                     if (cx == null || cy == null || payload.value == null) return <g key={payload.id} />
-                    return <circle key={payload.id} cx={cx} cy={cy} r={payload.current ? 5 : 3.5} fill={payload.current ? ACCENT : CHALKDIM} />
+                    return <circle key={payload.id} cx={cx} cy={cy} r={payload.current ? 5 : 3.5} fill={payload.current ? accentNow() : CHALKDIM} />
                   }}
                 />
               </LineChart>

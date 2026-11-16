@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Share, Trophy, Check, ImagePlus, Copy, Download } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
+import { useAdmin } from '../context/AdminContext.jsx'
 import { Button, Card } from './ui.jsx'
 import { dateLocale } from '../lib/dates.js'
 import { prepareCard, shareFile, loadPhoto, downloadFile, copyImage, canCopyImage, isIOS, shareFontsReady, shareFontsLoaded } from '../lib/shareCard.js'
@@ -20,6 +21,8 @@ function formatDate(date, lang) {
 // fromHistory: opened later from a saved workout, not right after Finish.
 export default function WorkoutDone({ summary, onDone, fromHistory = false }) {
   const { t, lang, dir } = useLanguage()
+  // The coach's name in place of "Ironlog" on the card, when they set one.
+  const brandName = useAdmin().brand?.name || null
   const { toast } = useFeedback()
   const [variant, setVariant] = useState('plain')
   // Each picture is made ahead of any tap, so the share menu / clipboard can
@@ -61,7 +64,7 @@ export default function WorkoutDone({ summary, onDone, fromHistory = false }) {
     setMade({})
     setFailed({})
     const draw = (v) =>
-      prepareCard(summary, { rtl: dir === 'rtl', labels, variant: v, photo: v === 'photo' ? photoRef.current : null }, fileName(v))
+      prepareCard(summary, { rtl: dir === 'rtl', labels, brandName, variant: v, photo: v === 'photo' ? photoRef.current : null }, fileName(v))
         .then((f) => {
           if (cancelled) return
           remember(v, f)
@@ -83,7 +86,7 @@ export default function WorkoutDone({ summary, onDone, fromHistory = false }) {
     return () => {
       cancelled = true
     }
-  }, [summary, dir, lang]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [summary, dir, lang, brandName]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(
     () => () => {
@@ -101,7 +104,7 @@ export default function WorkoutDone({ summary, onDone, fromHistory = false }) {
     let photo = null
     try {
       photo = await loadPhoto(picked)
-      const f = await prepareCard(summary, { rtl: dir === 'rtl', labels, variant: 'photo', photo }, fileName('photo'))
+      const f = await prepareCard(summary, { rtl: dir === 'rtl', labels, brandName, variant: 'photo', photo }, fileName('photo'))
       photoRef.current?.close?.()
       photoRef.current = photo
       remember('photo', f)
@@ -110,7 +113,7 @@ export default function WorkoutDone({ summary, onDone, fromHistory = false }) {
         // fonts still arriving: redraw this one when they do
         shareFontsReady().then((ok) => {
           if (ok && photoRef.current === photo) {
-            prepareCard(summary, { rtl: dir === 'rtl', labels, variant: 'photo', photo }, fileName('photo')).then((g) => remember('photo', g)).catch(() => {})
+            prepareCard(summary, { rtl: dir === 'rtl', labels, brandName, variant: 'photo', photo }, fileName('photo')).then((g) => remember('photo', g)).catch(() => {})
           }
         })
       }
@@ -129,7 +132,7 @@ export default function WorkoutDone({ summary, onDone, fromHistory = false }) {
   async function retryCard(v) {
     setFailed((m) => ({ ...m, [v]: false }))
     try {
-      const f = await prepareCard(summary, { rtl: dir === 'rtl', labels, variant: v, photo: v === 'photo' ? photoRef.current : null }, fileName(v))
+      const f = await prepareCard(summary, { rtl: dir === 'rtl', labels, brandName, variant: v, photo: v === 'photo' ? photoRef.current : null }, fileName(v))
       remember(v, f)
     } catch (err) {
       console.error(err)
@@ -233,7 +236,7 @@ export default function WorkoutDone({ summary, onDone, fromHistory = false }) {
                   // first visit to the photo tab: go straight to the picker
                   if (key === 'photo' && !made.photo && !photoBusy) fileInput.current?.click()
                 }}
-                className={`min-h-[44px] rounded-md text-sm font-medium ${variant === key ? 'bg-brass text-ink' : 'text-chalkdim'}`}
+                className={`min-h-[44px] rounded-md text-sm font-medium ${variant === key ? 'bg-brass text-onaccent' : 'text-chalkdim'}`}
               >
                 {label}
               </button>
@@ -308,7 +311,7 @@ export default function WorkoutDone({ summary, onDone, fromHistory = false }) {
             <span className="min-w-0 flex items-center gap-2">
               <span className="truncate">{r.name}</span>
               {r.prKind && (
-                <span className="shrink-0 text-xs bg-brass text-ink rounded-full px-2 py-0.5 font-semibold">
+                <span className="shrink-0 text-xs bg-brass text-onaccent rounded-full px-2 py-0.5 font-semibold">
                   {r.prKind === 'reps' ? t('sessionCard.repsPrBadge') : r.single ? t('sessionCard.prBadge') : t('sessionCard.weightPrBadge')}
                 </span>
               )}

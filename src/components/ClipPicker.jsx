@@ -137,7 +137,7 @@ function ClipPickerModal({ value, auto, onPick, onClose }) {
                     <span className="relative block w-full aspect-square rounded-[10px] overflow-hidden bg-white">
                       <img src={clip.still} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       {on && (
-                        <span className="absolute top-1 end-1 w-6 h-6 rounded-full bg-accent text-ink flex items-center justify-center">
+                        <span className="absolute top-1 end-1 w-6 h-6 rounded-full bg-accent text-onaccent flex items-center justify-center">
                           <Check size={14} strokeWidth={3} />
                         </span>
                       )}

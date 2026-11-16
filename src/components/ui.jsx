@@ -8,9 +8,9 @@ export function Button({ children, variant = 'primary', className = '', to, ...p
   const base =
     'inline-flex items-center justify-center gap-1.5 rounded-[14px] px-4 py-2 min-h-[44px] text-[15px] font-semibold transition-colors press disabled:opacity-40 disabled:pointer-events-none'
   const variants = {
-    primary: 'bg-accent text-ink hover:bg-accent/90',
+    primary: 'bg-accent text-onaccent hover:bg-accent/90',
     save: 'bg-goodbtn text-chalk hover:bg-goodbtn/90',
-    brass: 'bg-accent text-ink hover:bg-accent/90',
+    brass: 'bg-accent text-onaccent hover:bg-accent/90',
     ghost: 'bg-surface2 text-chalk hover:bg-surface2/70',
     subtle: 'bg-surface2 text-chalk hover:bg-surface2/70',
     danger: 'bg-transparent text-irontext hover:bg-ironsoft',

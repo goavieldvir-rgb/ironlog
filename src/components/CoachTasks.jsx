@@ -131,7 +131,7 @@ export default function CoachTasks({ trainees, today }) {
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 font-medium">
           <ListChecks size={18} /> {t('tasks.title')}
-          {open.length > 0 && <span className="num text-xs rounded-full bg-accent text-ink px-2 py-0.5">{open.length}</span>}
+          {open.length > 0 && <span className="num text-xs rounded-full bg-accent text-onaccent px-2 py-0.5">{open.length}</span>}
         </div>
       </div>
       {loadFailed && tasks === null ? (

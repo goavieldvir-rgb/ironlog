@@ -295,7 +295,7 @@ export default function Tour({ steps, onClose }) {
             <button
               type="button"
               onClick={next}
-              className="press inline-flex items-center gap-1.5 rounded-full bg-accent text-ink font-semibold px-5 min-h-11 text-[15px] hover:bg-accent/90"
+              className="press inline-flex items-center gap-1.5 rounded-full bg-accent text-onaccent font-semibold px-5 min-h-11 text-[15px] hover:bg-accent/90"
             >
               {last ? t('tour.done') : t('tour.next')}
               {!last && <ForwardChevron size={16} aria-hidden="true" />}

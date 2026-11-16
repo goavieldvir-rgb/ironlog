@@ -17,7 +17,8 @@ import {
   round1,
 } from '../lib/measurements.js'
 import { Button, Card, EmptyState, Field, LoadError } from './ui.jsx'
-import { ACCENT, CHALK, CHALKDIM, GRID, SURFACE } from '../theme.js'
+import { useAdmin } from '../context/AdminContext.jsx'
+import { accentNow, CHALK, CHALKDIM, GRID, SURFACE } from '../theme.js'
 
 function shortDate(lang, iso) {
   return fmtDate(lang, new Date(iso + 'T00:00:00'), { month: 'short', day: 'numeric' })
@@ -32,6 +33,7 @@ const fmt = (v, unit) => `${v}${unit || ''}`
 // waist card. Anything logged before keeps showing even if the coach has
 // since turned it off, so no history disappears.
 export default function MeasurementTracker({ uid }) {
+  useAdmin() // redraw in the coach's color once it loads
   const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
   const [setup] = useMeasurementSetup(uid)
@@ -149,7 +151,7 @@ export default function MeasurementTracker({ uid }) {
               role="tab"
               aria-selected={k === kind}
               onClick={() => setSelected(k)}
-              className={`min-h-9 px-3 rounded-full text-sm border ${k === kind ? 'bg-accent text-ink border-accent' : 'border-line text-chalkdim hover:text-chalk'}`}
+              className={`min-h-9 px-3 rounded-full text-sm border ${k === kind ? 'bg-accent text-onaccent border-accent' : 'border-line text-chalkdim hover:text-chalk'}`}
             >
               <bdi>{label(k)}</bdi>
             </button>
@@ -179,7 +181,7 @@ export default function MeasurementTracker({ uid }) {
                   labelStyle={{ color: CHALK }}
                   formatter={(value) => [fmt(value, displayUnit), label(kind)]}
                 />
-                <Line type="monotone" dataKey="shown" stroke={ACCENT} strokeWidth={2.5} dot={{ fill: ACCENT, r: 3 }} />
+                <Line type="monotone" dataKey="shown" stroke={accentNow()} strokeWidth={2.5} dot={{ fill: accentNow(), r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>

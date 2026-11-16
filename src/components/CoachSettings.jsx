@@ -7,7 +7,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCoachSettings, saveCoachSettings, TASK_KINDS } from '../lib/coachSettings.js'
 import { BUILT_IN, customKey, measurementLabel, fetchMeasurementSetup } from '../lib/measurements.js'
-import { PALETTE, rgbOf, resizeLogo } from '../lib/brand.js'
+import { PALETTE, rgbOf, fgOf, isCustomColor, resizeLogo } from '../lib/brand.js'
 import { SUGGESTED_QUESTIONS, QUESTION_TYPES, MAX_QUESTIONS, newQuestionId } from '../lib/checkins.js'
 import { Card, Button } from './ui.jsx'
 import { PageLoader } from './Loading.jsx'
@@ -81,7 +81,9 @@ export default function CoachSettings() {
       refreshBrand()
     } catch (e) {
       console.error(e)
-      toast(t('feedback.saveFailed'), 'error')
+      // A color the database doesn't know yet: supabase-brand-colors.sql hasn't run.
+      if (e?.code === '23514' && /brand/.test(e?.message || '')) toast(t('brand.colorsNotReady'), 'error')
+      else toast(t('feedback.saveFailed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -114,7 +116,7 @@ export default function CoachSettings() {
                 disabled={!state.available}
                 aria-pressed={on}
                 onClick={() => toggleIn('default_measurements', k)}
-                className={`min-h-9 px-3 rounded-full text-sm border inline-flex items-center gap-1 ${on ? 'bg-accent text-ink border-accent' : 'border-line text-chalkdim hover:text-chalk'}`}
+                className={`min-h-9 px-3 rounded-full text-sm border inline-flex items-center gap-1 ${on ? 'bg-accent text-onaccent border-accent' : 'border-line text-chalkdim hover:text-chalk'}`}
               >
                 {on && <Check size={13} />}
                 <bdi>{measurementLabel(k, types, t, lang)}</bdi>
@@ -284,10 +286,33 @@ export default function CoachSettings() {
                         className={`w-10 h-10 rounded-full inline-flex items-center justify-center ${on ? 'ring-2 ring-chalk ring-offset-2 ring-offset-surface' : ''}`}
                         style={{ background: rgbOf(c) }}
                       >
-                        {on && <Check size={16} className="text-ink" />}
+                        {on && <Check size={16} style={{ color: fgOf(c) }} />}
                       </button>
                     )
                   })}
+                  {/* The coach's exact brand color. Shown as the app will use it:
+                      a very dark color is lifted just enough to show on the dark app. */}
+                  <label
+                    title={t('brand.colors.custom')}
+                    className={`relative w-10 h-10 rounded-full inline-flex items-center justify-center cursor-pointer ${isCustomColor(form.brand_color) ? 'ring-2 ring-chalk ring-offset-2 ring-offset-surface' : 'border border-dashed border-chalkdim'}`}
+                    style={isCustomColor(form.brand_color) ? { background: rgbOf(form.brand_color) } : { background: 'conic-gradient(#DC2626, #FACC15, #16A34A, #2563EB, #7C3AED, #DC2626)' }}
+                  >
+                    <input
+                      type="color"
+                      aria-label={t('brand.colors.custom')}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      value={isCustomColor(form.brand_color) ? form.brand_color : '#1E3A8A'}
+                      onChange={(e) => set({ brand_color: e.target.value.toUpperCase() })}
+                    />
+                    {isCustomColor(form.brand_color) && <Check size={16} style={{ color: fgOf(form.brand_color) }} />}
+                  </label>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <p className="text-xs text-chalkdim">
+                    {isCustomColor(form.brand_color) ? t('brand.colors.custom') : t(`brand.colors.${form.brand_color || 'ember'}`)}
+                  </p>
+                  {/* Or type the exact code from the coach's brand guide. */}
+                  <HexField value={isCustomColor(form.brand_color) ? form.brand_color : ''} onValid={(hex) => set({ brand_color: hex })} label={t('brand.hexLabel')} />
                 </div>
               </div>
               <div className="flex items-center gap-3 flex-wrap">
@@ -349,5 +374,30 @@ export default function CoachSettings() {
         )}
       </div>
     </div>
+  )
+}
+
+// A #RRGGBB box: takes the coach's code as they type and applies it once it
+// is a full, valid color.
+function HexField({ value, onValid, label }) {
+  const [text, setText] = useState(value)
+  useEffect(() => setText(value), [value])
+  return (
+    <input
+      aria-label={label}
+      placeholder="#1E3A8A"
+      dir="ltr"
+      maxLength={7}
+      spellCheck={false}
+      autoCapitalize="characters"
+      className="w-28 num text-sm"
+      value={text}
+      onChange={(e) => {
+        let v = e.target.value.trim().toUpperCase()
+        if (v && !v.startsWith('#')) v = '#' + v
+        setText(v)
+        if (/^#[0-9A-F]{6}$/.test(v)) onValid(v)
+      }}
+    />
   )
 }

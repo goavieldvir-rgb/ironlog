@@ -1,6 +1,17 @@
 // Mirrors the CSS custom properties in index.css for places that need a
 // literal colour (chart libraries). Change the accent in both places.
 export const ACCENT = '#FF5B3A'
+
+// The accent right now: the coach's brand color when one is set (brand.js
+// writes it to --accent), else ACCENT. Read it while rendering, never once at
+// load, so charts and the share card follow the coach's look.
+export function accentNow(name = '--accent', fallback = ACCENT) {
+  if (typeof document === 'undefined') return fallback
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  const m = v.match(/^(\d+)\s+(\d+)\s+(\d+)$/)
+  if (!m) return fallback
+  return '#' + m.slice(1, 4).map((n) => Number(n).toString(16).padStart(2, '0')).join('').toUpperCase()
+}
 export const DANGER = '#E5484D'
 export const CHALK = '#F2F2EF'
 export const CHALKDIM = '#A3A3A8'

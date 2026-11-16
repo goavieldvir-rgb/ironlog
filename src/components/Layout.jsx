@@ -121,7 +121,7 @@ export default function Layout() {
                 {t('layout.accountSuffix')}
               </span>
             </span>
-            <button onClick={() => setActingAs(null)} className="press shrink-0 rounded-full bg-accent text-ink font-semibold px-3 min-h-11 text-xs">
+            <button onClick={() => setActingAs(null)} className="press shrink-0 rounded-full bg-accent text-onaccent font-semibold px-3 min-h-11 text-xs">
               {t('layout.backToMyAccount')}
             </button>
           </div>
@@ -219,7 +219,7 @@ export default function Layout() {
               </span>
               <button
                 onClick={() => setActingAs(null)}
-                className="shrink-0 rounded-md bg-brass text-ink font-medium px-3 min-h-11 text-xs hover:bg-brass/90"
+                className="shrink-0 rounded-md bg-brass text-onaccent font-medium px-3 min-h-11 text-xs hover:bg-brass/90"
               >
                 {t('layout.backToMyAccount')}
               </button>
@@ -399,7 +399,7 @@ function CountBadge({ n, label, corner = false }) {
     <span
       role="img"
       aria-label={label(n)}
-      className={`num inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-accent text-ink text-[11px] font-bold leading-none ${
+      className={`num inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-accent text-onaccent text-[11px] font-bold leading-none ${
         corner ? 'absolute -top-1.5 -end-2.5 ring-2 ring-[#242428]' : ''
       }`}
     >

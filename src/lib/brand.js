@@ -1,19 +1,12 @@
 import { supabase } from '../supabase.js'
 
-// A coach's look for their trainees (supabase-coach-branding.sql): a name,
-// one of these accent colours and a small logo. Every colour here keeps the
-// app's dark text readable on accent buttons.
-export const PALETTE = {
-  ember: '255 91 58',
-  gold: '250 204 21',
-  lime: '163 230 53',
-  mint: '74 222 128',
-  teal: '45 212 191',
-  sky: '56 189 248',
-  violet: '167 139 250',
-  pink: '244 114 182',
-}
-const DEFAULT_ACCENT = PALETTE.ember
+// A coach's look for their trainees (supabase-coach-branding.sql and
+// supabase-brand-colors.sql): a name, a color and a small logo. The color is
+// one of these names or the coach's own '#rrggbb'.
+export { PALETTE, accentTokens, contrast, hexOf } from './accent.js'
+import { accentTokens } from './accent.js'
+
+const chan = (rgb) => rgb.join(' ')
 
 export async function fetchMyBrand() {
   const { data, error } = await supabase.rpc('my_brand')
@@ -21,13 +14,21 @@ export async function fetchMyBrand() {
   return data || {}
 }
 
-// Sets the app-wide accent (index.css --accent). Null brings back the usual.
+// Sets the app-wide accent (index.css --accent, --accent-fg, --accent-text).
+// Null brings back the usual.
 export function applyBrandColor(color) {
   if (typeof document === 'undefined') return
-  document.documentElement.style.setProperty('--accent', PALETTE[color] || DEFAULT_ACCENT)
+  const { accent, fg, text } = accentTokens(color || 'ember')
+  const st = document.documentElement.style
+  st.setProperty('--accent', chan(accent))
+  st.setProperty('--accent-fg', chan(fg))
+  st.setProperty('--accent-text', chan(text))
 }
 
-export const rgbOf = (color) => `rgb(${(PALETTE[color] || DEFAULT_ACCENT).split(' ').join(',')})`
+// For the picker: the swatch as the app will show it, and its check mark.
+export const rgbOf = (color) => `rgb(${accentTokens(color).accent.join(',')})`
+export const fgOf = (color) => `rgb(${accentTokens(color).fg.join(',')})`
+export const isCustomColor = (color) => /^#[0-9a-fA-F]{6}$/.test(color || '')
 
 // A picked image as a 160px square (centre crop) data URL, small enough to
 // keep in the settings row.

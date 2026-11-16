@@ -88,7 +88,7 @@ export default function InstallGuide() {
               ))}
             </ol>
             {platform === 'android' && install && (
-              <button type="button" onClick={install} className="press rounded-full bg-accent text-ink font-semibold px-4 min-h-11 text-sm w-fit">
+              <button type="button" onClick={install} className="press rounded-full bg-accent text-onaccent font-semibold px-4 min-h-11 text-sm w-fit">
                 {t('installGuide.oneTap')}
               </button>
             )}
