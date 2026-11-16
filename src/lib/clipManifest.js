@@ -62,7 +62,7 @@ export const CLIPS = {
   'step-down': { v: 'dab1f16f' },
   't-bar-row': { v: '179bc35f' },
   'treadmill-running': { v: 'b954e714', t: 'fe6d81d8' },
-  'triceps-pushdown': { v: '94d4411d' },
+  'triceps-pushdown': { v: 'a36fc1db' },
   'wall-slides': { v: '9d3ed95c' },
   'wide-grip-lat-pulldown': { v: 'a7f3f44f', t: 'ad14289d' },
 }
