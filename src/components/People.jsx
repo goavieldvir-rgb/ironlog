@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Users, UserPlus, Copy, Check, Share, AlertTriangle, Search, Pin, Trophy, CalendarCheck, ChevronUp, ChevronDown, MessageSquare } from 'lucide-react'
+import { Settings, Users, UserPlus, Copy, Check, Share, AlertTriangle, Search, Pin, Trophy, CalendarCheck, ChevronUp, ChevronDown, MessageSquare } from 'lucide-react'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
 import { supabase } from '../supabase.js'
@@ -12,6 +12,7 @@ import { Card, Badge, EmptyState, Button, Field, LoadError } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { PageLoader } from './Loading.jsx'
 import CoachTasks from './CoachTasks.jsx'
+import { useCoachSettings } from '../lib/coachSettings.js'
 import Tour, { useFirstTour } from './Tour.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { useMessagesState } from '../lib/messages.js'
@@ -22,7 +23,10 @@ import { fetchRoster, fetchRecentPrs, rosterFlags, attentionScore, adherence, da
 // their coach page (PersonDetail).
 export default function People() {
   const { user } = useAuth()
-  const { setActingAs, isOwner, isCoach } = useAdmin()
+  const { setActingAs, isOwner, isCoach, profile } = useAdmin()
+  const [coachSettings] = useCoachSettings(isCoach ? profile?.id : null)
+  const behindPct = coachSettings?.settings.behind_pct ?? 60
+  const tasksOff = coachSettings?.settings.tasks_off || []
   const { t } = useLanguage()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -76,10 +80,10 @@ export default function People() {
       rows
         .filter((p) => p.id !== user.uid)
         .map((p) => {
-          const flags = rosterFlags(p, today)
+          const flags = rosterFlags(p, today, behindPct, tasksOff)
           return { ...p, unread: unreadMsgs[p.id] || 0, flags, score: attentionScore(flags), adh: adherence(p.week_counts, p.planned_per_week, p.created_at, today) }
         }),
-    [rows, user.uid, today, unreadMsgs],
+    [rows, user.uid, today, unreadMsgs, behindPct, tasksOff],
   )
   const me = rows.find((p) => p.id === user.uid)
 
@@ -154,7 +158,10 @@ export default function People() {
             <p data-tour="coach-places" className="text-chalkdim text-sm mt-1 num">{t('people.myLimit')(myLimit.trainees, myLimit.trainee_limit)}</p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="ghost" to="/coach-settings" aria-label={t('coachSettings.title')}>
+            <Settings size={16} /> <span className="hidden sm:inline">{t('coachSettings.title')}</span>
+          </Button>
           {isOwner && (
             <Button variant="ghost" to="/errors">
               <AlertTriangle size={16} /> {t('people.errorLogs')}
@@ -534,6 +541,9 @@ function UnreadBadge({ n, t }) {
 function InviteModal({ onClose, t }) {
   useScrollLock(true)
   const { toast } = useFeedback()
+  const { profile } = useAdmin()
+  const [coachSettings] = useCoachSettings(profile?.id)
+  const ownText = coachSettings?.settings.invite_text?.trim()
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)
@@ -553,7 +563,10 @@ function InviteModal({ onClose, t }) {
     return `${base}${query ? `?${query}` : ''}#/`
   })()
 
-  const message = t('people.inviteMessage')(name, link)
+  // The coach's own wording (Coach settings) when they wrote one.
+  const message = ownText
+    ? (/\{link\}/.test(ownText) ? ownText : `${ownText}\n${'{link}'}`).replace(/\{name\}/g, () => name).replace(/\{link\}/g, () => link)
+    : t('people.inviteMessage')(name, link)
 
   // Records the invite first. Another coach's live invite for this email
   // stops here, since signing up would land them with that coach. Anything

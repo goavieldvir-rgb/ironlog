@@ -32,6 +32,7 @@ const lazyRetry = (load) =>
 const Nutrition = lazyRetry(() => import('./components/Nutrition.jsx'))
 const People = lazyRetry(() => import('./components/People.jsx'))
 const PersonDetail = lazyRetry(() => import('./components/PersonDetail.jsx'))
+const CoachSettings = lazyRetry(() => import('./components/CoachSettings.jsx'))
 const ErrorLogs = lazyRetry(() => import('./components/ErrorLogs.jsx'))
 const Stats = lazyRetry(() => import('./components/Stats.jsx'))
 const BodyWeight = lazyRetry(() => import('./components/BodyWeight.jsx'))
@@ -114,6 +115,7 @@ export default function App() {
         <Route path="/history/:id/share" element={<SessionShare />} />
         <Route path="/people" element={<People />} />
         <Route path="/people/:id" element={<PersonDetail />} />
+        <Route path="/coach-settings" element={<CoachSettings />} />
         <Route path="/errors" element={<ErrorLogs />} />
         <Route path="/nutrition" element={<Nutrition />} />
         <Route path="/stats" element={<Stats />} />

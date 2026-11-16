@@ -7,12 +7,47 @@ import { shiftDay } from './nutritionStats.js'
 // Nutrition diary: pure helpers (text normalising, macro maths) and plain
 // async data functions. Every data function throws on a Supabase error.
 
-export const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
+// Every meal slot, in diary order. The usual four, plus two a coach can add
+// for five or six meals a day (supabase-nutrition-coach-options.sql).
+export const ALL_MEALS = ['breakfast', 'lunch', 'dinner', 'snack', 'snack2', 'snack3']
 export const MEAL_KEY = {
   breakfast: 'nutrition.mealBreakfast',
   lunch: 'nutrition.mealLunch',
   dinner: 'nutrition.mealDinner',
   snack: 'nutrition.mealSnack',
+  snack2: 'nutrition.mealSnack2',
+  snack3: 'nutrition.mealSnack3',
+}
+export const DEFAULT_MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
+
+// The meal slots the coach set on the person's targets (targets.meals), for
+// whichever diary is open. Nutrition sets it when targets load, so the
+// helpers below and every meal picker follow it without threading it
+// through each component.
+let layout = { keys: DEFAULT_MEALS, names: {}, lang: 'en' }
+export function setMealLayout(meals, lang) {
+  const list = Array.isArray(meals) && meals.length ? meals.filter((m) => ALL_MEALS.includes(m?.key)) : null
+  layout = {
+    keys: list ? ALL_MEALS.filter((k) => list.some((m) => m.key === k)) : DEFAULT_MEALS,
+    names: Object.fromEntries((list || []).map((m) => [m.key, { en: (m.en || '').trim(), he: (m.he || '').trim() }])),
+    lang,
+  }
+}
+// Slots on offer, plus any slot that already has rows (a coach may have
+// turned it off since), in diary order.
+export function mealsFor(rows = []) {
+  const used = new Set(rows.map((r) => r.meal))
+  return ALL_MEALS.filter((k) => layout.keys.includes(k) || used.has(k))
+}
+export function activeMeals() {
+  return layout.keys
+}
+// A coach's name for the slot in the reader's language, else the other
+// language, else the built-in name.
+export function customMealName(m) {
+  const n = layout.names[m]
+  if (!n) return ''
+  return layout.lang === 'he' ? n.he || n.en : n.en || n.he
 }
 
 // ---------------------------------------------------------------- text
@@ -438,7 +473,7 @@ export function groupMeals(rows) {
   }
   const dayOrder = [...new Set((rows || []).map((r) => r.date))]
   return [...byKey.values()].sort(
-    (a, b) => dayOrder.indexOf(a.date) - dayOrder.indexOf(b.date) || MEALS.indexOf(a.meal) - MEALS.indexOf(b.meal),
+    (a, b) => dayOrder.indexOf(a.date) - dayOrder.indexOf(b.date) || ALL_MEALS.indexOf(a.meal) - ALL_MEALS.indexOf(b.meal),
   )
 }
 
@@ -471,6 +506,13 @@ export async function saveTargets(uid, t, setBy = 'coach') {
       .select()
       .single()
   let res = await upsert(t)
+  // PGRST204 on the coach options: supabase-nutrition-coach-options.sql not
+  // run yet. Save the calories and macros without them.
+  if (res.error?.code === 'PGRST204' && /fiber|kcal_band|meals/.test(res.error.message || '')) {
+    const { fiber, kcal_band, meals, ...rest } = t
+    t = rest
+    res = await upsert(t)
+  }
   // PGRST204: set_by doesn't exist yet (supabase-food-fiber-own-targets.sql
   // not run). The coach can still save; a trainee is refused by RLS anyway.
   if (res.error?.code === 'PGRST204' && /set_by/.test(res.error.message || '')) {
@@ -944,8 +986,6 @@ export async function setFavorite(uid, food, on) {
 
 export function defaultMeal(now = new Date()) {
   const h = now.getHours()
-  if (h < 11) return 'breakfast'
-  if (h < 16) return 'lunch'
-  if (h < 21) return 'dinner'
-  return 'snack'
+  const pick = h < 11 ? 'breakfast' : h < 16 ? 'lunch' : h < 21 ? 'dinner' : 'snack'
+  return layout.keys.includes(pick) ? pick : layout.keys[0]
 }

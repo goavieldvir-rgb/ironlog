@@ -14,6 +14,7 @@ import { listDrafts, clearDraft } from '../lib/draft.js'
 import { Button, Card, LoadError, FeedbackDot } from './ui.jsx'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import WeeklySchedule from './WeeklySchedule.jsx'
+import CheckinCard from './CheckinCard.jsx'
 import Tour, { useFirstTour, tourSeen, markTourSeen } from './Tour.jsx'
 import { useOwnerName } from '../lib/coach.js'
 import { itemTarget } from './RoutineView.jsx'
@@ -90,7 +91,7 @@ export default function Dashboard() {
   const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
   const { unread: unreadMessages, latest: latestMessage, threads: coachThreads } = useMessagesState()
-  const { isAdmin, nutritionAllowed, coachFrozen } = useAdmin()
+  const { isAdmin, nutritionAllowed, coachFrozen, traineeSettings, brand } = useAdmin()
   const location = useLocation()
   const navigate = useNavigate()
   const [exercises, exercisesLoading, refreshExercises, exercisesError] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
@@ -269,6 +270,13 @@ export default function Dashboard() {
         <p className="text-[15px] leading-5 text-chalkdim">
           {fmtDate(lang, now, { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
+        {/* The coach's own name and logo (Coach settings → Your look). */}
+        {!actingAs && !isAdmin && (brand?.name || brand?.logo) && (
+          <p className="flex items-center gap-2 text-sm text-chalkdim mt-1">
+            {brand.logo && <img src={brand.logo} alt="" className="w-6 h-6 rounded-md object-cover" />}
+            {brand.name && <span>{t('brand.coachedByLabel')} <bdi>{brand.name}</bdi></span>}
+          </p>
+        )}
       </div>
 
       {!actingAs && <CoachWelcome />}
@@ -382,8 +390,11 @@ export default function Dashboard() {
         />
       )}
 
+      {/* The coach's weekly questions, for the trainee themselves. */}
+      {!actingAs && !isAdmin && <CheckinCard uid={effectiveUid} />}
+
       {/* A morning weigh-in is the person's own; a coach viewing their account doesn't get it. */}
-      {!actingAs && !weightSaved && !weightHidden && !weightsLoading && !weightsError && !loadFailed && !weights.some((w) => w.date === todayIso) && (
+      {!actingAs && !traineeSettings?.weigh_prompt_off && !weightSaved && !weightHidden && !weightsLoading && !weightsError && !loadFailed && !weights.some((w) => w.date === todayIso) && (
         <WeightQuickCard
           last={weights[0]}
           t={t}
