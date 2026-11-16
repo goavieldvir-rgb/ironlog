@@ -60,7 +60,7 @@ export const CLIPS = {
   'standing-calf-raise': { v: 'ff2dc506', t: 'd51056a5' },
   'static-lunge': { v: 'e18e3d98' },
   'step-down': { v: 'dab1f16f' },
-  't-bar-row': { v: '50348d26' },
+  't-bar-row': { v: '179bc35f' },
   'treadmill-running': { v: 'b954e714', t: 'fe6d81d8' },
   'triceps-pushdown': { v: '94d4411d' },
   'wall-slides': { v: '9d3ed95c' },
