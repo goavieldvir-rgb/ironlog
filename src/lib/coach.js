@@ -3,6 +3,7 @@ import { supabase } from '../supabase.js'
 import { toLocalISODate, weekStartOf } from './dates.js'
 import { TERMS_VERSION, TERMS_DOC_KEY } from '../legal/terms.js'
 import { fetchMeasurements, fetchMeasurementSetup } from './measurements.js'
+import { fetchAnswers } from './checkins.js'
 
 // Coach-side data for the People page and a trainee's coach page. The
 // roster comes from one database call (coach_roster, supabase-coach-tools.sql)
@@ -157,7 +158,7 @@ export async function deleteCoachTask(id) {
 
 export async function fetchTraineeDetail(uid, today = toLocalISODate()) {
   const since = shiftDay(today, -7 * 26)
-  const [profile, sessions, weights, measurements, prs, notes, goal, schedule, consent, food, targets, routines, measurementSetup, traineeSettings] = await Promise.all([
+  const [profile, sessions, weights, measurements, prs, notes, goal, schedule, consent, food, targets, routines, measurementSetup, traineeSettings, checkins] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', uid).single().then(check),
     supabase
       .from('sessions')
@@ -207,11 +208,12 @@ export async function fetchTraineeDetail(uid, today = toLocalISODate()) {
     fetchMeasurementSetup(uid),
     // Optional: null until supabase-coach-extras.sql has been run.
     supabase.from('trainee_settings').select('*').eq('user_id', uid).maybeSingle().then(({ data, error }) => (error ? null : data || {}), () => null),
+    fetchAnswers(uid).catch(() => null),
   ])
   // The birthday lives on the person (it moves with them), the rest of the
   // goal is this coach's own.
   const withBirthday = goal || profile?.birthday ? { ...(goal || {}), birthday: profile?.birthday ?? null } : null
-  return { profile, sessions, weights, measurements, measurementSetup, traineeSettings, prs, notes, goal: withBirthday, schedule, consent: consent[0] || null, food, targets, routines }
+  return { profile, sessions, weights, measurements, measurementSetup, traineeSettings, checkins, prs, notes, goal: withBirthday, schedule, consent: consent[0] || null, food, targets, routines }
 }
 
 // Sessions per week for the last `n` weeks, oldest first.

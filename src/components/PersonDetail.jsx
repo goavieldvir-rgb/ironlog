@@ -33,6 +33,7 @@ import {
   addMeasurementType,
   setMeasurementTypeArchived,
 } from '../lib/measurements.js'
+import { questionText } from '../lib/checkins.js'
 import {
   fetchTraineeDetail,
   weeklyCounts,
@@ -419,6 +420,8 @@ export default function PersonDetail() {
           )}
 
           <MeasurementCharts entries={data.measurements} types={data.measurementSetup.types} today={today} t={t} lang={lang} />
+
+          {data.checkins?.length > 0 && <Checkins list={data.checkins} t={t} lang={lang} />}
 
           {!(p.is_admin || p.is_coach) && (
             <Section title={t('photos.title')}>
@@ -1118,3 +1121,41 @@ function TrackingSettings({ person, name, setup, coachId, t, lang, confirm, toas
     </Section>
   )
 }
+
+// The trainee's weekly check-in answers, newest week first; the latest is
+// open, older weeks fold. Question text comes from the copy saved with the
+// answers, so later edits to the questions don't change old answers.
+function Checkins({ list, t, lang }) {
+  const [openWeek, setOpenWeek] = useState(list[0]?.week_start)
+  return (
+    <Section title={t('checkin.coachTitle')} hint={t('checkin.coachHint')}>
+      <ul className="flex flex-col divide-y divide-line">
+        {list.map((c) => {
+          const open = openWeek === c.week_start
+          const qs = (c.questions || []).filter((q) => c.answers?.[q.id] !== undefined)
+          return (
+            <li key={c.id} className="py-2">
+              <button type="button" onClick={() => setOpenWeek(open ? null : c.week_start)} aria-expanded={open} className="w-full flex items-center justify-between gap-2 min-h-9 text-start">
+                <span className="text-sm">{t('checkin.weekOf', { date: fmtDate(lang, new Date(c.week_start + 'T00:00:00'), { month: 'short', day: 'numeric' }) })}</span>
+                <ChevronDown size={15} className={`text-chalkdim transition-transform ${open ? 'rotate-180' : ''}`} />
+              </button>
+              {open && (
+                <dl className="flex flex-col gap-2 mt-1">
+                  {qs.map((q) => (
+                    <div key={q.id}>
+                      <dt className="text-xs text-chalkdim" dir="auto">{questionText(q, lang)}</dt>
+                      <dd className="text-sm text-chalk whitespace-pre-wrap break-words" dir="auto">
+                        {q.type === 'scale' ? <span className="num" dir="ltr">{c.answers[q.id]}/5</span> : String(c.answers[q.id])}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </Section>
+  )
+}
+

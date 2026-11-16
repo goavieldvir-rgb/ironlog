@@ -14,6 +14,7 @@ import { listDrafts, clearDraft } from '../lib/draft.js'
 import { Button, Card, LoadError, FeedbackDot } from './ui.jsx'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import WeeklySchedule from './WeeklySchedule.jsx'
+import CheckinCard from './CheckinCard.jsx'
 import Tour, { useFirstTour, tourSeen, markTourSeen } from './Tour.jsx'
 import { useOwnerName } from '../lib/coach.js'
 import { itemTarget } from './RoutineView.jsx'
@@ -381,6 +382,9 @@ export default function Dashboard() {
           t={t}
         />
       )}
+
+      {/* The coach's weekly questions, for the trainee themselves. */}
+      {!actingAs && !isAdmin && <CheckinCard uid={effectiveUid} />}
 
       {/* A morning weigh-in is the person's own; a coach viewing their account doesn't get it. */}
       {!actingAs && !traineeSettings?.weigh_prompt_off && !weightSaved && !weightHidden && !weightsLoading && !weightsError && !loadFailed && !weights.some((w) => w.date === todayIso) && (

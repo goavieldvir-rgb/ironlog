@@ -7,6 +7,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCoachSettings, saveCoachSettings, TASK_KINDS } from '../lib/coachSettings.js'
 import { BUILT_IN, customKey, measurementLabel, fetchMeasurementSetup } from '../lib/measurements.js'
+import { SUGGESTED_QUESTIONS, QUESTION_TYPES, MAX_QUESTIONS, newQuestionId } from '../lib/checkins.js'
 import { Card, Button } from './ui.jsx'
 import { PageLoader } from './Loading.jsx'
 
@@ -56,6 +57,12 @@ export default function CoachSettings() {
       const patch = { default_measurements: form.default_measurements }
       if (state.prefsAvailable) {
         for (const k of ['tasks_off', 'weigh_days', 'food_days', 'behind_pct', 'checkin_days', 'pr_alerts']) patch[k] = form[k]
+      }
+      if (state.checkinAvailable) {
+        // Questions with no text in either language are dropped.
+        patch.checkin_questions = form.checkin_questions
+          .map((q) => ({ id: q.id, type: q.type, en: (q.en || '').trim(), he: (q.he || '').trim() }))
+          .filter((q) => q.en || q.he)
       }
       if (state.extrasAvailable) {
         patch.snippets = form.snippets
@@ -194,6 +201,51 @@ export default function CoachSettings() {
                 <Plus size={16} />
               </Button>
             </div>
+          )}
+        </Card>
+
+        <Card className="flex flex-col gap-3">
+          <h2 className="text-base text-chalk">{t('coachSettings.checkinTitle')}</h2>
+          <p className="text-xs text-chalkdim -mt-2">{t('coachSettings.checkinHint')}</p>
+          {!state.checkinAvailable ? (
+            <p className="text-xs text-accent">{t('coachSettings.checkinNotReady')}</p>
+          ) : (
+            <>
+              {form.checkin_questions.map((q, i) => {
+                const setQ = (patch) => set({ checkin_questions: form.checkin_questions.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
+                return (
+                  <div key={q.id} className="flex flex-col gap-2 rounded-[14px] border border-line p-3">
+                    <div className="flex items-center gap-2">
+                      <span className="num text-xs text-chalkdim w-5">{i + 1}</span>
+                      <select value={q.type} onChange={(e) => setQ({ type: e.target.value })} className="flex-1" aria-label={t('coachSettings.questionType')}>
+                        {QUESTION_TYPES.map((ty) => (
+                          <option key={ty} value={ty}>
+                            {t(`coachSettings.qType.${ty}`)}
+                          </option>
+                        ))}
+                      </select>
+                      <button type="button" onClick={() => set({ checkin_questions: form.checkin_questions.filter((_, j) => j !== i) })} className="hit text-chalkdim p-1" aria-label={t('common.delete')}>
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                    <input value={q.en || ''} onChange={(e) => setQ({ en: e.target.value })} maxLength={200} dir="ltr" placeholder={t('coachSettings.questionEn')} aria-label={t('coachSettings.questionEn')} />
+                    <input value={q.he || ''} onChange={(e) => setQ({ he: e.target.value })} maxLength={200} dir="rtl" placeholder={t('coachSettings.questionHe')} aria-label={t('coachSettings.questionHe')} />
+                  </div>
+                )
+              })}
+              <div className="flex gap-2 flex-wrap">
+                {form.checkin_questions.length < MAX_QUESTIONS && (
+                  <Button variant="ghost" onClick={() => set({ checkin_questions: [...form.checkin_questions, { id: newQuestionId(), type: 'scale', en: '', he: '' }] })}>
+                    <Plus size={16} /> {t('coachSettings.addQuestion')}
+                  </Button>
+                )}
+                {form.checkin_questions.length === 0 && (
+                  <Button variant="ghost" onClick={() => set({ checkin_questions: SUGGESTED_QUESTIONS })}>
+                    {t('coachSettings.useSuggested')}
+                  </Button>
+                )}
+              </div>
+            </>
           )}
         </Card>
 
