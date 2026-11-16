@@ -140,7 +140,7 @@ export default function PersonDetail() {
       toReview: data.sessions.filter((s) => needsReview(s, today)),
       lastWeight,
       weightSeries,
-      baselineDays: baseline ? daysSince(lastWeight.date, today) - daysSince(baseline.date, today) : null,
+      baselineDays: baseline ? daysSince(baseline.date, today) - daysSince(lastWeight.date, today) : null,
       weightChange: baseline ? Math.round((lastWeight.weight - baseline.weight) * 10) / 10 : null,
       food: { days: days.length, kcal: avg('kcal'), protein: avg('protein') },
     }
