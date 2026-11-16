@@ -17,13 +17,18 @@
 // because Instagram puts its own buttons at the top and bottom. Photos are
 // only ever drawn on this phone.
 import tailwind from '../../tailwind.config.js'
-import { ACCENT } from '../theme.js'
+import { ACCENT, accentNow } from '../theme.js'
+import { accentTokens, hexOf } from './accent.js'
 
 const W = 1080
 const H = 1920
 const M = 96 // side margin
 const T = tailwind.theme.extend.colors
-const C = { ink: T.ink, chalk: T.chalk, dim: T.chalkdim, line: T.line, accent: ACCENT }
+const C = { ink: T.ink, chalk: T.chalk, dim: T.chalkdim, line: T.line, accent: ACCENT, accentFg: T.ink, accentText: ACCENT }
+// The wordmark on the card. renderShareCard sets both for one drawing: the
+// accent follows the coach's color, and `brandName` (when given) replaces
+// "Ironlog" with the coach's own name.
+let WORDMARK = 'Ironlog'
 
 // The app's own pair: Geist for Latin and numbers, IBM Plex Sans Hebrew for
 // Hebrew letters (the browser picks per letter, so mixed names just work).
@@ -223,7 +228,7 @@ function drawValue(ctx, f, x, y, { rtl, gap, color, unitColor }) {
   const { st, size, unitPx } = f
   ctx.direction = 'ltr'
   ctx.textAlign = rtl ? 'right' : 'left'
-  ctx.fillStyle = st.accent ? C.accent : color
+  ctx.fillStyle = st.accent ? C.accentNum || C.accentText : color
   setFont(ctx, 600, size, -0.04)
   put(ctx, st.value, x, y)
   if (!st.unit) return
@@ -285,9 +290,17 @@ function drawName(ctx, nm, x, y, { rtl, color }) {
 }
 
 // The wordmark: a small accent dot and the name.
-function drawBrand(ctx, x, y, { rtl, color, size = 44 }) {
+function drawBrand(ctx, x, y, { rtl, color, size = 44, maxW = W - M * 2 }) {
+  // A long coach name first shrinks (to 70%), then is cut with an ellipsis.
+  const base = size
+  const dotW = () => Math.round(size * 0.3) + Math.round(size * 0.24)
   setFont(ctx, 600, size, -0.02)
-  const tw = ctx.measureText('Ironlog').width
+  while (size > Math.round(base * 0.7) && dotW() + ctx.measureText(WORDMARK).width > maxW) {
+    size -= 1
+    setFont(ctx, 600, size, -0.02)
+  }
+  const word = fit(ctx, WORDMARK, maxW - dotW())
+  const tw = ctx.measureText(word).width
   const d = Math.round(size * 0.3) // dot diameter
   const gap = Math.round(size * 0.24)
   const total = d + gap + tw
@@ -302,12 +315,21 @@ function drawBrand(ctx, x, y, { rtl, color, size = 44 }) {
       ctx.fill()
       ctx.restore()
     }
-    ctx.direction = 'ltr'
-    ctx.textAlign = 'left'
+    // A Hebrew name reads right to left; it still starts after the dot.
+    const he = /[\u0590-\u05FF]/.test(word)
+    ctx.direction = he ? 'rtl' : 'ltr'
+    ctx.textAlign = he ? 'right' : 'left'
     ctx.fillStyle = color
     setFont(ctx, 600, size, -0.02)
-    put(ctx, 'Ironlog', left + d + gap, y)
+    put(ctx, word, he ? left + d + gap + tw : left + d + gap, y)
   })
+}
+
+// Under a coach's name, a small "Powered by Ironlog" so the app is always
+// credited. Nothing when the card already says Ironlog.
+function drawCredit(ctx, x, y, { rtl, labels, color, size = 30 }) {
+  if (WORDMARK === 'Ironlog' || !labels?.poweredBy) return
+  drawLabel(ctx, labels.poweredBy, x, y, { rtl, size, weight: 500, color, maxW: W - M * 2 })
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -337,8 +359,9 @@ function drawPill(ctx, text, x, top, { rtl, size = 30 }) {
     ctx.fill()
     ctx.restore()
     if (FX?.sticker && PASS === 'stroke') return
-    // a small ink dot, then the words, in ink on the accent
-    ctx.fillStyle = C.ink
+    // a small dot, then the words, in the accent's own text color (dark, or
+    // white on a dark coach color)
+    ctx.fillStyle = C.accentFg
     const cx = rtl ? left + w - pad - dot : left + pad + dot
     ctx.beginPath()
     ctx.arc(cx, top + h / 2, dot, 0, Math.PI * 2)
@@ -357,7 +380,7 @@ function drawPill(ctx, text, x, top, { rtl, size = 30 }) {
 // are one design. Anchored by the pill's top (`top`) or by the last label's
 // baseline (`bottom`); a two-line name grows away from the anchor. Returns
 // the baseline of the last row.
-function drawOverlayBlock(ctx, summary, { rtl, labels, top, bottom, labelColor, unitColor = C.accent }) {
+function drawOverlayBlock(ctx, summary, { rtl, labels, top, bottom, labelColor, unitColor = C.accentText }) {
   const x0 = rtl ? W - M : M
   const full = W - M * 2
   const { hero, small } = pickStats(summary, labels)
@@ -459,7 +482,9 @@ function drawPlain(ctx, summary, { rtl, labels }) {
   ctx.textBaseline = 'alphabetic'
 
   // top row: wordmark at the start, the date at the end
-  drawBrand(ctx, x0, 316, { rtl, color: C.chalk })
+  // the name gets a bit over half the width; the date keeps the rest
+  drawBrand(ctx, x0, 316, { rtl, color: C.chalk, maxW: Math.round(full * 0.58) })
+  drawCredit(ctx, x0, 366, { rtl, labels, color: C.dim })
   if (summary.date) {
     const d = new Date(`${summary.date}T00:00:00`)
     const text = d.toLocaleDateString(rtl ? 'he-IL' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -490,7 +515,7 @@ function drawPlain(ctx, summary, { rtl, labels }) {
 
   drawPill(ctx, labels.eyebrow, x0, dy, { rtl, size: 30 })
   drawName(ctx, nm, x0, dy + nameY, { rtl, color: C.chalk })
-  drawValue(ctx, heroFit, x0, dy + heroY, { rtl, gap: 18, color: C.chalk, unitColor: C.accent })
+  drawValue(ctx, heroFit, x0, dy + heroY, { rtl, gap: 18, color: C.chalk, unitColor: C.accentText })
   drawLabel(ctx, heroLabel, x0, dy + heroLabelY, { rtl, size: 34, color: C.dim, maxW: full })
 
   smallFits.forEach((f, i) => {
@@ -503,14 +528,31 @@ function drawPlain(ctx, summary, { rtl, labels }) {
     ctx.lineWidth = 2
     ctx.stroke()
     const x = rtl ? left + tileW - 32 : left + 32
-    drawValue(ctx, f, x, top + 52 + Math.round(smallSize * 0.72), { rtl, gap: 8, color: C.chalk, unitColor: C.accent })
+    drawValue(ctx, f, x, top + 52 + Math.round(smallSize * 0.72), { rtl, gap: 8, color: C.chalk, unitColor: C.accentText })
     drawLabel(ctx, f.st.label, x, top + tileH - 36, { rtl, size: 28, color: C.dim, maxW: tileW - 64 })
   })
 }
 
 // variant: 'plain' (default), 'photo' (needs `photo`) or 'sticker'.
-// labels: { eyebrow, totalVolume, duration, volume, distance, sets, streak, weekUnit, min, records }
-export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo = null }) {
+// labels: { eyebrow, totalVolume, duration, volume, distance, sets, streak, weekUnit, min, records, poweredBy }
+// accent: a #RRGGBB color, else the app's accent right now (the coach's).
+// brandName: shown in place of "Ironlog" when given.
+export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo = null, accent = null, brandName = null }) {
+  if (/^#[0-9A-Fa-f]{6}$/.test(accent || '')) {
+    const tk = accentTokens(accent)
+    C.accent = hexOf(tk.accent)
+    C.accentFg = hexOf(tk.fg)
+    C.accentText = hexOf(tk.text)
+  } else {
+    C.accent = accentNow()
+    C.accentFg = accentNow('--accent-fg', C.ink)
+    C.accentText = accentNow('--accent-text', C.accent)
+  }
+  WORDMARK = (brandName || '').trim().slice(0, 40) || 'Ironlog'
+  // On a photo or a see-through sticker the card can land on anything, light
+  // or dark. Any coach color but the usual one could fade there, so the
+  // records number goes white like the units.
+  C.accentNum = (variant === 'sticker' || (variant === 'photo' && photo)) && C.accent.toUpperCase() !== ACCENT.toUpperCase() ? '#FFFFFF' : null
   const canvas = document.createElement('canvas')
   canvas.width = W
   const ctx = canvas.getContext('2d')
@@ -524,6 +566,7 @@ export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo
       drawPhoto(ctx, photo)
       FX = { sticker: true, shadow: { color: 'rgba(0,0,0,0.22)', blur: 6, y: 1 } }
       drawBrand(ctx, rtl ? W - M : M, 316, { rtl, color: '#FFFFFF' })
+      drawCredit(ctx, rtl ? W - M : M, 366, { rtl, labels, color: 'rgba(255,255,255,0.88)' })
       const white = 'rgba(255,255,255,0.92)'
       drawOverlayBlock(ctx, summary, { rtl, labels, bottom: 1640, labelColor: white, unitColor: white })
       return canvas
@@ -534,6 +577,11 @@ export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo
   } finally {
     FX = null
     PASS = 'fill'
+    C.accent = ACCENT
+    C.accentFg = C.ink
+    C.accentText = ACCENT
+    C.accentNum = null
+    WORDMARK = 'Ironlog'
   }
 }
 
@@ -551,6 +599,7 @@ function renderSticker(summary, { rtl, labels }) {
   // units in white too: the accent can vanish on a light story
   const bottom = drawOverlayBlock(sctx, summary, { rtl, labels, top: 120, labelColor: 'rgba(255,255,255,0.9)', unitColor: 'rgba(255,255,255,0.9)' })
   drawBrand(sctx, rtl ? W - M : M, bottom + 100, { rtl, color: '#FFFFFF', size: 38 })
+  drawCredit(sctx, rtl ? W - M : M, bottom + 146, { rtl, labels, color: 'rgba(255,255,255,0.88)', size: 28 })
 
   const { data, width, height } = sctx.getImageData(0, 0, scratch.width, scratch.height)
   let x0 = width

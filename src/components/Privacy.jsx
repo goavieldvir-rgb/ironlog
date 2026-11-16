@@ -1,8 +1,9 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { privacy } from '../legal/privacy.js'
-import { terms } from '../legal/terms.js'
+import { privacyFor } from '../legal/privacy.js'
+import { termsFor } from '../legal/terms.js'
+import { useMyCoach } from '../lib/myCoach.js'
 import { Card } from './ui.jsx'
 
 // The notice itself, shared with the consent screen.
@@ -25,8 +26,10 @@ export function PrivacySections({ doc, level = 2 }) {
 // at any time. Also reachable signed out (standalone), from the login screen.
 export default function Privacy({ standalone = false }) {
   const { t, lang } = useLanguage()
-  const doc = privacy[lang] || privacy.en
-  const termsDocs = terms[lang] || terms.en
+  // null when signed out, which keeps the owner's version.
+  const coach = useMyCoach()
+  const doc = privacyFor(lang, coach)
+  const termsDocs = termsFor(lang, coach)
   const termsDoc = termsDocs.adult
   const minorDoc = termsDocs.minor
 

@@ -194,6 +194,8 @@ function CopyToPersonModal({ routine, onClose }) {
   useScrollLock(true)
   const { t } = useLanguage()
   const { toast } = useFeedback()
+  const { isOwner } = useAdmin()
+  const [coaches, setCoaches] = useState([])
   const [people, setPeople] = useState([])
   const [loading, setLoading] = useState(true)
   const [copiedTo, setCopiedTo] = useState(null)
@@ -216,7 +218,29 @@ function CopyToPersonModal({ routine, onClose }) {
         setPeople(data || [])
         setLoading(false)
       })
-  }, [attempt])
+    // The owner can also send a copy to an independent coach's account.
+    if (isOwner) {
+      supabase.rpc('list_coaches').then(({ data, error }) => {
+        if (error) console.error(error)
+        setCoaches((data || []).filter((c) => !c.frozen))
+      })
+    }
+  }, [attempt, isOwner])
+
+  async function sendToCoach(c) {
+    if (busyId) return
+    setBusyId(c.id)
+    try {
+      const { error } = await supabase.rpc('send_routine_to_coach', { p_routine: routine.id, p_coach: c.id })
+      if (error) throw error
+      setCopiedTo(c.id)
+    } catch (err) {
+      console.error(err)
+      toast(t('feedback.saveFailed'), 'error')
+    } finally {
+      setBusyId(null)
+    }
+  }
 
   async function copyTo(person) {
     if (busyId) return // a double-tap would send two copies
@@ -257,6 +281,18 @@ function CopyToPersonModal({ routine, onClose }) {
             >
               <span className="truncate min-w-0">{p.full_name || p.email}</span>
               <span className="text-xs text-brass shrink-0">{copiedTo === p.id ? t('routines.copiedLabel') : t('routines.copyHereLabel')}</span>
+            </button>
+          ))}
+          {coaches.length > 0 && <div className="eyebrow mt-3 px-2">{t('routines.coachesHeading')}</div>}
+          {coaches.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => sendToCoach(c)}
+              disabled={copiedTo === c.id || !!busyId}
+              className="flex items-center justify-between gap-2 px-2 py-2 rounded-md hover:bg-surface2 text-start disabled:opacity-50"
+            >
+              <span className="truncate min-w-0">{c.name || c.email}</span>
+              <span className="text-xs text-brass shrink-0">{copiedTo === c.id ? t('routines.copiedLabel') : t('routines.sendToCoachLabel')}</span>
             </button>
           ))}
         </div>

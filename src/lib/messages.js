@@ -200,7 +200,7 @@ const POLL_MS = 60_000
 // `enabled` stays false for them.
 export function useMessagesState() {
   const { user } = useAuth()
-  const { isAdmin, loadingProfile } = useAdmin()
+  const { isAdmin, loadingProfile, traineeSettings } = useAdmin()
   const { pathname } = useLocation()
   const [, tick] = useState(0)
   const uid = user?.uid
@@ -232,7 +232,8 @@ export function useMessagesState() {
     }
   }, [active, uid, coach, pathname])
 
-  const on = active && !missing
+  // A coach can switch messages off for a trainee.
+  const on = active && !missing && !(!isAdmin && traineeSettings?.messages_off)
   return {
     enabled: on && !coach,
     unread: on ? store.unread : 0,

@@ -7,12 +7,13 @@ import { getLogTotalsRange, kcalOnTarget, periodRange, periodStats, shiftDay, sh
 import { getWaterGoal, getWaterLogs, litres } from '../../lib/water.js'
 import { LoadError } from '../ui.jsx'
 import { Backward, Forward, N, SheetHeader, ToneLabel, Track } from './parts.jsx'
-import { ACCENT, CHALK, CHALKDIM, MUTED, GRID, SURFACE } from '../../theme.js'
+import { useAdmin } from '../../context/AdminContext.jsx'
+import { accentNow, CHALK, CHALKDIM, MUTED, GRID, SURFACE } from '../../theme.js'
 
 // Week and month averages against the targets, as a view in the diary's
 // sheet. Only finished days count (see nutritionStats.js).
 
-const COLORS = { protein: '#8A8A90', kcal: '#8A8A90', hit: ACCENT, chalkdim: CHALKDIM, grid: GRID }
+const COLORS = { protein: '#8A8A90', kcal: '#8A8A90', get hit() { return accentNow() }, chalkdim: CHALKDIM, grid: GRID }
 
 export default function Trends({ uid, today, targets, onBack, onClose, onPickDay }) {
   const { t, lang } = useLanguage()
@@ -200,7 +201,7 @@ function OnTarget({ stats, targets, waterGoal }) {
   const { t } = useLanguage()
   const rows = [
     ['protein', t('nutrition.protein'), t('nutrition.ruleProtein'), stats.proteinHits, stats.loggedDays],
-    ['kcal', t('nutrition.calories'), t('nutrition.ruleKcal'), stats.kcalHits, stats.loggedDays],
+    ['kcal', t('nutrition.calories'), t('nutrition.ruleKcal', { n: targets?.kcal_band > 0 ? targets.kcal_band : 10 }), stats.kcalHits, stats.loggedDays],
   ]
   if (stats.waterDays > 0) rows.push(['water', t('water.title'), t('nutrition.ruleWater'), waterGoal ? stats.waterHits : null, stats.waterDays])
   return (
@@ -226,9 +227,10 @@ function OnTarget({ stats, targets, waterGoal }) {
 }
 
 function DailyChart({ stats, kind, targets, metric, setMetric, onPickDay }) {
+  useAdmin() // redraw in the coach's color once it loads
   const { t, lang } = useLanguage()
   const target = metric === 'kcal' ? targets?.kcal : targets?.protein
-  const isHit = (day) => (metric === 'kcal' ? kcalOnTarget(day.kcal, target) : target > 0 && day.protein >= target)
+  const isHit = (day) => (metric === 'kcal' ? kcalOnTarget(day.kcal, target, targets?.kcal_band) : target > 0 && day.protein >= target)
   const rows = stats.days.map((day) => {
     const date = new Date(day.date + 'T00:00:00')
     return {

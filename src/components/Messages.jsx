@@ -26,7 +26,7 @@ function stamp(lang, iso) {
 
 // The chat itself, used by the trainee's Messages screen and by a trainee's
 // coach page. `side` is who is looking: 'trainee' or 'coach'.
-export function MessageThread({ traineeId, viewerId, side, listClass = 'max-h-[28rem]', onRead }) {
+export function MessageThread({ traineeId, viewerId, side, listClass = 'max-h-[28rem]', onRead, readOnlyNote = null }) {
   const { t, lang } = useLanguage()
   const [rows, setRows] = useState(null)
   const [loadError, setLoadError] = useState(null)
@@ -155,6 +155,9 @@ export function MessageThread({ traineeId, viewerId, side, listClass = 'max-h-[2
         ))}
       </div>
 
+      {readOnlyNote ? (
+        <p className="text-chalkdim text-sm">{readOnlyNote}</p>
+      ) : (
       <div className="flex items-end gap-2">
         <textarea
           ref={areaRef}
@@ -172,12 +175,13 @@ export function MessageThread({ traineeId, viewerId, side, listClass = 'max-h-[2
           disabled={!text.trim() || tooLong}
           aria-label={t('messages.send')}
           title={t('messages.send')}
-          className="press shrink-0 w-11 h-11 rounded-full bg-accent text-ink flex items-center justify-center disabled:opacity-40 disabled:pointer-events-none"
+          className="press shrink-0 w-11 h-11 rounded-full bg-accent text-onaccent flex items-center justify-center disabled:opacity-40 disabled:pointer-events-none"
         >
           <SendHorizontal size={20} className="rtl:-scale-x-100" aria-hidden="true" />
         </button>
       </div>
-      {tooLong && <p className="text-xs text-accent num">{t('messages.tooLong')(MESSAGE_MAX)}</p>}
+      )}
+      {!readOnlyNote && tooLong && <p className="text-xs text-accent num">{t('messages.tooLong')(MESSAGE_MAX)}</p>}
     </div>
   )
 }
@@ -185,7 +189,7 @@ export function MessageThread({ traineeId, viewerId, side, listClass = 'max-h-[2
 function Bubble({ own, body, meta, seen, failed, onRetry, onDiscard, t }) {
   return (
     <div className={`flex flex-col gap-0.5 ${own ? 'items-end' : 'items-start'}`}>
-      <div className={`max-w-[85%] rounded-[18px] px-3.5 py-2 text-[15px] leading-5 whitespace-pre-wrap break-words ${own ? 'bg-accent text-ink' : 'bg-surface2 text-chalk'} ${failed ? 'opacity-60' : ''}`}>
+      <div className={`max-w-[85%] rounded-[18px] px-3.5 py-2 text-[15px] leading-5 whitespace-pre-wrap break-words ${own ? 'bg-accent text-onaccent' : 'bg-surface2 text-chalk'} ${failed ? 'opacity-60' : ''}`}>
         <bdi dir="auto">{body}</bdi>
       </div>
       <div className="flex items-center gap-2 px-1 text-[11px] text-chalkdim">

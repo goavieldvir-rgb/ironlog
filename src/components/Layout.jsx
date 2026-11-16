@@ -25,7 +25,8 @@ const links = [
 
 export default function Layout() {
   const { user, logout } = useAuth()
-  const { isAdmin, nutritionAllowed, actingAs, setActingAs } = useAdmin()
+  const { isAdmin, nutritionAllowed, actingAs, setActingAs, brand } = useAdmin()
+  const logoMark = brand?.logo ? <img src={brand.logo} alt="" className="w-7 h-7 rounded-md object-cover" /> : <Dumbbell className="text-irontext" size={22} strokeWidth={2.5} />
   const { t, lang, setLang } = useLanguage()
   const { enabled: messagesOn, unread: unreadMessages } = useMessagesState()
   // Where the unread count shows: People for the coach, Messages (under More
@@ -120,7 +121,7 @@ export default function Layout() {
                 {t('layout.accountSuffix')}
               </span>
             </span>
-            <button onClick={() => setActingAs(null)} className="press shrink-0 rounded-full bg-accent text-ink font-semibold px-3 min-h-11 text-xs">
+            <button onClick={() => setActingAs(null)} className="press shrink-0 rounded-full bg-accent text-onaccent font-semibold px-3 min-h-11 text-xs">
               {t('layout.backToMyAccount')}
             </button>
           </div>
@@ -135,12 +136,12 @@ export default function Layout() {
               shouldn't pull you out of the session. */}
           {inWorkout ? (
             <div className="flex items-center gap-2">
-              <Dumbbell className="text-irontext" size={22} strokeWidth={2.5} />
+              {logoMark}
               <span className="font-display text-2xl tracking-wide">Ironlog</span>
             </div>
           ) : (
             <NavLink to="/" className="flex items-center gap-2" aria-label={t('nav.dashboard')}>
-              <Dumbbell className="text-irontext" size={22} strokeWidth={2.5} />
+              {logoMark}
               <span className="font-display text-2xl tracking-wide">Ironlog</span>
             </NavLink>
           )}
@@ -218,7 +219,7 @@ export default function Layout() {
               </span>
               <button
                 onClick={() => setActingAs(null)}
-                className="shrink-0 rounded-md bg-brass text-ink font-medium px-3 min-h-11 text-xs hover:bg-brass/90"
+                className="shrink-0 rounded-md bg-brass text-onaccent font-medium px-3 min-h-11 text-xs hover:bg-brass/90"
               >
                 {t('layout.backToMyAccount')}
               </button>
@@ -398,7 +399,7 @@ function CountBadge({ n, label, corner = false }) {
     <span
       role="img"
       aria-label={label(n)}
-      className={`num inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-accent text-ink text-[11px] font-bold leading-none ${
+      className={`num inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-accent text-onaccent text-[11px] font-bold leading-none ${
         corner ? 'absolute -top-1.5 -end-2.5 ring-2 ring-[#242428]' : ''
       }`}
     >

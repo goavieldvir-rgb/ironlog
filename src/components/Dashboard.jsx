@@ -14,7 +14,9 @@ import { listDrafts, clearDraft } from '../lib/draft.js'
 import { Button, Card, LoadError, FeedbackDot } from './ui.jsx'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import WeeklySchedule from './WeeklySchedule.jsx'
-import Tour, { useFirstTour } from './Tour.jsx'
+import CheckinCard from './CheckinCard.jsx'
+import Tour, { useFirstTour, tourSeen, markTourSeen, COACH_NEW_TOUR } from './Tour.jsx'
+import { useOwnerName } from '../lib/coach.js'
 import { itemTarget } from './RoutineView.jsx'
 import { useMessagesState } from '../lib/messages.js'
 import { setVolume } from '../lib/bodyweight.js'
@@ -89,7 +91,7 @@ export default function Dashboard() {
   const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
   const { unread: unreadMessages, latest: latestMessage, threads: coachThreads } = useMessagesState()
-  const { isAdmin, nutritionAllowed } = useAdmin()
+  const { isAdmin, nutritionAllowed, coachFrozen, traineeSettings, brand } = useAdmin()
   const location = useLocation()
   const navigate = useNavigate()
   const [exercises, exercisesLoading, refreshExercises, exercisesError] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
@@ -268,7 +270,23 @@ export default function Dashboard() {
         <p className="text-[15px] leading-5 text-chalkdim">
           {fmtDate(lang, now, { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
+        {/* The coach's own name and logo (Coach settings → Your look). */}
+        {!actingAs && !isAdmin && (brand?.name || brand?.logo) && (
+          <p className="flex items-center gap-2 text-sm text-chalkdim mt-1">
+            {brand.logo && <img src={brand.logo} alt="" className="w-6 h-6 rounded-md object-cover" />}
+            {brand.name && <span>{t('brand.coachedByLabel')} <bdi>{brand.name}</bdi></span>}
+          </p>
+        )}
       </div>
+
+      {!actingAs && <CoachWelcome />}
+
+      {coachFrozen && !actingAs && (
+        <Card className="!p-5 flex flex-col gap-1">
+          <p className="font-medium">{t('dashboard.coachFrozenTitle')}</p>
+          <p className="text-chalkdim text-sm">{t('dashboard.coachFrozenBody')}</p>
+        </Card>
+      )}
 
       {/* New messages lead the page, for both sides: a trainee sees their
           coach's newest message, the coach sees who wrote. Hidden while the
@@ -306,7 +324,7 @@ export default function Dashboard() {
                 nested version is invalid HTML and could need two taps. */}
             <Link
               to={`/workout/${draft.routineId || 'freestyle'}`}
-              className="press flex-1 inline-flex items-center justify-center gap-2 rounded-[14px] min-h-[48px] text-[15px] font-semibold bg-accent text-ink hover:bg-accent/90 transition-colors"
+              className="press flex-1 inline-flex items-center justify-center gap-2 rounded-[14px] min-h-[48px] text-[15px] font-semibold bg-accent text-onaccent hover:bg-accent/90 transition-colors"
             >
               <Play size={15} fill="currentColor" /> {t('dashboard.resume')}
             </Link>
@@ -372,8 +390,11 @@ export default function Dashboard() {
         />
       )}
 
+      {/* The coach's weekly questions, for the trainee themselves. */}
+      {!actingAs && !isAdmin && <CheckinCard uid={effectiveUid} />}
+
       {/* A morning weigh-in is the person's own; a coach viewing their account doesn't get it. */}
-      {!actingAs && !weightSaved && !weightHidden && !weightsLoading && !weightsError && !loadFailed && !weights.some((w) => w.date === todayIso) && (
+      {!actingAs && !traineeSettings?.weigh_prompt_off && !weightSaved && !weightHidden && !weightsLoading && !weightsError && !loadFailed && !weights.some((w) => w.date === todayIso) && (
         <WeightQuickCard
           last={weights[0]}
           t={t}
@@ -499,7 +520,7 @@ function TodayHero({ routine, others, eyebrow = null, othersLabel = null, sessio
       )}
       <Link
         to={`/workout/${routine.id}`}
-        className="press h-[54px] rounded-[14px] bg-accent text-ink hover:bg-accent/90 transition-colors text-[16px] font-semibold flex items-center justify-center gap-2"
+        className="press h-[54px] rounded-[14px] bg-accent text-onaccent hover:bg-accent/90 transition-colors text-[16px] font-semibold flex items-center justify-center gap-2"
       >
         <Play size={16} fill="currentColor" />
         {t('dashboard.startWorkout')}
@@ -655,12 +676,49 @@ function MessageBanner({ to, title, preview, count, t }) {
       <span className="min-w-0 flex-1">
         <span className="flex items-start justify-between gap-2">
           <span className="text-[15px] font-semibold leading-5 min-w-0 break-words">{title}</span>
-          <span className="num shrink-0 mt-px text-[11px] leading-[18px] font-bold rounded-full bg-accent text-ink px-1.5 min-w-[18px] text-center">{count > 99 ? '99+' : count}</span>
+          <span className="num shrink-0 mt-px text-[11px] leading-[18px] font-bold rounded-full bg-accent text-onaccent px-1.5 min-w-[18px] text-center">{count > 99 ? '99+' : count}</span>
         </span>
         {preview && <span className="text-[14px] leading-5 text-chalkdim mt-1 line-clamp-2 break-words">{preview}</span>}
         <span className="block text-[13px] text-accent font-medium mt-1.5">{t('messages.openReply')}</span>
       </span>
       <ForwardChevron size={16} className="text-chalkdim shrink-0 self-center" />
     </Link>
+  )
+}
+
+// For a coach other than the owner who hasn't had the coach walkthrough yet
+// (just joined, or just made a coach): it lives on People, so Home points
+// there. Gone once the walkthrough is seen or skipped, or after Not now.
+function CoachWelcome() {
+  const { user } = useAuth()
+  const { isCoach, isOwner } = useAdmin()
+  const { t } = useLanguage()
+  const navigate = useNavigate()
+  const show = isCoach && !isOwner && !!user && !tourSeen(user.uid, 'coach')
+  const ownerName = useOwnerName(show)
+  const [hidden, setHidden] = useState(false)
+  if (!show || hidden) return null
+  return (
+    <Card className="!p-5 flex flex-col gap-3">
+      <div>
+        <p className="font-medium">{t('tour.coach.homeTitle')}</p>
+        <p className="text-chalkdim text-sm mt-1">{t('tour.coach.homeBody', { owner: ownerName || t('tour.coach.ownerFallback') })}</p>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <Button variant="brass" onClick={() => navigate('/people', { state: { coachTour: true } })}>
+          {t('tour.coach.homeButton')} <ForwardChevron size={15} />
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            markTourSeen(user.uid, 'coach')
+            markTourSeen(user.uid, COACH_NEW_TOUR)
+            setHidden(true)
+          }}
+        >
+          {t('tour.coach.notNow')}
+        </Button>
+      </div>
+    </Card>
   )
 }

@@ -1,4 +1,4 @@
-import React, { lazy, useEffect, useState } from 'react'
+import React, { lazy, Suspense, useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext.jsx'
 import { useLanguage } from './context/LanguageContext.jsx'
@@ -32,6 +32,7 @@ const lazyRetry = (load) =>
 const Nutrition = lazyRetry(() => import('./components/Nutrition.jsx'))
 const People = lazyRetry(() => import('./components/People.jsx'))
 const PersonDetail = lazyRetry(() => import('./components/PersonDetail.jsx'))
+const CoachSettings = lazyRetry(() => import('./components/CoachSettings.jsx'))
 const ErrorLogs = lazyRetry(() => import('./components/ErrorLogs.jsx'))
 const Stats = lazyRetry(() => import('./components/Stats.jsx'))
 const BodyWeight = lazyRetry(() => import('./components/BodyWeight.jsx'))
@@ -43,7 +44,7 @@ const Messages = lazyRetry(() => import('./components/Messages.jsx'))
 
 export default function App() {
   const { user, loading, recovery, needsCode, hasTwoStep } = useAuth()
-  const { isAdmin, profile, loadingProfile } = useAdmin()
+  const { isAdmin, profile, loadingProfile, removed } = useAdmin()
   const { t } = useLanguage()
   const location = useLocation()
   const [linkProblem, setLinkProblem] = useState(null)
@@ -80,6 +81,17 @@ export default function App() {
 
   if (loadingProfile && !profile) return <ScreenLoader />
 
+  // Removed from the app: only downloading their data and deleting the
+  // account are left. The database blocks everything else too.
+  if (removed)
+    return (
+      <Suspense fallback={<ScreenLoader />}>
+        <div className="min-h-screen p-4 sm:p-8 flex justify-center">
+          <Account removed />
+        </div>
+      </Suspense>
+    )
+
   // The coach account sees every trainee's data, so it can't be used
   // without two-step verification.
   if (isAdmin && !hasTwoStep) return <TwoStepRequired />
@@ -101,8 +113,10 @@ export default function App() {
         <Route path="/history/:id" element={<SessionDetail />} />
         <Route path="/history/:id/edit" element={<EditSession />} />
         <Route path="/history/:id/share" element={<SessionShare />} />
-        <Route path="/people" element={<People />} />
+        {/* Coaches only: a trainee, or a coach the owner froze, goes Home. */}
+        <Route path="/people" element={isAdmin ? <People /> : <Navigate to="/" replace />} />
         <Route path="/people/:id" element={<PersonDetail />} />
+        <Route path="/coach-settings" element={<CoachSettings />} />
         <Route path="/errors" element={<ErrorLogs />} />
         <Route path="/nutrition" element={<Nutrition />} />
         <Route path="/stats" element={<Stats />} />

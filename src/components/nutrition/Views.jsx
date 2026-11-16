@@ -17,6 +17,9 @@ import {
   logUnit,
   unitLabel,
   updateSavedMeal,
+  ALL_MEALS,
+  DEFAULT_MEALS,
+  MEAL_KEY,
 } from '../../lib/nutrition.js'
 import { MACROS, macroGrams, setMacroPct, splitFromTargets, splitTotal } from '../../lib/macroSplit.js'
 import { AmountControl, AmountText, MacroInputs, MacroPanel, MealTabs, N, Name, SheetHeader, UnitChips, mealLabel, useDirtyForm } from './parts.jsx'
@@ -179,16 +182,39 @@ export function EditLog({ row, maxDate, onBack, onClose, onSave, onCopy, onDelet
 
 // ------------------------------------------------------------ daily targets
 
-export function TargetsView({ targets, note, onBack, onClose, onSave }) {
+// The meal slots as the editor holds them: every slot, on or off, with the
+// coach's names.
+function mealRows(meals) {
+  const list = Array.isArray(meals) && meals.length ? meals : DEFAULT_MEALS.map((key) => ({ key }))
+  return ALL_MEALS.map((key) => {
+    const m = list.find((x) => x.key === key)
+    return { key, on: !!m, en: m?.en || '', he: m?.he || '' }
+  })
+}
+function mealsValue(rows) {
+  const on = rows.filter((r) => r.on)
+  const plain = on.length === DEFAULT_MEALS.length && on.every((r, i) => r.key === DEFAULT_MEALS[i] && !r.en.trim() && !r.he.trim())
+  return plain ? null : on.map((r) => ({ key: r.key, ...(r.en.trim() ? { en: r.en.trim() } : {}), ...(r.he.trim() ? { he: r.he.trim() } : {}) }))
+}
+
+export function TargetsView({ targets, note, coach = false, onBack, onClose, onSave }) {
   const { t } = useLanguage()
   const g = t('nutrition.g')
   const [kcalText, setKcalText] = useState(targets?.kcal != null ? String(targets.kcal) : '')
   const [split, setSplit] = useState(() => splitFromTargets(targets))
+  const [fiberText, setFiberText] = useState(targets?.fiber != null ? String(targets.fiber) : '')
+  const [band, setBand] = useState(targets?.kcal_band ?? 10)
+  const [meals, setMeals] = useState(() => mealRows(targets?.meals))
   // The split before the current slider started moving; the other two keep
   // its ratio. Replaced whenever a different slider is touched.
   const [anchor, setAnchor] = useState({ key: null, split })
-  const [start] = useState({ kcalText, split })
-  useDirtyForm(kcalText !== start.kcalText || MACROS.some((k) => split[k] !== start.split[k]))
+  const [start] = useState({ kcalText, split, fiberText, band, meals: JSON.stringify(meals) })
+  useDirtyForm(
+    kcalText !== start.kcalText || MACROS.some((k) => split[k] !== start.split[k]) ||
+      fiberText !== start.fiberText || band !== start.band || JSON.stringify(meals) !== start.meals,
+  )
+  const setMeal = (key, patch) => setMeals((rows) => rows.map((r) => (r.key === key ? { ...r, ...patch } : r)))
+  const mealsOn = meals.filter((r) => r.on).length
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const kcal = parseNum(kcalText) > 0 ? Math.round(parseNum(kcalText)) : null
@@ -208,7 +234,13 @@ export function TargetsView({ targets, note, onBack, onClose, onSave }) {
       // Grams to one decimal (fat at 2,500 kcal / 20% is 55.6 g). 0 g is
       // stored as "no target", as before.
       const grams = (k) => round1(macroGrams(kcal, split[k], k)) || null
-      await onSave({ kcal, protein: grams('protein'), carbs: grams('carbs'), fat: grams('fat') })
+      const fiber = parseNum(fiberText) > 0 ? Math.min(199, round1(parseNum(fiberText))) : null
+      const extras = {}
+      // Only sent once changed, so an app ahead of the database still saves.
+      if (fiberText !== start.fiberText) extras.fiber = fiber
+      if (band !== start.band) extras.kcal_band = band
+      if (coach && JSON.stringify(meals) !== start.meals) extras.meals = mealsValue(meals)
+      await onSave({ kcal, protein: grams('protein'), carbs: grams('carbs'), fat: grams('fat'), ...extras })
     } finally {
       setBusy(false)
     }
@@ -264,6 +296,69 @@ export function TargetsView({ targets, note, onBack, onClose, onSave }) {
             })}
             <p className="text-chalkdim text-xs">{t('nutrition.splitHint')}</p>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1.5">
+              <span className="eyebrow">{t('nutrition.fiberTarget')}</span>
+              <input
+                inputMode="decimal"
+                dir="ltr"
+                className="num text-center"
+                placeholder="—"
+                value={fiberText}
+                onChange={(e) => setFiberText(e.target.value.replace(/[^\d.]/g, ''))}
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="eyebrow">{t('nutrition.kcalBand')}</span>
+              <select value={band} onChange={(e) => setBand(Number(e.target.value))}>
+                {[5, 10, 15, 20, 25].map((n) => (
+                  <option key={n} value={n}>
+                    ±{n}%
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <p className="text-chalkdim text-xs -mt-3">{t('nutrition.kcalBandHint')}</p>
+          {coach && (
+            <div className="flex flex-col gap-2">
+              <span className="eyebrow">{t('nutrition.mealSlots')}</span>
+              <p className="text-chalkdim text-xs">{t('nutrition.mealSlotsHint')}</p>
+              {meals.map((r) => (
+                <div key={r.key} className="flex items-center gap-2">
+                  <span className="w-20 shrink-0 text-sm text-chalkdim truncate">{t(MEAL_KEY[r.key])}</span>
+                  <input
+                    type="checkbox"
+                    checked={r.on}
+                    disabled={r.on && mealsOn === 1}
+                    onChange={() => setMeal(r.key, { on: !r.on })}
+                    aria-label={t(MEAL_KEY[r.key])}
+                    className="w-5 h-5 shrink-0"
+                  />
+                  <input
+                    value={r.en}
+                    onChange={(e) => setMeal(r.key, { en: e.target.value })}
+                    placeholder={t('nutrition.mealNameEn')}
+                    maxLength={30}
+                    dir="ltr"
+                    disabled={!r.on}
+                    className="flex-1 min-w-0 !text-sm"
+                    aria-label={t('nutrition.mealNameEn')}
+                  />
+                  <input
+                    value={r.he}
+                    onChange={(e) => setMeal(r.key, { he: e.target.value })}
+                    placeholder={t('nutrition.mealNameHe')}
+                    maxLength={30}
+                    dir="rtl"
+                    disabled={!r.on}
+                    className="flex-1 min-w-0 !text-sm"
+                    aria-label={t('nutrition.mealNameHe')}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
           {error && (
             <p className="text-sm text-irontext" role="alert">
               {error}

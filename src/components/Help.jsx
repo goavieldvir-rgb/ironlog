@@ -11,7 +11,7 @@ export default function Help() {
   const { t } = useLanguage()
   const [openIndex, setOpenIndex] = useState(0)
   const navigate = useNavigate()
-  const { isAdmin, actingAs } = useAdmin()
+  const { isAdmin, isCoach, isOwner, actingAs } = useAdmin()
 
   // Finishing (11) follows logging, and reminders (12) and language/privacy
   // (13) sit before the troubleshooting section so that stays last.
@@ -41,6 +41,22 @@ export default function Help() {
           <span className="flex-1 min-w-0">
             <span className="block text-chalk">{t('tour.replay')}</span>
             <span className="block text-chalkdim text-sm">{t('tour.replayBody')}</span>
+          </span>
+          <ForwardChevron size={16} className="text-chalkdim/70 shrink-0" />
+        </button>
+      )}
+
+      {/* Replays the coach walkthrough on People, for coaches other than the owner. */}
+      {isCoach && !isOwner && !actingAs && (
+        <button
+          type="button"
+          onClick={() => navigate('/people', { state: { coachTour: true } })}
+          className="press-row card !p-4 flex items-center gap-3 text-start hover:bg-surface2"
+        >
+          <Sparkles size={18} className="text-accent shrink-0" aria-hidden="true" />
+          <span className="flex-1 min-w-0">
+            <span className="block text-chalk">{t('tour.coach.replay')}</span>
+            <span className="block text-chalkdim text-sm">{t('tour.coach.replayBody')}</span>
           </span>
           <ForwardChevron size={16} className="text-chalkdim/70 shrink-0" />
         </button>

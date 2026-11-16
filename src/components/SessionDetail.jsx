@@ -11,6 +11,7 @@ import { fmtDate } from '../lib/dates.js'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useCollection, updateTrainerComment, deleteSession, hasUnreadFeedback, markFeedbackSeen } from '../lib/db.js'
 import { markSessionsReviewed } from '../lib/coach.js'
+import { useCoachSettings } from '../lib/coachSettings.js'
 import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
 import { useGyms, sessionGymId, gymLabel } from '../lib/gyms.js'
 import { Card, CategoryTag, Badge, Button } from './ui.jsx'
@@ -21,7 +22,7 @@ import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
 import { formatPace } from '../lib/cardio.js'
 import CardioTotals from './CardioTotals.jsx'
 import { sameKindSessions, matchingEntry, targetFor, entryStats, trend, sessionVolume } from '../lib/sessionCompare.js'
-import { ACCENT, CHALK, CHALKDIM, MUTED, SURFACE } from '../theme.js'
+import { accentNow, CHALK, CHALKDIM, MUTED, SURFACE } from '../theme.js'
 
 function formatDate(lang, iso) {
   if (!iso) return ''
@@ -90,7 +91,7 @@ function prSets(entry, baseline) {
 }
 
 export default function SessionDetail() {
-  const { effectiveUid, isAdmin, actingAs } = useAdmin()
+  const { effectiveUid, isAdmin, isOwner, actingAs } = useAdmin()
   const { t, lang } = useLanguage()
   const { id } = useParams()
   const navigate = useNavigate()
@@ -201,7 +202,7 @@ export default function SessionDetail() {
         </div>
       </div>
 
-      <TrainerComment session={session} effectiveUid={effectiveUid} isAdmin={isAdmin} isNew={unseen} onSaved={refresh} t={t} />
+      <TrainerComment session={session} effectiveUid={effectiveUid} isAdmin={isAdmin && (isOwner || !!actingAs)} isNew={unseen} onSaved={refresh} t={t} />
 
       {session.notes && <p className="text-chalkdim text-[15px] px-1">{session.notes}</p>}
 
@@ -319,6 +320,10 @@ function TrainerComment({ session, effectiveUid, isAdmin, isNew, onSaved, t }) {
   const [text, setText] = useState(session.trainer_comment || '')
   const [saving, setSaving] = useState(false)
   const { toast } = useFeedback()
+  const { profile } = useAdmin()
+  // The coach's saved feedback lines (Coach settings), one tap to add.
+  const [coachSettings] = useCoachSettings(isAdmin && editing ? profile?.id : null)
+  const snippets = coachSettings?.settings.snippets || []
 
   // Nothing to show and nobody who can add anything — render nothing at all.
   if (!session.trainer_comment && !isAdmin) return null
@@ -350,6 +355,21 @@ function TrainerComment({ session, effectiveUid, isAdmin, isNew, onSaved, t }) {
           rows={3}
           autoFocus
         />
+        {snippets.length > 0 && (
+          <div className="flex gap-1.5 flex-wrap" aria-label={t('coachSettings.snippetsTitle')}>
+            {snippets.map((sn, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setText((cur) => (cur.trim() ? `${cur.trimEnd()} ${sn}` : sn))}
+                className="max-w-full truncate min-h-9 px-3 rounded-full text-xs border border-line text-chalkdim hover:text-chalk"
+                title={sn}
+              >
+                <bdi>{sn}</bdi>
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setEditing(false)}>
             {t('common.cancel')}
@@ -559,7 +579,7 @@ function ComparePanel({ session, previous, compared, count, setCount, exById, la
                   dot={(props) => {
                     const { cx, cy, payload } = props
                     if (cx == null || cy == null || payload.value == null) return <g key={payload.id} />
-                    return <circle key={payload.id} cx={cx} cy={cy} r={payload.current ? 5 : 3.5} fill={payload.current ? ACCENT : CHALKDIM} />
+                    return <circle key={payload.id} cx={cx} cy={cy} r={payload.current ? 5 : 3.5} fill={payload.current ? accentNow() : CHALKDIM} />
                   }}
                 />
               </LineChart>

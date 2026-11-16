@@ -18,6 +18,8 @@ export default {
         // brass was the old gold call-to-action colour; it now means "accent".
         brass: 'rgb(var(--accent) / <alpha-value>)',
         brasssoft: 'rgb(var(--accent) / 0.14)',
+        // Text on an accent fill: dark, or white on a dark coach color.
+        onaccent: 'rgb(var(--accent-fg) / <alpha-value>)',
         // iron is now strictly "danger": errors, delete, discard.
         iron: '#E5484D',
         irontext: '#FF6369',
@@ -30,6 +32,12 @@ export default {
         good: '#4CAF7D',
         // good is too light for a chalk label (2.3:1); this one is 4.8:1.
         goodbtn: '#287548',
+      },
+      // Accent-colored words sit on the dark background, so they use a shade
+      // lifted to 4.5:1 (the same as the fill for the usual orange).
+      textColor: {
+        accent: 'rgb(var(--accent-text) / <alpha-value>)',
+        brass: 'rgb(var(--accent-text) / <alpha-value>)',
       },
       fontFamily: {
         // One family. Geist for Latin and numbers, Plex Sans Hebrew for Hebrew.

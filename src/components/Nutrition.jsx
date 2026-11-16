@@ -8,8 +8,9 @@ import { useFeedback } from '../context/FeedbackContext.jsx'
 import { fmtDate, toLocalISODate } from '../lib/dates.js'
 import { shiftDay } from '../lib/nutritionStats.js'
 import {
-  MEALS,
-  MEAL_KEY,
+  activeMeals,
+  mealsFor,
+  setMealLayout,
   buildUnitOptions,
   cloneLogs,
   defaultMeal,
@@ -30,7 +31,7 @@ import {
   logName,
 } from '../lib/nutrition.js'
 import { Button, Card, LoadError } from './ui.jsx'
-import { AmountText, DirtyScope, Forward, N, Name, Sheet, Track, UndoToast, useDiscardGuard } from './nutrition/parts.jsx'
+import { AmountText, DirtyScope, Forward, N, Name, Sheet, Track, UndoToast, mealLabel, useDiscardGuard } from './nutrition/parts.jsx'
 import { loadCatalog } from '../lib/foodCatalog.js'
 import AddFood from './nutrition/AddFood.jsx'
 import FoodDetail from './nutrition/FoodDetail.jsx'
@@ -64,7 +65,7 @@ const COPY_LOOKBACK = 14
 function Diary() {
   const { t, lang } = useLanguage()
   const { user } = useAuth()
-  const { isAdmin, effectiveUid, actingAs } = useAdmin()
+  const { isAdmin, isOwner, effectiveUid, actingAs } = useAdmin()
   const { toast } = useFeedback()
   const uid = effectiveUid
   const today = toLocalISODate()
@@ -276,18 +277,20 @@ function Diary() {
   // The last time this meal was logged, into the same meal on this day.
   async function copyPrevMeal(m) {
     const rows = cloneLogs(prevMeal(m).rows, { uid, date })
-    await addLogs(rows, t('nutrition.loggedToMeal', { meal: t(MEAL_KEY[m]) }))
+    await addLogs(rows, t('nutrition.loggedToMeal', { meal: mealLabel(t, m) }))
   }
 
   // From a past day: the same meal, added to today.
   async function copyMealToToday(m) {
     const rows = cloneLogs(logs.filter((r) => r.meal === m), { uid, date: today })
-    await addLogs(rows, t('nutrition.copiedToToday', { meal: t(MEAL_KEY[m]) }))
+    await addLogs(rows, t('nutrition.copiedToToday', { meal: mealLabel(t, m) }))
   }
 
   async function onSaveTargets(values) {
     try {
-      const saved = await saveTargets(uid, values, isAdmin ? 'coach' : 'self')
+      // 'coach' locks the targets for the trainee. Another coach's own targets
+      // are his to edit, so they stay 'self'.
+      const saved = await saveTargets(uid, values, isAdmin && (isOwner || actingAs) ? 'coach' : 'self')
       setTargets(saved)
       targetsCache.set(uid, saved)
       showToast(t('nutrition.targetsSaved'))
@@ -342,12 +345,21 @@ function Diary() {
   }
 
   // ----- derived
+  // The coach's meal slots for this person (four by default).
+  setMealLayout(targets?.meals, lang)
+  // The first meal was picked before the coach's slots loaded: move off a
+  // slot this person doesn't have.
+  const mealKeys = (targets?.meals || []).map((m) => m?.key).join(',')
+  useEffect(() => {
+    if (!activeMeals().includes(meal)) setMeal(defaultMeal())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mealKeys])
   const totals = sumLogs(logs)
   // Copy sources: the last day anything was logged, and per meal the last day
   // that meal was. Usually yesterday; a skipped day falls back further.
   const lastDayOf = (rows) => (rows.length ? { date: rows[0].date, rows: rows.filter((r) => r.date === rows[0].date) } : null)
   const prevDay = lastDayOf(prevLogs)
-  const prevMeals = Object.fromEntries(MEALS.map((m) => [m, lastDayOf(prevLogs.filter((r) => r.meal === m))]))
+  const prevMeals = Object.fromEntries(activeMeals().map((m) => [m, lastDayOf(prevLogs.filter((r) => r.meal === m))]))
   const prevMeal = (m) => prevMeals[m]
   const prevTotals = sumLogs(prevDay?.rows || [])
   const isToday = date === today
@@ -357,7 +369,7 @@ function Diary() {
   const tomorrow = shiftDay(today, 1)
   const lastDay = shiftDay(today, MAX_DAYS_AHEAD)
   // Time of day says nothing about a planned day: start from breakfast.
-  const addMeal = () => (isFuture ? 'breakfast' : defaultMeal())
+  const addMeal = () => (isFuture ? activeMeals()[0] : defaultMeal())
   const dateObj = new Date(date + 'T00:00:00')
   const dayLabel = isToday
     ? t('nutrition.today')
@@ -513,38 +525,40 @@ function Diary() {
             </Card>
           )}
 
-          {MEALS.map((m) => {
+          {mealsFor(logs).map((m) => {
             const rows = logs.filter((r) => r.meal === m)
             const mt = sumLogs(rows)
             return (
               <section key={m} aria-labelledby={`meal-${m}`} className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
-                  <h2 id={`meal-${m}`} className="text-[17px] font-semibold flex items-baseline gap-2 min-w-0">
-                    <span className="truncate">{t(MEAL_KEY[m])}</span>
+                  <h2 id={`meal-${m}`} className="text-[17px] font-semibold flex items-baseline gap-2 min-w-0 flex-1">
+                    {/* The meal name stays whole and the totals shorten instead; a long
+                        custom meal name (coach-set slots) still cuts off at 60%. */}
+                    <span className="shrink-0 max-w-[60%] truncate">{mealLabel(t, m)}</span>
                     {rows.length > 0 && (
-                      <span className="text-chalkdim text-sm font-normal whitespace-nowrap">
+                      <span className="text-chalkdim text-sm font-normal whitespace-nowrap truncate min-w-0">
                         <N mono>{fmt(mt.protein, 0)}</N> {g} {t('nutrition.proteinWord')} · <N mono>{fmt(mt.kcal, 0)}</N> {k}
                       </span>
                     )}
                   </h2>
                   <div className="flex items-center gap-1 shrink-0">
                     {isPast && rows.length > 0 && (
-                      <button type="button" onClick={() => copyMealToToday(m)} aria-label={t('nutrition.copyMealToToday', { meal: t(MEAL_KEY[m]) })} title={t('nutrition.copyToTodayShort')} className="w-11 h-11 -my-1 inline-flex items-center justify-center rounded-full text-chalkdim hover:text-chalk press">
+                      <button type="button" onClick={() => copyMealToToday(m)} aria-label={t('nutrition.copyMealToToday', { meal: mealLabel(t, m) })} title={t('nutrition.copyToTodayShort')} className="w-11 h-11 -my-1 inline-flex items-center justify-center rounded-full text-chalkdim hover:text-chalk press">
                         <CopyPlus size={18} />
                       </button>
                     )}
                     {rows.length > 0 && (
-                      <button type="button" onClick={() => push({ type: 'saveMeal', meal: m })} aria-label={`${t('nutrition.saveAsMeal')}: ${t(MEAL_KEY[m])}`} title={t('nutrition.saveAsMeal')} className="w-11 h-11 -my-1 inline-flex items-center justify-center rounded-full text-chalkdim hover:text-chalk press">
+                      <button type="button" onClick={() => push({ type: 'saveMeal', meal: m })} aria-label={`${t('nutrition.saveAsMeal')}: ${mealLabel(t, m)}`} title={t('nutrition.saveAsMeal')} className="w-11 h-11 -my-1 inline-flex items-center justify-center rounded-full text-chalkdim hover:text-chalk press">
                         <Bookmark size={18} />
                       </button>
                     )}
-                    <button type="button" onClick={() => openAdd(m)} aria-label={t('nutrition.addToMealLabel', { meal: t(MEAL_KEY[m]) })} className="hit w-9 h-9 inline-flex items-center justify-center rounded-full bg-surface2 hover:bg-white/10 press">
+                    <button type="button" onClick={() => openAdd(m)} aria-label={t('nutrition.addToMealLabel', { meal: mealLabel(t, m) })} className="hit w-9 h-9 inline-flex items-center justify-center rounded-full bg-surface2 hover:bg-white/10 press">
                       <Plus size={16} strokeWidth={2} />
                     </button>
                   </div>
                 </div>
                 {rows.length === 0 && prevMeal(m) ? (
-                  <RepeatMeal rows={prevMeal(m).rows} day={sourceDay(prevMeal(m).date)} meal={t(MEAL_KEY[m])} onClick={() => copyPrevMeal(m)} />
+                  <RepeatMeal rows={prevMeal(m).rows} day={sourceDay(prevMeal(m).date)} meal={mealLabel(t, m)} onClick={() => copyPrevMeal(m)} />
                 ) : rows.length === 0 ? (
                   <p className="text-chalkdim text-sm">{isFuture ? t('nutrition.nothingPlanned') : t('nutrition.nothingLogged')}</p>
                 ) : (
@@ -609,7 +623,7 @@ function Diary() {
                 )
                 break
               case 'detail':
-                body = <FoodDetail {...common} food={v.food} meal={meal} setMeal={setMeal} targets={targets} totals={totals} favUid={uid} isAdmin={isAdmin} onLog={logFood} />
+                body = <FoodDetail {...common} food={v.food} meal={meal} setMeal={setMeal} targets={targets} totals={totals} favUid={uid} isAdmin={isOwner} onLog={logFood} />
                 break
               case 'label':
                 body = (
@@ -618,7 +632,7 @@ function Diary() {
                     barcode={v.barcode}
                     prefill={v.prefill}
                     uid={user.uid}
-                    isAdmin={isAdmin}
+                    isAdmin={isOwner}
                     onSaved={onLabelSaved}
                     onUseExisting={(food) => setStack((s) => [...s.slice(0, -1), { type: 'detail', food }])}
                   />
@@ -628,13 +642,13 @@ function Diary() {
                 body = <EditLog {...common} row={v.row} maxDate={lastDay} onSave={onSaveEdit} onCopy={onCopyLog} onDelete={onDeleteLog} />
                 break
               case 'targets':
-                body = <TargetsView {...common} targets={targets} note={isAdmin ? '' : t('nutrition.ownTargetsNote')} onSave={onSaveTargets} />
+                body = <TargetsView {...common} targets={targets} coach={isAdmin} note={isAdmin ? '' : t('nutrition.ownTargetsNote')} onSave={onSaveTargets} />
                 break
               case 'saveMeal':
                 body = (
                   <SaveMealView
                     {...common}
-                    defaultName={t(MEAL_KEY[v.meal])}
+                    defaultName={mealLabel(t, v.meal)}
                     count={logs.filter((r) => r.meal === v.meal).length}
                     onSave={(name) => onSaveMeal(v.meal, name)}
                   />
@@ -825,9 +839,16 @@ function Summary({ totals, targets, canEdit, onEdit }) {
             )}
           </div>
         ))}
-        {totals.fiber > 0 && (
+        {(totals.fiber > 0 || targets?.fiber > 0) && (
           <span className="col-span-2 text-chalkdim whitespace-nowrap">
-            {t('nutrition.fiber')} <N mono className="text-chalk font-medium">{fmt(totals.fiber, 0)}</N> {g}
+            {t('nutrition.fiber')} <N mono className="text-chalk font-medium">{fmt(totals.fiber || 0, 0)}</N>
+            {targets?.fiber > 0 && (
+              <>
+                {' / '}
+                <N mono>{fmt(targets.fiber, 0)}</N>
+              </>
+            )}{' '}
+            {g}
           </span>
         )}
       </div>

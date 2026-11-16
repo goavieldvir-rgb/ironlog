@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Users, UserPlus, Copy, Check, Share, AlertTriangle, Search, Pin, Trophy, CalendarCheck, ChevronUp, ChevronDown, MessageSquare } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Settings, Users, UserPlus, Copy, Check, Share, AlertTriangle, Search, Pin, Trophy, CalendarCheck, ChevronUp, ChevronDown, MessageSquare } from 'lucide-react'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
+import { supabase } from '../supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -11,21 +12,36 @@ import { Card, Badge, EmptyState, Button, Field, LoadError } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { PageLoader } from './Loading.jsx'
 import CoachTasks from './CoachTasks.jsx'
+import { useCoachSettings } from '../lib/coachSettings.js'
+import Tour, { useFirstTour, tourSeen, markTourSeen, COACH_NEW_TOUR } from './Tour.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { useMessagesState } from '../lib/messages.js'
-import { fetchRoster, fetchRecentPrs, rosterFlags, attentionScore, adherence, daysSince, recordInvite } from '../lib/coach.js'
+import { fetchRoster, fetchRecentPrs, rosterFlags, attentionScore, adherence, daysSince, recordInvite, fetchMyCoachLimit, fetchOwnerName } from '../lib/coach.js'
 
 // The coach's roster: who needs attention first, how each trainee is doing
 // against their plan, and what is waiting for review. Tapping a trainee opens
 // their coach page (PersonDetail).
 export default function People() {
   const { user } = useAuth()
-  const { setActingAs } = useAdmin()
+  const { setActingAs, isOwner, isCoach, profile } = useAdmin()
+  const [coachSettings] = useCoachSettings(isCoach ? profile?.id : null)
+  const behindPct = coachSettings?.settings.behind_pct ?? 60
+  const tasksOff = coachSettings?.settings.tasks_off || []
   const { t } = useLanguage()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
   const [reload, setReload] = useState(0)
+  // A coach's own trainee count and limit, set by the owner.
+  const [myLimit, setMyLimit] = useState(null)
+  const [limitLoaded, setLimitLoaded] = useState(false)
+  useEffect(() => {
+    if (isCoach && !isOwner)
+      fetchMyCoachLimit().then((l) => {
+        setMyLimit(l)
+        setLimitLoaded(true)
+      })
+  }, [isCoach, isOwner, reload])
   const [inviting, setInviting] = useState(false)
   const [query, setQuery] = useState('')
   const [view, setView] = useState('attention')
@@ -64,10 +80,10 @@ export default function People() {
       rows
         .filter((p) => p.id !== user.uid)
         .map((p) => {
-          const flags = rosterFlags(p, today)
+          const flags = rosterFlags(p, today, behindPct, tasksOff)
           return { ...p, unread: unreadMsgs[p.id] || 0, flags, score: attentionScore(flags), adh: adherence(p.week_counts, p.planned_per_week, p.created_at, today) }
         }),
-    [rows, user.uid, today, unreadMsgs],
+    [rows, user.uid, today, unreadMsgs, behindPct, tasksOff],
   )
   const me = rows.find((p) => p.id === user.uid)
 
@@ -98,6 +114,38 @@ export default function People() {
     })
   }, [trainees, query, view])
 
+  // The coach walkthrough: once for a coach other than the owner, the first
+  // time this page has loaded after they became a coach (a new coach, or an
+  // existing trainee the owner made one). Home and Help can ask for it again.
+  const location = useLocation()
+  const navigate = useNavigate()
+  const isOtherCoach = isCoach && !isOwner
+  // The owner's name goes into the cards; if it can't be read, they say
+  // "Ironlog's owner" instead of waiting forever.
+  const [ownerName, setOwnerName] = useState(null)
+  useEffect(() => {
+    if (!isOtherCoach) return
+    let live = true
+    fetchOwnerName().then((n) => live && setOwnerName(n), () => live && setOwnerName(''))
+    return () => { live = false }
+  }, [isOtherCoach])
+  const tourRequested = !!location.state?.coachTour
+  const tourReady = isOtherCoach && !loading && limitLoaded && ownerName != null
+  const [tourOpen, closeFullTour] = useFirstTour('coach', tourReady, tourRequested, { coach: true })
+  // The full walkthrough already covers what's new, so finishing or
+  // skipping it also counts as having seen the "what's new" one.
+  const closeTour = (completed, empty) => {
+    if (!empty && user) markTourSeen(user.uid, COACH_NEW_TOUR)
+    closeFullTour(completed, empty)
+  }
+  useEffect(() => {
+    if (tourOpen && tourRequested) navigate('.', { replace: true, state: null })
+  }, [tourOpen, tourRequested, navigate])
+  const tourSteps = coachTourSteps(t, ownerName)
+  // Coaches who finished the walkthrough before Coach settings and the
+  // Tracking card existed get a short "what's new" instead, once.
+  const [newOpen, closeNew] = useFirstTour(COACH_NEW_TOUR, tourReady && !tourOpen && !!user && tourSeen(user.uid, 'coach'), false, { coach: true })
+
   const views = [
     ['attention', t('people.viewAttention')],
     ['review', t('people.viewReview')],
@@ -107,22 +155,36 @@ export default function People() {
 
   return (
     <div className="flex flex-col gap-5">
+      {tourOpen && <Tour steps={tourSteps} onClose={closeTour} />}
+      {newOpen && !tourOpen && <Tour steps={coachNewSteps(t)} onClose={closeNew} />}
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <div className="eyebrow mb-1">{t('people.admin')}</div>
+        <div data-tour="coach-own">
+          <div className="eyebrow mb-1">{t(isOwner ? 'people.admin' : 'people.coachBadge')}</div>
           <h1 className="text-3xl">{t('people.title')}</h1>
           <p className="text-chalkdim text-sm mt-1 flex items-center gap-1.5 flex-wrap">
             {t('people.subtitle')}
             <InfoTip text={t('people.dotTip')} />
           </p>
+          {myLimit?.trainee_limit != null && (
+            <p data-tour="coach-places" className="text-chalkdim text-sm mt-1 num">{t('people.myLimit')(myLimit.trainees, myLimit.trainee_limit)}</p>
+          )}
         </div>
-        <div className="flex gap-2">
-          <Button variant="ghost" to="/errors">
-            <AlertTriangle size={16} /> {t('people.errorLogs')}
-          </Button>
-          <Button variant="brass" onClick={() => setInviting(true)}>
-            <UserPlus size={16} /> {t('people.inviteSomeone')}
-          </Button>
+        <div className="flex gap-2 flex-wrap">
+          <span data-tour="coach-settings" className="contents">
+            <Button variant="ghost" to="/coach-settings" aria-label={t('coachSettings.title')}>
+              <Settings size={16} /> <span className="hidden sm:inline">{t('coachSettings.title')}</span>
+            </Button>
+          </span>
+          {isOwner && (
+            <Button variant="ghost" to="/errors">
+              <AlertTriangle size={16} /> {t('people.errorLogs')}
+            </Button>
+          )}
+          <span data-tour="coach-invite" className="contents">
+            <Button variant="brass" onClick={() => setInviting(true)}>
+              <UserPlus size={16} /> {t('people.inviteSomeone')}
+            </Button>
+          </span>
         </div>
       </div>
 
@@ -182,17 +244,25 @@ export default function People() {
       <div className="flex flex-col gap-5 2xl:grid 2xl:grid-cols-[minmax(0,1fr)_300px] 2xl:items-start">
         <div className="flex flex-col gap-2">
           <div className="flex flex-col gap-2 lg:hidden">
-            {shown.map((p) => (
-              <TraineeRow key={p.id} p={p} today={today} t={t} />
+            {shown.map((p, i) => (
+              <span key={p.id} data-tour={i === 0 ? 'coach-trainee' : undefined} className="contents">
+                <TraineeRow p={p} today={today} t={t} />
+              </span>
             ))}
           </div>
-          {shown.length > 0 && <RosterTable rows={shown} today={today} t={t} />}
+          {shown.length > 0 && (
+            <span data-tour="coach-trainee" className="contents">
+              <RosterTable rows={shown} today={today} t={t} />
+            </span>
+          )}
           {trainees.length > 0 && shown.length === 0 && (
             <p className="text-chalkdim text-sm text-center py-6">{view === 'review' && !query ? t('people.nothingToReview') : t('people.noMatches')}</p>
           )}
         </div>
         {trainees.length > 0 && <SidePanel trainees={trainees} prs={recentPrs} today={today} t={t} />}
       </div>
+
+      {isOwner && <CoachesCard onChanged={() => setReload((r) => r + 1)} />}
 
       {me && (
         <Card className="flex items-center justify-between gap-3">
@@ -208,6 +278,193 @@ export default function People() {
 
       {inviting && <InviteModal onClose={() => setInviting(false)} t={t} />}
     </div>
+  )
+}
+
+// The coach walkthrough's cards, with the owner's name filled in. Steps
+// with a target light that part of this page and are skipped when it isn't
+// shown (no limit set, no trainees yet); the rest are plain cards.
+export function coachTourSteps(t, ownerName) {
+  const owner = ownerName || t('tour.coach.ownerFallback')
+  const fill = (key) => {
+    const s = t(`tour.coach.${key}`)
+    const f = (x) => x.replace(/\{owner\}/g, owner)
+    return { eyebrow: f(s.eyebrow), title: f(s.title), body: f(s.body) }
+  }
+  return [
+    { target: 'coach-own', ...fill('own') },
+    { target: 'coach-settings', ...fill('settings') },
+    { target: 'coach-invite', ...fill('invite') },
+    { target: 'coach-places', ...fill('places') },
+    { target: 'coach-trainee', ...fill('trainee') },
+    fill('setup'),
+    fill('routines'),
+    fill('remove'),
+    fill('owner'),
+  ]
+}
+
+// The short "what's new" for coaches who had the walkthrough before Coach
+// settings and the Tracking card arrived.
+export function coachNewSteps(t) {
+  const eyebrow = t('tour.coach.newEyebrow')
+  const pick = (key) => {
+    const s = t(`tour.coach.${key}`)
+    return { eyebrow, title: s.title, body: s.body }
+  }
+  return [{ target: 'coach-settings', ...pick('settings') }, pick('setup')]
+}
+
+// Owner only: the independent coaches. Names, emails and how many trainees
+// they have, never the trainees themselves.
+function CoachesCard({ onChanged }) {
+  const { t } = useLanguage()
+  const { toast, confirm } = useFeedback()
+  const [coaches, setCoaches] = useState(null)
+  // The coach whose trainee limit is being edited, and the typed value.
+  const [editing, setEditing] = useState(null)
+
+  async function saveLimit(c) {
+    const raw = String(editing?.value ?? '').trim()
+    const limit = raw === '' ? null : Number(raw)
+    if (limit != null && (!Number.isInteger(limit) || limit < 0)) {
+      toast(t('people.limitInvalid'), 'error')
+      return
+    }
+    const { error } = await supabase.rpc('set_coach_limit', { p_coach: c.id, p_limit: limit })
+    if (error) {
+      console.error(error)
+      toast(t('people.coachError'), 'error')
+      return
+    }
+    setEditing(null)
+    toast(limit == null ? t('people.limitCleared', { name: c.name || c.email }) : t('people.limitSaved', { name: c.name || c.email, n: limit }))
+    load()
+  }
+
+  async function setRemovedCoach(c, removed) {
+    const name = c.name || c.email
+    const ok = await confirm(
+      removed
+        ? { title: t('people.removeAppTitle', { name }), body: t('people.removeAppCoachBody', { name }), confirmLabel: t('people.removeApp'), danger: true }
+        : { title: t('people.restoreTitle', { name }), body: t('people.restoreCoachBody', { name }), confirmLabel: t('people.restore') }
+    )
+    if (!ok) return
+    const { error } = await supabase.rpc('set_removed', { p_person: c.id, p_removed: removed })
+    if (error) {
+      console.error(error)
+      toast(t('people.coachError'), 'error')
+      return
+    }
+    toast(t(removed ? 'people.removedApp' : 'people.restored', { name }))
+    load()
+  }
+
+  async function load() {
+    const { data, error } = await supabase.rpc('list_coaches')
+    if (error) return console.error(error)
+    setCoaches(data || [])
+  }
+  useEffect(() => {
+    load()
+  }, [])
+
+  async function setFrozen(c, frozen) {
+    const name = c.name || c.email
+    const ok = await confirm(
+      frozen
+        ? { title: t('people.freezeTitle', { name }), body: t('people.freezeBody', { name }), confirmLabel: t('people.freezeCoach'), danger: true }
+        : { title: t('people.unfreezeTitle', { name }), body: t('people.unfreezeBody', { name }), confirmLabel: t('people.unfreezeCoach') }
+    )
+    if (!ok) return
+    const { error } = await supabase.rpc('set_coach_frozen', { p_coach: c.id, p_frozen: frozen })
+    if (error) {
+      console.error(error)
+      toast(t('people.coachError'), 'error')
+      return
+    }
+    toast(t(frozen ? 'people.coachFrozen' : 'people.coachUnfrozen', { name }))
+    load()
+  }
+
+  // Only a coach with no trainees left can stop being a coach.
+  async function remove(c) {
+    const name = c.name || c.email
+    if (!(await confirm({ title: t('people.removeCoachTitle', { name }), body: t('people.removeCoachBody'), confirmLabel: t('people.removeCoach'), danger: true }))) return
+    const { error } = await supabase.rpc('set_coach', { p_person: c.id, p_on: false })
+    if (error) {
+      console.error(error)
+      toast(t(/COACH_HAS_TRAINEES/.test(error.message || '') ? 'people.coachHasTrainees' : 'people.coachError'), 'error')
+      load()
+      return
+    }
+    toast(t('people.coachRemoved', { name }))
+    load()
+    onChanged()
+  }
+
+  if (coaches == null) return null
+  return (
+    <Card className="flex flex-col gap-2">
+      <h2 className="text-lg">{t('people.coachesTitle')}</h2>
+      {coaches.length === 0 && <p className="text-chalkdim text-sm">{t('people.coachesHint')}</p>}
+      {coaches.map((c) => (
+        <div key={c.id} className="flex flex-col gap-1 py-2 border-t border-line first-of-type:border-t-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <p className="truncate min-w-0">{c.name || c.email}</p>
+            {c.frozen && <Badge>{t('people.frozenBadge')}</Badge>}
+            {c.removed && <Badge>{t('people.removedBadge')}</Badge>}
+          </div>
+          {c.name && <p className="text-xs text-chalkdim truncate">{c.email}</p>}
+          <p className="text-xs text-chalkdim num">
+            {c.trainee_limit != null ? t('people.coachTraineesOf')(c.trainees || 0, c.trainee_limit) : t('people.coachTrainees')(c.trainees || 0)}
+          </p>
+          {editing?.id === c.id ? (
+            <div className="flex items-center gap-3 mt-1">
+              <input
+                type="number"
+                min="0"
+                inputMode="numeric"
+                className="w-28"
+                value={editing.value}
+                placeholder={t('people.limitNone')}
+                aria-label={t('people.limitLabel')}
+                onChange={(e) => setEditing({ id: c.id, value: e.target.value })}
+              />
+              <button onClick={() => saveLimit(c)} className="text-sm text-brass">{t('people.limitSave')}</button>
+              <button onClick={() => setEditing(null)} className="text-sm text-chalkdim">{t('people.limitCancel')}</button>
+            </div>
+          ) : (
+            <div className="flex gap-x-4 gap-y-1 flex-wrap mt-1">
+              {!c.removed && (
+                <button onClick={() => setEditing({ id: c.id, value: c.trainee_limit ?? '' })} className="text-sm text-chalkdim">
+                  {t('people.limitButton')}
+                </button>
+              )}
+              {c.frozen ? (
+                <button onClick={() => setFrozen(c, false)} className="text-sm text-chalkdim">
+                  {t('people.unfreezeCoach')}
+                </button>
+              ) : (
+                c.trainees > 0 && (
+                  <button onClick={() => setFrozen(c, true)} className="text-sm text-chalkdim">
+                    {t('people.freezeCoach')}
+                  </button>
+                )
+              )}
+              <button onClick={() => setRemovedCoach(c, !c.removed)} className="text-sm text-chalkdim">
+                {c.removed ? t('people.restore') : t('people.removeApp')}
+              </button>
+              {!c.trainees && (
+                <button onClick={() => remove(c)} className="text-sm text-chalkdim">
+                  {t('people.removeCoach')}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </Card>
   )
 }
 
@@ -280,6 +537,8 @@ function TraineeRow({ p, today, t }) {
         <div className="flex items-center gap-2 min-w-0">
           <p className="truncate min-w-0">{p.full_name || p.email}</p>
           {p.is_admin && <Badge>{t('people.adminBadge')}</Badge>}
+          {p.is_coach && <Badge>{t('people.coachBadge')}</Badge>}
+          {p.removed && <Badge>{t('people.removedBadge')}</Badge>}
           {p.unread > 0 && <UnreadBadge n={p.unread} t={t} />}
         </div>
         <p className="text-xs text-chalkdim num">{stats.join(' · ')}</p>
@@ -299,7 +558,7 @@ function TraineeRow({ p, today, t }) {
 
 function UnreadBadge({ n, t }) {
   return (
-    <span role="img" aria-label={t('messages.unreadLabel')(n)} title={t('messages.unreadLabel')(n)} className="shrink-0 inline-flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 font-medium bg-accent text-ink num">
+    <span role="img" aria-label={t('messages.unreadLabel')(n)} title={t('messages.unreadLabel')(n)} className="shrink-0 inline-flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 font-medium bg-accent text-onaccent num">
       <MessageSquare size={11} aria-hidden="true" /> {n}
     </span>
   )
@@ -308,6 +567,9 @@ function UnreadBadge({ n, t }) {
 function InviteModal({ onClose, t }) {
   useScrollLock(true)
   const { toast } = useFeedback()
+  const { profile } = useAdmin()
+  const [coachSettings] = useCoachSettings(profile?.id)
+  const ownText = coachSettings?.settings.invite_text?.trim()
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)
@@ -327,12 +589,34 @@ function InviteModal({ onClose, t }) {
     return `${base}${query ? `?${query}` : ''}#/`
   })()
 
-  const message = t('people.inviteMessage')(name, link)
+  // The coach's own wording (Coach settings) when they wrote one.
+  const message = ownText
+    ? (/\{link\}/.test(ownText) ? ownText : `${ownText}\n${'{link}'}`).replace(/\{name\}/g, () => name).replace(/\{link\}/g, () => link)
+    : t('people.inviteMessage')(name, link)
+
+  // Records the invite first. Another coach's live invite for this email
+  // stops here, since signing up would land them with that coach. Anything
+  // else is best effort: the link still works if invite-only is off.
+  async function invite() {
+    try {
+      await recordInvite(email)
+      return true
+    } catch (err) {
+      console.error(err)
+      if (String(err?.message || '').includes('INVITED_BY_OTHER_COACH')) {
+        toast(t('people.invitedByOther'), 'error')
+        return false
+      }
+      if (String(err?.message || '').includes('COACH_LIMIT_REACHED')) {
+        toast(t('people.limitReached'), 'error')
+        return false
+      }
+      return true
+    }
+  }
 
   async function copy(text, setCopied) {
-    // Best effort: the link still works today if this fails, as long as
-    // invite-only sign-up hasn't been switched on.
-    recordInvite(email).catch((err) => console.error(err))
+    if (!(await invite())) return
     try {
       await navigator.clipboard.writeText(text)
       setCopied(true)
@@ -347,7 +631,7 @@ function InviteModal({ onClose, t }) {
   // copy-and-paste step. Only offered where the browser supports it.
   const canShare = typeof navigator !== 'undefined' && !!navigator.share
   async function share() {
-    recordInvite(email).catch((err) => console.error(err))
+    if (!(await invite())) return
     try {
       await navigator.share({ text: message })
     } catch (err) {
