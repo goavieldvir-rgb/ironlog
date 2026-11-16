@@ -40,7 +40,7 @@ export const CLIPS = {
   'lying-leg-curl': { v: 'd1bce236' },
   'machine-lateral-raise': { v: 'dc2a6d27' },
   'machine-shoulder-press': { v: 'ed6a98a5', t: '1f10d399' },
-  'machine-single-arm-row': { v: 'b8d2a8bb' },
+  'machine-single-arm-row': { v: '34a78647' },
   'one-arm-dumbbell-row': { v: 'afcce322', t: 'd79f7385' },
   'parallel-bar-dips': { v: '59f678d0', t: 'e727f3ee' },
   'pec-deck-fly-machine': { v: 'af62ecef' },
