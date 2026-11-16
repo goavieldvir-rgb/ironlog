@@ -58,8 +58,10 @@ export async function getLogTotalsRange(uid, from, to) {
   )
 }
 
-export function kcalOnTarget(kcal, target) {
-  return target > 0 && Math.abs(kcal - target) <= target * KCAL_BAND
+// band: the coach's on-target range in % (targets.kcal_band), 10 by default.
+export function kcalOnTarget(kcal, target, band) {
+  const b = band > 0 ? band / 100 : KCAL_BAND
+  return target > 0 && Math.abs(kcal - target) <= target * b
 }
 
 // days: one row per calendar day of the period, with the day's totals.
