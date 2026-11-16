@@ -25,10 +25,10 @@ import { workingSets } from '../lib/warmup.js'
 import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
 import { currentStreak } from '../lib/streak.js'
 import { cardioSummary, formatPace, formatSpeed, formatDistance, toKm } from '../lib/cardio.js'
-import { ACCENT, CHALK, CHALKDIM, MUTED, GRID, SURFACE } from '../theme.js'
+import { accentNow, CHALK, CHALKDIM, MUTED, GRID, SURFACE } from '../theme.js'
 import { setVolume } from '../lib/bodyweight.js'
 
-const COLORS = { iron: ACCENT, brass: ACCENT, cardio: MUTED, chalk: CHALK, chalkdim: CHALKDIM, grid: GRID }
+const COLORS = { get iron() { return accentNow() }, get brass() { return accentNow() }, cardio: MUTED, chalk: CHALK, chalkdim: CHALKDIM, grid: GRID }
 
 
 function shortDate(lang, iso) {
@@ -511,7 +511,7 @@ export default function Stats() {
                       strokeWidth={2}
                       dot={(p) =>
                         p.index === selectedProgress.points.length - 1 ? (
-                          <circle key={p.key} cx={p.cx} cy={p.cy} r={5} fill={ACCENT} />
+                          <circle key={p.key} cx={p.cx} cy={p.cy} r={5} fill={accentNow()} />
                         ) : (
                           <circle key={p.key} cx={p.cx} cy={p.cy} r={2.5} fill={COLORS.chalkdim} />
                         )
@@ -619,7 +619,7 @@ function WeeklyChart({ title, caption, data, dataKey, yWidth, allowDecimals = tr
             <Tooltip {...TOOLTIP} cursor={{ fill: 'rgba(255,255,255,0.04)' }} formatter={tooltipFormatter} />
             <Bar dataKey={dataKey} radius={[6, 6, 2, 2]} minPointSize={2}>
               {data.map((d, i) => (
-                <Cell key={d.week} fill={i === last ? ACCENT : MUTED} />
+                <Cell key={d.week} fill={i === last ? accentNow() : MUTED} />
               ))}
             </Bar>
           </BarChart>

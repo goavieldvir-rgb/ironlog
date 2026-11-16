@@ -23,9 +23,9 @@ import { Button, Card, EmptyState, LoadError, Field } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import MeasurementTracker from './MeasurementTracker.jsx'
 import ProgressPhotos from './ProgressPhotos.jsx'
-import { ACCENT, CHALK, CHALKDIM, MUTED, GRID, SURFACE } from '../theme.js'
+import { accentNow, CHALK, CHALKDIM, MUTED, GRID, SURFACE } from '../theme.js'
 
-const COLORS = { iron: ACCENT, chalk: CHALK, chalkdim: CHALKDIM, grid: GRID }
+const COLORS = { get iron() { return accentNow() }, chalk: CHALK, chalkdim: CHALKDIM, grid: GRID }
 
 // If someone logs a few entries in kg and later switches to lb (or vice
 // versa) — easy to do by accident since the unit is just a dropdown on

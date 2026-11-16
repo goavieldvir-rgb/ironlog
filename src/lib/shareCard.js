@@ -17,13 +17,17 @@
 // because Instagram puts its own buttons at the top and bottom. Photos are
 // only ever drawn on this phone.
 import tailwind from '../../tailwind.config.js'
-import { ACCENT } from '../theme.js'
+import { ACCENT, accentNow } from '../theme.js'
 
 const W = 1080
 const H = 1920
 const M = 96 // side margin
 const T = tailwind.theme.extend.colors
 const C = { ink: T.ink, chalk: T.chalk, dim: T.chalkdim, line: T.line, accent: ACCENT }
+// The wordmark on the card. renderShareCard sets both for one drawing: the
+// accent follows the coach's color, and `brandName` (when given) replaces
+// "Ironlog" with the coach's own name.
+let WORDMARK = 'Ironlog'
 
 // The app's own pair: Geist for Latin and numbers, IBM Plex Sans Hebrew for
 // Hebrew letters (the browser picks per letter, so mixed names just work).
@@ -151,6 +155,12 @@ function setFont(ctx, weight, px, em = 0) {
   if ('letterSpacing' in ctx) ctx.letterSpacing = `${(px * em).toFixed(2)}px`
 }
 
+function luminance(hex) {
+  const n = parseInt(hex.slice(1), 16)
+  const ch = (v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+  return 0.2126 * ch((n >> 16) & 255) + 0.7152 * ch((n >> 8) & 255) + 0.0722 * ch(n & 255)
+}
+
 // '#FF5B3A' + alpha -> 'rgba(255,91,58,a)'
 function tint(hex, a) {
   const n = parseInt(hex.slice(1), 16)
@@ -223,7 +233,7 @@ function drawValue(ctx, f, x, y, { rtl, gap, color, unitColor }) {
   const { st, size, unitPx } = f
   ctx.direction = 'ltr'
   ctx.textAlign = rtl ? 'right' : 'left'
-  ctx.fillStyle = st.accent ? C.accent : color
+  ctx.fillStyle = st.accent ? C.accentNum || C.accent : color
   setFont(ctx, 600, size, -0.04)
   put(ctx, st.value, x, y)
   if (!st.unit) return
@@ -287,7 +297,7 @@ function drawName(ctx, nm, x, y, { rtl, color }) {
 // The wordmark: a small accent dot and the name.
 function drawBrand(ctx, x, y, { rtl, color, size = 44 }) {
   setFont(ctx, 600, size, -0.02)
-  const tw = ctx.measureText('Ironlog').width
+  const tw = ctx.measureText(WORDMARK).width
   const d = Math.round(size * 0.3) // dot diameter
   const gap = Math.round(size * 0.24)
   const total = d + gap + tw
@@ -302,11 +312,13 @@ function drawBrand(ctx, x, y, { rtl, color, size = 44 }) {
       ctx.fill()
       ctx.restore()
     }
-    ctx.direction = 'ltr'
-    ctx.textAlign = 'left'
+    // A Hebrew name reads right to left; it still starts after the dot.
+    const he = /[\u0590-\u05FF]/.test(WORDMARK)
+    ctx.direction = he ? 'rtl' : 'ltr'
+    ctx.textAlign = he ? 'right' : 'left'
     ctx.fillStyle = color
     setFont(ctx, 600, size, -0.02)
-    put(ctx, 'Ironlog', left + d + gap, y)
+    put(ctx, WORDMARK, he ? left + d + gap + tw : left + d + gap, y)
   })
 }
 
@@ -510,7 +522,15 @@ function drawPlain(ctx, summary, { rtl, labels }) {
 
 // variant: 'plain' (default), 'photo' (needs `photo`) or 'sticker'.
 // labels: { eyebrow, totalVolume, duration, volume, distance, sets, streak, weekUnit, min, records }
-export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo = null }) {
+// accent: a #RRGGBB color, else the app's accent right now (the coach's).
+// brandName: shown in place of "Ironlog" when given.
+export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo = null, accent = null, brandName = null }) {
+  C.accent = /^#[0-9A-Fa-f]{6}$/.test(accent || '') ? accent : accentNow()
+  WORDMARK = (brandName || '').trim().slice(0, 30) || 'Ironlog'
+  // On a photo or a see-through sticker the card can land on something
+  // light. A coach color lighter than the usual accent (gold, lime...) would
+  // fade there, so the records number goes white like the units.
+  C.accentNum = (variant === 'sticker' || (variant === 'photo' && photo)) && luminance(C.accent) > luminance(ACCENT) ? '#FFFFFF' : null
   const canvas = document.createElement('canvas')
   canvas.width = W
   const ctx = canvas.getContext('2d')
@@ -534,6 +554,9 @@ export function renderShareCard(summary, { rtl, labels, variant = 'plain', photo
   } finally {
     FX = null
     PASS = 'fill'
+    C.accent = ACCENT
+    C.accentNum = null
+    WORDMARK = 'Ironlog'
   }
 }
 

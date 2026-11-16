@@ -49,7 +49,7 @@ import {
   useOwnerName,
 } from '../lib/coach.js'
 import { sessionTitle } from '../lib/names.js'
-import { ACCENT, CHALK, CHALKDIM, MUTED, SURFACE } from '../theme.js'
+import { accentNow, CHALK, CHALKDIM, MUTED, SURFACE } from '../theme.js'
 
 function shortDate(lang, iso) {
   return fmtDate(lang, new Date(iso + 'T00:00:00'), { month: 'short', day: 'numeric' })
@@ -378,7 +378,7 @@ export default function PersonDetail() {
                   {derived.planned && <ReferenceLine y={derived.planned} stroke={CHALKDIM} strokeDasharray="3 3" />}
                   <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={28}>
                     {derived.weeks.map((w, i) => (
-                      <Cell key={w.week} fill={i === derived.weeks.length - 1 ? ACCENT : derived.planned && w.count >= derived.planned ? CHALKDIM : MUTED} />
+                      <Cell key={w.week} fill={i === derived.weeks.length - 1 ? accentNow() : derived.planned && w.count >= derived.planned ? CHALKDIM : MUTED} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -411,7 +411,7 @@ export default function PersonDetail() {
                     />
                     <Tooltip contentStyle={{ background: SURFACE, border: 0, borderRadius: 12, fontSize: 13 }} labelStyle={{ color: CHALK }} formatter={(v) => [v, t('person.weight')]} />
                     {data.goal?.target_weight && <ReferenceLine y={Number(data.goal.target_weight)} stroke={CHALKDIM} strokeDasharray="3 3" />}
-                    <Line type="monotone" dataKey="weight" stroke={ACCENT} strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="weight" stroke={accentNow()} strokeWidth={2} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -900,7 +900,7 @@ function MeasurementCharts({ entries, types, today, t, lang }) {
               <XAxis dataKey="label" stroke={CHALKDIM} fontSize={10} tickLine={false} axisLine={false} minTickGap={24} reversed={lang === 'he'} />
               <YAxis hide domain={[(min) => Math.floor(min - 1), (max) => Math.ceil(max + 1)]} />
               <Tooltip contentStyle={{ background: SURFACE, border: 0, borderRadius: 12, fontSize: 13 }} labelStyle={{ color: CHALK }} formatter={(v) => [`${v}${unit}`, name]} />
-              <Line type="monotone" dataKey="v" stroke={ACCENT} strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="v" stroke={accentNow()} strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
