@@ -2,7 +2,7 @@
 // slug -> { v: version of the clip and its still, t: version of the technique-tips clip }
 export const CLIPS = {
   'ab-wheel-rollout': { v: '3a51759e', t: '5c088581' },
-  'arnold-press': { v: '7ab7f8ff', t: 'dd820c25' },
+  'arnold-press': { v: '2089ff33', t: 'dd820c25' },
   'assault-air-bike': { v: 'bc0f1c89', t: '905ff888' },
   'assisted-dips': { v: 'd4794378', t: 'f88e08b9' },
   'assisted-pull-up': { v: 'cf31c7b0', t: '4f0c8d86' },
