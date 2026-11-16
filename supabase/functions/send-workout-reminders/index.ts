@@ -98,8 +98,20 @@ async function runReminders() {
   const { data: subs, error } = await db.from('push_subscriptions').select('*')
   if (error) return json({ error: error.message }, 500)
 
+  // A coach can set a trainee's time and weekdays (trainee_settings, from
+  // supabase-coach-reminders.sql); they win over the phone's own choice.
+  // Missing table or columns: everyone keeps their own.
+  const { data: overrideRows } = await db.from('trainee_settings').select('user_id, remind_time, remind_days')
+  const overrides = new Map((overrideRows || []).map((o: any) => [o.user_id, o]))
+
   let sent = 0, skipped = 0, removed = 0, failed = 0
-  for (const s of subs || []) {
+  for (const sub of subs || []) {
+    const o: any = overrides.get(sub.user_id)
+    const s = {
+      ...sub,
+      remind_time: o?.remind_time || sub.remind_time,
+      remind_days: Array.isArray(o?.remind_days) && o.remind_days.length ? o.remind_days : sub.remind_days,
+    }
     try {
       const now = localParts(s.tz)
       // Chosen weekdays, read in the phone's own tz. Null/missing (column not

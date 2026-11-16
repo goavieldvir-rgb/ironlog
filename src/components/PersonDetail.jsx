@@ -978,6 +978,19 @@ function TrackingSettings({ person, name, setup, coachId, t, lang, confirm, toas
     onTraineeSettings(next)
   }
 
+  async function saveReminder(patch) {
+    const next = { ...(traineeSettings || {}), ...patch }
+    const { error } = await supabase
+      .from('trainee_settings')
+      .upsert({ user_id: person.id, ...patch, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+    if (error) {
+      console.error(error)
+      toast(error.code === 'PGRST204' ? t('measure.reminderNotReady') : t('feedback.saveFailed'), 'error')
+      return
+    }
+    onTraineeSettings(next)
+  }
+
   async function saveQuiet() {
     const n = Math.min(60, Math.max(1, Math.round(Number(quiet)) || 5))
     setQuiet(String(n))
@@ -1024,6 +1037,7 @@ function TrackingSettings({ person, name, setup, coachId, t, lang, confirm, toas
               {t(`measure.${label}`)}
             </label>
           ))}
+          <ReminderControl settings={traineeSettings} lang={lang} t={t} onSave={saveReminder} />
         </div>
       )}
 
@@ -1156,6 +1170,59 @@ function Checkins({ list, t, lang }) {
         })}
       </ul>
     </Section>
+  )
+}
+
+// The trainee's daily workout reminder, set by the coach: a time and
+// weekdays that win over what the trainee picked on their phone. Empty
+// keeps the trainee's own choice.
+function ReminderControl({ settings, lang, t, onSave }) {
+  const time = settings?.remind_time ? String(settings.remind_time).slice(0, 5) : ''
+  const days = Array.isArray(settings?.remind_days) ? settings.remind_days.map(Number) : []
+  const dayNames = [0, 1, 2, 3, 4, 5, 6].map((d) =>
+    new Intl.DateTimeFormat(lang === 'he' ? 'he-IL' : 'en-US', { weekday: 'narrow', timeZone: 'UTC' }).format(new Date(Date.UTC(2023, 0, 1 + d))),
+  )
+  return (
+    <div className="flex flex-col gap-2 mt-2">
+      <div className="flex items-center gap-2 flex-wrap text-sm">
+        <span>{t('measure.reminderLabel')}</span>
+        <input
+          type="time"
+          value={time}
+          onChange={(e) => onSave({ remind_time: e.target.value || null, ...(e.target.value ? {} : { remind_days: null }) })}
+          className="w-28"
+          aria-label={t('measure.reminderLabel')}
+        />
+        {time && (
+          <button type="button" onClick={() => onSave({ remind_time: null, remind_days: null })} className="text-xs text-chalkdim underline min-h-9">
+            {t('measure.reminderClear')}
+          </button>
+        )}
+      </div>
+      {time && (
+        <div className="flex gap-1 flex-wrap" aria-label={t('measure.reminderDays')}>
+          {dayNames.map((n, d) => {
+            const on = days.length === 0 || days.includes(d)
+            return (
+              <button
+                key={d}
+                type="button"
+                aria-pressed={on}
+                onClick={() => {
+                  const base = days.length ? days : [0, 1, 2, 3, 4, 5, 6]
+                  const next = on ? base.filter((x) => x !== d) : [...base, d].sort()
+                  if (next.length) onSave({ remind_days: next.length === 7 ? null : next })
+                }}
+                className={`w-9 h-9 rounded-full text-xs ${on ? 'bg-accent text-ink' : 'bg-surface2 text-chalkdim'}`}
+              >
+                {n}
+              </button>
+            )
+          })}
+        </div>
+      )}
+      <p className="text-xs text-chalkdim">{time ? t('measure.reminderSetHint') : t('measure.reminderHint')}</p>
+    </div>
   )
 }
 
