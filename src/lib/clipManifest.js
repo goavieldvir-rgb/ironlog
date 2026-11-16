@@ -23,7 +23,7 @@ export const CLIPS = {
   'concentration-curl': { v: '9b16db10' },
   'dumbbell-biceps-curl': { v: 'ffdf54af' },
   'dumbbell-lateral-raise': { v: 'b98622b5' },
-  'dumbbell-overhead-triceps-extension': { v: '20773ab2', t: 'bf98ec61' },
+  'dumbbell-overhead-triceps-extension': { v: 'e8115ca8', t: 'bf98ec61' },
   'elliptical-trainer': { v: '862c85d4', t: 'bd7b5159' },
   'ez-bar-curl': { v: '7e442d2c' },
   'hack-squat': { v: '27788169' },
