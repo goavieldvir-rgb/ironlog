@@ -97,7 +97,7 @@ export function periodStats({ from, to, today, foodRows, waterRows, targets, wat
     loggedDays: fed.length,
     avg: { kcal: avg(fed, 'kcal'), protein: avg(fed, 'protein'), carbs: avg(fed, 'carbs'), fat: avg(fed, 'fat') },
     proteinHits: tp > 0 ? fed.filter((d) => d.protein >= tp).length : null,
-    kcalHits: tk > 0 ? fed.filter((d) => kcalOnTarget(d.kcal, tk)).length : null,
+    kcalHits: tk > 0 ? fed.filter((d) => kcalOnTarget(d.kcal, tk, targets?.kcal_band)).length : null,
     waterDays: watered.length,
     waterAvg: avg(watered, 'ml'),
     waterHits: waterGoal > 0 ? watered.filter((d) => d.ml >= waterGoal).length : null,

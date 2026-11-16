@@ -564,7 +564,7 @@ function InviteModal({ onClose, t }) {
 
   // The coach's own wording (Coach settings) when they wrote one.
   const message = ownText
-    ? (/\{link\}/.test(ownText) ? ownText : `${ownText}\n${'{link}'}`).replace(/\{name\}/g, name).replace(/\{link\}/g, link)
+    ? (/\{link\}/.test(ownText) ? ownText : `${ownText}\n${'{link}'}`).replace(/\{name\}/g, () => name).replace(/\{link\}/g, () => link)
     : t('people.inviteMessage')(name, link)
 
   // Records the invite first. Another coach's live invite for this email

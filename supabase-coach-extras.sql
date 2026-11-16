@@ -46,7 +46,10 @@ stable
 security definer
 set search_path = ''
 as $$
-  select not coalesce((select messages_off from public.trainee_settings where user_id = p_trainee), false);
+  -- Only answers for the trainee or their coach; anyone else gets true (the
+  -- other insert policies still decide), so the flag never leaks.
+  select not ((auth.uid() = p_trainee or public.can_coach(p_trainee))
+    and coalesce((select messages_off from public.trainee_settings where user_id = p_trainee), false));
 $$;
 revoke execute on function public.messages_allowed(uuid) from public, anon;
 grant execute on function public.messages_allowed(uuid) to authenticated;

@@ -200,7 +200,7 @@ function OnTarget({ stats, targets, waterGoal }) {
   const { t } = useLanguage()
   const rows = [
     ['protein', t('nutrition.protein'), t('nutrition.ruleProtein'), stats.proteinHits, stats.loggedDays],
-    ['kcal', t('nutrition.calories'), t('nutrition.ruleKcal'), stats.kcalHits, stats.loggedDays],
+    ['kcal', t('nutrition.calories'), t('nutrition.ruleKcal', { n: targets?.kcal_band > 0 ? targets.kcal_band : 10 }), stats.kcalHits, stats.loggedDays],
   ]
   if (stats.waterDays > 0) rows.push(['water', t('water.title'), t('nutrition.ruleWater'), waterGoal ? stats.waterHits : null, stats.waterDays])
   return (
