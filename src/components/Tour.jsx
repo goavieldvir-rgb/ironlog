@@ -30,6 +30,10 @@ export function isNewAccount(user) {
   return !!user?.createdAt && Date.now() - new Date(user.createdAt).getTime() < 14 * 864e5
 }
 
+// The coach "what's new" tour. Bump the name when there is something new
+// to show coaches who already had the coach walkthrough.
+export const COACH_NEW_TOUR = 'coach-new-2026-11'
+
 export function tourSeen(uid, name) {
   try { return localStorage.getItem(TOUR_KEY(uid, name)) === 'done' } catch { return true }
 }

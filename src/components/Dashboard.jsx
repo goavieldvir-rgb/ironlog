@@ -15,7 +15,7 @@ import { Button, Card, LoadError, FeedbackDot } from './ui.jsx'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import WeeklySchedule from './WeeklySchedule.jsx'
 import CheckinCard from './CheckinCard.jsx'
-import Tour, { useFirstTour, tourSeen, markTourSeen } from './Tour.jsx'
+import Tour, { useFirstTour, tourSeen, markTourSeen, COACH_NEW_TOUR } from './Tour.jsx'
 import { useOwnerName } from '../lib/coach.js'
 import { itemTarget } from './RoutineView.jsx'
 import { useMessagesState } from '../lib/messages.js'
@@ -712,6 +712,7 @@ function CoachWelcome() {
           variant="ghost"
           onClick={() => {
             markTourSeen(user.uid, 'coach')
+            markTourSeen(user.uid, COACH_NEW_TOUR)
             setHidden(true)
           }}
         >
