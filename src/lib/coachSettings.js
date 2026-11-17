@@ -20,6 +20,8 @@ export const COACH_DEFAULTS = {
   brand_logo: null,
   // Trainees this coach turned off in Needs attention (supabase-attention-off.sql).
   attention_off: [],
+  // Trainees this coach marked as priority (same script): shown first, with a star.
+  priority: [],
 }
 
 export const TASK_KINDS = ['quiet', 'checkin', 'weigh', 'food', 'birthday', 'welcome']
@@ -34,7 +36,7 @@ export async function fetchCoachSettings(coachId) {
   }
   // Before any row exists, ask whether the newer columns are there.
   const has = async (col) => (data ? col in data : !(await supabase.from('coach_settings').select(col).limit(0)).error)
-  const [prefsAvailable, extrasAvailable, checkinAvailable, brandAvailable, attentionAvailable] = await Promise.all([has('pr_alerts'), has('snippets'), has('checkin_questions'), has('brand_color'), has('attention_off')])
+  const [prefsAvailable, extrasAvailable, checkinAvailable, brandAvailable, attentionAvailable] = await Promise.all([has('pr_alerts'), has('snippets'), has('checkin_questions'), has('brand_color'), has('priority')])
   return { settings: { ...COACH_DEFAULTS, ...(data || {}) }, available: true, prefsAvailable, extrasAvailable, checkinAvailable, brandAvailable, attentionAvailable }
 }
 
