@@ -10,7 +10,7 @@ import { Button, Card } from './ui.jsx'
 // The coach's to-do list at the top of People: things worth a word with a
 // trainee (made each morning by supabase-coach-tasks.sql) and tasks the coach
 // writes. Ticking one off moves it to "Done", where it can be undone for a week.
-export default function CoachTasks({ trainees, today }) {
+export default function CoachTasks({ trainees, today, attentionOff }) {
   const { t, lang } = useLanguage()
   const { toast, confirm } = useFeedback()
   const [tasks, setTasks] = useState(null)
@@ -37,8 +37,11 @@ export default function CoachTasks({ trainees, today }) {
   }, [today, attempt])
 
   const nameOf = useMemo(() => Object.fromEntries(trainees.map((p) => [p.id, p.full_name || p.email])), [trainees])
-  const open = (tasks || []).filter((x) => !x.done_at)
-  const done = (tasks || []).filter((x) => x.done_at).sort((a, b) => b.done_at.localeCompare(a.done_at))
+  // Automatic items about a trainee the coach turned off in Needs attention
+  // are hidden; tasks the coach wrote always show.
+  const visible = (tasks || []).filter((x) => x.kind === 'custom' || !x.trainee_id || !attentionOff?.has(x.trainee_id))
+  const open = visible.filter((x) => !x.done_at)
+  const done = visible.filter((x) => x.done_at).sort((a, b) => b.done_at.localeCompare(a.done_at))
 
   const replace = (row) => setTasks((list) => list.map((x) => (x.id === row.id ? row : x)))
 
