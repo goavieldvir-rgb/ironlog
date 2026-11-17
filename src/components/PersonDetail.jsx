@@ -460,7 +460,7 @@ export default function PersonDetail() {
               action={<GiveRoutine personId={p.id} t={t} onGiven={() => setReload((r) => r + 1)} />}
             >
               {data.routines.length > 0 && (
-                <RoutineListView routines={data.routines} t={t} onEdit={(r) => openAccount(`/routines/${r.id}/edit`)} />
+                <RoutineListView routines={data.routines} exercises={data.exercises || []} lang={lang} t={t} onEdit={(r) => openAccount(`/routines/${r.id}/edit`)} />
               )}
             </Section>
           )}
@@ -712,8 +712,13 @@ function SessionList({ sessions, lang, t, today, onOpen, showReviewed }) {
 
 // The trainee's routines, read-only: tap one to see every exercise and its
 // target right here, without opening their account or the editor.
-function RoutineListView({ routines, t, onEdit }) {
+function RoutineListView({ routines, exercises, lang, t, onEdit }) {
   const [open, setOpen] = useState(null)
+  const byId = useMemo(() => Object.fromEntries(exercises.map((e) => [e.id, e])), [exercises])
+  const nameOf = (it) => {
+    const ex = byId[it.exerciseId]
+    return (lang === 'he' && ex?.name_he) || ex?.name || it.name
+  }
   return (
     <ul className="flex flex-col -my-1">
       {routines.map((r) => {
@@ -735,7 +740,7 @@ function RoutineListView({ routines, t, onEdit }) {
             </button>
             {isOpen && (
               <div className="pb-3">
-                <RoutineExercises routine={r} nameOf={(it) => it.name} t={t} compact />
+                <RoutineExercises routine={r} nameOf={nameOf} exerciseOf={(it) => byId[it.exerciseId]} t={t} compact />
                 <button onClick={() => onEdit(r)} className="mt-1 text-xs text-chalkdim hover:text-chalk inline-flex items-center gap-1 min-h-9">
                   <Pencil size={13} /> {t('person.editRoutine')}
                 </button>
