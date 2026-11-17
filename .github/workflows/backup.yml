@@ -12,6 +12,8 @@ on:
   schedule:
     - cron: '0 1 * * *' # 01:00 UTC, about 3-4 AM in Israel
   workflow_dispatch: # lets you run it by hand from the Actions tab
+  pull_request: # a pull request that changes this file tests it before merging
+    paths: ['.github/workflows/backup.yml']
 
 permissions:
   contents: read
