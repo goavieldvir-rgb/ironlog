@@ -7,7 +7,7 @@ complete, ordered record.
 |---|---|
 | `migrations/` | Every change to the database, numbered by date and time. The first file is the baseline: the whole live structure on the day this folder was set up. |
 | `schema.sql` | Generated snapshot of the live structure (tables, access rules, functions, triggers, indexes). Do not edit by hand. |
-| `cron-jobs.sql` | Generated list of the scheduled jobs on the live database. Do not edit by hand. |
+| `platform.sql` | Generated: what lives outside the public schema (photo storage bucket and its rules, the sign-up trigger, scheduled jobs). Do not edit by hand. |
 | `functions/` | Edge functions (`send-workout-reminders`, `purge-progress-photos`). |
 | `data/` | Food catalog source files, loaded once by hand. |
 | `legacy/` | The old hand-run scripts. History only, never run. |
