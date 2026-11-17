@@ -41,11 +41,35 @@ jobs:
         with:
           version: latest
 
+      # The secret is the link copied from Supabase with the password typed in.
+      # Passwords with symbols (/ # ? @ %) or leftover [ ] brackets would break
+      # that link, so the password part is cleaned up and encoded here.
+      - name: Tidy the connection link
+        env:
+          RAW_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          python3 - <<'PY'
+          import os, sys, urllib.parse as u
+          raw = os.environ['RAW_URL'].strip().strip('"').strip("'")
+          scheme, sep, rest = raw.partition('://')
+          if not sep or '@' not in rest:
+              sys.exit('SUPABASE_DB_URL is not a postgresql:// link with a password (see docs/backups.md)')
+          userinfo, host = rest.rsplit('@', 1)  # the last @ starts the server address
+          user, _, pw = userinfo.partition(':')
+          if pw.startswith('[') and pw.endswith(']'):
+              pw = pw[1:-1]
+          pw = u.quote(u.unquote(pw), safe='')
+          url = f'{scheme}://{user}:{pw}@{host}'
+          print(f'::add-mask::{pw}')  # never show it in the log
+          print(f'::add-mask::{url}')
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write(f'DB_URL={url}\n')
+          PY
+
       # Supabase's own recommended way to back up a project: three files.
       - name: Dump the database
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
+          SUPABASE_DB_URL="$DB_URL"
           mkdir -p backup
           supabase db dump --db-url "$SUPABASE_DB_URL" -f backup/roles.sql --role-only
           supabase db dump --db-url "$SUPABASE_DB_URL" -f backup/schema.sql

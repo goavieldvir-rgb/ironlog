@@ -19,7 +19,8 @@ restore. Instead, the **Nightly database backup** workflow
 
 1. **Copy the connection string.** Supabase dashboard → the Ironlog project →
    **Connect** (top of the page) → **Session pooler** → copy the URI. Replace
-   `[YOUR-PASSWORD]` with the database password. If you don't have it:
+   `[YOUR-PASSWORD]` with the database password. Any symbols in the
+   password are fine; the workflow encodes them. If you don't have it:
    **Project Settings → Database → Reset database password**. The app doesn't
    use this password, so resetting it doesn't affect anyone.
 2. **Make a passphrase.** A long one, for example five random words. Store it
