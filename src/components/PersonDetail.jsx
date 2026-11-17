@@ -19,6 +19,7 @@ import ProgressPhotos from './ProgressPhotos.jsx'
 import { MessageThread } from './Messages.jsx'
 import { useMessagesAvailable } from '../lib/messages.js'
 import { RoutineExercises } from './RoutineView.jsx'
+import WeeklySchedule from './WeeklySchedule.jsx'
 import {
   BUILT_IN,
   customKey,
@@ -231,6 +232,13 @@ export default function PersonDetail() {
     else setData((d) => ({ ...d, profile: { ...d.profile, coach_id: coachId } }))
   }
 
+  // Reload just the plan after an edit (the rest of the page stays put).
+  async function refreshSchedule() {
+    const { data: schedule, error } = await supabase.from('weekly_schedule').select('day_of_week, slot, routine_id').eq('user_id', p.id)
+    if (error) return console.error(error)
+    setData((d) => (d && d.profile.id === p.id ? { ...d, schedule } : d))
+  }
+
   async function markAllReviewed() {
     const ids = derived.toReview.map((s) => s.id)
     try {
@@ -385,6 +393,22 @@ export default function PersonDetail() {
               </ResponsiveContainer>
             </div>
           </Section>
+
+          {/* Their weekly plan, editable here with the same editor they use,
+              without switching into their account. */}
+          {!(p.is_admin || p.is_coach) && (
+            <Card className="flex flex-col gap-2">
+              <WeeklySchedule
+                coach
+                readOnly={!!p.removed_at}
+                effectiveUid={p.id}
+                routines={data.routines}
+                sessions={data.sessions}
+                schedule={data.schedule}
+                refreshSchedule={refreshSchedule}
+              />
+            </Card>
+          )}
 
           {data.weights.length > 1 && (
             <Section

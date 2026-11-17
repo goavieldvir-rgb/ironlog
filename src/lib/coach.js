@@ -186,7 +186,7 @@ export async function fetchTraineeDetail(uid, today = toLocalISODate()) {
       .then(check),
     supabase.from('coach_notes').select('*').eq('trainee_id', uid).order('created_at', { ascending: false }).then(check),
     supabase.from('coach_goals').select('*').eq('trainee_id', uid).maybeSingle().then(check),
-    supabase.from('weekly_schedule').select('day_of_week, routine_id').eq('user_id', uid).then(check),
+    supabase.from('weekly_schedule').select('day_of_week, slot, routine_id').eq('user_id', uid).then(check),
     supabase
       .from('consents')
       .select('version, variant, accepted_at, guardian_name')
