@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Settings, Users, UserPlus, Copy, Check, Share, AlertTriangle, Search, Pin, Trophy, CalendarCheck, ChevronUp, ChevronDown, MessageSquare } from 'lucide-react'
+import { Settings, Users, UserPlus, Copy, Check, Share, AlertTriangle, Search, Pin, Trophy, CalendarCheck, ChevronUp, ChevronDown, MessageSquare, Pencil, Star } from 'lucide-react'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
 import { supabase } from '../supabase.js'
@@ -12,7 +12,7 @@ import { Card, Badge, EmptyState, Button, Field, LoadError } from './ui.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { PageLoader } from './Loading.jsx'
 import CoachTasks from './CoachTasks.jsx'
-import { useCoachSettings } from '../lib/coachSettings.js'
+import { useCoachSettings, saveCoachSettings } from '../lib/coachSettings.js'
 import Tour, { useFirstTour, tourSeen, markTourSeen, COACH_NEW_TOUR } from './Tour.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { useMessagesState } from '../lib/messages.js'
@@ -28,6 +28,32 @@ export default function People() {
   const behindPct = coachSettings?.settings.behind_pct ?? 60
   const tasksOff = coachSettings?.settings.tasks_off || []
   const { t } = useLanguage()
+  const { toast } = useFeedback()
+  // Per-trainee settings, kept per coach in coach_settings (Edit trainees):
+  // - attention_off: their warning flags, Deal with first and automatic To do
+  //   items are hidden; sessions to review still show.
+  // - priority: starred, and shown first in every view and in Deal with first.
+  const attentionAvailable = !!coachSettings?.attentionAvailable
+  const [local, setLocal] = useState({})
+  const offIds = useMemo(() => new Set(local.attention_off ?? coachSettings?.settings.attention_off ?? []), [local, coachSettings])
+  const priorityIds = useMemo(() => new Set(local.priority ?? coachSettings?.settings.priority ?? []), [local, coachSettings])
+  const [editing, setEditing] = useState(false)
+  async function toggleIn(field, id) {
+    if (!attentionAvailable) return
+    const set = field === 'priority' ? priorityIds : offIds
+    const before = [...set]
+    const next = set.has(id) ? before.filter((x) => x !== id) : [...before, id]
+    setLocal((l) => ({ ...l, [field]: next }))
+    try {
+      await saveCoachSettings(profile.id, { [field]: next })
+    } catch (e) {
+      console.error(e)
+      setLocal((l) => ({ ...l, [field]: before }))
+      toast(t('people.attentionFailed'), 'error')
+    }
+  }
+  const toggleAttention = (id) => toggleIn('attention_off', id)
+  const togglePriority = (id) => toggleIn('priority', id)
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
@@ -80,10 +106,12 @@ export default function People() {
       rows
         .filter((p) => p.id !== user.uid)
         .map((p) => {
-          const flags = rosterFlags(p, today, behindPct, tasksOff)
-          return { ...p, unread: unreadMsgs[p.id] || 0, flags, score: attentionScore(flags), adh: adherence(p.week_counts, p.planned_per_week, p.created_at, today) }
+          const attentionOff = offIds.has(p.id)
+          let flags = rosterFlags(p, today, behindPct, tasksOff)
+          if (attentionOff) flags = [...flags.filter((f) => f.key === 'review' || f.key === 'pr'), { key: 'off', tone: 'muted', score: 0 }]
+          return { ...p, attentionOff, priority: priorityIds.has(p.id), unread: unreadMsgs[p.id] || 0, flags, score: attentionScore(flags), adh: adherence(p.week_counts, p.planned_per_week, p.created_at, today) }
         }),
-    [rows, user.uid, today, unreadMsgs, behindPct, tasksOff],
+    [rows, user.uid, today, unreadMsgs, behindPct, tasksOff, offIds, priorityIds],
   )
   const me = rows.find((p) => p.id === user.uid)
 
@@ -108,6 +136,8 @@ export default function People() {
     if (view === 'review') list = list.filter((p) => p.to_review > 0)
     const name = (p) => (p.full_name || p.email || '').toLowerCase()
     return [...list].sort((a, b) => {
+      // Priority trainees come first in every view.
+      if (a.priority !== b.priority) return a.priority ? -1 : 1
       if (view === 'recent') return (b.last_session || '').localeCompare(a.last_session || '') || name(a).localeCompare(name(b))
       if (view === 'attention' || view === 'review') return b.score - a.score || (b.to_review || 0) - (a.to_review || 0) || name(a).localeCompare(name(b))
       return name(a).localeCompare(name(b))
@@ -198,7 +228,7 @@ export default function People() {
 
       {trainees.length > 0 && (
         <>
-          <CoachTasks trainees={trainees} today={today} />
+          <CoachTasks trainees={trainees} today={today} attentionOff={offIds} />
           <div className="grid grid-cols-4 lg:grid-cols-6 gap-2">
             <Tile label={t('people.tileAttention')} value={totals.attention} onClick={() => setView('attention')} active={view === 'attention'} warn={totals.attention > 0} />
             <Tile label={t('people.tileReview')} value={totals.review} onClick={() => setView('review')} active={view === 'review'} />
@@ -222,7 +252,8 @@ export default function People() {
                 />
               </label>
             )}
-            <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1">
+            <div className="flex items-center gap-2">
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1 min-w-0 flex-1">
               {views.map(([key, label]) => (
                 <button
                   key={key}
@@ -237,22 +268,40 @@ export default function People() {
                 </button>
               ))}
             </div>
+              <button
+                type="button"
+                data-shot="edit-attention"
+                aria-pressed={editing}
+                onClick={() => setEditing((e) => !e)}
+                className={`press shrink-0 rounded-full px-3 min-h-9 text-xs font-medium inline-flex items-center gap-1.5 ${
+                  editing ? 'bg-chalk text-ink' : 'bg-surface2 text-chalkdim'
+                }`}
+              >
+                {editing ? <Check size={14} /> : <Pencil size={14} />}
+                {editing ? t('people.attentionDone') : t('people.attentionEdit')}
+              </button>
+            </div>
+            {editing && (
+              <p className="text-xs text-chalkdim">
+                {attentionAvailable ? t('people.attentionHint') : t('people.attentionNotReady')}
+              </p>
+            )}
           </div>
         </>
       )}
 
-      <div className="flex flex-col gap-5 2xl:grid 2xl:grid-cols-[minmax(0,1fr)_300px] 2xl:items-start">
+      <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-2">
           <div className="flex flex-col gap-2 lg:hidden">
             {shown.map((p, i) => (
               <span key={p.id} data-tour={i === 0 ? 'coach-trainee' : undefined} className="contents">
-                <TraineeRow p={p} today={today} t={t} />
+                <TraineeRow p={p} today={today} t={t} editing={editing} canEdit={attentionAvailable} onToggle={toggleAttention} onPriority={togglePriority} />
               </span>
             ))}
           </div>
           {shown.length > 0 && (
             <span data-tour="coach-trainee" className="contents">
-              <RosterTable rows={shown} today={today} t={t} />
+              <RosterTable rows={shown} today={today} t={t} editing={editing} canEdit={attentionAvailable} onToggle={toggleAttention} onPriority={togglePriority} />
             </span>
           )}
           {trainees.length > 0 && shown.length === 0 && (
@@ -505,12 +554,12 @@ const FLAG_TONES = {
   muted: 'bg-surface2 text-chalkdim',
 }
 
-export function FlagChips({ flags, t }) {
+export function FlagChips({ flags, t, wrap = false }) {
   if (!flags.length) return null
   return (
     <div className="flex flex-wrap gap-1.5">
       {flags.map((f) => (
-        <span key={f.key} className={`text-[11px] rounded-full px-2 py-0.5 font-medium whitespace-nowrap ${FLAG_TONES[f.tone]}`}>
+        <span key={f.key} className={`text-[11px] rounded-full px-2 py-0.5 font-medium ${wrap ? 'leading-snug' : 'whitespace-nowrap'} ${FLAG_TONES[f.tone]}`}>
           {t(`people.flag.${f.key}`)(f.n)}
         </span>
       ))}
@@ -518,7 +567,53 @@ export function FlagChips({ flags, t }) {
   )
 }
 
-function TraineeRow({ p, today, t }) {
+// Star: in edit mode a button that marks a trainee as priority, otherwise a
+// small filled star beside a priority trainee's name.
+function PriorityStar({ p, t, editing, disabled, onPriority }) {
+  if (!editing) return p.priority ? <Star size={13} className="shrink-0 text-accent fill-current" aria-label={t('people.priorityBadge')} /> : null
+  return (
+    <button
+      type="button"
+      aria-pressed={!!p.priority}
+      data-shot={`prio-${p.id}`}
+      aria-label={t('people.prioritySwitch')(p.full_name || p.email)}
+      disabled={disabled}
+      onClick={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        onPriority(p.id)
+      }}
+      className={`press shrink-0 w-9 h-9 -m-1.5 rounded-full flex items-center justify-center disabled:opacity-50 ${p.priority ? 'text-accent' : 'text-chalkdim hover:text-chalk'}`}
+    >
+      <Star size={18} className={p.priority ? 'fill-current' : ''} />
+    </button>
+  )
+}
+
+// On/off for whether a trainee shows in Needs attention.
+function AttentionSwitch({ p, t, disabled, onToggle }) {
+  const on = !p.attentionOff
+  return (
+    <button
+      type="button"
+      role="switch"
+      data-shot={`attn-${p.id}`}
+      aria-checked={on}
+      aria-label={t('people.attentionSwitch')(p.full_name || p.email)}
+      disabled={disabled}
+      onClick={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        onToggle(p.id)
+      }}
+      className={`relative shrink-0 w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${on ? 'bg-ironbtn' : 'bg-surface2 ring-1 ring-inset ring-line'}`}
+    >
+      <span className={`absolute top-0.5 start-0.5 w-5 h-5 rounded-full bg-chalk transition-transform ${on ? 'ltr:translate-x-5 rtl:-translate-x-5' : ''}`} />
+    </button>
+  )
+}
+
+function TraineeRow({ p, today, t, editing, canEdit, onToggle, onPriority }) {
   const thisWeek = (p.week_counts || []).at(-1) || 0
   const quiet = daysSince(p.last_session, today)
   const dot = p.score > 0 ? 'bg-accent' : thisWeek > 0 ? 'bg-good' : p.last_session ? 'bg-chalkdim' : 'bg-chalkdim/40'
@@ -530,11 +625,13 @@ function TraineeRow({ p, today, t }) {
       ].filter(Boolean)
     : [t('people.noSessionsYet')]
 
+  const Row = editing ? 'div' : Link
   return (
-    <Link to={`/people/${p.id}`} className="card p-4 press-row flex items-center gap-3">
+    <Row {...(editing ? {} : { to: `/people/${p.id}` })} className={`card p-4 flex items-center gap-3 ${editing ? '' : 'press-row'}`}>
       <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
       <div className="min-w-0 flex-1 flex flex-col gap-1.5">
         <div className="flex items-center gap-2 min-w-0">
+          {!editing && <PriorityStar p={p} t={t} />}
           <p className="truncate min-w-0">{p.full_name || p.email}</p>
           {p.is_admin && <Badge>{t('people.adminBadge')}</Badge>}
           {p.is_coach && <Badge>{t('people.coachBadge')}</Badge>}
@@ -550,9 +647,18 @@ function TraineeRow({ p, today, t }) {
           </p>
         )}
       </div>
-      <WeekBars counts={p.week_counts} planned={p.planned_per_week} />
-      <ForwardChevron size={16} className="text-chalkdim shrink-0" />
-    </Link>
+      {editing ? (
+        <div className="flex items-center gap-3 shrink-0">
+          <PriorityStar p={p} t={t} editing disabled={!canEdit} onPriority={onPriority} />
+          <AttentionSwitch p={p} t={t} disabled={!canEdit} onToggle={onToggle} />
+        </div>
+      ) : (
+        <>
+          <WeekBars counts={p.week_counts} planned={p.planned_per_week} />
+          <ForwardChevron size={16} className="text-chalkdim shrink-0" />
+        </>
+      )}
+    </Row>
   )
 }
 
@@ -707,13 +813,18 @@ const COLUMNS = [
   { key: 'prs', sort: (p) => p.prs_30d || 0 },
 ]
 
-function RosterTable({ rows, today, t }) {
+// The pinned trainee column needs its own solid background to cover what
+// scrolls under it.
+const STICKY = 'sticky start-0 z-[1] bg-surface'
+
+function RosterTable({ rows, today, t, editing, canEdit, onToggle, onPriority }) {
   const navigate = useNavigate()
   const [sort, setSort] = useState(null)
   const sorted = useMemo(() => {
     if (!sort) return rows
     const col = COLUMNS.find((c) => c.key === sort.key)
     return [...rows].sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority ? -1 : 1
       const x = col.sort(a), y = col.sort(b)
       return (x < y ? -1 : x > y ? 1 : 0) * sort.dir
     })
@@ -724,12 +835,14 @@ function RosterTable({ rows, today, t }) {
   }
 
   return (
-    <div className="hidden lg:block card overflow-x-auto">
+    // The trainee column stays pinned while the rest scrolls sideways on a
+    // narrow window; the scrollbar is the app's thin dark one.
+    <div className="hidden lg:block card overflow-x-auto scrollbar-thin">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-start text-xs text-chalkdim border-b border-line">
             {COLUMNS.map((c) => (
-              <th key={c.key} scope="col" className="font-medium text-start px-3 py-3 first:ps-5 whitespace-nowrap">
+              <th key={c.key} scope="col" className={`font-medium text-start px-3 py-3 first:ps-5 whitespace-nowrap ${c.key === 'name' ? STICKY : ''}`}>
                 {c.sort ? (
                   <button onClick={() => toggle(c.key)} className="inline-flex items-center gap-1 hover:text-chalk">
                     {t(`people.col.${c.key}`)}
@@ -751,21 +864,31 @@ function RosterTable({ rows, today, t }) {
             return (
               <tr
                 key={p.id}
-                onClick={() => navigate(`/people/${p.id}`)}
-                className="border-b border-line last:border-0 hover:bg-surface2/60 cursor-pointer align-middle"
+                onClick={() => (editing ? canEdit && onToggle(p.id) : navigate(`/people/${p.id}`))}
+                className="group border-b border-line last:border-0 hover:bg-surface2/60 cursor-pointer align-middle"
               >
-                <td className="px-3 py-3 ps-5 max-w-[200px]">
-                  <Link to={`/people/${p.id}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-2.5 min-w-0">
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
+                <td className={`px-3 py-3 ps-5 max-w-[220px] ${STICKY} group-hover:bg-[#1A1A1D]`}>
+                  <Link to={`/people/${p.id}`} onClick={(e) => (editing ? e.preventDefault() : e.stopPropagation())} className="flex items-center gap-2.5 min-w-0">
+                    {editing ? (
+                      <>
+                        <AttentionSwitch p={p} t={t} disabled={!canEdit} onToggle={onToggle} />
+                        <PriorityStar p={p} t={t} editing disabled={!canEdit} onPriority={onPriority} />
+                      </>
+                    ) : (
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
+                    )}
                     <span className="min-w-0">
-                      <span className="block truncate text-chalk">{p.full_name || p.email}</span>
+                      <span className="flex items-center gap-1.5 min-w-0 text-chalk">
+                        {!editing && <PriorityStar p={p} t={t} />}
+                        <span className="truncate">{p.full_name || p.email}</span>
+                      </span>
                       {p.pinned_note && <span className="block truncate text-xs text-chalkdim">{p.pinned_note}</span>}
                     </span>
                     {p.unread > 0 && <UnreadBadge n={p.unread} t={t} />}
                   </Link>
                 </td>
-                <td className="px-3 py-3 min-w-[150px]">
-                  <FlagChips flags={p.flags.filter((f) => f.key !== 'pr')} t={t} />
+                <td className="px-3 py-3 min-w-[150px] max-w-[210px]">
+                  <FlagChips flags={p.flags.filter((f) => f.key !== 'pr')} t={t} wrap />
                 </td>
                 <td className="px-3 py-3 num whitespace-nowrap">
                   {p.planned_per_week ? (
@@ -832,7 +955,7 @@ function RosterTable({ rows, today, t }) {
 // records across the team.
 function SidePanel({ trainees, prs, today, t }) {
   const { lang } = useLanguage()
-  const urgent = trainees.filter((p) => p.score > 0).sort((a, b) => b.score - a.score).slice(0, 6)
+  const urgent = trainees.filter((p) => p.score > 0).sort((a, b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0) || b.score - a.score).slice(0, 6)
   const checkins = trainees
     .filter((p) => p.next_checkin)
     .sort((a, b) => a.next_checkin.localeCompare(b.next_checkin))
@@ -841,7 +964,7 @@ function SidePanel({ trainees, prs, today, t }) {
   const day = (iso) => fmtDate(lang, new Date(iso), { month: 'short', day: 'numeric' })
 
   return (
-    <aside className="hidden lg:grid grid-cols-3 gap-4 items-start 2xl:flex 2xl:flex-col">
+    <aside className="hidden lg:grid grid-cols-3 gap-4 items-start">
       <Card className="flex flex-col gap-3">
         <h2 className="text-base text-chalk">{t('people.panelAttention')}</h2>
         {urgent.length === 0 ? (
@@ -851,7 +974,10 @@ function SidePanel({ trainees, prs, today, t }) {
             {urgent.map((p) => (
               <li key={p.id}>
                 <Link to={`/people/${p.id}`} className="block hover:opacity-80">
-                  <span className="block text-sm text-chalk truncate">{p.full_name || p.email}</span>
+                  <span className="flex items-center gap-1.5 text-sm text-chalk min-w-0">
+                    <PriorityStar p={p} t={t} />
+                    <span className="truncate">{p.full_name || p.email}</span>
+                  </span>
                   <span className="block text-xs text-accent truncate">
                     {p.flags.filter((f) => f.tone === 'warn').map((f) => t(`people.flag.${f.key}`)(f.n)).join(' · ')}
                   </span>

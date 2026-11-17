@@ -250,6 +250,12 @@
     font-weight: 600;
     letter-spacing: -0.03em;
   }
+  /* A thin dark scrollbar. The page isn't color-scheme: dark, so without
+     this a sideways-scrolling box gets the browser's bright white one. */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #3A3A40 transparent;
+  }
   .scrollbar-thin::-webkit-scrollbar {
     height: 6px;
     width: 6px;
