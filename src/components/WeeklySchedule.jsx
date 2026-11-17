@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
-import { Play, CalendarDays, Check } from 'lucide-react'
+import { Play, CalendarDays, Check, Pencil } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { setScheduleDay } from '../lib/db.js'
@@ -20,7 +20,12 @@ const SLOT_LABEL_KEYS = ['slotMobility', 'slotStrength', 'slotCardio']
 
 // `schedule` is loaded by Dashboard (it also drives the "Start today's
 // workout" button), so both always agree and an edit here refreshes both.
-export default function WeeklySchedule({ effectiveUid, routines, routinesLoading = false, sessions = [], schedule, scheduleLoading = false, refreshSchedule, openRequest = null }) {
+//
+// `coach` is the coach's view of a trainee (their page under People): the
+// whole week is listed so it reads at a glance, tapping a day opens the same
+// editor the trainee uses (same slots, same rules), and nothing starts a
+// workout. `readOnly` shows the plan without the editor.
+export default function WeeklySchedule({ effectiveUid, routines, routinesLoading = false, sessions = [], schedule, scheduleLoading = false, refreshSchedule, openRequest = null, coach = false, readOnly = false }) {
   const { t } = useLanguage()
   const { toast, confirm } = useFeedback()
   const navigate = useNavigate()
@@ -144,7 +149,10 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
       setPending({})
       refreshSchedule?.()
       toast(t('feedback.saved'))
-      setMode('view')
+      // The coach's view has no day panel to go back to (it would offer to
+      // start the trainee's workout), so saving closes the editor.
+      if (coach) close()
+      else setMode('view')
     } catch (err) {
       console.error(err)
       toast(t('feedback.saveFailed'), 'error')
@@ -174,12 +182,26 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
   const isTodayOpen = openDay === today
 
   // First time the week editor opens: pick a day, fill its slots, save.
-  const [tourOpen, closeTour] = useFirstTour('week', openDay != null && mode === 'edit')
+  const [tourOpen, closeTour] = useFirstTour('week', !coach && openDay != null && mode === 'edit')
   const tourSteps = ['days', 'slots', 'save'].map((k) => ({ target: `w-${k}`, ...t(`tour.w.${k}`) }))
 
   return (
     <div className="flex flex-col gap-2">
       {tourOpen && openDay != null && mode === 'edit' && <Tour steps={tourSteps} onClose={closeTour} />}
+      {coach ? (
+        <CoachWeek
+          t={t}
+          today={today}
+          weekDates={weekDates}
+          planLoading={planLoading}
+          hasRoutines={routines.length > 0}
+          readOnly={readOnly}
+          routinesForDay={routinesForDay}
+          loggedOnDay={loggedOnDay}
+          onEdit={(dow) => openDayPanel(dow, 'edit')}
+        />
+      ) : (
+      <>
       <div className="flex items-center justify-between gap-2">
         <h2 className="eyebrow inline-flex items-center gap-1">
           {t('dashboard.weeklySchedule')} <InfoTip text={t('dashboard.weeklyScheduleTip')} />
@@ -220,6 +242,8 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
           )
         })}
       </div>
+      </>
+      )}
 
       {/* Rendered at the top level of the page so nothing it sits inside
           (a card, a pressed row) can shift or clip the panel. */}
@@ -378,5 +402,70 @@ export default function WeeklySchedule({ effectiveUid, routines, routinesLoading
         document.body,
       )}
     </div>
+  )
+}
+
+// The coach's list: every day with what's planned on it, so the week reads
+// without opening anything. A tick marks a day they already trained this week.
+function CoachWeek({ t, today, weekDates, planLoading, hasRoutines, readOnly, routinesForDay, loggedOnDay, onEdit }) {
+  const canEdit = !readOnly && hasRoutines
+  const empty = !planLoading && DAYS.every((dow) => routinesForDay(dow).length === 0)
+  return (
+    <>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-base text-chalk">{t('person.schedule')}</h2>
+          <p className="text-xs text-chalkdim mt-0.5">
+            {readOnly
+              ? t('person.scheduleReadOnly')
+              : !hasRoutines && !planLoading
+                ? t('person.scheduleNoRoutines')
+                : empty
+                  ? t('person.scheduleEmptyHint')
+                  : t('person.scheduleHint')}
+          </p>
+        </div>
+        {canEdit && (
+          <Button type="button" variant="ghost" className="shrink-0" onClick={() => onEdit(today)}>
+            <Pencil size={14} /> {t('dashboard.editWeek')}
+          </Button>
+        )}
+      </div>
+      <ul className="flex flex-col gap-1 mt-1">
+        {DAYS.map((dow) => {
+          const isToday = dow === today
+          const list = planLoading ? [] : routinesForDay(dow)
+          const logged = loggedOnDay(dow).length > 0
+          const plan = planLoading ? '…' : list.length > 0 ? list.map((r) => r.name).join(' · ') : t('dashboard.restDay')
+          const Row = canEdit ? 'button' : 'div'
+          return (
+            <li key={dow}>
+              <Row
+                {...(canEdit
+                  ? { type: 'button', onClick: () => onEdit(dow), 'aria-label': t('person.scheduleDayAria')(t(`dashboard.day${dow}`), plan) }
+                  : {})}
+                aria-current={isToday ? 'date' : undefined}
+                className={`w-full text-start rounded-[10px] px-3 min-h-11 py-2 flex items-center gap-3 ${
+                  isToday ? 'bg-surface2' : ''
+                } ${canEdit ? 'press-row hover:bg-surface2/70' : ''}`}
+              >
+                <span className={`w-10 shrink-0 text-xs ${isToday ? 'text-chalk font-semibold' : 'text-chalkdim'}`}>
+                  {t(`dashboard.dayShort${dow}`)}
+                  <span className="block num text-[11px] text-chalkdim/70 font-normal">{Number(weekDates[dow].slice(8))}</span>
+                </span>
+                <span className={`flex-1 min-w-0 text-sm break-words ${list.length > 0 ? 'text-chalk' : 'text-chalkdim/70'}`}>{plan}</span>
+                {logged && (
+                  <span className="shrink-0 inline-flex items-center gap-1 text-[11px] text-chalkdim" title={t('dashboard.alreadyLogged')}>
+                    <Check size={13} className="text-good" />
+                    <span className="sr-only">{t('dashboard.alreadyLogged')}</span>
+                  </span>
+                )}
+                {canEdit && <Pencil size={13} className="shrink-0 text-chalkdim/60" aria-hidden="true" />}
+              </Row>
+            </li>
+          )
+        })}
+      </ul>
+    </>
   )
 }
