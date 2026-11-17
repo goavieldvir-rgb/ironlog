@@ -1,0 +1,66 @@
+name: Database migrations
+
+# Applies new files in supabase/migrations/ to the live database.
+# - On a pull request: lists which migrations would run, changes nothing.
+# - On merge to main: runs them, in order, and records each one in Supabase so
+#   it never runs twice.
+# Uses the same SUPABASE_DB_URL secret as the nightly backup.
+
+on:
+  pull_request:
+    paths: ['supabase/migrations/**', '.github/workflows/db-migrate.yml']
+  push:
+    branches: [main]
+    paths: ['supabase/migrations/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-migrate
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tidy the connection link
+        env:
+          RAW_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          python3 - <<'PY'
+          import os, sys, urllib.parse as u
+          raw = os.environ['RAW_URL'].strip().strip('"').strip("'")
+          scheme, sep, rest = raw.partition('://')
+          if not sep or '@' not in rest:
+              sys.exit('SUPABASE_DB_URL is not a postgresql:// link with a password (see docs/backups.md)')
+          userinfo, host = rest.rsplit('@', 1)
+          user, _, pw = userinfo.partition(':')
+          if pw.startswith('[') and pw.endswith(']'):
+              pw = pw[1:-1]
+          pw = u.quote(u.unquote(pw), safe='')
+          url = f'{scheme}://{user}:{pw}@{host}'
+          print(f'::add-mask::{pw}')
+          print(f'::add-mask::{url}')
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write(f'DB_URL={url}\n')
+          PY
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Migrations already on the live database vs. in this branch
+        run: supabase migration list --db-url "$DB_URL"
+
+      - name: What would run (no changes)
+        if: github.event_name == 'pull_request'
+        run: supabase db push --db-url "$DB_URL" --dry-run
+
+      - name: Apply to the live database
+        if: github.event_name != 'pull_request'
+        run: supabase db push --db-url "$DB_URL"
