@@ -65,7 +65,11 @@ jobs:
           tar -czf "$name.tar.gz" -C backup .
           gpg --batch --yes --pinentry-mode loopback --symmetric --cipher-algo AES256 \
             --passphrase "$BACKUP_PASSPHRASE" -o "$name.tar.gz.gpg" "$name.tar.gz"
-          rm -rf backup "$name.tar.gz"
+          # Prove the locked file opens with the passphrase and holds all three files.
+          gpg --batch --quiet --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" \
+            --decrypt "$name.tar.gz.gpg" | tar -tzf - | tee contents.txt
+          for f in roles.sql schema.sql data.sql; do grep -q "$f" contents.txt; done
+          rm -rf backup "$name.tar.gz" contents.txt
           echo "NAME=$name" >> "$GITHUB_ENV"
 
       - uses: actions/upload-artifact@v4
