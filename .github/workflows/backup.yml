@@ -1,0 +1,76 @@
+name: Nightly database backup
+
+# Every night, an encrypted copy of the whole database (structure, data and
+# the people who can sign in) is saved to this repository's Actions tab and
+# kept for 30 days. See docs/backups.md for how to restore one.
+#
+# Needs two repository secrets (Settings > Secrets and variables > Actions):
+#   SUPABASE_DB_URL     the database's "Session pooler" connection string
+#   BACKUP_PASSPHRASE   a long password that locks the backup files
+
+on:
+  schedule:
+    - cron: '0 1 * * *' # 01:00 UTC, about 3-4 AM in Israel
+  workflow_dispatch: # lets you run it by hand from the Actions tab
+  pull_request: # a pull request that changes this file tests it before merging
+    paths: ['.github/workflows/backup.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check the secrets are set
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::error::Add the SUPABASE_DB_URL and BACKUP_PASSPHRASE secrets (see docs/backups.md)."
+            exit 1
+          fi
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Supabase's own recommended way to back up a project: three files.
+      - name: Dump the database
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          mkdir -p backup
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backup/roles.sql --role-only
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backup/schema.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backup/data.sql --use-copy --data-only \
+            -x cron.job_run_details -x net._http_response
+          ls -l backup
+          # A backup with no data is a failed backup.
+          test -s backup/schema.sql && test -s backup/data.sql
+
+      # The files hold trainees' personal data, so they are locked with the
+      # passphrase before they leave this machine.
+      - name: Lock the backup with the passphrase
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          name="ironlog-db-$(date -u +%Y-%m-%d)"
+          tar -czf "$name.tar.gz" -C backup .
+          gpg --batch --yes --pinentry-mode loopback --symmetric --cipher-algo AES256 \
+            --passphrase "$BACKUP_PASSPHRASE" -o "$name.tar.gz.gpg" "$name.tar.gz"
+          rm -rf backup "$name.tar.gz"
+          echo "NAME=$name" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NAME }}
+          path: ${{ env.NAME }}.tar.gz.gpg
+          retention-days: 30
+          if-no-files-found: error

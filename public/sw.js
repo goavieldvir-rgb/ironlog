@@ -41,7 +41,10 @@ self.addEventListener('activate', (e) =>
 
 function pageResponse(request, event) {
   const key = SCOPE // every navigation is the same single-page shell
-  const network = fetch(request)
+  // no-cache: always ask the server (a cheap "has it changed?" check) rather
+  // than taking the browser's own copy, which GitHub Pages lets it keep for
+  // 10 minutes and which would otherwise hide a fresh deploy.
+  const network = fetch(request, { cache: 'no-cache' })
   // Registered now, while the event is still open: calling waitUntil later,
   // after the timeout has already answered from cache, throws and the cache
   // would never refresh. The copy is taken before the page reads the body.

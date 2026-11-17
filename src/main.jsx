@@ -8,6 +8,7 @@ import { LanguageProvider } from './context/LanguageContext.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { FeedbackProvider } from './context/FeedbackContext.jsx'
 import { captureInstallPrompt } from './lib/install.js'
+import UpdateBanner from './components/UpdateBanner.jsx'
 import './index.css'
 
 captureInstallPrompt()
@@ -35,6 +36,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           </AuthProvider>
         </HashRouter>
         </FeedbackProvider>
+        <UpdateBanner />
       </ErrorBoundary>
     </LanguageProvider>
   </React.StrictMode>,
