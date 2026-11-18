@@ -386,8 +386,9 @@ export function SaveMealView({ defaultName, count, coachSlot = '', onBack, onClo
   const { t } = useLanguage()
   const [name, setName] = useState(defaultName)
   const [asCoach, setAsCoach] = useState(!!coachSlot)
-  // The coach logged these foods only to build the option: clear them after.
-  const [clear, setClear] = useState(true)
+  // Off by default: the foods may be the trainee's real meal. The coach opts
+  // in when they logged them only to build the option.
+  const [clear, setClear] = useState(false)
   const [busy, setBusy] = useState(false)
   async function submit(e) {
     e.preventDefault()
