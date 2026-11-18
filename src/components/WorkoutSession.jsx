@@ -5,7 +5,9 @@ import { InfoTip } from './InfoTip.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
-import { useCollection, logSession, addExercise, clearExerciseNote, isCompletedSet, addBodyWeightEntry } from '../lib/db.js'
+import { useCollection, logSession, addExercise, clearExerciseNote, isCompletedSet, cleanEntries, addBodyWeightEntry } from '../lib/db.js'
+import { queueSession, isNetworkError, listQueued, CHANGED as OUTBOX_CHANGED } from '../lib/outbox.js'
+import { useAuth } from '../context/AuthContext.jsx'
 import { bodyWeightFor, bodyWeightIn, usesBodyWeight } from '../lib/bodyweight.js'
 import { useGyms, sessionGymId, gymHistory, exerciseAtGym, gymLabel } from '../lib/gyms.js'
 import { saveDraft, loadDraft, clearDraft, FREESTYLE_KEY } from '../lib/draft.js'
@@ -196,6 +198,7 @@ function AddExerciseSheet({ options, recentIds, onPick, onBrowse, onClose, t }) 
 
 export default function WorkoutSession() {
   const { effectiveUid } = useAdmin()
+  const { user } = useAuth()
   const { t, lang } = useLanguage()
   const { confirm, toast } = useFeedback()
   const { routineId } = useParams()
@@ -291,6 +294,8 @@ export default function WorkoutSession() {
   useScrollLock(showLibraryPicker || creatingCustom)
   const [saved, setSaved] = useState(false)
   const [summary, setSummary] = useState(null)
+  // The finished workout is waiting on this phone for a connection.
+  const [pendingSync, setPendingSync] = useState(false)
   // Screen stays on for the whole workout; the summary screen lets it sleep.
   useWakeLock(!summary)
   // When this workout was started — carried inside the draft, so resuming
@@ -298,6 +303,15 @@ export default function WorkoutSession() {
   const [startedAt, setStartedAt] = useState(null)
   // Kept in the draft so it survives a reload and is the saved session's id.
   const [sessionId, setSessionId] = useState(newSessionId)
+  // Once a workout kept on this phone has synced, the recap says so.
+  useEffect(() => {
+    if (!pendingSync) return
+    const check = () => {
+      if (!listQueued(user?.uid).some((q) => q.session.id === sessionId)) setPendingSync(false)
+    }
+    window.addEventListener(OUTBOX_CHANGED, check)
+    return () => window.removeEventListener(OUTBOX_CHANGED, check)
+  }, [pendingSync, user?.uid, sessionId])
   const [now, setNow] = useState(Date.now())
   const restRef = useRef(null)
   const dateInputRef = useRef(null)
@@ -856,7 +870,7 @@ export default function WorkoutSession() {
       } catch (err) {
         console.error(err)
       }
-      await logSession(effectiveUid, {
+      const session = {
         id: sessionId,
         routineId: isFreestyle ? null : routine?.id,
         routineName: isFreestyle ? 'Freestyle' : routine?.name,
@@ -889,11 +903,28 @@ export default function WorkoutSession() {
           // `done` is only the on-screen tick; it isn't part of a saved set.
           sets: e.sets.map(({ done, ...set }) => set),
         })),
-      })
+      }
+      if (cleanEntries(session.entries).length === 0) throw new Error('EMPTY_SESSION')
+      // No signal: keep the finished workout on this phone and send it when
+      // the connection is back (see lib/outbox.js), instead of making the
+      // lifter wait at the door with the app open.
+      let queued = false
+      const keepForLater = () => (queued = queueSession(user?.uid, effectiveUid, session))
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        if (!keepForLater()) throw new Error('OFFLINE')
+      } else {
+        try {
+          await logSession(effectiveUid, session)
+        } catch (err) {
+          if (!isNetworkError(err) || !keepForLater()) throw err
+          console.error(err)
+        }
+      }
       clearDraft(effectiveUid, draftKey)
       clearSavedRest()
       setSaved(true)
-      toast(t('workout.sessionSaved'))
+      setPendingSync(queued)
+      toast(queued ? t('workout.savedOffline') : t('workout.sessionSaved'))
       // Show the recap (with Share) instead of jumping straight to History.
       if (summaryData) setSummary(summaryData)
       else navigate('/history')
@@ -939,7 +970,7 @@ export default function WorkoutSession() {
     return <p className="text-chalkdim">{t('workout.routineNotFound')}</p>
   }
 
-  if (summary) return <WorkoutDone summary={summary} onDone={() => navigate('/history', { replace: true })} />
+  if (summary) return <WorkoutDone summary={summary} pending={pendingSync} onDone={() => navigate('/history', { replace: true })} />
 
   const availableToAdd = exercises.filter((e) => !entries.some((en) => en.exerciseId === e.id))
   const exerciseOptions = availableToAdd.map((e) => ({
