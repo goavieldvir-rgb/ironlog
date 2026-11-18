@@ -532,7 +532,7 @@ export function MyMealsView({ uid, date, meal, setMeal, onBack, onClose, onLog, 
           const tot = sumLogs(scaled)
           const editing = renaming?.id === m.id
           return (
-            <section key={m.id} className="card overflow-hidden">
+            <section key={m.id} className="card overflow-hidden shrink-0">
               <div className="p-4 pb-2">
                 {editing ? (
                   <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); rename(m) }}>
