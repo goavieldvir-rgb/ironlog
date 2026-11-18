@@ -158,7 +158,7 @@ export async function deleteCoachTask(id) {
 
 export async function fetchTraineeDetail(uid, today = toLocalISODate()) {
   const since = shiftDay(today, -7 * 26)
-  const [profile, sessions, weights, measurements, prs, notes, goal, schedule, consent, food, targets, routines, measurementSetup, traineeSettings, checkins] = await Promise.all([
+  const [profile, sessions, weights, measurements, prs, notes, goal, schedule, consent, food, targets, routines, exercises, measurementSetup, traineeSettings, checkins] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', uid).single().then(check),
     supabase
       .from('sessions')
@@ -205,6 +205,15 @@ export async function fetchTraineeDetail(uid, today = toLocalISODate()) {
       .then(check),
     supabase.from('nutrition_targets').select('kcal, protein').eq('user_id', uid).maybeSingle().then(check),
     supabase.from('routines').select('id, name, category, exercises').eq('user_id', uid).order('created_at', { ascending: false }).then(check),
+    // The trainee's own library, so their routines show the same clip and
+    // name here as on their phone (a clip picked for a Hebrew-named
+    // exercise, a renamed exercise). Optional: the routines still list
+    // without it.
+    supabase
+      .from('exercises')
+      .select('id, name, name_he, clip, video_url')
+      .eq('user_id', uid)
+      .then(({ data, error }) => (error ? [] : data || []), () => []),
     fetchMeasurementSetup(uid),
     // Optional: null until supabase-coach-extras.sql has been run.
     supabase.from('trainee_settings').select('*').eq('user_id', uid).maybeSingle().then(({ data, error }) => (error ? null : data || {}), () => null),
@@ -213,7 +222,7 @@ export async function fetchTraineeDetail(uid, today = toLocalISODate()) {
   // The birthday lives on the person (it moves with them), the rest of the
   // goal is this coach's own.
   const withBirthday = goal || profile?.birthday ? { ...(goal || {}), birthday: profile?.birthday ?? null } : null
-  return { profile, sessions, weights, measurements, measurementSetup, traineeSettings, checkins, prs, notes, goal: withBirthday, schedule, consent: consent[0] || null, food, targets, routines }
+  return { profile, sessions, weights, measurements, measurementSetup, traineeSettings, checkins, prs, notes, goal: withBirthday, schedule, consent: consent[0] || null, food, targets, routines, exercises }
 }
 
 // Sessions per week for the last `n` weeks, oldest first.
