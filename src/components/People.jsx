@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Settings, Users, UserPlus, Copy, Check, Share, AlertTriangle, Search, Pin, Trophy, CalendarCheck, ChevronUp, ChevronDown, MessageSquare, Pencil, Star } from 'lucide-react'
+import { Settings, Users, UserPlus, Copy, Check, Share, AlertTriangle, Search, Pin, Trophy, CalendarCheck, ChevronUp, ChevronDown, MessageSquare, Pencil, Star, Layers } from 'lucide-react'
 import { ForwardChevron } from './DirectionalIcon.jsx'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
 import { supabase } from '../supabase.js'
@@ -200,6 +200,9 @@ export default function People() {
           )}
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button variant="ghost" to="/people/programs">
+            <Layers size={16} /> {t('programs.title')}
+          </Button>
           <span data-tour="coach-settings" className="contents">
             <Button variant="ghost" to="/coach-settings" aria-label={t('coachSettings.title')}>
               <Settings size={16} /> <span className="hidden sm:inline">{t('coachSettings.title')}</span>

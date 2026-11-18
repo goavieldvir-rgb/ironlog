@@ -294,16 +294,22 @@ export async function copyRoutineToUser(targetUid, routine) {
     }
     mapped.push({ ...it, exerciseId: match.id, name: match.name })
   }
-  await addRoutine(targetUid, { name: routine.name, category: routine.category, exercises: mapped })
+  return addRoutine(targetUid, { name: routine.name, category: routine.category, exercises: mapped })
 }
+// Returns the new routine's id.
 export async function addRoutine(uid, routine) {
-  const { error } = await supabase.from('routines').insert({
-    user_id: uid,
-    name: routine.name,
-    category: routine.category || 'strength',
-    exercises: routine.exercises || [],
-  })
+  const { data, error } = await supabase
+    .from('routines')
+    .insert({
+      user_id: uid,
+      name: routine.name,
+      category: routine.category || 'strength',
+      exercises: routine.exercises || [],
+    })
+    .select('id')
+    .single()
   if (error) throw error
+  return data?.id
 }
 
 export async function updateRoutine(uid, id, patch) {
