@@ -16,32 +16,23 @@ the app gets their own private login and their own history; nobody sees anyone e
 - **Exercise clips** — each exercise shows a still of Ironlog's own animation next to its
   name (workout, routine, builder, library, picker, history); tap it for the looping clip
   and, where there is one, a technique-tips clip. Matched by English name, or picked per
-  exercise by the coach (needs `supabase-exercise-clips.sql`). The files live in
+  exercise by the coach. The files live in
   `public/clips/`; after an approved re-render run `ONLY=<slug> scripts/sync-clips.sh` (or with no `ONLY` for everything) to copy it in, remake
   the stills (`scripts/clip_still.py`, overrides in `scripts/clip_stills.txt`) and update
   `src/lib/clipManifest.js`.
 - **Accounts** — email/password sign-up. Everyone shares the same app, but Supabase
-  Row Level Security keeps each account's data private (see `supabase.sql`).
+  Row Level Security keeps each account's data private (see `supabase/migrations/`).
 - **Admin mode** — optionally, one or more accounts can be marked admin. An admin sees
   a "People" tab, can pick anyone's account, and build routines/exercises (and view
-  their logged history) on their behalf — see `supabase-admin-upgrade.sql`.
+  their logged history) on their behalf.
 
 ---
 
-## Turning on admin mode (optional)
+## Database
 
-If you want to be able to build routines for family members yourself instead of them
-doing it, run this once, after everyone already has an account (or run it any time —
-it also works retroactively):
-
-1. Supabase → **SQL Editor** → New query → paste in the entire contents of
-   `supabase-admin-upgrade.sql` → **Run**.
-2. At the very bottom of that script, edit the email in the last line to match your
-   own account, then run just that line again (select it, click "Run selection") —
-   this is what actually makes *you* the admin. Nobody else becomes admin by default.
-3. Refresh the app and log in — you'll see a new **People** tab. Pick anyone from the
-   list to build their routines/exercises for them, or view their history. A banner at
-   the top reminds you whose account you're managing, with a link back to your own.
+The database's full, ordered history lives in `supabase/migrations/`, and
+changes reach the live database only through a merged pull request. How to
+make a change: `supabase/README.md`. Backups: `docs/backups.md`.
 
 ---
 
@@ -51,9 +42,10 @@ it also works retroactively):
    click **New project**. Name it anything (e.g. `ironlog`), set a database password
    (you won't need to remember it — Supabase stores it), pick any region, and create.
    It takes a minute or two to spin up.
-2. In the left sidebar, go to the **SQL Editor** → **New query**. Open `supabase.sql`
-   from this repo, copy its entire contents, paste it into the editor, and click **Run**.
-   This creates the three tables the app needs and locks every row to its owner.
+2. Build the database from this repo: install the
+   [Supabase CLI](https://supabase.com/docs/guides/cli) and run
+   `supabase db push --db-url "<your project's Session pooler connection string>"`.
+   This applies every file in `supabase/migrations/` in order.
 3. In the left sidebar, go to **Authentication → Providers**, make sure **Email** is
    enabled (it is by default). Then go to **Authentication → Sign in / Providers →
    Email** settings and turn **off "Confirm email"** — otherwise each new sign-up has to
@@ -106,7 +98,7 @@ your domain, so there's no extra step here.
 
 Send them the GitHub Pages URL. Each person clicks **Create account** and gets their own
 private login — separate routines, separate history, nobody can see anyone else's data
-(enforced server-side by the Row Level Security policies in `supabase.sql`, not just
+(enforced server-side by the Row Level Security policies in `supabase/migrations/`, not just
 hidden in the UI).
 
 ---
@@ -131,7 +123,7 @@ src/
 ```
 
 Data lives in three Postgres tables — `exercises`, `routines`, `sessions` — each row
-tagged with a `user_id` and protected by the policies in `supabase.sql`. When you finish
+tagged with a `user_id` and protected by the policies in `supabase/migrations/`. When you finish
 logging a session, the app also updates a "last weight/reps" snapshot on each exercise
 row so the next time you do it, the log screen shows what you did last time.
 
