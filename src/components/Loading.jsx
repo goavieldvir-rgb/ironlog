@@ -84,3 +84,56 @@ export function PageLoader() {
     </div>
   )
 }
+
+// Skeletons: grey blocks in the shape of the content that is on its way, for
+// a page whose layout is known. One look everywhere: surface2 blocks, a slow
+// soft pulse (no shimmer), still when the phone asks for reduced motion.
+// Nothing shows for the first 300 ms, so a fast load never flashes.
+const SKELETON_DELAY_MS = 300
+
+function useShowAfter(ms) {
+  const [show, setShow] = useState(ms <= 0)
+  useEffect(() => {
+    if (ms <= 0) return undefined
+    const id = setTimeout(() => setShow(true), ms)
+    return () => clearTimeout(id)
+  }, [ms])
+  return show
+}
+
+// One block. Size and shape come from className (h-3 w-1/2 rounded-full ...).
+export function Skeleton({ className = '', style }) {
+  return <div aria-hidden="true" className={`skeleton ${className}`} style={style} />
+}
+
+// Holds its children back for the first 300 ms. For a small placeholder
+// inside content that is already on screen.
+export function Delayed({ ms = SKELETON_DELAY_MS, children }) {
+  return useShowAfter(ms) ? children : null
+}
+
+// A page's (or a section's) worth of skeleton blocks. Tells screen readers
+// once that it is loading, then fades in after the delay.
+export function SkeletonGroup({ children, className = '', delay = SKELETON_DELAY_MS }) {
+  const { t } = useLanguage()
+  const show = useShowAfter(delay)
+  return (
+    <div role="status" aria-busy="true" aria-label={t('common.loading')} className={show ? `skeleton-in ${className}` : ''}>
+      {show && children}
+    </div>
+  )
+}
+
+// A list row's placeholder: a thumbnail and two lines. The History list uses
+// it, and lists shaped like it can too.
+export function SkeletonRow({ thumb = 'w-[34px] h-10 rounded-md', className = '' }) {
+  return (
+    <div className={`flex items-center gap-3.5 ${className}`}>
+      {thumb && <Skeleton className={`${thumb} shrink-0`} />}
+      <div className="flex-1 flex flex-col gap-2">
+        <Skeleton className="h-3.5 w-1/2" />
+        <Skeleton className="h-3 w-3/4" />
+      </div>
+    </div>
+  )
+}

@@ -15,6 +15,7 @@ import { useCoachSettings } from '../lib/coachSettings.js'
 import { sessionTitle, entryName, exerciseMap } from '../lib/names.js'
 import { useGyms, sessionGymId, gymLabel } from '../lib/gyms.js'
 import { Card, CategoryTag, Badge, Button } from './ui.jsx'
+import { SessionDetailSkeleton } from './Skeletons.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { isWarmup, workingSets } from '../lib/warmup.js'
 import { entryPrKind, recordBaseline } from '../lib/records.js'
@@ -140,7 +141,16 @@ export default function SessionDetail() {
   }, [unseen, session?.id])
 
   if (!loading && !session) return <p className="text-chalkdim">{t('sessionDetail.notFound')}</p>
-  if (!session) return null
+  if (!session) {
+    return (
+      <div className="flex flex-col gap-5 max-w-2xl pb-[120px]">
+        <Link to="/history" className="text-chalkdim text-sm inline-flex items-center gap-1 hover:text-chalk w-fit min-h-[44px] -mb-3">
+          <BackChevron size={16} /> {t('sessionDetail.back')}
+        </Link>
+        <SessionDetailSkeleton />
+      </div>
+    )
+  }
 
   async function remove() {
     if (!(await confirm({ title: t('history.deleteConfirm'), body: t('feedback.cantUndo'), confirmLabel: t('common.delete'), danger: true }))) return

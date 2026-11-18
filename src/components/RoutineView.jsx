@@ -9,6 +9,7 @@ import { cleanRest, formatRest } from '../lib/rest.js'
 import { loadDraft } from '../lib/draft.js'
 import { Button, CategoryTag, LoadError } from './ui.jsx'
 import ExerciseThumb from './ExerciseThumb.jsx'
+import { RoutineViewSkeleton } from './Skeletons.jsx'
 
 // A routine read-only: every exercise with its target, coach note and
 // superset link, nothing editable. For a coach checking what a trainee is
@@ -29,13 +30,24 @@ export default function RoutineView() {
   // A failed load must not read as "deleted".
   if (!loading && !routine && loadError) return <LoadError onRetry={refresh} />
   if (!loading && !routine) return <p className="text-chalkdim">{t('routines.notFound')}</p>
-  if (!routine) return null
+
+  const back = (
+    <Link to="/routines" className="text-chalkdim text-sm inline-flex items-center gap-1 hover:text-chalk w-fit min-h-[44px] -mb-3">
+      <BackChevron size={16} /> {t('routines.title')}
+    </Link>
+  )
+  if (!routine) {
+    return (
+      <div className="flex flex-col gap-5 max-w-2xl pb-[120px]">
+        {back}
+        <RoutineViewSkeleton />
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-5 max-w-2xl pb-[120px]">
-      <Link to="/routines" className="text-chalkdim text-sm inline-flex items-center gap-1 hover:text-chalk w-fit min-h-[44px] -mb-3">
-        <BackChevron size={16} /> {t('routines.title')}
-      </Link>
+      {back}
 
       <div className="flex flex-col gap-1.5">
         <div className="flex items-start justify-between gap-3">
