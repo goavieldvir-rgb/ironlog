@@ -3,7 +3,7 @@ import { copyRoutineToUser, setScheduleDay } from './db.js'
 
 // Program templates: a coach's set of routines plus a weekly plan, given to
 // several trainees at once. Stored in program_templates (see the migration
-// 20261118084500_program_templates.sql); who got which program is logged in
+// 20261118110000_program_templates.sql); who got which program is logged in
 // program_assignments.
 //
 // A program points at the coach's own routines, so editing a routine
