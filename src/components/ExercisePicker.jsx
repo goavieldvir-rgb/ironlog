@@ -144,7 +144,9 @@ export default function ExercisePicker({ existingNames, onAdd, onCreateCustom, o
               <div key={g.id} className="flex items-center justify-between gap-2 px-2 py-2 rounded-md hover:bg-surface2">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <ExerciseThumb size={36} names={[g.name]} label={displayName(g)} />
-                  <span className="truncate min-w-0">{filteredLabels[i]}</span>
+                  {/* The whole name, wrapped, never cut off: "Single-arm cable curl"
+                      and "Single-arm cable row" must not both read "Single-arm c…". */}
+                  <span className="min-w-0 break-words leading-snug">{filteredLabels[i]}</span>
                   <CategoryTag category={g.category} />
                   {g.bodyweight && !g.timed && g.category !== 'cardio' && <Badge tone="brass">{t('sessionCard.bwShort')}</Badge>}
                 </div>
