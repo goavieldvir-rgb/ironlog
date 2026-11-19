@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Share, Trophy, Check, ImagePlus, Copy, Download } from 'lucide-react'
+import { Share, Trophy, Check, CloudOff, ImagePlus, Copy, Download } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useFeedback } from '../context/FeedbackContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
@@ -19,7 +19,8 @@ function formatDate(date, lang) {
 // a way to share a trimmed-down picture (name, big total, time, streak) as
 // a plain card, over their own photo, or as a see-through sticker.
 // fromHistory: opened later from a saved workout, not right after Finish.
-export default function WorkoutDone({ summary, onDone, fromHistory = false }) {
+// `pending`: saved on this phone only, waiting for a connection to sync.
+export default function WorkoutDone({ summary, onDone, fromHistory = false, pending = false }) {
   const { t, lang, dir } = useLanguage()
   // The coach's name in place of "Ironlog" on the card, when they set one.
   const brandName = useAdmin().brand?.name || null
@@ -199,9 +200,14 @@ export default function WorkoutDone({ summary, onDone, fromHistory = false }) {
   return (
     <div className="flex flex-col gap-5 max-w-2xl" data-testid="workout-done">
       <div>
-        {!fromHistory && (
+        {!fromHistory && !pending && (
           <div className="inline-flex items-center gap-2 text-good">
             <Check size={18} /> <span className="eyebrow">{t('share.subtitle')}</span>
+          </div>
+        )}
+        {!fromHistory && pending && (
+          <div className="inline-flex items-center gap-2 text-chalkdim">
+            <CloudOff size={18} /> <span className="eyebrow">{t('share.subtitlePending')}</span>
           </div>
         )}
         <h1 className="text-3xl mt-1">{fromHistory ? t('share.historyTitle') : t('share.title')}</h1>

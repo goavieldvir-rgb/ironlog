@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase, isPasswordRecovery, clearPasswordRecovery, signupRedirect } from '../supabase.js'
 import { removeDeviceReminder } from '../lib/push.js'
 import { clearAllDrafts } from '../lib/draft.js'
+import { flushOutbox } from '../lib/outbox.js'
+import { logSession } from '../lib/db.js'
 import { assurance } from '../lib/mfa.js'
 
 const AuthContext = createContext(null)
@@ -92,7 +94,14 @@ export function AuthProvider({ children }) {
     },
     logout: async () => {
       // Best effort, but never let a slow connection stall signing out.
-      if (user) await Promise.race([removeDeviceReminder(user.id), new Promise((r) => setTimeout(r, 3000))])
+      // Workouts still waiting to sync get one more try while signed in;
+      // whatever can't be sent stays on this phone for the next sign-in.
+      if (user) {
+        await Promise.race([
+          Promise.all([removeDeviceReminder(user.id), flushOutbox(user.id, logSession).catch(() => {})]),
+          new Promise((r) => setTimeout(r, 3000)),
+        ])
+      }
       clearAllDrafts()
       return supabase.auth.signOut()
     },
