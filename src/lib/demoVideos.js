@@ -75,6 +75,24 @@ export const DEMO_VIDEOS = {
   elliptical: { id: 'mNM01g9wLy4' }, // LIVESTRONG
   assault_bike: { id: 'RPY7HTGfOiU' }, // Peak Human Performance
   jump_rope: { id: 'Y3wzaWE9QRY' }, // Karina Inkster
+  // One-sided versions. Each key is the library name itself, normalized.
+  single_arm_seated_cable_row: { id: 'h6A2acbBWp8' }, // Andrew Coates
+  single_arm_dumbbell_bench_press: { id: 'Os9UeL_YZPw' }, // PureGym
+  single_arm_cable_chest_press: { id: 'uVmRqrTcHyc' }, // ScottHermanFitness
+  single_arm_cable_chest_fly: { id: 'hYg9KkHk1lE' }, // Fitness Lab
+  single_arm_dumbbell_shoulder_press: { id: '4mzFocnr5mU' }, // Colossus Fitness
+  single_arm_cable_rear_delt_fly: { id: 'qz1OLup4W_M' }, // Renaissance Periodization
+  single_arm_cable_curl: { id: '5KLsXyqw8mk' }, // Danny Nichols Fitness
+  single_arm_dumbbell_preacher_curl: { id: 'fuK3nFvwgXk' }, // Renaissance Periodization
+  single_arm_cable_tricep_pushdown: { id: 'Cp_bShvMY4c' }, // Renaissance Periodization
+  single_arm_cable_overhead_tricep_extension: { id: 'sUFUQVMWdnU' }, // Ryan Jewers
+  single_leg_leg_press: { id: 'sxF9BcDt-yY' }, // PureGym
+  single_leg_leg_extension: { id: '82IuSLk5zNc' }, // PureGym
+  single_leg_seated_leg_curl: { id: 'h5NievMGthk' }, // OPEX Fitness
+  single_leg_calf_raise: { id: 'Zt6NdUHowkY' }, // Live Lean TV Daily Exercises
+  single_leg_hip_thrust: { id: 'qCObDXTe4KY' }, // Mind Pump TV
+  single_leg_glute_bridge: { id: 'sVfp4LN9niA' }, // PureGym
+  single_arm_machine_chest_press: { id: 'b8_hggYXiu8' }, // ONE Life Health & Fitness
 }
 
 // Lowercase, trimmed, single-spaced, with hyphens and en/em dashes read as
@@ -254,6 +272,16 @@ const ALIASES = {
   'stiff leg deadlift': 'romanian_deadlift',
   'standing calf raise machine': 'calf_raise',
   'jogging': 'treadmill',
+  // Library names that now say the equipment. The shorter old names above
+  // stay, so exercises already in people's accounts keep their clip.
+  'dumbbell rear delt fly': 'rear_delt_fly',
+  'chest supported dumbbell row': 'chest_supported_row',
+  'dumbbell preacher curl': 'preacher_curl',
+  'dumbbell hammer curl': 'hammer_curl',
+  'dumbbell overhead tricep extension': 'overhead_tricep_extension',
+  'cable tricep pushdown': 'tricep_pushdown',
+  'incline barbell bench press': 'incline_bench_press',
+  'barbell romanian deadlift': 'romanian_deadlift',
 }
 
 // The canonical exercise key for a name (e.g. "Lat Pull Down" ->
