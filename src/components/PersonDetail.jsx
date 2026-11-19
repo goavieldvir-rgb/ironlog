@@ -487,6 +487,9 @@ export default function PersonDetail() {
                   sub={data.targets?.protein ? t('person.ofTarget')(`${Math.round(data.targets.protein)}g`) : null}
                 />
               </div>
+              {data.coachMeals?.options > 0 && (
+                <p className="text-sm text-chalkdim mt-3">{t('person.coachMealsEaten')(data.coachMeals.eaten)}</p>
+              )}
             </Section>
           )}
 

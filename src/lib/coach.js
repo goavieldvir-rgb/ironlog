@@ -158,7 +158,7 @@ export async function deleteCoachTask(id) {
 
 export async function fetchTraineeDetail(uid, today = toLocalISODate()) {
   const since = shiftDay(today, -7 * 26)
-  const [profile, sessions, weights, measurements, prs, notes, goal, schedule, consent, food, targets, routines, exercises, measurementSetup, traineeSettings, checkins] = await Promise.all([
+  const [profile, sessions, weights, measurements, prs, notes, goal, schedule, consent, food, targets, routines, exercises, measurementSetup, traineeSettings, checkins, coachMeals] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', uid).single().then(check),
     supabase
       .from('sessions')
@@ -218,11 +218,20 @@ export async function fetchTraineeDetail(uid, today = toLocalISODate()) {
     // Optional: null until supabase-coach-extras.sql has been run.
     supabase.from('trainee_settings').select('*').eq('user_id', uid).maybeSingle().then(({ data, error }) => (error ? null : data || {}), () => null),
     fetchAnswers(uid).catch(() => null),
+    // Optional: the coach's meal options and how many planned meals were
+    // logged in the last 7 days. Null before the coach meal options migration.
+    Promise.all([
+      supabase.from('saved_meals').select('id', { count: 'exact', head: true }).eq('user_id', uid).eq('by_coach', true),
+      supabase.from('food_logs').select('date, meal').eq('user_id', uid).not('saved_meal_id', 'is', null).gte('date', shiftDay(today, -7)).lt('date', today),
+    ]).then(
+      ([opts, logs]) => (opts.error || logs.error ? null : { options: opts.count || 0, eaten: new Set((logs.data || []).map((r) => `${r.date}|${r.meal}`)).size }),
+      () => null,
+    ),
   ])
   // The birthday lives on the person (it moves with them), the rest of the
   // goal is this coach's own.
   const withBirthday = goal || profile?.birthday ? { ...(goal || {}), birthday: profile?.birthday ?? null } : null
-  return { profile, sessions, weights, measurements, measurementSetup, traineeSettings, checkins, prs, notes, goal: withBirthday, schedule, consent: consent[0] || null, food, targets, routines, exercises }
+  return { profile, sessions, weights, measurements, measurementSetup, traineeSettings, checkins, prs, notes, goal: withBirthday, schedule, consent: consent[0] || null, food, targets, routines, exercises, coachMeals }
 }
 
 // Sessions per week for the last `n` weeks, oldest first.

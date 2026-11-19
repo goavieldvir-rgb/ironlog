@@ -287,9 +287,22 @@ const dropFiber = (row) => {
   const { fiber, ...rest } = row // eslint-disable-line no-unused-vars
   return rest
 }
+// Until the coach meal options migration runs, food_logs has no
+// saved_meal_id column either: leave the link out rather than fail.
+let noSavedMealColumn = false
+const dropSavedMeal = (row) => {
+  const { saved_meal_id, ...rest } = row // eslint-disable-line no-unused-vars
+  return rest
+}
 async function writeLogs(write, rows) {
   if (noFiberColumn) rows = rows.map(dropFiber)
-  const res = await write(rows)
+  if (noSavedMealColumn) rows = rows.map(dropSavedMeal)
+  let res = await write(rows)
+  if (res.error?.code === 'PGRST204' && /saved_meal_id/.test(res.error.message || '')) {
+    noSavedMealColumn = true
+    rows = rows.map(dropSavedMeal)
+    res = await write(rows)
+  }
   if (res.error?.code === 'PGRST204' && /fiber/.test(res.error.message || '')) {
     noFiberColumn = true
     return check(await write(rows.map(dropFiber)))
@@ -435,6 +448,8 @@ export function cloneLogs(rows, { uid, date, meal }) {
     carbs: r.carbs,
     fat: r.fat,
     fiber: r.fiber ?? null,
+    // A planned (coach) meal copied to another day is still that meal.
+    ...(r.saved_meal_id ? { saved_meal_id: r.saved_meal_id } : {}),
   }))
 }
 
@@ -535,8 +550,9 @@ export async function getSavedMeals(uid) {
   return check(await supabase.from('saved_meals').select('*').eq('user_id', uid).order('created_at', { ascending: false }))
 }
 
-export async function saveMeal(uid, name, logs) {
-  const items = logs.map((r) => ({
+// A diary row (or a saved item) as a saved meal item.
+export function mealItem(r) {
+  return {
     food_id: r.food_id ?? null,
     name: r.name,
     grams: r.grams ?? null,
@@ -547,10 +563,79 @@ export async function saveMeal(uid, name, logs) {
     carbs: r.carbs,
     fat: r.fat,
     fiber: r.fiber ?? null,
-  }))
-  const row = check(await supabase.from('saved_meals').insert({ user_id: uid, name, items }).select().single())
+  }
+}
+
+// coach: { meal } saves it as a coach option for that meal slot, which the
+// trainee sees in the diary but can't change (only their coach can).
+export async function saveMeal(uid, name, logs, coach = null) {
+  const items = logs.map(mealItem)
+  const row = { user_id: uid, name, items }
+  if (coach) Object.assign(row, { by_coach: true, meal: coach.meal })
+  const saved = check(await supabase.from('saved_meals').insert(row).select().single())
   mealsChanged()
-  return row
+  return saved
+}
+
+// ---------------------------------------------------------------- coach meal options
+// A coach option is a saved meal with by_coach set and a meal slot. Each item
+// may list swaps (items[i].alts): foods the trainee can pick instead.
+
+export const isCoachMeal = (m) => m?.by_coach === true
+
+// The coach options this person has, by slot. Empty before the migration.
+export async function getCoachMeals(uid) {
+  return (await getSavedMeals(uid)).filter(isCoachMeal)
+}
+
+// Every coach option a coach has given anyone (the rows a coach can read are
+// their own trainees'), the same meal given twice listed once: the coach's
+// meal library to copy from.
+export async function getCoachLibrary(exceptUid) {
+  const res = await supabase.from('saved_meals').select('*').eq('by_coach', true).order('created_at', { ascending: false }).limit(300)
+  if (res.error) {
+    if (res.error.code === '42703' || /by_coach/.test(res.error.message || '')) return []
+    throw res.error
+  }
+  const seen = new Set()
+  const out = []
+  for (const m of res.data || []) {
+    if (m.user_id === exceptUid) continue
+    const key = `${m.name}|${JSON.stringify(m.items)}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(m)
+  }
+  return out
+}
+
+// A library meal copied to this person as a coach option for `meal`.
+export async function copyCoachMeal(uid, m, meal) {
+  const row = { user_id: uid, name: m.name, items: m.items, by_coach: true, meal }
+  const saved = check(await supabase.from('saved_meals').insert(row).select().single())
+  mealsChanged()
+  return saved
+}
+
+// The items with each one's picked swap in its place (picks: index -> alt
+// index, 0 = the planned food). Swaps are dropped from the result.
+export function pickItems(items, picks = {}) {
+  return (items || []).map((it, i) => {
+    const alts = Array.isArray(it.alts) ? it.alts : []
+    const k = picks[i] || 0
+    const chosen = k > 0 && alts[k - 1] ? alts[k - 1] : it
+    return mealItem(chosen)
+  })
+}
+
+// Adds a swap to item `index` (pure). Returns the new items.
+export function addSwap(items, index, alt) {
+  return items.map((it, i) => (i === index ? { ...it, alts: [...(Array.isArray(it.alts) ? it.alts : []), mealItem(alt)] } : it))
+}
+
+// Removes swap `k` (0-based within alts) from item `index` (pure).
+export function removeSwap(items, index, k) {
+  return items.map((it, i) => (i === index ? { ...it, alts: (it.alts || []).filter((_, j) => j !== k) } : it))
 }
 
 // Fired when saved meals change, so an open Add sheet reloads its list.

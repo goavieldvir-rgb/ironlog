@@ -29,6 +29,10 @@ import {
   sumLogs,
   updateLog,
   logName,
+  addSwap,
+  getCoachMeals,
+  updateSavedMeal,
+  MEALS_EVENT,
 } from '../lib/nutrition.js'
 import { Button, Card, LoadError } from './ui.jsx'
 import { AmountText, DirtyScope, Forward, N, Name, Sheet, Track, UndoToast, mealLabel, useDiscardGuard } from './nutrition/parts.jsx'
@@ -40,6 +44,7 @@ import Scanner from './nutrition/Scanner.jsx'
 import Trends from './nutrition/Trends.jsx'
 import Water from './nutrition/Water.jsx'
 import { EditLog, MyMealsView, SaveMealView, TargetsView } from './nutrition/Views.jsx'
+import { CoachLibraryView, CoachMealCard, CoachMealDone } from './nutrition/CoachMeals.jsx'
 
 // Nutrition diary (beta). Scanner and sheets are overlays inside this page on
 // purpose: changing the URL hash while the camera is open makes iOS WebKit ask
@@ -86,6 +91,14 @@ function Diary() {
   // The day the `logs` state belongs to, for writing edits back to dayCache.
   const logsFor = useRef('')
   const adding = useRef(false)
+  // The coach working on someone's diary (the owner may coach themselves).
+  const coachMode = isAdmin && (isOwner || !!actingAs)
+  // The coach's meal options for this person, by slot (see CoachMeals.jsx).
+  const [coachMeals, setCoachMeals] = useState([])
+  // While the coach picks a swap: { meal: saved meal, index: item }. The next
+  // food picked in the add sheet becomes that swap instead of a log.
+  const swapFor = useRef(null)
+  const [swapping, setSwapping] = useState(null)
   const [ownReady, setOwnReady] = useState(false)
   useEffect(() => {
     let off = false
@@ -94,6 +107,21 @@ function Diary() {
       off = true
     }
   }, [])
+
+  useEffect(() => {
+    if (!uid) return
+    let off = false
+    const load = () =>
+      getCoachMeals(uid)
+        .then((list) => !off && setCoachMeals(list))
+        .catch((err) => console.error(err))
+    load()
+    window.addEventListener(MEALS_EVENT, load)
+    return () => {
+      off = true
+      window.removeEventListener(MEALS_EVENT, load)
+    }
+  }, [uid])
 
   // A PWA resumed the next morning still shows yesterday as "Today": move
   // to the new day when the app comes back, if it was showing today.
@@ -202,6 +230,7 @@ function Diary() {
   // A second tap while the first insert is on its way is ignored, so a slow
   // connection can't log the same food or day twice.
   async function addLogs(rows, message) {
+    if (swapFor.current) return pickSwap(rows)
     if (adding.current) return false
     adding.current = true
     try {
@@ -220,10 +249,55 @@ function Diary() {
     }
   }
 
+  // The food picked while choosing a swap goes onto the coach option, then
+  // back to the meals list. Resolves false so the add sheet doesn't treat it
+  // as logged.
+  async function pickSwap(rows) {
+    const target = swapFor.current
+    if (rows.length !== 1) {
+      toast(t('nutrition.swapOneFood'), 'error')
+      return false
+    }
+    try {
+      const items = Array.isArray(target.meal.items) ? target.meal.items : []
+      await updateSavedMeal(target.meal.id, { items: addSwap(items, target.index, rows[0]) })
+      endSwap()
+      setScanner(false)
+      setStack((s) => {
+        const i = s.findIndex((v) => v.type === 'meals')
+        return i >= 0 ? s.slice(0, i + 1) : []
+      })
+      showToast(t('nutrition.swapAdded', { name: rows[0].name }))
+    } catch (err) {
+      console.error(err)
+      toast(friendlyError(err, t), 'error')
+    }
+    return false
+  }
+  const endSwap = () => {
+    swapFor.current = null
+    setSwapping(null)
+  }
+  function startSwap(m, index) {
+    swapFor.current = { meal: m, index }
+    setSwapping({ name: m.items?.[index]?.name || '' })
+    push({ type: 'add' })
+  }
+
+  // A coach option logged into its slot, linked to it so the coach sees it.
+  async function logCoachMeal(items, m, slot) {
+    const rows = cloneLogs(items.map((it) => ({ ...it, saved_meal_id: m.id })), { uid, date, meal: slot })
+    await addLogs(rows, t('nutrition.loggedToMeal', { meal: mealLabel(t, slot) }))
+  }
+
   // ----- sheet stack
   const push = (view) => setStack((s) => [...s, view])
   const pop = useCallback(() => setStack((s) => s.slice(0, -1)), [])
   const closeAll = useCallback(() => setStack([]), [])
+  // Swap mode lasts while its add sheet is open.
+  useEffect(() => {
+    if (swapping && !stack.some((v, i) => v.type === 'add' && i > 0)) endSwap()
+  }, [stack, swapping])
   // Back, X, Escape and a tap outside ask first when a form has typed values.
   const guard = useDiscardGuard()
   const depth = useRef(0)
@@ -333,10 +407,15 @@ function Diary() {
     if (await addLogs([copy], t('nutrition.copiedTo', { day: dayName(patch.date) }))) closeAll()
   }
 
-  async function onSaveMeal(m, name) {
+  async function onSaveMeal(m, name, asCoach, clear) {
     try {
-      await saveMeal(uid, name, logs.filter((r) => r.meal === m))
-      showToast(t('nutrition.mealSaved'))
+      const rows = logs.filter((r) => r.meal === m)
+      await saveMeal(uid, name, rows, asCoach ? { meal: m } : null)
+      if (clear) {
+        await deleteLogs(rows.map((r) => r.id))
+        reload()
+      }
+      showToast(asCoach ? t('nutrition.coachOptionSaved', { meal: mealLabel(t, m) }) : t('nutrition.mealSaved'))
       pop()
     } catch (err) {
       console.error(err)
@@ -528,6 +607,8 @@ function Diary() {
           {mealsFor(logs).map((m) => {
             const rows = logs.filter((r) => r.meal === m)
             const mt = sumLogs(rows)
+            const options = coachMeals.filter((o) => o.meal === m)
+            const plannedDone = options.find((o) => rows.some((r) => r.saved_meal_id === o.id))
             return (
               <section key={m} aria-labelledby={`meal-${m}`} className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
@@ -557,7 +638,13 @@ function Diary() {
                     </button>
                   </div>
                 </div>
-                {rows.length === 0 && prevMeal(m) ? (
+                {rows.length === 0 && options.length > 0 ? (
+                  <div className="flex flex-col gap-2">
+                    {options.map((o) => (
+                      <CoachMealCard key={o.id} m={o} onLog={(items) => logCoachMeal(items, o, m)} />
+                    ))}
+                  </div>
+                ) : rows.length === 0 && prevMeal(m) ? (
                   <RepeatMeal rows={prevMeal(m).rows} day={sourceDay(prevMeal(m).date)} meal={mealLabel(t, m)} onClick={() => copyPrevMeal(m)} />
                 ) : rows.length === 0 ? (
                   <p className="text-chalkdim text-sm">{isFuture ? t('nutrition.nothingPlanned') : t('nutrition.nothingLogged')}</p>
@@ -587,6 +674,7 @@ function Diary() {
                     ))}
                   </ul>
                 )}
+                {plannedDone && <CoachMealDone name={plannedDone.name} />}
               </section>
             )
           })}
@@ -619,6 +707,7 @@ function Diary() {
                     onLabel={() => push({ type: 'label', barcode: '' })}
                     onLog={addLogs}
                     onManageMeals={() => push({ type: 'meals' })}
+                    title={swapping && i > 0 ? t('nutrition.pickSwapTitle', { name: swapping.name }) : ''}
                   />
                 )
                 break
@@ -650,7 +739,8 @@ function Diary() {
                     {...common}
                     defaultName={mealLabel(t, v.meal)}
                     count={logs.filter((r) => r.meal === v.meal).length}
-                    onSave={(name) => onSaveMeal(v.meal, name)}
+                    coachSlot={coachMode ? mealLabel(t, v.meal) : ''}
+                    onSave={(name, asCoach, clear) => onSaveMeal(v.meal, name, asCoach, clear)}
                   />
                 )
                 break
@@ -669,7 +759,22 @@ function Diary() {
                 )
                 break
               case 'meals':
-                body = <MyMealsView {...common} uid={uid} date={date} meal={meal} setMeal={setMeal} onLog={addLogs} />
+                body = (
+                  <MyMealsView
+                    {...common}
+                    uid={uid}
+                    date={date}
+                    meal={meal}
+                    setMeal={setMeal}
+                    onLog={addLogs}
+                    coach={coachMode}
+                    onAddSwap={coachMode ? startSwap : undefined}
+                    onLibrary={coachMode ? () => push({ type: 'library' }) : undefined}
+                  />
+                )
+                break
+              case 'library':
+                body = <CoachLibraryView {...common} uid={uid} meal={meal} setMeal={setMeal} />
                 break
               default:
                 break
