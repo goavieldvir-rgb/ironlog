@@ -20,6 +20,7 @@ import { entryName, exerciseMap } from '../lib/names.js'
 import { toLocalISODate, fmtDate, dateLocale, weekStartOf } from '../lib/dates.js'
 import { disambiguateLabels } from '../lib/disambiguate.js'
 import { EmptyState, LoadError, Field } from './ui.jsx'
+import { StatsSkeleton } from './Skeletons.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { workingSets } from '../lib/warmup.js'
 import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
@@ -343,6 +344,8 @@ export default function Stats() {
   return (
     <div className="flex flex-col gap-6 pb-[120px]">
       <h1 className="text-[30px] leading-9">{t('stats.title')}</h1>
+
+      {loading && <StatsSkeleton />}
 
       {!loading && loadFailed && <LoadError onRetry={refreshSessions} />}
 

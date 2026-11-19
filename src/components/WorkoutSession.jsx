@@ -11,6 +11,8 @@ import { useGyms, sessionGymId, gymHistory, exerciseAtGym, gymLabel } from '../l
 import { saveDraft, loadDraft, clearDraft, FREESTYLE_KEY } from '../lib/draft.js'
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
 import { Button, Card, Field, LoadError } from './ui.jsx'
+import { WorkoutSkeleton } from './Skeletons.jsx'
+import { Skeleton } from './Loading.jsx'
 import SessionEntryCard from './SessionEntryCard.jsx'
 import ExercisePicker, { useDialog } from './ExercisePicker.jsx'
 import ExerciseSelect from './ExerciseSelect.jsx'
@@ -203,7 +205,7 @@ export default function WorkoutSession() {
   const isFreestyle = routineId === 'freestyle'
 
   const [routines, routinesLoading, refreshRoutines, routinesError] = useCollection(effectiveUid, 'routines', 'created_at', 'desc')
-  const [exercises, , refreshExercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
+  const [exercises, exercisesLoading, refreshExercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const [pastSessions, pastLoading] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
   // The weight log, so bodyweight exercises count the trainee's body weight
   // and only extra load (belt, vest) has to be typed.
@@ -941,6 +943,24 @@ export default function WorkoutSession() {
 
   if (summary) return <WorkoutDone summary={summary} onDone={() => navigate('/history', { replace: true })} />
 
+  // The routine is still on its way: the workout's shape, with a way out.
+  if (!ready) {
+    return (
+      <div className="flex flex-col gap-3 max-w-2xl pb-48">
+        <header className="grid grid-cols-[88px_minmax(0,1fr)_88px] items-center -mx-2">
+          <Link to="/" aria-label={t('common.close')} title={t('common.close')} className="press w-11 h-11 flex items-center justify-center text-chalkdim hover:text-chalk">
+            <X size={22} strokeWidth={1.75} />
+          </Link>
+          <div className="flex flex-col items-center gap-1.5">
+            <Skeleton className="h-3.5 w-28" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+        </header>
+        <WorkoutSkeleton />
+      </div>
+    )
+  }
+
   const availableToAdd = exercises.filter((e) => !entries.some((en) => en.exerciseId === e.id))
   const exerciseOptions = availableToAdd.map((e) => ({
     id: e.id,
@@ -1101,6 +1121,7 @@ export default function WorkoutSession() {
             })()}
             personalBest={personalBests[entry.exerciseId]}
             pastSets={pastStrengthSets[entry.exerciseId]}
+            previousLoading={exercisesLoading || (gymsOn && pastLoading)}
             bodyWeight={usesBodyWeight(entry) ? { value: bodyWeightIn(bodyWeight, entry.unit), date: bodyWeight?.date, loading: bodyWeightLoading } : null}
             onLogBodyWeight={logBodyWeight}
             removable
