@@ -13,7 +13,7 @@ import { InfoTip } from './InfoTip.jsx'
 import { workingSets } from '../lib/warmup.js'
 import { cardioSummary, formatDistance, toKm } from '../lib/cardio.js'
 import { setVolume } from '../lib/bodyweight.js'
-import { SkeletonGroup, SkeletonRow } from './Loading.jsx'
+import { Skeleton, SkeletonGroup, SkeletonRow } from './Loading.jsx'
 
 function dayParts(lang, iso) {
   const d = new Date(iso + 'T00:00:00')
@@ -233,10 +233,15 @@ export default function History() {
 
       {/* Three placeholder rows while the first load runs, instead of a blank page. */}
       {loading && sessions.length === 0 && (
-        <SkeletonGroup className="bg-surface rounded-[18px] overflow-hidden">
-          {[0, 1, 2].map((i) => (
-            <SkeletonRow key={i} className={`min-h-[64px] ps-4 pe-3.5 py-2 ${i > 0 ? 'border-t border-white/[0.06]' : ''}`} />
-          ))}
+        <SkeletonGroup className="flex flex-col gap-2 mt-1">
+          <div className="h-[21px] flex items-center px-1">
+            <Skeleton className="h-3 w-24" />
+          </div>
+          <div className="bg-surface rounded-[18px] overflow-hidden">
+            {[0, 1, 2].map((i) => (
+              <SkeletonRow key={i} className={`min-h-[76px] ps-4 pe-3.5 py-2 ${i > 0 ? 'border-t border-white/[0.06]' : ''}`} />
+            ))}
+          </div>
         </SkeletonGroup>
       )}
 

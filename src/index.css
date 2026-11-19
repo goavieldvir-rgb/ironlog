@@ -199,8 +199,10 @@
       opacity: 0.55;
     }
   }
+  /* Eases in slowly, so a skeleton that is only up for a blink (a load
+     that ends just after the 300 ms wait) is barely seen. */
   .skeleton-in {
-    animation: skeletonin 240ms ease-out;
+    animation: skeletonin 500ms ease-in;
   }
   @keyframes skeletonin {
     from {

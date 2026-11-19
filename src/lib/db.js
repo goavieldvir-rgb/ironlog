@@ -24,13 +24,21 @@ export function useCollection(uid, table, orderField = 'created_at', direction =
   // Which query `data` belongs to, so a failed refresh keeps the rows already
   // loaded for it but never shows another account's rows after a switch.
   const loadedKey = useRef('')
+  // Which query the rows on screen belong to (cached callers only).
+  const shownKey = useRef(cacheKey)
 
   useEffect(() => {
     if (!uid) return
     let cancelled = false
     const key = `${uid}|${table}|${orderField}|${direction}`
     setLoading(true)
-    if (cached && loadedKey.current !== key && collectionCache.has(key)) setData(collectionCache.get(key))
+    // A cached caller shows its rows while it re-checks, so on a switch to
+    // another account the old account's rows must go at once: the new
+    // account's cached rows take their place, or nothing.
+    if (cached && shownKey.current !== key) {
+      shownKey.current = key
+      setData(collectionCache.get(key) || [])
+    }
 
     supabase
       .from(table)

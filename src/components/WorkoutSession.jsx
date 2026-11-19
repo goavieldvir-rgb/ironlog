@@ -14,7 +14,7 @@ import { saveDraft, loadDraft, clearDraft, FREESTYLE_KEY } from '../lib/draft.js
 import { toLocalISODate, fmtDate } from '../lib/dates.js'
 import { Button, Card, Field, LoadError } from './ui.jsx'
 import { WorkoutSkeleton } from './Skeletons.jsx'
-import { Skeleton } from './Loading.jsx'
+import { Skeleton, SkeletonGroup } from './Loading.jsx'
 import SessionEntryCard from './SessionEntryCard.jsx'
 import ExercisePicker, { useDialog } from './ExercisePicker.jsx'
 import ExerciseSelect from './ExerciseSelect.jsx'
@@ -982,10 +982,10 @@ export default function WorkoutSession() {
           <Link to="/" aria-label={t('common.close')} title={t('common.close')} className="press w-11 h-11 flex items-center justify-center text-chalkdim hover:text-chalk">
             <X size={22} strokeWidth={1.75} />
           </Link>
-          <div className="flex flex-col items-center gap-1.5">
-            <Skeleton className="h-3.5 w-28" />
-            <Skeleton className="h-3 w-16" />
-          </div>
+          <SkeletonGroup className="flex flex-col items-center gap-2">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-2.5 w-14" />
+          </SkeletonGroup>
         </header>
         <WorkoutSkeleton />
       </div>
