@@ -93,6 +93,18 @@ export const DEMO_VIDEOS = {
   single_leg_hip_thrust: { id: 'qCObDXTe4KY' }, // Mind Pump TV
   single_leg_glute_bridge: { id: 'sVfp4LN9niA' }, // PureGym
   single_arm_machine_chest_press: { id: 'b8_hggYXiu8' }, // ONE Life Health & Fitness
+  single_arm_landmine_press: { id: '5Cs27w8WVz4' }, // Functional Bodybuilding
+  landmine_meadows_row: { id: 'w1d_wD0v3gc' }, // The Barbell Physio
+  single_arm_kettlebell_swing: { id: 'r777bo9KuY4' }, // National Academy of Sports Medicine (NASM)
+  single_arm_incline_dumbbell_press: { id: 'F6PTxYsgbT0' }, // Live Lean TV Daily Exercises
+  single_arm_machine_shoulder_press: { id: 'guRVBTLERH0' }, // OPEX Fitness
+  single_arm_dumbbell_overhead_tricep_extension: { id: 'kZ-ReOdn2qk' }, // National Academy of Sports Medicine (NASM)
+  standing_cable_hip_abduction: { id: 'bGlm-qTnfTI' }, // Live Lean TV Daily Exercises
+  standing_cable_hip_adduction: { id: 'SIQrpq6YnT8' }, // Live Lean TV Daily Exercises
+  single_leg_lying_leg_curl: { id: 'L7eU0RhlXBs' }, // Live Lean TV Daily Exercises
+  single_leg_box_squat: { id: '__V4UEzKSBg' }, // The Active Life
+  single_leg_seated_calf_raise: { id: '4NUJeFJ14F4' }, // OPEX Fitness
+  copenhagen_plank: { id: 'aDsaGBnvDQo' }, // E3 Rehab Exercise Library
 }
 
 // Lowercase, trimmed, single-spaced, with hyphens and en/em dashes read as
