@@ -11,7 +11,9 @@ on:
     paths: ['supabase/migrations/**', '.github/workflows/db-migrate.yml']
   push:
     branches: [main]
-    paths: ['supabase/migrations/**']
+    # The workflow file too, so a fix to this file applies any migration
+    # that was left waiting.
+    paths: ['supabase/migrations/**', '.github/workflows/db-migrate.yml']
   workflow_dispatch:
 
 permissions:
@@ -77,4 +79,6 @@ jobs:
 
       - name: Apply to the live database
         if: github.event_name != 'pull_request'
-        run: supabase db push --db-url "$DB_URL"
+        # --yes: the CLI asks "apply N migrations?" and a workflow can't
+        # answer, so without it nothing is applied. Merging was the approval.
+        run: supabase db push --db-url "$DB_URL" --yes
