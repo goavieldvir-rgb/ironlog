@@ -13,7 +13,7 @@ export const DEMO_VIDEOS = {
   incline_dumbbell_press: { id: 'hChjZQhX1Ls' }, // ScottHermanFitness
   incline_smith_press: { id: 'pd2fnOrggI8' }, // MyTraining App
   chest_press_machine: { id: 'ksTNcvc6sKs' }, // Rehab My Patient
-  cable_chest_press: { id: 'N2RB0Qvab7o' }, // Live Lean TV Daily Exercises
+  cable_chest_press: { id: 'uuAi2G7vhps' }, // OriGym
   cable_fly: { id: '8Um35Es-ROE' }, // ScottHermanFitness
   pec_deck: { id: '-DZXcuPi4vk' }, // Live Lean TV Daily Exercises
   push_up: { id: 'vh72hbUqqfs' }, // ScottHermanFitness
@@ -27,15 +27,15 @@ export const DEMO_VIDEOS = {
   lat_pulldown: { id: 'CAwf7n6Luuc' }, // ScottHermanFitness
   wide_grip_lat_pulldown: { id: '7JnP8dFbS14' }, // PureGym
   close_grip_lat_pulldown: { id: 'IjoFCmLX7z0' }, // PureGym
-  single_arm_lat_pulldown: { id: 'nav4bUA3QZM' }, // Live Lean TV Daily Exercises
+  single_arm_lat_pulldown: { id: 'PTmdK_N9iTI' }, // Live Lean TV Daily Exercises
   seated_cable_row: { id: 'GZbfZ033f74' }, // ScottHermanFitness
-  chest_supported_row: { id: 'QpLTp2AJ_cI' }, // Fox Body Fitness
+  chest_supported_row: { id: 'f0bFCVXB8hc' }, // Travis Tarrant
   t_bar_row: { id: 'j3Igk5nyZE4' }, // ScottHermanFitness
   dumbbell_row: { id: 'sUqz6oaISkQ' }, // ScottHermanFitness
   machine_single_arm_row: { id: '0GDPa0w2_k0' }, // Fitness Lab
   back_extension: { id: 'CgbmrF-DRSE' }, // Enterprise Fitness
   romanian_deadlift: { id: '2SHsk9AzdjA' }, // Buff Dudes
-  leg_press: { id: 'IZxyjW7MPJQ' }, // ScottHermanFitness
+  leg_press: { id: 'n2ng6LCp3yk' }, // Rachel Scheer
   hack_squat: { id: 'plv5ur26Q7A' }, // Bodybuilding.com
   leg_extension: { id: 'gI0cn4DMFFI' }, // Live Lean TV Daily Exercises
   leg_curl: { id: '5Uvvd6NsCyU' }, // Live Lean TV Daily Exercises
@@ -46,8 +46,8 @@ export const DEMO_VIDEOS = {
   bulgarian_split_squat: { id: '2C-uNgKwPLE' }, // ScottHermanFitness
   static_lunge: { id: 'T2s9nByxqvk' }, // Get Healthy U - with Chris Freytag
   step_down: { id: 'Or4C-UQ63Xc' }, // Dr. Carl Baird
-  captains_chair_leg_raise: { id: '7KDDZtaUaxw' }, // Live Lean TV Daily Exercises
-  wall_slide: { id: 'D351y9ecIwc' }, // MGHOrthopaedics
+  captains_chair_leg_raise: { id: 'nBsP27-x7LU' }, // Live Lean TV Daily Exercises
+  wall_slide: { id: 'Fc14JgvMJFs' }, // James Wilson
   barbell_curl: { id: 'QZEqB6wUPxQ' }, // ScottHermanFitness
   dumbbell_curl: { id: 'w7hl4IbHMtY' }, // Live Lean TV Daily Exercises
   seated_dumbbell_curl: { id: 's9GGVuUXgmY' }, // Live Lean TV Daily Exercises
@@ -55,16 +55,16 @@ export const DEMO_VIDEOS = {
   cable_curl: { id: '_hRnRorKRWs' }, // Live Lean TV Daily Exercises
   ez_bar_curl: { id: 'wGi7k6JGs1k' }, // No Pain Project
   hammer_curl: { id: 'zC3nLlEvin4' }, // ScottHermanFitness
-  preacher_curl: { id: 'RgN216Cumtw' }, // Bodybuilding.com
+  preacher_curl: { id: 'sZfiJzEkaVc' }, // OriGym
   concentration_curl: { id: 'ZcU2hN76UyA' }, // Bodybuilding.com
   tricep_pushdown: { id: '2-LAMcpzODU' }, // ScottHermanFitness
-  overhead_tricep_extension: { id: 'YbX7Wd8jQ-Q' }, // ScottHermanFitness
+  overhead_tricep_extension: { id: '8_zOdr_rQgU' }, // Live Lean TV Daily Exercises
   cable_overhead_tricep_extension: { id: 'mRozZKkGIfg' }, // Bodybuilding.com
   lateral_raise: { id: 'XPPfnSEATJA' }, // National Academy of Sports Medicine (NASM)
-  cable_lateral_raise: { id: 'Z9KwFXXxkKQ' }, // Live Lean TV Daily Exercises
+  cable_lateral_raise: { id: 'K1eQqUAWRDI' }, // FITASTIC
   machine_lateral_raise: { id: 'dTwa2piwU-A' }, // Live Lean TV Daily Exercises
-  rear_delt_fly: { id: 'hmtnyIGgR9A' }, // Ignore Limits
-  arnold_press: { id: 'ZsVxV2dV5YU' }, // Live Lean TV Daily Exercises
+  rear_delt_fly: { id: 'lFJBHzGIKIE' }, // Functional AF
+  arnold_press: { id: 'FgaNMli_3y0' }, // Live Lean TV Daily Exercises
   seated_dumbbell_shoulder_press: { id: '8kwDkC8JhdY' }, // Live Lean TV Daily Exercises
   machine_shoulder_press: { id: 'Anu8s_nkNpM' }, // Live Lean TV Daily Exercises
   cable_crunch: { id: 'kc0PRn372lo' }, // Live Lean TV Daily Exercises
