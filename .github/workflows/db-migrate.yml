@@ -11,7 +11,7 @@ on:
     paths: ['supabase/migrations/**', '.github/workflows/db-migrate.yml']
   push:
     branches: [main]
-    paths: ['supabase/migrations/**']
+    paths: ['supabase/migrations/**', '.github/workflows/db-migrate.yml']
   workflow_dispatch:
 
 permissions:
@@ -76,5 +76,8 @@ jobs:
         run: supabase db push --db-url "$DB_URL" --dry-run
 
       - name: Apply to the live database
-        if: github.event_name != 'pull_request'
-        run: supabase db push --db-url "$DB_URL"
+        # Only ever from main: a manual run started on another branch stops here.
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        # --yes: nobody is there to answer "apply?" in a workflow run; without
+        # it the CLI stops and changes nothing. Merging was the approval.
+        run: supabase db push --db-url "$DB_URL" --yes
