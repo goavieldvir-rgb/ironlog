@@ -74,5 +74,5 @@ export const CLIPS = {
   'triceps-pushdown': { v: 'a36fc1db', t: '8d94333c' },
   'walking': { v: 'b23d331b' },
   'wall-slides': { v: '9d3ed95c', t: 'c4786090' },
-  'wide-grip-lat-pulldown': { v: '36855887', t: '63fbbd71' },
+  'wide-grip-lat-pulldown': { v: '9f9eb752', t: '63fbbd71' },
 }

@@ -21,3 +21,5 @@ pec-deck-fly-machine --frame 16
 concentration-curl --crop 250,350,530
 # Lat pulldown re-render (Nov 8, rear three-quarter camera), same crop as PR #83.
 lat-pulldown --crop 370,440,470
+# Nov 22 re-render: rear camera like the lat pulldown, whole tower in view.
+wide-grip-lat-pulldown --crop 390,400,500
