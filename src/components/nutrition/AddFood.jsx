@@ -51,7 +51,8 @@ function Stats({ protein, kcal, extra, source }) {
   )
 }
 
-export default function AddFood({ meal, setMeal, uid, authUid, date, today, onClose, onScan, onPick, onLabel, onLog, onManageMeals }) {
+// title: replaces the sheet title, e.g. while a coach picks a swap.
+export default function AddFood({ meal, setMeal, uid, authUid, date, today, onClose, onScan, onPick, onLabel, onLog, onManageMeals, title = '' }) {
   const { t, lang } = useLanguage()
   const [query, setQuery] = useState('')
   const [tab, setTab] = useState('recent')
@@ -303,7 +304,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, today, onCl
   async function logMeal(m) {
     const items = Array.isArray(m.items) ? m.items : []
     if (!items.length) return
-    const rows = cloneLogs(items, { uid, date, meal })
+    const rows = cloneLogs(items.map((it) => ({ ...it, saved_meal_id: m.id })), { uid, date, meal })
     if (await onLog(rows, t('nutrition.loggedToMeal', { meal: mealLabel(t, meal) }))) flash(m.id)
   }
 
@@ -379,7 +380,7 @@ export default function AddFood({ meal, setMeal, uid, authUid, date, today, onCl
 
   return (
     <>
-      <SheetHeader title={t('nutrition.addSheetTitle', { meal: mealLabel(t, meal) })} onClose={onClose} />
+      <SheetHeader title={title || t('nutrition.addSheetTitle', { meal: mealLabel(t, meal) })} onClose={onClose} />
       <div className="px-4 pt-2 shrink-0">
         <MealTabs value={meal} onChange={setMeal} />
       </div>

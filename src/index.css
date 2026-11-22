@@ -184,7 +184,34 @@
     border: 1.5px solid rgb(var(--accent));
     animation: jumpring 420ms ease-out forwards;
   }
+  /* Skeleton blocks (src/components/Loading.jsx): a slow, shallow pulse,
+     no shimmer, so a wait reads as calm rather than busy. */
+  .skeleton {
+    @apply bg-surface2 rounded-md;
+    animation: skeletonpulse 1800ms ease-in-out infinite;
+  }
+  @keyframes skeletonpulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
+  /* Eases in slowly, so a skeleton that is only up for a blink (a load
+     that ends just after the 300 ms wait) is barely seen. */
+  .skeleton-in {
+    animation: skeletonin 500ms ease-in;
+  }
+  @keyframes skeletonin {
+    from {
+      opacity: 0;
+    }
+  }
   @media (prefers-reduced-motion: reduce) {
+    .skeleton,
+    .skeleton-in,
     .press,
     .press-row,
     .flash-fill,

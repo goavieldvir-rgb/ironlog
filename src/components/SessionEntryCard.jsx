@@ -4,6 +4,7 @@ import { exerciseClipFor } from '../lib/exerciseClips.js'
 import React, { useEffect, useRef, useState } from 'react'
 import { X, Plus, Trash2, Minus, CornerDownLeft, StickyNote, Repeat, ArrowUp, ArrowDown, Trophy, Link2, Check, Flame, ChevronDown, Play, Square, Scale } from 'lucide-react'
 import { Badge } from './ui.jsx'
+import { Delayed, Skeleton } from './Loading.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import OverflowMenu from './OverflowMenu.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -172,6 +173,9 @@ export default function SessionEntryCard({
   // Gym name when the previous numbers come from another gym (this
   // exercise hasn't been done at the current gym yet).
   previousFrom = null,
+  // Last time's numbers are still loading: their cells show a placeholder
+  // dash instead of a "—" that would read as "never done".
+  previousLoading = false,
   // Bodyweight exercises during a workout: { value, date, loading } from
   // the weight log, value already in the exercise's unit (null when nothing
   // is logged). Left out elsewhere, where the body weight saved with the
@@ -527,6 +531,13 @@ export default function SessionEntryCard({
   const prevCell = (j) => {
     const s = entry.sets[j]
     const data = previousFor(j)
+    if (!data && previousLoading && !isWarmup(s)) {
+      return (
+        <Delayed>
+          <Skeleton className="h-2.5 w-10" />
+        </Delayed>
+      )
+    }
     if (!data) return <span className="text-[14px] text-chalkdim">—</span>
     const text = numbersText(data)
     return (

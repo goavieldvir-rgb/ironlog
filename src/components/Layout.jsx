@@ -2,6 +2,7 @@ import React, { Suspense, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom'
 import { PageLoader } from './Loading.jsx'
+import PendingSync from './PendingSync.jsx'
 import { Dumbbell, LayoutDashboard, ListChecks, History, Library, LogOut, X, Users, UserCheck, BarChart3, Scale, FileText, HelpCircle, CircleUser, Bell, Apple, Home, Ellipsis, MessageSquare } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
@@ -103,11 +104,8 @@ export default function Layout() {
     <div className="min-h-dvh flex flex-col">
       {/* Always mounted so screen readers announce it when it fills in. */}
       <div role="status" aria-live="polite">
-        {!online && (
-          <div className="sticky top-0 z-30 bg-surface text-chalkdim text-xs text-center px-4 py-2 border-b border-line" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)' }}>
-            {t('layout.offline')}
-          </div>
-        )}
+        {/* Offline notice, and finished workouts still waiting to sync. */}
+        <PendingSync online={online} />
       </div>
       {/* On phones the brand bar is gone: navigation lives in the floating
           tab bar at the bottom, and each screen carries its own title. */}

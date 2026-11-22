@@ -20,6 +20,7 @@ import { entryName, exerciseMap } from '../lib/names.js'
 import { toLocalISODate, fmtDate, dateLocale, weekStartOf } from '../lib/dates.js'
 import { disambiguateLabels } from '../lib/disambiguate.js'
 import { EmptyState, LoadError, Field } from './ui.jsx'
+import { StatsSkeleton } from './Skeletons.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { workingSets } from '../lib/warmup.js'
 import { formatSeconds, applyCurrentTimed } from '../lib/timed.js'
@@ -49,7 +50,7 @@ function last12WeekStarts() {
 export default function Stats() {
   const { effectiveUid } = useAdmin()
   const { t, lang } = useLanguage()
-  const [rawSessions, loading, refreshSessions, loadError] = useCollection(effectiveUid, 'sessions', 'date', 'desc')
+  const [rawSessions, loading, refreshSessions, loadError] = useCollection(effectiveUid, 'sessions', 'date', 'desc', { cached: true })
   const [exercises] = useCollection(effectiveUid, 'exercises', 'name', 'asc')
   const sessions = useMemo(() => applyCurrentTimed(rawSessions, exercises), [rawSessions, exercises])
   // null = nothing picked yet (the deep link or the most recent exercise
@@ -327,7 +328,8 @@ export default function Stats() {
     return [Math.max(0, Math.floor(lo - pad)), Math.ceil(hi + pad)]
   }, [selectedProgress, dataKey])
   const loadFailed = !!loadError && rawSessions.length === 0
-  const hasData = !loading && sessions.length > 0
+  // Workouts already loaded on another screen show at once while they re-check.
+  const hasData = sessions.length > 0
 
   const nf = (n) => n.toLocaleString(dateLocale(lang))
   const current = weeklyData[weeklyData.length - 1]
@@ -343,6 +345,8 @@ export default function Stats() {
   return (
     <div className="flex flex-col gap-6 pb-[120px]">
       <h1 className="text-[30px] leading-9">{t('stats.title')}</h1>
+
+      {loading && !hasData && <StatsSkeleton />}
 
       {!loading && loadFailed && <LoadError onRetry={refreshSessions} />}
 

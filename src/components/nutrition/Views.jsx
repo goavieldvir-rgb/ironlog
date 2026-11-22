@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Check, CopyPlus, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { Check, CopyPlus, Library, Pencil, Plus, Repeat, Trash2, X } from 'lucide-react'
 import { useLanguage } from '../../context/LanguageContext.jsx'
 import { useFeedback } from '../../context/FeedbackContext.jsx'
 import { Button } from '../ui.jsx'
@@ -9,6 +9,9 @@ import {
   fmt,
   friendlyError,
   getSavedMeals,
+  isCoachMeal,
+  removeSwap,
+  MEALS_EVENT,
   parseNum,
   round1,
   scaleItems,
@@ -377,16 +380,22 @@ export function TargetsView({ targets, note, coach = false, onBack, onClose, onS
 
 // ------------------------------------------------------------ save a meal
 
-export function SaveMealView({ defaultName, count, onBack, onClose, onSave }) {
+// coachSlot: the coach is saving for a trainee, so it can be saved as a coach
+// option for that meal slot (on by default).
+export function SaveMealView({ defaultName, count, coachSlot = '', onBack, onClose, onSave }) {
   const { t } = useLanguage()
   const [name, setName] = useState(defaultName)
+  const [asCoach, setAsCoach] = useState(!!coachSlot)
+  // Off by default: the foods may be the trainee's real meal. The coach opts
+  // in when they logged them only to build the option.
+  const [clear, setClear] = useState(false)
   const [busy, setBusy] = useState(false)
   async function submit(e) {
     e.preventDefault()
     if (!name.trim() || busy) return
     setBusy(true)
     try {
-      await onSave(name.trim())
+      await onSave(name.trim(), !!coachSlot && asCoach, !!coachSlot && asCoach && clear)
     } finally {
       setBusy(false)
     }
@@ -401,6 +410,21 @@ export function SaveMealView({ defaultName, count, onBack, onClose, onSave }) {
             <input dir="auto" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
           </label>
           <p className="text-chalkdim text-sm">{count === 1 ? t('nutrition.itemsOne') : t('nutrition.itemsMany', { n: count })}</p>
+          {coachSlot && (
+            <label className="card flex items-start gap-3 p-4 cursor-pointer">
+              <input type="checkbox" className="mt-1 shrink-0" checked={asCoach} onChange={(e) => setAsCoach(e.target.checked)} />
+              <span className="min-w-0">
+                <span className="block text-[15px] font-medium">{t('nutrition.asCoachOption', { meal: coachSlot })}</span>
+                <span className="block text-chalkdim text-sm mt-0.5">{t('nutrition.asCoachOptionHint')}</span>
+              </span>
+            </label>
+          )}
+          {coachSlot && asCoach && (
+            <label className="flex items-start gap-3 px-4 cursor-pointer">
+              <input type="checkbox" className="mt-1 shrink-0" checked={clear} onChange={(e) => setClear(e.target.checked)} />
+              <span className="text-sm text-chalkdim">{t('nutrition.clearAfterSave')}</span>
+            </label>
+          )}
         </div>
         <div className="p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] shrink-0">
           <Button type="submit" variant="brass" className="w-full min-h-[52px] text-base" disabled={!name.trim() || busy}>
@@ -414,7 +438,10 @@ export function SaveMealView({ defaultName, count, onBack, onClose, onSave }) {
 
 // ------------------------------------------------------------ my meals
 
-export function MyMealsView({ uid, date, meal, setMeal, onBack, onClose, onLog }) {
+// coach: the coach is looking at a trainee's meals, so coach options can be
+// edited, given swaps (onAddSwap) and copied from other trainees (onLibrary).
+// A trainee can log a coach option but not change it.
+export function MyMealsView({ uid, date, meal, setMeal, onBack, onClose, onLog, coach = false, onAddSwap, onLibrary }) {
   const { t } = useLanguage()
   const { confirm, toast } = useFeedback()
   const [meals, setMeals] = useState(null)
@@ -425,13 +452,19 @@ export function MyMealsView({ uid, date, meal, setMeal, onBack, onClose, onLog }
   const g = t('nutrition.g')
 
   useEffect(() => {
-    getSavedMeals(uid)
-      .then(setMeals)
-      .catch((err) => {
-        console.error(err)
-        setMeals([])
-        setError(friendlyError(err, t, 'nutrition.loadFailed'))
-      })
+    const load = () =>
+      getSavedMeals(uid)
+        // Coach options first: they're the plan.
+        .then((list) => setMeals([...list.filter(isCoachMeal), ...list.filter((m) => !isCoachMeal(m))]))
+        .catch((err) => {
+          console.error(err)
+          setMeals((m) => m || [])
+          setError(friendlyError(err, t, 'nutrition.loadFailed'))
+        })
+    load()
+    // A swap added from the add sheet, or a meal copied from the library.
+    window.addEventListener(MEALS_EVENT, load)
+    return () => window.removeEventListener(MEALS_EVENT, load)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid])
 
@@ -478,16 +511,29 @@ export function MyMealsView({ uid, date, meal, setMeal, onBack, onClose, onLog }
         <MealTabs value={meal} onChange={setMeal} />
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] pt-3 flex flex-col gap-3">
+        {coach && (
+          <div className="card p-4 flex flex-col gap-3">
+            <p className="text-chalkdim text-sm">{t('nutrition.coachOptionsHint')}</p>
+            {onLibrary && (
+              <Button variant="subtle" className="min-h-[48px]" onClick={onLibrary}>
+                <Library size={18} /> {t('nutrition.coachLibraryOpen')}
+              </Button>
+            )}
+          </div>
+        )}
         {error && <p className="text-sm" role="alert">{error}</p>}
         {meals && meals.length === 0 && !error && <p className="text-chalkdim text-sm">{t('nutrition.noSavedMeals')}</p>}
         {(meals || []).map((m) => {
           const items = Array.isArray(m.items) ? m.items : []
+          const byCoach = isCoachMeal(m)
+          // A trainee can use a coach option but only the coach changes it.
+          const canEdit = !byCoach || coach
           const factor = factors[m.id] ?? 1
           const scaled = scaleItems(items, factor)
           const tot = sumLogs(scaled)
           const editing = renaming?.id === m.id
           return (
-            <section key={m.id} className="card overflow-hidden">
+            <section key={m.id} className="card overflow-hidden shrink-0">
               <div className="p-4 pb-2">
                 {editing ? (
                   <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); rename(m) }}>
@@ -508,23 +554,32 @@ export function MyMealsView({ uid, date, meal, setMeal, onBack, onClose, onLog }
                   </form>
                 ) : (
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-xl leading-tight min-w-0"><bdi>{m.name}</bdi></h3>
-                    <button
+                    <div className="min-w-0">
+                      {byCoach && (
+                        <div className="eyebrow mb-0.5">
+                          {t('nutrition.fromCoach')}
+                          {m.meal ? ` · ${mealLabel(t, m.meal)}` : ''}
+                        </div>
+                      )}
+                      <h3 className="text-xl leading-tight min-w-0"><bdi>{m.name}</bdi></h3>
+                    </div>
+                    {canEdit && <button
                       type="button"
                       onClick={() => setRenaming({ id: m.id, name: m.name })}
                       className="min-h-[44px] min-w-[44px] -me-2 flex items-center justify-center text-chalkdim hover:text-chalk press shrink-0"
                       aria-label={t('nutrition.renameMeal')}
                     >
                       <Pencil size={16} />
-                    </button>
+                    </button>}
                   </div>
                 )}
                 <p className="text-chalkdim text-xs mt-0.5">{items.length === 1 ? t('nutrition.itemsOne') : t('nutrition.itemsMany', { n: items.length })}</p>
               </div>
               <ul className="divide-y divide-white/[0.06]">
                 {scaled.map((it, i) => (
-                  <li key={i} className="flex items-center justify-between gap-2 ps-4 pe-1 py-1">
-                    <div className="min-w-0">
+                  <li key={i} className="flex flex-col ps-4 pe-1 py-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
                       <Name className="text-sm">{it.name}</Name>
                       {it.grams != null && <p className="text-chalkdim text-xs"><AmountText row={it} /></p>}
                     </div>
@@ -532,15 +587,57 @@ export function MyMealsView({ uid, date, meal, setMeal, onBack, onClose, onLog }
                       <div className="text-sm"><N mono>{fmt(it.protein, 1)}</N> <span className="text-chalkdim text-xs">{g}</span></div>
                       <div className="text-chalkdim text-xs"><N mono>{fmt(it.kcal, 0)}</N> {t('nutrition.kcalUnit')}</div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => removeItem(m, items, i)}
-                      disabled={busy}
-                      className="min-h-[44px] min-w-[44px] flex items-center justify-center text-chalkdim hover:text-chalk press shrink-0 disabled:opacity-40"
-                      aria-label={t('nutrition.removeItem', { name: it.name })}
-                    >
-                      <X size={16} />
-                    </button>
+                    {canEdit ? (
+                      <button
+                        type="button"
+                        onClick={() => removeItem(m, items, i)}
+                        disabled={busy}
+                        className="min-h-[44px] min-w-[44px] flex items-center justify-center text-chalkdim hover:text-chalk press shrink-0 disabled:opacity-40"
+                        aria-label={t('nutrition.removeItem', { name: it.name })}
+                      >
+                        <X size={16} />
+                      </button>
+                    ) : (
+                      <span className="w-3 shrink-0" aria-hidden="true" />
+                    )}
+                  </div>
+                  {/* Swaps the coach gave for this food (not scaled: the
+                      trainee sees them at the planned amount). */}
+                  {byCoach && (items[i].alts?.length > 0 || coach) && (
+                    <ul className="flex flex-col pb-1">
+                      {(items[i].alts || []).map((alt, k) => (
+                        <li key={k} className="flex items-center gap-2 text-chalkdim text-xs min-h-[36px]">
+                          <Repeat size={13} className="shrink-0" aria-hidden="true" />
+                          <span dir="auto" className="flex-1 min-w-0 truncate text-start">
+                            {alt.name}
+                            {alt.grams != null && <> · <AmountText row={alt} /></>}
+                          </span>
+                          {coach && (
+                            <button
+                              type="button"
+                              onClick={() => patchMeal(m, { items: removeSwap(items, i, k) })}
+                              disabled={busy}
+                              className="min-h-[36px] min-w-[44px] flex items-center justify-center hover:text-chalk press shrink-0 disabled:opacity-40"
+                              aria-label={t('nutrition.removeSwap', { name: alt.name })}
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
+                        </li>
+                      ))}
+                      {coach && onAddSwap && (
+                        <li>
+                          <button
+                            type="button"
+                            onClick={() => onAddSwap(m, i)}
+                            className="min-h-[36px] inline-flex items-center gap-1.5 text-xs text-chalkdim hover:text-chalk press"
+                          >
+                            <Plus size={13} aria-hidden="true" /> {t('nutrition.addSwap')}
+                          </button>
+                        </li>
+                      )}
+                    </ul>
+                  )}
                   </li>
                 ))}
               </ul>
@@ -572,12 +669,14 @@ export function MyMealsView({ uid, date, meal, setMeal, onBack, onClose, onLog }
                 ))}
               </div>
               <div className="p-3 flex gap-2">
-                <Button variant="ghost" className="flex-1 min-h-[48px]" disabled={!items.length} onClick={() => onLog(cloneLogs(scaled, { uid, date, meal }), t('nutrition.loggedToMeal', { meal: mealLabel(t, meal) }))}>
+                <Button variant="ghost" className="flex-1 min-h-[48px]" disabled={!items.length} onClick={() => onLog(cloneLogs(scaled.map((it) => ({ ...it, saved_meal_id: m.id })), { uid, date, meal }), t('nutrition.loggedToMeal', { meal: mealLabel(t, meal) }))}>
                   <Plus size={18} /> {t('nutrition.logToMeal', { meal: mealLabel(t, meal) })}
                 </Button>
-                <Button variant="danger" className="px-3.5 min-h-[48px]" onClick={() => remove(m)} aria-label={t('nutrition.delete')}>
-                  <Trash2 size={18} />
-                </Button>
+                {canEdit && (
+                  <Button variant="danger" className="px-3.5 min-h-[48px]" onClick={() => remove(m)} aria-label={t('nutrition.delete')}>
+                    <Trash2 size={18} />
+                  </Button>
+                )}
               </div>
             </section>
           )

@@ -13,6 +13,7 @@ import Tour, { useFirstTour } from './Tour.jsx'
 import { InfoTip } from './InfoTip.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
 import { itemTarget } from './RoutineView.jsx'
+import { RoutineListSkeleton } from './Skeletons.jsx'
 
 export default function RoutineList() {
   const { effectiveUid, isAdmin } = useAdmin()
@@ -75,6 +76,8 @@ export default function RoutineList() {
       </div>
 
       <Tabs tab={tab} setTab={setTab} />
+
+      {loading && routines.length === 0 && <RoutineListSkeleton />}
 
       {!loading && loadFailed && <LoadError onRetry={refresh} />}
 

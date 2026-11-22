@@ -24,13 +24,21 @@ export function useCollection(uid, table, orderField = 'created_at', direction =
   // Which query `data` belongs to, so a failed refresh keeps the rows already
   // loaded for it but never shows another account's rows after a switch.
   const loadedKey = useRef('')
+  // Which query the rows on screen belong to (cached callers only).
+  const shownKey = useRef(cacheKey)
 
   useEffect(() => {
     if (!uid) return
     let cancelled = false
     const key = `${uid}|${table}|${orderField}|${direction}`
     setLoading(true)
-    if (cached && loadedKey.current !== key && collectionCache.has(key)) setData(collectionCache.get(key))
+    // A cached caller shows its rows while it re-checks, so on a switch to
+    // another account the old account's rows must go at once: the new
+    // account's cached rows take their place, or nothing.
+    if (cached && shownKey.current !== key) {
+      shownKey.current = key
+      setData(collectionCache.get(key) || [])
+    }
 
     supabase
       .from(table)
@@ -294,16 +302,22 @@ export async function copyRoutineToUser(targetUid, routine) {
     }
     mapped.push({ ...it, exerciseId: match.id, name: match.name })
   }
-  await addRoutine(targetUid, { name: routine.name, category: routine.category, exercises: mapped })
+  return addRoutine(targetUid, { name: routine.name, category: routine.category, exercises: mapped })
 }
+// Returns the new routine's id.
 export async function addRoutine(uid, routine) {
-  const { error } = await supabase.from('routines').insert({
-    user_id: uid,
-    name: routine.name,
-    category: routine.category || 'strength',
-    exercises: routine.exercises || [],
-  })
+  const { data, error } = await supabase
+    .from('routines')
+    .insert({
+      user_id: uid,
+      name: routine.name,
+      category: routine.category || 'strength',
+      exercises: routine.exercises || [],
+    })
+    .select('id')
+    .single()
   if (error) throw error
+  return data?.id
 }
 
 export async function updateRoutine(uid, id, patch) {
