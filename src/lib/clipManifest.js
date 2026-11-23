@@ -19,6 +19,7 @@ export const CLIPS = {
   'cable-lateral-raise': { v: 'f7f395cc', t: '9af3a67d' },
   'cable-overhead-triceps-extension': { v: 'ad4204c9', t: '9dec5bb8' },
   'captains-chair-leg-raise': { v: '07d40331', t: '2741f050' },
+  'cat-cow': { v: 'd8895ab5' },
   'chest-press-machine': { v: '6484205d', t: '2be306ea' },
   'chest-supported-row': { v: '62311526', t: '1cc8f2cb' },
   'close-grip-lat-pulldown': { v: 'f3194d1d', t: '8ca48fe0' },
