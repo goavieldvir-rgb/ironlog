@@ -74,13 +74,20 @@ const CLIP_BY_KEY = {
   wide_grip_lat_pulldown: 'wide-grip-lat-pulldown',
 }
 
+// Library names (normalized) whose clip slug is written differently and
+// that have no key in demoVideos.js.
+const CLIP_BY_NAME = {
+  'barbell hip thrust': 'hip-thrust',
+}
+
 const BASE = `${import.meta.env.BASE_URL || './'}clips/`
 
 function clipSlugFor(name) {
   const key = exerciseKeyFor(name)
   if (key && CLIP_BY_KEY[key] && CLIPS[CLIP_BY_KEY[key]]) return CLIP_BY_KEY[key]
   // A library name written exactly like the clip ("Treadmill running").
-  const slug = normalizeExerciseName(name).replace(/ /g, '-')
+  const norm = normalizeExerciseName(name)
+  const slug = CLIP_BY_NAME[norm] || norm.replace(/ /g, '-')
   return CLIPS[slug] ? slug : null
 }
 

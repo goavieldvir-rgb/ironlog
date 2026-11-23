@@ -2,7 +2,8 @@
 #   <slug> [--frame N] [--crop CX,CY,SIDE]
 # Crops are in the clip's 720 px frame. Used for tall cable machines, where
 # the automatic crop keeps the whole stack and the figure ends up tiny.
-cable-biceps-curl --crop 450,380,500
+# Nov 18 re-render: side-on camera, taller figure in frame.
+cable-biceps-curl --crop 420,372,670
 # Cable crunch re-render (Nov 10): whole tower in view, figure to the right.
 cable-crunch --crop 470,445,490
 close-grip-lat-pulldown --crop 400,440,500
@@ -20,3 +21,5 @@ pec-deck-fly-machine --frame 16
 concentration-curl --crop 250,350,530
 # Lat pulldown re-render (Nov 8, rear three-quarter camera), same crop as PR #83.
 lat-pulldown --crop 370,440,470
+# Nov 22 re-render: rear camera like the lat pulldown, whole tower in view.
+wide-grip-lat-pulldown --crop 390,400,500

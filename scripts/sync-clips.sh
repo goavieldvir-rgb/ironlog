@@ -5,7 +5,7 @@
 # changed and keep the rest cached.
 #
 #   scripts/sync-clips.sh [ANIMATIONS_OUT_DIR]
-#   ONLY=slug,slug scripts/sync-clips.sh   just these clips, the rest untouched
+#   ONLY=slug,slug scripts/sync-clips.sh   just these clips (new ones are added), the rest untouched
 #   ONLY=slug TIPS=1 scripts/sync-clips.sh also their technique-tips clips
 #
 # Use ONLY when a single clip was re-rendered and approved: the render output
@@ -61,8 +61,12 @@ if [ -n "${ONLY:-}" ]; then
   # Swap just these slugs' lines in the existing manifest.
   for e in "${entries[@]}"; do
     slug="$(echo "$e" | sed -E "s/^  '([^']+)'.*/\1/")"
-    grep -q "^  '$slug':" "$MANIFEST" || { echo "$slug is not in the manifest; run a full sync" >&2; exit 1; }
-    E="$e" S="$slug" python3 -I -c 'import os,re,sys; p=sys.argv[1]; t=open(p).read(); t=re.sub(r"^  \x27"+re.escape(os.environ["S"])+r"\x27:.*$", lambda m: os.environ["E"], t, flags=re.M); open(p,"w").write(t)' "$MANIFEST"
+    # A slug the manifest doesn't have yet (a new clip) is added in order.
+    E="$e" S="$slug" python3 -I -c 'import os,re,sys; p=sys.argv[1]; t=open(p).read(); e=os.environ["E"]; s=os.environ["S"]; pat=re.compile(r"^  \x27"+re.escape(s)+r"\x27:.*$", re.M)
+if pat.search(t): t=pat.sub(lambda m: e, t)
+else:
+    head,body=t.split("export const CLIPS = {\n"); rows=body.rsplit("}",1)[0].splitlines()+[e]; t=head+"export const CLIPS = {\n"+"\n".join(sorted(rows))+"\n}\n"
+open(p,"w").write(t)' "$MANIFEST"
   done
   echo "Synced ${#entries[@]} clip(s): $ONLY"
   exit 0
