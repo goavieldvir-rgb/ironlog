@@ -26,7 +26,7 @@ export const CLIPS = {
   'concentration-curl': { v: '9b16db10', t: '22afafe9' },
   'conventional-deadlift': { v: 'aa0fad66' },
   'dumbbell-biceps-curl': { v: '02982f36', t: '489adc84' },
-  'dumbbell-lateral-raise': { v: '53037203', t: '1e3f2bea' },
+  'dumbbell-lateral-raise': { v: '25599b5f', t: '1e3f2bea' },
   'dumbbell-overhead-triceps-extension': { v: 'e8115ca8', t: 'c2cbbe5b' },
   'dumbbell-shrug': { v: 'bc7c3f62' },
   'elliptical-trainer': { v: 'c277b0a3', t: '422f379c' },
