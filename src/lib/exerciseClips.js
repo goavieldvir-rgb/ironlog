@@ -131,3 +131,34 @@ export function exerciseClipFor(chosen, names) {
   if (chosen === NO_CLIP) return null
   return (chosen && clipBySlug(chosen)) || autoClipFor(names)
 }
+
+const STOP = new Set(['the', 'a', 'an', 'with', 'on', 'of', 'and', 'machine'])
+const wordsOf = (s) =>
+  String(s || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(' ')
+    .filter((w) => w.length > 1 && !STOP.has(w))
+    .map((w) => (w.length > 3 ? w.replace(/(es|s)$/, '').replace(/e$/, '') : w))
+
+// Clips that look like a match for a typed exercise name, best first: the
+// exact automatic match, then clips sharing words with the name.
+//   [{ slug, video, still, tips }]
+export function suggestClips(name, limit = 4) {
+  const out = []
+  const auto = autoClipFor(name)
+  if (auto) out.push(auto)
+  const words = wordsOf(name)
+  if (words.length) {
+    const scored = []
+    for (const slug of CLIP_SLUGS) {
+      if (auto && slug === auto.slug) continue
+      const sw = wordsOf(slug)
+      const hit = words.filter((w) => sw.includes(w)).length
+      if (hit) scored.push({ slug, score: hit / Math.sqrt(sw.length * words.length) })
+    }
+    scored.sort((a, b) => b.score - a.score || a.slug.length - b.slug.length)
+    for (const { slug } of scored) out.push(clipBySlug(slug))
+  }
+  return out.slice(0, limit)
+}

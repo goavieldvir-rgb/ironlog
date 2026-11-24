@@ -6,7 +6,7 @@ import { useFeedback } from '../context/FeedbackContext.jsx'
 import { normalizeVideoUrl } from '../lib/url.js'
 import ExerciseVideo from './ExerciseVideo.jsx'
 import ExerciseThumb from './ExerciseThumb.jsx'
-import { ClipField } from './ClipPicker.jsx'
+import { ClipField, ClipChooser } from './ClipPicker.jsx'
 import { useCollection, addExercise, updateExercise, deleteExercise } from '../lib/db.js'
 import { Button, Card, CategoryTag, Badge, EmptyState, LoadError, Field } from './ui.jsx'
 import ExercisePicker from './ExercisePicker.jsx'
@@ -318,6 +318,7 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
   const { confirm, toast } = useFeedback()
   const [form, setForm] = useState({ ...emptyExerciseForm, ...initial })
   const [saving, setSaving] = useState(false)
+  const [clipError, setClipError] = useState(false)
   // A stray backdrop tap must not throw away typed input.
   const dirty = JSON.stringify({ ...emptyExerciseForm, ...initial }) !== JSON.stringify(form)
 
@@ -325,6 +326,12 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
     e.preventDefault()
     const cleanName = form.name.trim().replace(/\s+/g, ' ')
     if (!cleanName) return
+    // A trainee's own new exercise must have its clip chosen (or "No clip").
+    if (!initial.id && !form.clip) {
+      setClipError(true)
+      document.getElementById('clip-field')?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      return
+    }
 
     // Two exercises with the same name quietly split your history in two
     // (half your bench sessions under one, half under the other), so warn
@@ -523,15 +530,25 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
 
           {/* Not a <Field>: that is a <label>, and a tap anywhere on a label
               is passed to its first button, which here plays the clip. */}
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5" id="clip-field">
             <span className="eyebrow">{t('clips.field')}</span>
-            <ClipField
-              value={form.clip || ''}
-              onChange={(clip) => setForm({ ...form, clip })}
-              names={[form.name]}
-              label={(lang === 'he' && form.nameHe) || form.name}
-            />
-            <p className="text-chalkdim text-xs mt-1">{t('clips.fieldHint')}</p>
+            {initial.id ? (
+              <ClipField
+                value={form.clip || ''}
+                onChange={(clip) => setForm({ ...form, clip })}
+                names={[form.name]}
+                label={(lang === 'he' && form.nameHe) || form.name}
+              />
+            ) : (
+              <ClipChooser
+                value={form.clip || ''}
+                onChange={(clip) => setForm({ ...form, clip })}
+                name={form.name}
+                label={(lang === 'he' && form.nameHe) || form.name}
+                error={clipError}
+              />
+            )}
+            <p className="text-chalkdim text-xs mt-1">{initial.id ? t('clips.fieldHint') : t('clips.fieldHintNew')}</p>
           </div>
 
           <Field label={t('exercises.videoLink')}>

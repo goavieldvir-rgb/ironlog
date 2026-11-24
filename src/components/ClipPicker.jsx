@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Search, X, Ban, Sparkles } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
-import { CLIP_SLUGS, NO_CLIP, autoClipFor, clipLabel, exerciseClipFor } from '../lib/exerciseClips.js'
+import { CLIP_SLUGS, NO_CLIP, autoClipFor, clipLabel, exerciseClipFor, suggestClips } from '../lib/exerciseClips.js'
 import ExerciseThumb from './ExerciseThumb.jsx'
 
 // "Demo clip" in the exercise editor: shows the clip this exercise will get
@@ -48,7 +48,7 @@ export function ClipField({ value, onChange, names, label }) {
   )
 }
 
-function ClipPickerModal({ value, auto, onPick, onClose }) {
+function ClipPickerModal({ value, auto, onPick, onClose, required = false }) {
   const { t } = useLanguage()
   useScrollLock(true)
   const [q, setQ] = useState('')
@@ -95,10 +95,12 @@ function ClipPickerModal({ value, auto, onPick, onClose }) {
         </div>
 
         <div className="flex gap-2 flex-wrap">
-          <button type="button" className={option(!value)} onClick={() => onPick('')}>
-            <Sparkles size={15} aria-hidden="true" />
-            {auto ? t('clips.autoFound', { name: clipLabel(auto.slug) }) : t('clips.auto')}
-          </button>
+          {!required && (
+            <button type="button" className={option(!value)} onClick={() => onPick('')}>
+              <Sparkles size={15} aria-hidden="true" />
+              {auto ? t('clips.autoFound', { name: clipLabel(auto.slug) }) : t('clips.auto')}
+            </button>
+          )}
           <button type="button" className={option(value === NO_CLIP)} onClick={() => onPick(NO_CLIP)}>
             <Ban size={15} aria-hidden="true" />
             {t('clips.none')}
@@ -154,5 +156,80 @@ function ClipPickerModal({ value, auto, onPick, onClose }) {
       </div>
     </div>,
     document.body,
+  )
+}
+
+// "Demo clip" when a trainee creates their own exercise: they must choose.
+// Clips that look like the name they typed come first, then "browse all",
+// and "No clip" for exercises we have no clip for.
+//   value  '' (not chosen yet), a clip slug, or NO_CLIP
+export function ClipChooser({ value, onChange, name, label, error }) {
+  const { t } = useLanguage()
+  const [open, setOpen] = useState(false)
+  const typed = String(name || '').trim()
+  const suggestions = useMemo(() => suggestClips(typed, 4), [typed])
+  const chosen = value && value !== NO_CLIP ? exerciseClipFor(value, []) : null
+
+  const chip = (selected) =>
+    `flex items-center gap-2 min-h-[44px] px-3 rounded-full text-sm ${selected ? 'bg-chalk text-ink' : 'bg-surface2 text-chalk hover:bg-line'}`
+
+  return (
+    <div className="flex flex-col gap-2.5" data-testid="clip-chooser">
+      {chosen && (
+        <div className="flex items-center gap-3">
+          <ExerciseThumb size={52} chosen={value} names={[]} label={label || clipLabel(chosen.slug)} />
+          <span className="min-w-0 text-sm"><bdi>{clipLabel(chosen.slug)}</bdi></span>
+        </div>
+      )}
+      {!typed && !value && <p className="text-chalkdim text-sm">{t('clips.typeNameFirst')}</p>}
+      {typed && suggestions.length > 0 && (
+        <>
+          <p className="text-chalkdim text-xs">{t('clips.suggested')}</p>
+          <div className="grid grid-cols-4 gap-2">
+            {suggestions.map((c) => {
+              const on = value === c.slug
+              return (
+                <button
+                  key={c.slug}
+                  type="button"
+                  onClick={() => onChange(c.slug)}
+                  aria-pressed={on}
+                  className={`press flex flex-col gap-1 p-1 rounded-[12px] text-start ${on ? 'bg-accentsoft ring-2 ring-accent' : 'hover:bg-surface2'}`}
+                >
+                  <span className="block w-full aspect-square rounded-[9px] overflow-hidden bg-white">
+                    <img src={c.still} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                  </span>
+                  <span className="text-[11px] leading-[14px] text-chalk line-clamp-2"><bdi>{clipLabel(c.slug)}</bdi></span>
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+      {typed && suggestions.length === 0 && <p className="text-chalkdim text-sm">{t('clips.noSuggestion')}</p>}
+      <div className="flex gap-2 flex-wrap">
+        <button type="button" className={chip(false)} onClick={() => setOpen(true)}>
+          <Search size={15} aria-hidden="true" />
+          {t('clips.browseAll')}
+        </button>
+        <button type="button" className={chip(value === NO_CLIP)} onClick={() => onChange(NO_CLIP)} aria-pressed={value === NO_CLIP}>
+          <Ban size={15} aria-hidden="true" />
+          {t('clips.none')}
+        </button>
+      </div>
+      {error && !value && <p className="text-sm text-iron" role="alert">{t('clips.mustChoose')}</p>}
+      {open && (
+        <ClipPickerModal
+          value={value}
+          auto={null}
+          required
+          onClose={() => setOpen(false)}
+          onPick={(v) => {
+            onChange(v)
+            setOpen(false)
+          }}
+        />
+      )}
+    </div>
   )
 }
