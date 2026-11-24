@@ -155,10 +155,64 @@ export function suggestClips(name, limit = 4) {
       if (auto && slug === auto.slug) continue
       const sw = wordsOf(slug)
       const hit = words.filter((w) => sw.includes(w)).length
-      if (hit) scored.push({ slug, score: hit / Math.sqrt(sw.length * words.length) })
+      const score = hit / Math.sqrt(sw.length * words.length)
+      // A lone shared word ("press") is too weak, unless it is all they typed.
+      if (hit && (score >= 0.6 || words.length === 1)) scored.push({ slug, score })
     }
     scored.sort((a, b) => b.score - a.score || a.slug.length - b.slug.length)
     for (const { slug } of scored) out.push(clipBySlug(slug))
+  }
+  return out.slice(0, limit)
+}
+
+// Hebrew words for matching against the library's Hebrew names (name_he).
+const HE_STOP = new Set(['עם', 'על', 'של', 'את', 'או', 'ו'])
+const HE_FINAL = { ך: 'כ', ם: 'מ', ן: 'נ', ף: 'פ', ץ: 'צ' }
+const heWordsOf = (s) =>
+  String(s || '')
+    .replace(/[\u0591-\u05C7]/g, '')
+    .toLowerCase()
+    .replace(/[^\u05D0-\u05EAa-z0-9]+/g, ' ')
+    .split(' ')
+    .filter((w) => w.length > 1 && !HE_STOP.has(w))
+    .map((w) => {
+      let x = w.replace(/[ךםןףץ]/g, (c) => HE_FINAL[c])
+      if (x.length > 4) x = x.replace(/(ימ|ות)$/, '')
+      if (x.length > 3 && x.endsWith('ת')) x = x.slice(0, -1)
+      if (x.length > 4 && x[0] === 'ה') x = x.slice(1)
+      return x
+    })
+
+// Suggestions for a new exercise typed in English and/or Hebrew. `names` are
+// the typed names; `catalogue` is the shared library (name + name_he). A
+// Hebrew name is matched to library rows by its Hebrew words, and the
+// matching rows' English names are then used to find clips.
+export function suggestClipsFor(names, catalogue = [], limit = 4) {
+  const typed = [].concat(names).map((n) => String(n || '').trim()).filter(Boolean)
+  const queries = []
+  const heTyped = typed.flatMap(heWordsOf).filter((w) => /[\u05D0-\u05EA]/.test(w))
+  if (heTyped.length) {
+    const scored = []
+    for (const g of catalogue) {
+      const gw = heWordsOf(g.name_he)
+      if (!gw.length) continue
+      const hit = heTyped.filter((w) => gw.includes(w)).length
+      const score = hit / Math.sqrt(gw.length * heTyped.length)
+      if (hit && score >= 0.5) scored.push({ name: g.name, score })
+    }
+    scored.sort((a, b) => b.score - a.score)
+    queries.push(...scored.slice(0, 3).map((x) => x.name))
+  }
+  queries.push(...typed)
+  const out = []
+  const seen = new Set()
+  for (const q of queries) {
+    for (const c of suggestClips(q, limit)) {
+      if (!seen.has(c.slug)) {
+        seen.add(c.slug)
+        out.push(c)
+      }
+    }
   }
   return out.slice(0, limit)
 }

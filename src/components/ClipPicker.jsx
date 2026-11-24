@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Search, X, Ban, Sparkles } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { useScrollLock } from '../lib/scrollLock.js'
-import { CLIP_SLUGS, NO_CLIP, autoClipFor, clipLabel, exerciseClipFor, suggestClips } from '../lib/exerciseClips.js'
+import { CLIP_SLUGS, NO_CLIP, autoClipFor, clipLabel, exerciseClipFor, suggestClipsFor } from '../lib/exerciseClips.js'
+import { useGlobalExercises } from '../lib/db.js'
 import ExerciseThumb from './ExerciseThumb.jsx'
 
 // "Demo clip" in the exercise editor: shows the clip this exercise will get
@@ -163,11 +164,12 @@ function ClipPickerModal({ value, auto, onPick, onClose, required = false }) {
 // Clips that look like the name they typed come first, then "browse all",
 // and "No clip" for exercises we have no clip for.
 //   value  '' (not chosen yet), a clip slug, or NO_CLIP
-export function ClipChooser({ value, onChange, name, label, error }) {
+export function ClipChooser({ value, onChange, name, nameHe, label, error }) {
   const { t } = useLanguage()
   const [open, setOpen] = useState(false)
-  const typed = String(name || '').trim()
-  const suggestions = useMemo(() => suggestClips(typed, 4), [typed])
+  const [catalogue] = useGlobalExercises()
+  const typed = [name, nameHe].map((n) => String(n || '').trim()).filter(Boolean).join(' ')
+  const suggestions = useMemo(() => suggestClipsFor([name, nameHe], catalogue || [], 4), [name, nameHe, catalogue])
   const chosen = value && value !== NO_CLIP ? exerciseClipFor(value, []) : null
 
   const chip = (selected) =>

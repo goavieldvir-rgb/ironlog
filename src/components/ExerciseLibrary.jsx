@@ -544,6 +544,7 @@ export function ExerciseModal({ initial, onClose, onSave, hasHistory = false, on
                 value={form.clip || ''}
                 onChange={(clip) => setForm({ ...form, clip })}
                 name={form.name}
+                nameHe={form.nameHe}
                 label={(lang === 'he' && form.nameHe) || form.name}
                 error={clipError}
               />
