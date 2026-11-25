@@ -4,8 +4,8 @@
 # the automatic crop keeps the whole stack and the figure ends up tiny.
 # Nov 18 re-render: side-on camera, taller figure in frame.
 cable-biceps-curl --crop 420,372,670
-# Cable crunch re-render (Nov 10): whole tower in view, figure to the right.
-cable-crunch --crop 470,445,490
+# Cable crunch re-render (Nov 25): closer camera, figure kneels further from the tower.
+cable-crunch --crop 470,460,500
 close-grip-lat-pulldown --crop 400,440,500
 single-arm-lat-pulldown --crop 380,430,520
 # The re-render (Nov 4) has a new, closer camera, so no crop is needed;
