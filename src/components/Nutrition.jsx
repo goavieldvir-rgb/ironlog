@@ -558,7 +558,10 @@ function Diary() {
           {(coachMeals.length > 0 || coachMode) && (
             <button type="button" onClick={() => push({ type: 'plan' })} className="card w-full flex items-center gap-3 px-4 min-h-[52px] -mt-2 text-start hover:bg-surface2 press-row">
               <ClipboardList size={18} className="text-chalkdim shrink-0" aria-hidden="true" />
-              <span className="flex-1 min-w-0 truncate text-sm">{t('nutrition.planTitle')} · <span className="text-chalkdim">{t('nutrition.planCardBody')}</span></span>
+              <span className="flex-1 min-w-0 py-2">
+                <span className="block text-sm">{t('nutrition.planTitle')}</span>
+                <span className="block text-chalkdim text-xs">{t('nutrition.planCardBody')}</span>
+              </span>
               <Forward size={18} className="text-chalkdim shrink-0" aria-hidden="true" />
             </button>
           )}
