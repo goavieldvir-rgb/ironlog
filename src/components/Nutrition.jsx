@@ -112,6 +112,7 @@ function Diary() {
   useEffect(() => {
     if (!uid) return
     let off = false
+    setCoachMeals([])
     const load = () =>
       getCoachMeals(uid)
         .then((list) => !off && setCoachMeals(list))

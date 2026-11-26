@@ -37,8 +37,11 @@ export function MealPlanView({ coachMeals, targets, coach, onImport, onManage, o
   const { t, lang } = useLanguage()
   const g = t('nutrition.g')
   const k = t('nutrition.kcalUnit')
-  const slots = ALL_MEALS.filter((m) => coachMeals.some((o) => o.meal === m))
-  const day = dayTotals(coachMeals, sumLogs)
+  // Options in the order the coach gave them (oldest first); the day total
+  // uses the first one of each slot.
+  const ordered = [...coachMeals].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+  const slots = ALL_MEALS.filter((m) => ordered.some((o) => o.meal === m))
+  const day = dayTotals(ordered, sumLogs)
   const tgt = (v) => (v != null ? <> {t('nutrition.of')} <N mono>{fmt(v, 0)}</N></> : null)
   return (
     <>
@@ -49,21 +52,23 @@ export function MealPlanView({ coachMeals, targets, coach, onImport, onManage, o
           <section className="bg-surface2 rounded-[18px] px-4 py-3 flex flex-col gap-1" aria-label={t('nutrition.planDay')}>
             <div className="eyebrow">{t('nutrition.planDay')}</div>
             <Macros tot={day} g={g} k={k} t={t} />
-            {targets && (
+            {(targets?.kcal != null || targets?.protein != null) && (
               <span className="text-chalkdim text-xs">
-                {t('nutrition.planTarget')}: <N mono>{fmt(targets.kcal, 0)}</N> {k}
-                {targets.protein != null && <> · <N mono>{fmt(targets.protein, 0)}</N> {g} {t('nutrition.proteinWord')}</>}
+                {t('nutrition.planTarget')}:{' '}
+                {targets.kcal != null && <><N mono>{fmt(targets.kcal, 0)}</N> {k}</>}
+                {targets.kcal != null && targets.protein != null && ' · '}
+                {targets.protein != null && <><N mono>{fmt(targets.protein, 0)}</N> {g} {t('nutrition.proteinWord')}</>}
               </span>
             )}
           </section>
         )}
         {slots.map((m) => {
-          const opts = coachMeals.filter((o) => o.meal === m)
+          const opts = ordered.filter((o) => o.meal === m)
           return (
             <section key={m} className="flex flex-col gap-2" aria-label={mealLabel(t, m)}>
               <h3 className="text-[15px] font-semibold">{mealLabel(t, m)}</h3>
               {opts.map((o, n) => {
-                const items = Array.isArray(o.items) ? o.items : []
+                const items = (Array.isArray(o.items) ? o.items : []).filter(Boolean)
                 return (
                   <div key={o.id} className="bg-surface rounded-[18px] px-4 py-3 flex flex-col gap-1.5 border border-white/[0.06]">
                     <div className="flex items-baseline justify-between gap-3">
@@ -81,7 +86,7 @@ export function MealPlanView({ coachMeals, targets, coach, onImport, onManage, o
                             {logName(it, lang)}
                             {it.grams != null && <span className="text-chalkdim"> · <AmountText row={it} /></span>}
                           </span>
-                          {(it.alts || []).map((a, j) => (
+                          {(Array.isArray(it.alts) ? it.alts : []).filter(Boolean).map((a, j) => (
                             <span key={j} dir="auto" className="block text-start text-chalkdim">
                               {t('nutrition.planOr')} {logName(a, lang)}
                               {a.grams != null && <> · <AmountText row={a} /></>}
@@ -131,20 +136,29 @@ function amountFor(food, p) {
   if (p.unit === 'g' && p.qty) return { grams: round1(p.qty), unit: null, check: false }
   const units = (Array.isArray(food.units) ? food.units : []).filter((u) => Number(u?.g) > 0)
   const q = p.qty || 1
-  const hit = p.unit && UNIT_MATCH[p.unit] ? units.find((u) => UNIT_MATCH[p.unit].test(`${u.en || ''} ${u.he || ''}`)) : null
-  const u = hit || (units.length ? units[0] : null)
+  const matches = p.unit && UNIT_MATCH[p.unit] ? units.filter((x) => UNIT_MATCH[p.unit].test(`${x.en || ''} ${x.he || ''}`)) : []
+  const hit = matches.find((x) => /medium|בינונ/i.test(`${x.en} ${x.he}`)) || matches[0] || null
+  // Real foods list "small / medium / large unit": a count means the
+  // ordinary one, not the first (smallest).
+  const usual = ['^unit$', '^medium unit$', '^medium serving$', '^serving$', '^medium', 'unit|serving'].reduce(
+    (found, re) => found || units.find((x) => new RegExp(re, 'i').test(x.en || '')),
+    null,
+  )
+  const u = hit || usual || (units.length ? units[0] : null)
   if (!u) return { grams: round1(q * 100), unit: null, check: true }
   return { grams: round1(q * u.g), unit: { u, qty: q }, check: !p.qty || (!!p.unit && !hit) }
 }
 
 async function resolveChoice(c, uid) {
   let food = null
+  let failed = false
   try {
     food = (await searchFoods(c.query, { uid }))[0] || null
   } catch (err) {
     console.error(err)
+    failed = true
   }
-  return { ...c, pQty: c.qty, pUnit: c.unit, key: Math.random().toString(36).slice(2), food, ...amountFor(food, { qty: c.qty, unit: c.unit }) }
+  return { ...c, searchFailed: failed, pQty: c.qty, pUnit: c.unit, key: Math.random().toString(36).slice(2), food, ...amountFor(food, { qty: c.qty, unit: c.unit }) }
 }
 
 // One parsed choice as a saved-meal item.
@@ -257,9 +271,15 @@ export function ImportPlanView({ uid, authUid, existing, onBack, onClose, onSave
   const [meals, setMeals] = useState(null) // null = still pasting
   const [busy, setBusy] = useState(false)
   const [empty, setEmpty] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const parsedText = useRef('')
   useDirtyForm(text.trim() !== '' || meals !== null)
 
   async function review() {
+    if (meals && text === parsedText.current) {
+      setEditing(false)
+      return
+    }
     const parsed = parseMealPlan(text)
     if (!parsed.length) {
       setEmpty(true)
@@ -275,6 +295,9 @@ export function ImportPlanView({ uid, authUid, existing, onBack, onClose, onSave
         out.push({ key: Math.random().toString(36).slice(2), meal: m.meal, name: m.name, items })
       }
       setMeals(out)
+      parsedText.current = text
+      setEditing(false)
+      if (out.some((m) => m.items.some((it) => it.choices.some((c) => c.searchFailed)))) toast(t('nutrition.loadFailed'), 'error')
     } finally {
       setBusy(false)
     }
@@ -320,7 +343,7 @@ export function ImportPlanView({ uid, authUid, existing, onBack, onClose, onSave
     <>
       <SheetHeader title={t('nutrition.importTitle')} onBack={onBack} onClose={onClose} />
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] pt-3 flex flex-col gap-3">
-        {meals === null ? (
+        {meals === null || editing ? (
           <>
             <p className="text-chalkdim text-sm">{t('nutrition.importHint')}</p>
             {existing > 0 && <p className="text-chalkdim text-xs">{t('nutrition.importExisting', { n: existing })}</p>}
@@ -349,8 +372,8 @@ export function ImportPlanView({ uid, authUid, existing, onBack, onClose, onSave
                     <select
                       value={m.meal}
                       aria-label={t('nutrition.importSlot')}
-                      onChange={(e) => setMeals((ms) => ms.map((x) => (x.key === m.key ? { ...x, meal: e.target.value } : x)))}
-                      className="min-h-[40px] rounded-lg bg-surface px-2 text-[14px]"
+                      onChange={(e) => setMeals((ms) => ms.map((x) => (x.key === m.key ? { ...x, meal: e.target.value, name: x.name === mealLabel(t, x.meal) ? '' : x.name } : x)))}
+                      className="min-h-[40px] max-w-[40%] truncate rounded-lg bg-surface px-2 text-[14px]"
                     >
                       {ALL_MEALS.map((k) => (
                         <option key={k} value={k}>{mealLabel(t, k)}</option>
@@ -376,7 +399,7 @@ export function ImportPlanView({ uid, authUid, existing, onBack, onClose, onSave
             })}
             {bad && <p className="text-brass text-sm" role="alert">{t('nutrition.importFix')}</p>}
             <div className="flex gap-2">
-              <Button variant="ghost" className="min-h-[44px]" onClick={() => setMeals(null)}>{t('nutrition.importEditText')}</Button>
+              <Button variant="ghost" className="min-h-[44px]" onClick={() => setEditing(true)}>{t('nutrition.importEditText')}</Button>
               <Button className="flex-1 min-h-[44px]" disabled={busy || bad || !meals.length} onClick={save}>
                 <Check size={16} /> {t('nutrition.importSave')}
               </Button>
