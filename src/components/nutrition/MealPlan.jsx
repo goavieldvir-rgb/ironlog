@@ -20,7 +20,7 @@ import {
   unitLabel,
 } from '../../lib/nutrition.js'
 import { dayTotals, parseMealPlan } from '../../lib/mealPlan.js'
-import { AmountText, N, SheetHeader, mealLabel } from './parts.jsx'
+import { AmountText, N, SheetHeader, mealLabel, useDirtyForm } from './parts.jsx'
 
 // ---------------------------------------------------------------- day view
 // The whole plan on one page: every meal slot with its options, swaps and
@@ -144,7 +144,7 @@ async function resolveChoice(c, uid) {
   } catch (err) {
     console.error(err)
   }
-  return { ...c, key: Math.random().toString(36).slice(2), food, ...amountFor(food, c) }
+  return { ...c, pQty: c.qty, pUnit: c.unit, key: Math.random().toString(36).slice(2), food, ...amountFor(food, { qty: c.qty, unit: c.unit }) }
 }
 
 // One parsed choice as a saved-meal item.
@@ -171,6 +171,7 @@ function ChoiceRow({ c, first, uid, onChange, onRemove }) {
 
   useEffect(() => {
     if (!searching || !q.trim()) {
+      seq.current++
       setResults(null)
       return undefined
     }
@@ -184,7 +185,7 @@ function ChoiceRow({ c, first, uid, onChange, onRemove }) {
   }, [q, searching, uid])
 
   const pick = (food) => {
-    onChange({ ...c, food, ...amountFor(food, { ...c, unit: c.unit?.u ? undefined : c.unit }) })
+    onChange({ ...c, food, gramsText: undefined, ...amountFor(food, { qty: c.pQty, unit: c.pUnit }) })
     setSearching(false)
     setQ('')
   }
@@ -210,10 +211,11 @@ function ChoiceRow({ c, first, uid, onChange, onRemove }) {
             dir="ltr"
             inputMode="decimal"
             aria-label={t('nutrition.importGrams', { name: c.food ? foodName(c.food, lang) : c.orig })}
-            value={c.grams ?? ''}
+            value={c.gramsText ?? c.grams ?? ''}
             onChange={(e) => {
-              const n = parseFloat(e.target.value.replace(',', '.'))
-              onChange({ ...c, grams: Number.isFinite(n) && n >= 0 ? n : null, unit: null, check: false })
+              const raw = e.target.value
+              const n = parseFloat(raw.replace(',', '.'))
+              onChange({ ...c, gramsText: raw, grams: Number.isFinite(n) && n >= 0 ? n : null, unit: null, check: false })
             }}
             className="w-16 min-h-[40px] rounded-lg bg-surface2 px-2 text-center text-chalk num"
           />
@@ -239,7 +241,7 @@ function ChoiceRow({ c, first, uid, onChange, onRemove }) {
           />
           {(results || []).map((f) => (
             <button key={f.id} type="button" onClick={() => pick(f)} className="min-h-[40px] px-2 text-start text-[14px] rounded-lg hover:bg-surface truncate" dir="auto">
-              {foodName(f, lang)} <span className="text-chalkdim text-xs"><N mono>{fmt(f.kcal, 0)}</N> {t('nutrition.kcalUnit')}/100{t('nutrition.g')}</span>
+              {foodName(f, lang)} <span className="text-chalkdim text-xs"><N mono>{fmt(f.kcal, 0)}</N> {t('nutrition.kcalUnit')}<bdi>/100{t('nutrition.g')}</bdi></span>
             </button>
           ))}
         </div>
@@ -255,6 +257,7 @@ export function ImportPlanView({ uid, authUid, existing, onBack, onClose, onSave
   const [meals, setMeals] = useState(null) // null = still pasting
   const [busy, setBusy] = useState(false)
   const [empty, setEmpty] = useState(false)
+  useDirtyForm(text.trim() !== '' || meals !== null)
 
   async function review() {
     const parsed = parseMealPlan(text)

@@ -90,7 +90,12 @@ function splitTop(line) {
   const out = []
   let depth = 0
   let cur = ''
-  for (const ch of line) {
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (ch === ',' && /\d/.test(line[i - 1] || '') && /\d/.test(line[i + 1] || '')) {
+      cur += ch
+      continue
+    }
     if (ch === '(' || ch === '[') depth++
     if (ch === ')' || ch === ']') depth = Math.max(0, depth - 1)
     if (depth === 0 && /[,;+،]/.test(ch)) {
@@ -115,7 +120,7 @@ function heading(line) {
   for (const [key, re] of SLOT_WORDS) {
     const h = text.match(re)
     if (!h) continue
-    if (!c && text.split(/\s+/).length > 3) continue
+    if (!c && h[0].trim().length !== text.length) continue
     let meal = key
     if (key === 'snack' && h[1]) meal = SNACKS[Math.min(Number(h[1]), 3) - 1] || 'snack'
     return { meal, name: text, rest }
