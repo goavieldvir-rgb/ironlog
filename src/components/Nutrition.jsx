@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { BarChart3, Bookmark, CalendarDays, Check, ChevronLeft, ChevronRight, Copy, CopyPlus, Pencil, Plus, Repeat, ScanBarcode } from 'lucide-react'
+import { BarChart3, Bookmark, CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardList, Copy, CopyPlus, Pencil, Plus, Repeat, ScanBarcode } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAdmin } from '../context/AdminContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -45,6 +45,7 @@ import Trends from './nutrition/Trends.jsx'
 import Water from './nutrition/Water.jsx'
 import { EditLog, MyMealsView, SaveMealView, TargetsView } from './nutrition/Views.jsx'
 import { CoachLibraryView, CoachMealCard, CoachMealDone } from './nutrition/CoachMeals.jsx'
+import { ImportPlanView, MealPlanView } from './nutrition/MealPlan.jsx'
 
 // Nutrition diary (beta). Scanner and sheets are overlays inside this page on
 // purpose: changing the URL hash while the camera is open makes iOS WebKit ask
@@ -554,6 +555,13 @@ function Diary() {
             <span className="flex-1 min-w-0 truncate text-sm">{t('nutrition.averagesOpen')}</span>
             <Forward size={18} className="text-chalkdim shrink-0" aria-hidden="true" />
           </button>
+          {(coachMeals.length > 0 || coachMode) && (
+            <button type="button" onClick={() => push({ type: 'plan' })} className="card w-full flex items-center gap-3 px-4 min-h-[52px] -mt-2 text-start hover:bg-surface2 press-row">
+              <ClipboardList size={18} className="text-chalkdim shrink-0" aria-hidden="true" />
+              <span className="flex-1 min-w-0 truncate text-sm">{t('nutrition.planTitle')} · <span className="text-chalkdim">{t('nutrition.planCardBody')}</span></span>
+              <Forward size={18} className="text-chalkdim shrink-0" aria-hidden="true" />
+            </button>
+          )}
           {!targets && (
             <Card className="flex flex-col gap-2">
               {isAdmin ? (
@@ -772,6 +780,21 @@ function Diary() {
                     onLibrary={coachMode ? () => push({ type: 'library' }) : undefined}
                   />
                 )
+                break
+              case 'plan':
+                body = (
+                  <MealPlanView
+                    {...common}
+                    coachMeals={coachMeals}
+                    targets={targets}
+                    coach={coachMode}
+                    onImport={() => push({ type: 'importPlan' })}
+                    onManage={() => push({ type: 'meals' })}
+                  />
+                )
+                break
+              case 'importPlan':
+                body = <ImportPlanView {...common} uid={uid} authUid={user.uid} existing={coachMeals.length} onSaved={() => setStack((s) => s.slice(0, -1))} />
                 break
               case 'library':
                 body = <CoachLibraryView {...common} uid={uid} meal={meal} setMeal={setMeal} />

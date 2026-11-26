@@ -1074,3 +1074,15 @@ export function defaultMeal(now = new Date()) {
   const pick = h < 11 ? 'breakfast' : h < 16 ? 'lunch' : h < 21 ? 'dinner' : 'snack'
   return layout.keys.includes(pick) ? pick : layout.keys[0]
 }
+
+// ---------------------------------------------------------------- meal plan import
+
+// A pasted plan saved as coach options for `uid`: meals = [{ meal, name,
+// items }] with swaps in items[i].alts. One insert, so a plan lands whole or
+// not at all.
+export async function saveCoachPlan(uid, meals) {
+  const rows = meals.map((m) => ({ user_id: uid, name: m.name, items: m.items, by_coach: true, meal: m.meal }))
+  const saved = check(await supabase.from('saved_meals').insert(rows).select())
+  mealsChanged()
+  return saved
+}
